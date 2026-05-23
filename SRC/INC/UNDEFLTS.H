@@ -12,63 +12,54 @@
 #define _INC_UNDEFLTS
 
 /*-----------------------------------------------------------------------------
-	Global Unreal defaults
+	Global Unreal defaults.
 -----------------------------------------------------------------------------*/
 
 class UNREAL_API FGlobalDefaults
-	{
-	public:
-	//
-	// Command line info:
-	//
-	char CmdLine	[256]; 	// Uppercase command line
-	char AutoLevel	[256];	// Level to load automatically
-	char AutoURL	[256];	// URL to load automatically
-	//
-	// Subsystems to activate:
-	//
+{
+public:
+
+	// Command line info.
+	char CmdLine	[256]; 	// Uppercase command line.
+	char AutoLevel	[256];	// Level to load automatically.
+	char AutoURL	[256];	// URL to load automatically.
+
+	// Subsystems to activate.
 	int	LaunchEditor;
-	//
-	// Memory grabber:
-	//
+
+	// Memory grabber.
 	int	GlobalsMemSize;
 	int DynamicsMemSize;
-	//
-	// Camera properties:
-	//
+
+	// Camera properties.
 	int	FrameRate;
 	int	CameraSXR;
 	int	CameraSYR;
-	//
-	// Resources
-	//
+
+	// Resources.
 	int MaxRes;
 	int MaxNames;
 	int MaxFiles;
 	int MaxTypes;
-	//
-	// Transaction tracking:
-	//
+
+	// Transaction tracking.
 	int	MaxTrans;
 	int	MaxChanges;
 	int	MaxDataOffset;
-	//
-	// Audio
-	//
+
+	// Audio.
 	int AudioActive;
-	//
-	// Camera:
-	//
-	FLOAT FOV;
-	//
-	// Functions:
-	//
+
+	// Camera.
+	FLOAT Fov;
+
+	// Functions.
 	void Init(char *CmdLine);
-	void Exit(void);
-	};
+	void Exit();
+};
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/
 #endif // _INC_UNDEFLTS
 

@@ -3,7 +3,7 @@
 UnCheat.cpp: Unreal cheats
 
 Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
-Compiled with Visual C++ 4.0, Calling method=__fastcall
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
     This provides an implementation for the virtual functions
@@ -59,8 +59,8 @@ void FGameCheat::ApplyPendingCheats(INDEX iPlayer)
         FOR_ALL_TYPED_RES(Class,RES_Class,UClass)
             if
             (  
-                    Class->IsKindOf( GClasses.Weapon ) 
-                &&  Class != GClasses.Weapon 
+                    Class->IsKindOf("Weapon") 
+                &&  !Class->IsNamed("Weapon")
                 &&  FActor::Actor(Class->DefaultActor).Weapon().OwningSet > 0
             )
             {
@@ -95,6 +95,13 @@ void FGameCheat::ApplyPendingCheats(INDEX iPlayer)
         GLevel->SpawnActor(Spawn,NAME_NONE,&Location);
         Spawn = 0;
     }
+    if( Ghost )
+    {
+        Pawn.bCollideWorld  = !Pawn.bCollideWorld  ;
+        Player.SetActorCollision(!Player.bCollideActors);
+        Ghost = FALSE;
+    }
+
 }
 
 //----------------------------------------------------------------------------
@@ -125,26 +132,26 @@ void FGameCheat::DoAdjustments(INDEX iPlayer, FLOAT * Values)
         // need more up/down pairs.
         // The shift key will increase the speed. Double-press shift for even more speed.
         const FInput::TSwitchState * Switches = GInput.Switches;
-        const int  Up      = Switches[FInput::S_N8].IsOn? 1 : 0;
-        const int  Down    = Switches[FInput::S_N2].IsOn? 1 : 0;
-        const int  Up2     = Switches[FInput::S_N7].IsOn? 1 : 0;
-        const int  Down2   = Switches[FInput::S_N1].IsOn? 1 : 0;
-        const int  Up3     = Switches[FInput::S_N9].IsOn? 1 : 0;
-        const int  Down3   = Switches[FInput::S_N3].IsOn? 1 : 0;
-        const int  Up4     = Switches[FInput::S_NMinus].IsOn? 1 : 0;
-        const int  Down4   = Switches[FInput::S_NPlus].IsOn? 1 : 0;
-        const int  Left    = Switches[FInput::S_N4].IsOn? 1 : 0;
-        const int  Right   = Switches[FInput::S_N6].IsOn? 1 : 0;
-        const int  Left2   = Switches[FInput::S_N1].IsOn? 1 : 0;
-        const int  Right2  = Switches[FInput::S_N3].IsOn? 1 : 0;
-        const int  Left3   = Switches[FInput::S_N7].IsOn? 1 : 0;
-        const int  Right3  = Switches[FInput::S_N9].IsOn? 1 : 0;
-        const int  Left4   = Switches[FInput::S_N0].IsOn? 1 : 0;
-        const int  Right4  = Switches[FInput::S_NPeriod].IsOn? 1 : 0;
+        const int  Up      = Switches[FPlatformInput::S_N8].IsOn? 1 : 0;
+        const int  Down    = Switches[FPlatformInput::S_N2].IsOn? 1 : 0;
+        const int  Up2     = Switches[FPlatformInput::S_N7].IsOn? 1 : 0;
+        const int  Down2   = Switches[FPlatformInput::S_N1].IsOn? 1 : 0;
+        const int  Up3     = Switches[FPlatformInput::S_N9].IsOn? 1 : 0;
+        const int  Down3   = Switches[FPlatformInput::S_N3].IsOn? 1 : 0;
+        const int  Up4     = Switches[FPlatformInput::S_NMinus].IsOn? 1 : 0;
+        const int  Down4   = Switches[FPlatformInput::S_NPlus].IsOn? 1 : 0;
+        const int  Left    = Switches[FPlatformInput::S_N4].IsOn? 1 : 0;
+        const int  Right   = Switches[FPlatformInput::S_N6].IsOn? 1 : 0;
+        const int  Left2   = Switches[FPlatformInput::S_N1].IsOn? 1 : 0;
+        const int  Right2  = Switches[FPlatformInput::S_N3].IsOn? 1 : 0;
+        const int  Left3   = Switches[FPlatformInput::S_N7].IsOn? 1 : 0;
+        const int  Right3  = Switches[FPlatformInput::S_N9].IsOn? 1 : 0;
+        const int  Left4   = Switches[FPlatformInput::S_N0].IsOn? 1 : 0;
+        const int  Right4  = Switches[FPlatformInput::S_NPeriod].IsOn? 1 : 0;
 
         const int Speed = 
-            GInput.Switches[FInput::S_Shift].IsDouble   ?   8
-        :   GInput.Switches[FInput::S_Shift].IsOn       ?   4
+            GInput.Switches[FPlatformInput::S_Shift].IsDouble   ?   8
+        :   GInput.Switches[FPlatformInput::S_Shift].IsOn       ?   4
         :   1
         ;
 
@@ -187,29 +194,6 @@ void FGameCheat::DoAdjustments(INDEX iPlayer, FLOAT * Values)
             if( Actor != 0 ) Actor->Send_TextMsg( Message );
         }
     }
-}
-
-// Parsing helper function: If *Text starts with Match and is followed by
-// an integer value, interpret the value.
-static BOOL ParseInt( const char ** Text_, const char * Match, int & Value )
-{
-    BOOL Matched = FALSE;
-    const char * Text = *Text_;
-    while( isspace(*Text) ) { Text++; }
-    const int MatchLength = strlen(Match);
-    Value = 0;
-    if( strnicmp(Text,Match,MatchLength) == 0 && isdigit(Text[MatchLength]) )
-    {
-        Matched = TRUE;
-        Text += MatchLength;
-        while( isdigit(*Text) ) // Parse the integer value.
-        {
-            Value = Value * 10 + (*Text - '0');
-            Text++;
-        }
-        *Text_ = Text;
-    }
-    return Matched;
 }
 
 // Parse a (possibly abbreviated) word out of the given text.
@@ -339,201 +323,269 @@ BOOL FGameCheat::DoCheatCommands
     Pawn.bStatusChanged = TRUE;
     AWeapon * Weapon = Pawn.iWeapon == INDEX_NONE ? 0 : (AWeapon*)&Level->ActorList->Element(Pawn.iWeapon);
     int Value;
+    char MessageText[300];
     while( IsOkay && *Text != 0 )
-        {
+    {
         while( *Text != 0 && isspace(*Text) ) { Text++; }
         if( ParseAbbreviation(&Text,"fly",1) ) // Flying?
-            {
-                Pawn.bGravity = !Pawn.bGravity; 
-                Pawn.bLimitRotation = Pawn.bGravity;
-                Out->Log( Pawn.bGravity ? "Gravity prevails" : "You defy gravity" );
-            }
+        {
+            Pawn.bGravity = !Pawn.bGravity; 
+            Pawn.bLimitRotation = Pawn.bGravity;
+            Out->Log( Pawn.bGravity ? "Gravity prevails" : "You defy gravity" );
+        }
+        else if( ParseAbbreviation(&Text,"swim",1) )
+        {
+            Pawn.bIsSwimming = !Pawn.bIsSwimming; 
+            Out->Log( Pawn.bIsSwimming ? "You swim" : "You swim no longer" );
+        }
         else if( ParseAbbreviation(&Text,"playerturns",11) )
-            {
-                Pawn.bCannotTurn = !Pawn.bCannotTurn; 
-                Out->Log( Pawn.bCannotTurn ? "Cannot turn" : "Can turn" );
-            }
+        {
+            Pawn.bCannotTurn = !Pawn.bCannotTurn; 
+            Out->Log( Pawn.bCannotTurn ? "Cannot turn" : "Can turn" );
+        }
         else if( ParseAbbreviation(&Text,"playermoves",11) )
-            {
-                Pawn.bCannotMove = !Pawn.bCannotMove; 
-                Out->Log( Pawn.bCannotMove ? "Cannot move" : "Can move" );
-            }
+        {
+            Pawn.bCannotMove = !Pawn.bCannotMove; 
+            Out->Log( Pawn.bCannotMove ? "Cannot move" : "Can move" );
+        }
         else if( ParseAbbreviation(&Text,"invisible",5) ) // Invisibility?
-            {
-                Pawn.bHasInvisibility = !Pawn.bHasInvisibility;
-                Pawn.InvisibilityTimeLeft = 100000; // Ignored if !bHasInvisibility
-                Out->Log( Pawn.bHasInvisibility ? "Invisible" : "Visible" );
-            }
+        {
+            Pawn.bHasInvisibility = !Pawn.bHasInvisibility;
+            Pawn.InvisibilityTimeLeft = 100000; // Ignored if !bHasInvisibility
+            Out->Log( Pawn.bHasInvisibility ? "Invisible" : "Visible" );
+        }
         else if( ParseAbbreviation(&Text,"invincible",5) ) // Invincibility?
-            {
-                Pawn.bHasInvincibility = !Pawn.bHasInvincibility;
-                Pawn.InvincibilityTimeLeft = 100000; // Ignored if !bHasInvincibility
-                Out->Log( Pawn.bHasInvincibility ? "Invincible" : "Vincible" );
-            }
+        {
+            Pawn.bHasInvincibility = !Pawn.bHasInvincibility;
+            Pawn.InvincibilityTimeLeft = 100000; // Ignored if !bHasInvincibility
+            Out->Log( Pawn.bHasInvincibility ? "Invincible" : "Vincible" );
+        }
         else if( ParseAbbreviation( &Text,"quiet",1) ) // Quiet?
-            {
-                Pawn.bHasSilence = !Pawn.bHasSilence;
-                Pawn.SilenceTimeLeft = 100000; // Ignored if !bHasSilence
-                Out->Log( Pawn.bHasSilence ? "Silence" : "Not Silence" );
-            }
+        {
+            Pawn.bHasSilence = !Pawn.bHasSilence;
+            Pawn.SilenceTimeLeft = 100000; // Ignored if !bHasSilence
+            Out->Log( Pawn.bHasSilence ? "Silence" : "Not Silence" );
+        }
         else if( ParseIntChange(&Text,"armor", int(Pawn.Armor[DMT_Basic]), Value, 100, 2) ) // Armor?
-            {
-                Pawn.Armor[DMT_Basic] = Value;
-                Out->Logf( "Armor: %i", Value );
-            }
+        {
+            Pawn.Armor[DMT_Basic] = Value;
+            Out->Logf( "Armor: %i", Value );
+        }
         else if( ParseIntChange(&Text,"health", int(Pawn.Health), Value, 100, 1) ) // Health?
-            {
-                Pawn.Health = Value;
-                Out->Log( "Health" );
-            }
+        {
+            Pawn.Health = Value;
+            Out->Log( "Health" );
+        }
         else if( ParseAbbreviation(&Text,"bigtime",7) ) // Cheat big-time?
-            {
-                DoCheatCommands
-                (
-                    "weapons allammo invincible"
-                ,   Player
-                ,   Level
-                ,   Out
-                );
-            }
+        {
+            DoCheatCommands
+            (
+                "weapons allammo invincible"
+            ,   Player
+            ,   Level
+            ,   Out
+            );
+        }
         else if( ParseAbbreviation(&Text,"allammo", 4 ) )
+        {
+            for( int AmmoType = 0; AmmoType < AmmoType_Count; AmmoType++ )
             {
-                for( int AmmoType = 0; AmmoType < AmmoType_Count; AmmoType++ )
-                {
-                    Pawn.AmmoCount[AmmoType] = Pawn.AmmoCapacity[AmmoType];
-                }
-                Out->Log( "Ammo for all weapons" );
+                Pawn.AmmoCount[AmmoType] = Pawn.AmmoCapacity[AmmoType];
             }
+            Out->Log( "Ammo for all weapons" );
+        }
         else if // Ammo?
-            ( 
-                Weapon != 0 
-            &&  ParseIntChange
-                (
-                    &Text
-                ,   "ammo"
-                ,   Pawn.AmmoCount[Weapon->AmmoType]
-                ,   Value
-                ,   Pawn.AmmoCapacity[Weapon->AmmoType]
-                ,   2
-                ) 
-            )
-            {
-                Pawn.AmmoCount[Weapon->AmmoType] = Value;
-                Out->Logf( "Ammo for %s: %i", Weapon->Class->Name, Value );
-            }
+        ( 
+            Weapon != 0 
+        &&  ParseIntChange
+            (
+                &Text
+            ,   "ammo"
+            ,   Pawn.AmmoCount[Weapon->AmmoType]
+            ,   Value
+            ,   Pawn.AmmoCapacity[Weapon->AmmoType]
+            ,   2
+            ) 
+        )
+        {
+            Pawn.AmmoCount[Weapon->AmmoType] = Value;
+            Out->Logf( "Ammo for %s: %i", Weapon->Class->Name, Value );
+        }
         else if( ParseAbbreviation(&Text,"ghost",1) ) // Float freely through world?
-            {
-                Pawn.bCollideWorld  = !Pawn.bCollideWorld  ;
-                FActor::Actor(Player->iMe).SetActorCollision(!Player->bCollideActors);
-                Out->Log( Pawn.bCollideWorld ? "Corporeal" : "Ghost" );
-            }
+        {
+            Ghost = TRUE;
+            Out->Log( Pawn.bCollideWorld ? "Ghost" : "Corporeal" );
+        }
         else if( ParseAbbreviation(&Text,"weapons",1) ) // Get all weapons?
-            {
-                
-                GetAllWeapons = TRUE;
-                Out->Log( "All weapons" );
-            }
+        {
+            GetAllWeapons = TRUE;
+            Out->Log( "All weapons" );
+        }
         else if( ParseAbbreviation(&Text,"lethalhit",9) ) // Next hit to monster is lethal?
-            {
-                LethalHit = TRUE;
-                Out->Log( "Next damage to monster is lethal" );
-            }
+        {
+            LethalHit = TRUE;
+            Out->Log( "Next damage to monster is lethal" );
+        }
         else if( ParseAbbreviation(&Text,"slowmotion",5) ) // Slow motion?
-            {
-                SlowMotion = !SlowMotion;
-                Out->Logf( "%s Motion", SlowMotion ? "Slow" : "Normal" );
-            }
+        {
+            SlowMotion = !SlowMotion;
+            Out->Logf( "%s Motion", SlowMotion ? "Slow" : "Normal" );
+        }
         else if( ParseAbbreviation(&Text,"slowprojectiles",5) ) // Slow projectiles?
-            {
-                SlowProjectiles = !SlowProjectiles;
-                Out->Logf( "%s projectiles", SlowProjectiles ? "Slow" : "Normal" );
-            }
+        {
+            SlowProjectiles = !SlowProjectiles;
+            Out->Logf( "%s projectiles", SlowProjectiles ? "Slow" : "Normal" );
+        }
+        else if( ParseAbbreviation(&Text,"InvisibleWeapons",5) )
+        {
+            InvisibleWeapons = !InvisibleWeapons;
+            Out->Logf( "Weapons: %s", InvisibleWeapons ? "Invisible" : "Visible" );
+        }
+        else if( ParseAbbreviation(&Text,"ShowPawnPhysics",10) )
+        {
+            ShowPawnPhysics = !ShowPawnPhysics;
+            Out->Logf( "Pawn physics: %s", ShowPawnPhysics ? "On" : "Off" );
+        }
+        else if( ParseAbbreviation(&Text,"gluemonsters",5) )
+        {
+            GluedMonsters = !GluedMonsters;
+            Out->Logf( "Monsters: %s", GluedMonsters ? "Glued" : "Unglued" );
+        }
         else if( ParseAbbreviation(&Text,"slowmonsters",7) )
-            {
-                MonsterSlowMotionValue = MonsterSlowMotionValue==0 ? 0x7 : 0;
-                Out->Logf( "%s monsters", MonsterSlowMotionValue != 0 ? "Slow" : "Normal" );
-            }
+        {
+            MonsterSlowMotionValue = MonsterSlowMotionValue==0 ? 0x7 : 0;
+            Out->Logf( "%s monsters", MonsterSlowMotionValue != 0 ? "Slow" : "Normal" );
+        }
         else if( ParseAbbreviation(&Text,"buzzard",7) ) // Slow projectiles?
-            {
-                IsWizard = !IsWizard;
-                Out->Logf( "Wizard: %s", IsWizard ? "True" : "False" );
-            }
+        {
+            IsWizard = !IsWizard;
+            Out->Logf( "Wizard: %s", IsWizard ? "True" : "False" );
+        }
         else if( ParseAbbreviation(&Text,"performance",11) ) 
-            {
-                MeasurePerformance = !MeasurePerformance;
-                Out->Logf( "Performance: %s", MeasurePerformance ? "On" : "Off" );
-            }
+        {
+            MeasurePerformance = !MeasurePerformance;
+            Out->Logf( "Performance: %s", MeasurePerformance ? "On" : "Off" );
+        }
         else if( ParseAbbreviation(&Text,"showdamage",5) )
-            {
-                ShowDamage = !ShowDamage;
-                Out->Logf( "%s damage", ShowDamage ? "Show" : "Don't show" );
-            }
+        {
+            ShowDamage = !ShowDamage;
+            Out->Logf( "%s damage", ShowDamage ? "Show" : "Don't show" );
+        }
         else if( ParseAbbreviation(&Text,"damage",3) )
-            {
-                NoDamage = !NoDamage;
-                Out->Logf( "All actors: damage %s", NoDamage ? "off" : "on" );
-            }
+        {
+            NoDamage = !NoDamage;
+            Out->Logf( "All actors: damage %s", NoDamage ? "off" : "on" );
+        }
         else if( ParseAbbreviation(&Text,"brains",3) )
-            {
-                NoBrains = !NoBrains;
-                Out->Logf( "Actors are %s", NoBrains ? "mindless" : "mindful" );
-            }
+        {
+            NoBrains = !NoBrains;
+            Out->Logf( "Actors are %s", NoBrains ? "mindless" : "mindful" );
+        }
         else if( ParseAbbreviation(&Text,"lethalhits",10) ) // Hits are lethal?
-            {
-                LethalHits = !LethalHits;
-                Out->Logf( "Hits to monsters are %slethal", LethalHits ? "" : "not " );
-            }
+        {
+            LethalHits = !LethalHits;
+            Out->Logf( "Hits to monsters are %slethal", LethalHits ? "" : "not " );
+        }
         else if( ParseAbbreviation(&Text,"adjustweapon",7) )
-            {
-                Adjustment = AdjustWeaponPosition;
-                Out->Logf( "Adjusting weapon position" );
-            }
+        {
+            Adjustment = AdjustWeaponPosition;
+            Out->Logf( "Adjusting weapon position" );
+        }
         else if( ParseAbbreviation(&Text,"adjustweaponmotion",14) )
-            {
-                Adjustment = AdjustWeaponMotion;
-                Out->Logf( "Adjusting weapon motion" );
-            }
+        {
+            Adjustment = AdjustWeaponMotion;
+            Out->Logf( "Adjusting weapon motion" );
+        }
         else if( ParseAbbreviation(&Text,"adjustplayerviewroll",20) )
-            {
-                Adjustment = AdjustPlayerViewRoll;
-                Out->Logf( "Adjusting player view roll" );
-            }
+        {
+            Adjustment = AdjustPlayerViewRoll;
+            Out->Logf( "Adjusting player view roll" );
+        }
         else if( ParseAbbreviation(&Text,"adjust",3) )
-            {
-                Adjustment = NoAdjustment;
-                Out->Logf( "Adjustments off" );
-            }
+        {
+            Adjustment = NoAdjustment;
+            Out->Logf( "Adjustments off" );
+        }
         else if( ParseAbbreviation(&Text,"spawn",5) )
+        {
+            BOOL DoSpawn = FALSE;
+            char ClassName[101];
+            if( FParse::GetWord(Text,ClassName,100) > 0 )
             {
-                BOOL DoSpawn = FALSE;
-                char ClassName[101];
-                if( FParse::GetWord(Text,ClassName,100) > 0 )
+                Spawn = new(ClassName,FIND_Optional)UClass;
+                if( Spawn )
                 {
-                    Spawn = new(ClassName,FIND_Optional)UClass;
-                    if( Spawn )
+                    DoSpawn = TRUE;
+                    if( !FParse::GetFloat( Text, SpawnDistance ) )
                     {
-                        DoSpawn = TRUE;
-                        if( !FParse::GetFloat( Text, SpawnDistance ) )
-                        {
-                            SpawnDistance = 200.0;
-                        }
+                        SpawnDistance = 200.0;
                     }
                 }
-                if( DoSpawn )
-                {
-                    Out->Logf( "Spawning: %s %3.1f units away", Spawn->Name, SpawnDistance );
-                }
-                else
-                {
-                    Out->Logf( "Bad spawn" );
-                }
             }
-        else 
+            if( DoSpawn )
             {
-                Text += strlen(Text); // Skip to end
-                Out->Log( "Bad cheat" );
+                Out->Logf( "Spawning: %s %3.1f units away", Spawn->Name, SpawnDistance );
+            }
+            else
+            {
+                Out->Logf( "Bad spawn" );
             }
         }
+        else if( ParseAbbreviation(&Text,"forward",4) )
+        {
+            FLOAT Distance;
+            if( !FParse::GetFloat( Text, Distance ) )
+            {
+                Distance = 200.0;
+            }
+            Pawn.Location += Pawn.ViewRot.Vector().Normal() * Distance;
+            Out->Logf( "Move forward %3.1f units", Distance );
+        }
+        else if( ParseAbbreviation(&Text,"animate",6) )
+        {
+            // Force nearest pawn to use specified animations:
+            AActor * TargetPawn = 0;
+            for( int Which = 0; Which < Level->ActorList->Num; ++Which )
+            {
+                AActor * CheckActor = &Level->ActorList->Element(Which);
+                if( CheckActor->Class != 0 
+					&& CheckActor->Class->IsKindOf("Pawn") 
+					&& CheckActor->iMe != Player->iMe )
+                {
+                    // We have a TargetPawn. Choose it if it is the first one we found or
+                    // if it is closer than the closest one we found so far.
+                    if( TargetPawn == 0 || (CheckActor->Location - Player->Location).Size() < (TargetPawn->Location - Player->Location).Size() )
+                    {
+                        TargetPawn = CheckActor;
+                    }
+                }
+            }
+            if( TargetPawn == 0 )
+            {
+                Out->Logf( "Nearby pawn not found" );
+                Text += strlen(Text); // Skip to end
+            }
+            else
+            {
+                char * Message = MessageText;
+                FActor & Actor = FActor::Actor(*TargetPawn);
+                Message += sprintf( Message, "Animating pawn %s:", TargetPawn->Class->Name );
+                int Sequence;
+                Actor.CancelAnimations();
+                while( FParse::GetInteger( Text, Sequence) )
+                {
+                    Actor.AddAnimation( Sequence, 1 );
+                    Message += sprintf( Message, " %i", int(Sequence) );
+                }
+                Out->Log( MessageText );
+            }
+        }
+        else 
+        {
+            Text += strlen(Text); // Skip to end
+            Out->Log( "Bad cheat" );
+        }
+    }
     return IsOkay;
 }
 

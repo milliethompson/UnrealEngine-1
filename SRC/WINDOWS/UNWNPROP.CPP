@@ -1,5 +1,15 @@
-// UnWnProp.cpp : implementation file
-//
+/*============================================================================
+UnWnProp.cpp: Properties dialog
+
+Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
+
+Description:
+    Refer to the associated header file.
+
+Revision history:
+    * xx/xx/96: Created by Mark
+============================================================================*/
 
 #include "stdafx.h"
 #include "unwn.h"
@@ -10,6 +20,7 @@
 #include "UnWnDevD.h"
 #include "UnWnAudD.h"
 #include "UnWnSerD.h"
+#include "UnChecks.h"
 
 #include "UnConfig.h" // So we can save configurations.
 
@@ -25,9 +36,10 @@ CDialog * CDialogProperties::LatestInstance = 0;
 // CDialogProperties dialog
 
 
-CDialogProperties::CDialogProperties(CWnd* pParent /*=NULL*/)
+CDialogProperties::CDialogProperties(UCamera * Camera, CWnd* pParent /*=NULL*/)
 	: CDialog(CDialogProperties::IDD, pParent)
 {
+    this->Camera = Camera;
 	//{{AFX_DATA_INIT(CDialogProperties)
 		// NOTE: the ClassWizard will add member initialization here
 	//}}AFX_DATA_INIT
@@ -47,6 +59,7 @@ BOOL CDialogProperties::OnInitDialog()
     CDialog::OnInitDialog();
     CurrentPage = NoPage;
     PageDialog = 0;
+    checkVital( Camera != 0, "Properties dialog with no camera set!" );
     LatestInstance = this;
     {
         TC_ITEM TabInfo;
@@ -170,13 +183,13 @@ void CDialogProperties::StartNewPage()
         }
         case ActionsPage:
         {
-            NewDialog = new CDialogInputActions(TabParent);
+            NewDialog = new CDialogInputActions(Camera,TabParent);
             NewDialogId = CDialogInputActions::IDD;
             break;
         }
         case SensitivityPage:
         {
-            NewDialog = new CDialogInputSensitivity(TabParent);
+            NewDialog = new CDialogInputSensitivity(Camera,TabParent);
             NewDialogId = CDialogInputSensitivity::IDD;
             break;
         }
@@ -261,7 +274,8 @@ BOOL CDialogProperties::Accept()
             Accepted = Dialog.Accept();
             if( Accepted )
             {
-                GConfiguration.WriteValuesToFile( FConfiguration::InputSection );
+                Camera->Console->GetInput()->SaveValues();
+                //tbd:GConfiguration.WriteValuesToFile( FConfiguration::InputSection );
             }
             break;
         }
@@ -271,7 +285,8 @@ BOOL CDialogProperties::Accept()
             Accepted = Dialog.Accept();
             if( Accepted && Dialog.ChangesWereSaved )
             {
-                GConfiguration.WriteValuesToFile( FConfiguration::ActionSection );
+                Camera->Console->GetInput()->SaveValues();
+                //tbd:GConfiguration.WriteValuesToFile( FConfiguration::ActionSection );
             }
             break;
         }
@@ -281,7 +296,8 @@ BOOL CDialogProperties::Accept()
             Accepted = Dialog.Accept();
             if( Accepted && Dialog.ChangesWereSaved )
             {
-                GConfiguration.WriteValuesToFile( FConfiguration::InputSection );
+                Camera->Console->GetActions()->SaveValues();
+                //tbd:GConfiguration.WriteValuesToFile( FConfiguration::InputSection );
             }
             break;
         }

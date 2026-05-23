@@ -1,4 +1,5 @@
-/*=========================================================================
+/*
+=========================================================================
 FILENAME:     soundeng.h
 DESCRIPTION:  Include file shared between Unreal sound engine and the
               Unreal sound maker utility.
@@ -17,7 +18,8 @@ contains, in this order, the csound header, the ssound headers, and the
 WAV data for the samples for each of the ssounds.
 
 When stored in a file, the same format is used.
-=========================================================================*/
+=========================================================================
+*/
 
 #ifndef _SOUNDHDR_H
 #define _SOUNDHDR_H
@@ -162,6 +164,8 @@ int	SoundEngSoundRegister(void *sound);
 int	SoundEngSoundPlay(int sid, int volume, int pan);
 void	SoundEngSoundStop(int pid);
 void	SoundEngSoundChange(int pid, int newvol, int newpan);
+void	SoundEngSoundSetRadius(int pid, double radius);
+void	SoundEngSoundScaleVolume(int pid, double scale);
 
 void	SoundEngSetOrigin(double x, double y, double z,
 				int yaw, int pitch, int roll);
@@ -170,7 +174,8 @@ int	SoundEngSoundPlayLocated(int sid, int actid,
 				double x, double y, double z);
 void	SoundEngSoundMoveLocated(int pid,
 				double x, double y, double z);
-void	SoundEngActorMove(int actid, double x, double y, double z);
+void	SoundEngActorMove(int actid, double x, double y, double z,
+				double scale);
 void	SoundEngActorStop(int actid);
 
 int	SoundEngMusicSpecifySong(char *name);
@@ -183,7 +188,11 @@ int	SoundEngSfxVolumeGet(void);
 int	SoundEngDirectSoundFlagSet(int val);
 int	SoundEngDirectSoundFlagGet(void);
 
+int	SoundEngFilterFlagSet(int val);
+int	SoundEngFilterFlagGet(void);
+
 DWORD	SoundEngMixingRateSet(DWORD val);
+DWORD	SoundEngMixingRateGet(void);
 int	SoundEngNumChannelsSet(int val);
 
 void	SoundEngPause(void);

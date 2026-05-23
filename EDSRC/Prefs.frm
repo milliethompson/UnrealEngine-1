@@ -7,7 +7,7 @@ Begin VB.Form frmPreferences
    ClientTop       =   2310
    ClientWidth     =   6000
    ForeColor       =   &H80000008&
-   Height          =   6510
+   Height          =   6465
    HelpContextID   =   116
    Icon            =   "Prefs.frx":0000
    Left            =   2040
@@ -16,7 +16,7 @@ Begin VB.Form frmPreferences
    ScaleHeight     =   6105
    ScaleWidth      =   6000
    ShowInTaskbar   =   0   'False
-   Top             =   1965
+   Top             =   2010
    Width           =   6120
    Begin VB.Frame Frame5 
       Caption         =   "Editing Features"
@@ -92,6 +92,14 @@ Begin VB.Form frmPreferences
       TabIndex        =   9
       Top             =   3720
       Width           =   5775
+      Begin VB.CheckBox AutoUnique 
+         Caption         =   "Unique autosave filenames"
+         Height          =   255
+         Left            =   3120
+         TabIndex        =   20
+         Top             =   360
+         Width           =   2535
+      End
       Begin VB.ComboBox AutoTime 
          Height          =   315
          Left            =   1320
@@ -266,6 +274,7 @@ Private Sub Ok_Click()
     Dim i As Integer
     '
     Ed.AutoSaveTime = Val(AutoTime.Text) ' May be 0
+    Ed.AutoUnique = AutoUnique.Value
     '
     Ed.InitialMacro = InitialMacroName.Caption
     If InitialMacroName.Caption = "(none)" Then Ed.InitialMacro = ""
@@ -305,6 +314,8 @@ Private Sub Form_Load()
     '
     InitialMacroName.Caption = Ed.InitialMacro
     If Ed.InitialMacro = "" Then InitialMacroName.Caption = "(none)"
+    '
+    AutoUnique.Value = Ed.AutoUnique
     '
     AutoTime.AddItem "(Never)"
     AutoTime.AddItem "5"

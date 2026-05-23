@@ -4,8 +4,8 @@ Begin VB.Form frmTwoDee
    BackColor       =   &H00000000&
    Caption         =   "2D Editor"
    ClientHeight    =   5430
-   ClientLeft      =   3645
-   ClientTop       =   2835
+   ClientLeft      =   450
+   ClientTop       =   5040
    ClientWidth     =   7515
    BeginProperty Font 
       name            =   "MS Sans Serif"
@@ -17,15 +17,17 @@ Begin VB.Form frmTwoDee
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   6120
+   Height          =   6030
    HelpContextID   =   127
-   Left            =   3585
+   Left            =   390
    LinkTopic       =   "Form4"
+   MaxButton       =   0   'False
+   MinButton       =   0   'False
    ScaleHeight     =   5424.373
    ScaleMode       =   0  'User
    ScaleWidth      =   7512.791
    ShowInTaskbar   =   0   'False
-   Top             =   2205
+   Top             =   4500
    Visible         =   0   'False
    Width           =   7635
    Begin VB.CommandButton Command2 
@@ -747,6 +749,7 @@ Attribute VB_Exposed = False
 Option Explicit
 Const GWW_HWNDPARENT = (-8)
 Dim TwoDeeWord As Integer
+Dim Po
 
 '
 ' Most Declarations moved to
@@ -830,7 +833,7 @@ Private Sub AddNewMesh(Add As Integer)
 End Sub
 
 Private Function Arccos(Z As Double) As Double
-    Arccos = Atn(-Z / Sqr(-Z * Z + 1)) * 1.5708
+    Arccos = Atn(-Z / Sqr(1 - Z * Z)) + Pi * 0.5
 End Function
 
 Private Function CheckAngles(MeshNum As Integer, TriNum As Integer) As Integer
@@ -876,7 +879,7 @@ Dim D As Double  ' Distance
     'Debug.Print "Cos C: ", COSAC
     '
     ' Find inverse cosine of COSAA for degrees
-    ' Arccos(Z)=Atn(-Z / Sqr(-Z * Z + 1)) + 1.5708
+    ' Arccos(Z)=Atn(-Z / Sqr(-Z * Z + 1)) + PI*0.5
     '                                  or * 1.5708 ?
     ' AA = Atn(-COSAA / Sqr(-COSAA * COSAA + 1)) + 1.5708
     

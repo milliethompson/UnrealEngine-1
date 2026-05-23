@@ -1984,7 +1984,7 @@ X		Dynamic lighting per mesh not lattice -> Augh, much too slow!
 +	Fixed line bug
 +	Typing blank name in ed should change to none
 +	Fixed small sprite bug
-+	Fixed John/Inoxx FlishActorBrush bug
++	Fixed John/Inoxx FlushActorBrush bug
 +	Refixed DirectDraw bugs
 +	Added bTriggerOnceOnly to Mover
 +	Jeremy War overflow bug
@@ -2346,3 +2346,692 @@ X	Zone portal bEnclosed flag and bound optimization! -> outdated
 +	Fix broken effects and enforce minimum lattice size per effect (proutine,minx,miny)
 +	textures mode is funny when starting new level
 
+///////////////////////////////////////////////////////////////////////////////
+Notes for others (10/1/96):
+
+Mark:
+	Many changes... I've been saving these up for the past 2 months.
+	Please diff the .tcx's when merging; I made many changes the day I integrated
+		with your 82z merge.
+
+	Changed: KeyPoints.tcx (modified ZoneDescriptor, added LevelDescriptor, more).
+	Changed: Root.tcx (Added SoundRadius, radius of the ambient sound, added
+		ambient sound support code to ACTOR_PostBeginPlay, Dim Brush as ...Const...,
+		added DefaultEdCategory).
+	Changed: All calls to PlaySfxOrigined and PlaySfxLocated, to include the
+		SoundRadius value.  The SoundRadius should apply only to true ambient sounds
+		(played due to the AmbientSound property) such as the sound of a torch
+		burning, and not to regular sound effects like gun shots.
+	Changed: UnCon.cpp (Brightness level code, removal of fade in/out code).
+	Changed: UnActor.h (AActorDraw::SoundRadius, AActorDraw::WorldSoundRadius)
+	Changed: UnEngine.cpp (Order of calls to GAudio.Init and Level->SetState so
+		that ambient sounds are inited properly).
+	Changed: AmbientBrightness in Root to InherentBrightness to prevent naming conflict.
+	Changed: Added FGame::CheckState to perform structure size checking. This enables
+		the Root.ucx rebuild to succeed even if the contents of Root.h is outdated, avoiding
+		a chicken-and-egg problem.
+	Changed: ILevel::GetZoneDescriptor to fix bug.
+	Changed: Separated ZoneDescriptor into its own root class and file, modified the
+		associated Classes.mac.
+	Added: ILevel::GetZoneGravityVector().  Use this for figuring out the gravity acceleration
+		vector rather than the deleted GMath.GravityAcceleration.  This will enable us to change
+		the gravity level per zone and per level.
+
+	Requests:
+
+	When DirectMouse is disabled, Unreal is run for gameplay, and multiple camera windows
+		are opened up, controls in the non-focus window still go nuts. I think this is
+		an input system bug...
+	Move flame class into a subclass of Light and rename it into something more descriptive
+		appropriate like TorchFlame...
+	Avoid all unnecessary calls to ZCollision and other IModel physics functions; these eat up
+		a lot of CPU time.  For example, the pickup class calls it every tick.  I recommend 
+		adding in ALWAYS_BEGINTIME and ALWAYS_ENDTIME macros to check out the performance 
+		impact of key pieces of code in levels populated with a lot of actors.
+	Please go with the Un*.cpp and Un*.h file naming convention (not DArray.h, etc).
+
+Ammon:
+
+	Changed: FGlobalAudio::InitLevel to: int InitLevel(int MaxIndices), where MaxIndices is
+		the maximum number of actor indices that are valid; all calls to the sound updating.
+		routines will use indices where 0<=Index<MaxIndices.
+	Changed: All actors now have a 'sound radius' property for their ambient sounds.  This is useful
+		for reducing the number of sounds that are active at a time, since it allows level
+		designers to explicitly set the sound radii while considering their level layouts,
+		and it also enables far-away sound effects to be culled more efficiently.
+		As a result, I added a FLOAT SoundRadius property to PlaySfxOrigined and
+		PlaySfxLocated.  The SoundRadius value is in the same 'world units' as the Location vector.
+		A value of 0 means "no radius" so that the existing sound-diminishing code should be
+		used.  If SoundRadius is nonzero, then the sound effect volume should smoothly range from
+		its maximum (at the sound location) to zero (at SoundRadius units away from the sound
+		location). For performance, when updating sounds for a viewer, you may want to remember 
+		SoundRadius*SoundRadius, and compare it to the value of (PlayerLocation-SoundLocation).SizeSquared()
+		to avoid the penalty of a sqrt().
+	Changed: Directory management code in all UnrealEd forms, user interface, some other tweaking to
+		make the UI consistent with the other browsers.  When merging the VB source, please diff 
+		the source and merge your code into mine to preserve the new form layout.
+
+	To-do notes in order of importance...
+
+	1. Panning seems to be exaggerated; unless a sound effect is directly in front of the 
+		player, the sound seems to come out entirely through the left or right speaker.
+		Panning should be more evenly distributed.
+	2. As the player gets really close to an ambient sound, the sound's directionality should be
+		diminished and the sound should be panned closer to the center.  Let's say that in
+		the interval (1.0*Radius, 0.2*Radius) the panning is as-is (full panning), and in
+		(0.2*Radius,0.1*Radius), the panning is smoothly adjusted between as it is and
+		full-center, and in (0.1*Radius,0.0) the panning is full center.  This will give level
+		designers control over volume sound sources, like roaring water etc.
+	3. In the properties dialog, music/sound volumes need to take effect immediately as sliders 
+		are adjusted, and the sampling rate combo should be fixed (or removed if no longer
+		relevant); an interpolation on/off option would be good.
+	4. Still need audio to work within UnrealEd so that level designers can hear the sound effects
+		and ambient sounds from the sound browser while they are editing levels. Otherwise, adding
+		sounds to levels is extremely tedious. This should be pretty easy (just check the hacked-in 
+		calls that disables sound whenever the editor is running).
+	5. The functions which play sound effects and which update a sound effects' positions should also 
+		take an additional parameter, a scaling factor (from 0.0=inaudible to 1.0=full volume) which
+		scale the sound effect's volume.  Passing a value of 1.0 should have the same effect as
+		calling the function has now; values smaller than 1.0 should scale the volume down
+		proportionally.  This is so that I can easily modulate ambient sound effects via script,
+		for example ramping a torchlight's sound in proportion to the light's brightness.
+	6. Sound property editing needs to happen natively in UnrealEd rather than through an external utility.
+	7. The general sound system really needs to be finished and fully debugged/tested asap so that we can
+		all move on.
+
+Carlo/Ammon:
+	Sound quality is still unstable (pops/clicking) on NT 4.0 with both DirectSound and WinMM
+		in Unreal as well as the Galaxy player. This is not related to the known problem
+		with IDirectDraw::Lock.  Mod4Win doesn't have this kind of problem on NT 4.0.
+	Sound effects are really noisy when played at low volume.  Try placing an ambient sound then
+	    walking up to it and away from it, and you can hear static noise increase as you walk
+		away.  Very low-volume sounds are particularly bad.
+
+Rebellious programmers: please use the following style for your file headings.
+It's not any better/worse than other styles, but this is something we should keep
+consistent for everyone working with the Unreal code base.
+
+/*==============================================================================
+UnAction.h: Player input actions
+Used by: Player processing code
+
+Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Compiled with Visual C++ 4.0.
+
+Description:
+
+Revision history:
+    * 05/30/96, Created by Mark
+==============================================================================*/
+
+#ifndef _INC_UnAction
+#define _INC_UnAction
+..etc...
+
+///////////////////////////////////////////////////////////////////////////////
+10/1/96
+
++	UnEngine.cpp: Now init Audio before ULevel::SetState so that actors
++		with ambient sounds are now properly inited.
+
++	Remove fadein code from UnCon.cpp
++	Gamma: No fullsc req, GCache.Flush();
+
++	Old notes:
+X		KeyPos and KeyRot noneditable -> better to be editable
+X		ACTOR_PostEditMove/ACTOR_PostEditMove -> ACTOR_EditPosChange -> ok as is
++		Clean up and rearrange root properties
++		Must upgrade FRotation components to 32-bit, needed for scripting
++		Import/export upgraded angles
+
++	Added SoundRadius to Root
++	Mesh viewer is dead again
+
++	Added ProductRequired to Teleporter to support teleporters that require a certain
++		product, such as the registered version of Unreal
+
++	Need a LevelDescriptor class, create in InitLevel
++	Need AmbientSound class
++	Text message actor class
++	Const Brush
++	DefaultCategory
++	LT_Strobe
++	Added GClasses.LevelDescriptor
++	My poor little actors are disappearing!
+
++	Killed bLightIsAmbient
++	LevelDescriptor, ZoneDescriptor lightning (added to ambient)
+
++	Set all DefaultEdCategory properties
++	Only cache MeshVoid if pure static
+
++	Sound browser import looks in wrong directory
++	UnrealEd Cliff DefaultEdCategory support
++	Texture family gets lost bug
+
++	ZoneDescriptor base class
++	Cliff: Added bUnlit property to prevent meshes from being affected by lighting.
+
+X	Not showing actors in wire views before map rebuilt -> Doofus! You're in 16-bit color.
+
++	Added INDEX ILevel::GetLevelDescriptor(int iZone);
++	Added FVector ILevel::GetZoneVelocity(INDEX iActor);
++	Added FVector ILevel::GetZoneGravityAcceleration(INDEX iActor);
+
+///////////////////////////////////////////////////////////////////////////////
+10/2/96
+
++	Show span occlude time
++	Support bGravityZone, bVelocityZone
+
+///////////////////////////////////////////////////////////////////////////////
+10/3/96 - 10/5/96
+
++	Business stuff
+
+///////////////////////////////////////////////////////////////////////////////
+10/6/96
+
++	Slept
+
+///////////////////////////////////////////////////////////////////////////////
+10-7-96
+
++	Right-click poly show # polys selected & # lights affecting them
++	Autosave directory screwed up? Critical: FEditor::Exec(MAP SAVE FILE="u:\Unreal\Maps)
+
+X	Right-click wire brush show options (copy to brush in place, copy to brush with move) -> Can live without it
+
++	Undoing past light rebuild -> Fixed transaction tracking reset bug
+X	Lower shadow detail options? -> Can live without
+X	esc abort slow rebuilds and imports if possible -> no
++	default per class prop tab
++	sheet brush tab order
++	texture browser starts up with empty family
+
+X	Are my mesh texture coordinates off by +/- 0.5 or 1.0 from James' mesh editor??? -> James' textures need borders
+
++	lighting not autorebuilt when propchange sometimes
++	UnLine case 4 bugs
+
++	Fixed major coplanar portal bug
++	Improved numerical stability of geometry optimizer
+
+X	Clipper crack bugs -> Were geometry optimizer precision problems
+
++	side linker still doesn't work with really cut up coplanars
+
++	"apply selected lights only" should apply all lights in zone of selected zonedescriptors,
++		update UnrealEd text
+
++	UnrealEd multiple instance problems! Fixed via SINGLEUSE_IMPLEMENT_OLECREATE
++	fix light updating in UnrealEd
++	If I undo to/beyond the point of my last lighting rebuild, the editor crashes.
+
+X	>Also, if I have brushes snapped to say a grid unit
+X	>of 4, if I go into map edit mode -- and forget to set the grid to 4 -- all
+X	>of my brushes are snapped out of whack. This is all extremely
+X	>time-consuming resetting brushes and what not. Any chance of a fix so that
+X	>brushes stay put?
+
++	Freeing 64K aligned items crashes in debug ver
++	fake backdrop broken? -> No, only shows up when player controls are on
+
++		Counter
++			Displays optional text message
++			Optional countdown value
++			Separate trigger-in and trigger-out
+
++	make 8-bit color 15% darker 
+
+///////////////////////////////////////////////////////////////////////////////
+10-8-96
+
++	TFBS
+
+///////////////////////////////////////////////////////////////////////////////
+10-9-96
+
++	Support bNoSmooth when rendering actor sprites and meshes, now things like
++		guns can be set to be not smoothed.
++	UnrealEd prop cat thing needs < and > buttons
+
++	>An option that would give us the best of both worlds is a dialog box
++	>similar to the one used when importing brushes that has a check box for
++	>'merge coplanar' and 'don't merge coplanars'
++	I think this works as desired in all cases now. Let me know if otherwise.
++	However, this method of map design is not going to work well; it results in way more
++	polygons than Unreal can handle quickly.
+
++	Rewrote portal code to be far more robust and general. Volumetric solids may be 
++	added to the world as portals now, enabling easy creation of things like water zones
++	and in the future (if custom rendering support is added) clipping zones for volumetric
++	lighting and fog effects.
+
++	Any empty world is now classified as solid space rather than vacant space. Therefore,
++	you begin level design by subtracting stuff rather than adding it.  This is a significant
++	speed optimization.  As a result, you should delete all of the gigantic solid brushes
++	you're subtracting your world out of.  This will require level designers to rework
++	areas which are designed as outdoors.  One easy solution is to subtract a gigantic
++	cube surrounding the world, go into map edit mode, select just the gigantic cube,
++	and hit the 'to front' button to make it subtract first.  *Only* do this if you have
++	to; it's much better for performance to design levels subtractively.
+
++	All collision problems near semisolids should be fixed now...
+
++	Fix hull bounds overflowing bugs
+
++	Force palette rebuild if ZoneDescriptor temp change
++	Generate zones even if no portals so ZoneDescriptor works always
+
+///////////////////////////////////////////////////////////////////////////////
+10-10-96
+
++	Rename 'rectangle' to 'cube'
++	All brush builders default to solid
+
+X	Support zone/level lightning ambient offset support for lightning etc (Lightning).
+
+X	Z-collision code needs support for complex gravity vectors; use Raytrace
+X		instead, add iActorHit support, and call special-case Z-collision where
+X		possible. Also support underwater. -> Overly complex!
+
++	It seems as if moving brushes with their bTrigger property set to True
++	trigger the event that they are assigned, but the brush is not animated
++	(does not move).  I've called Cliff about this new UnEd 0.83 bug and it
++	appears that he is also experiencing the same problem. -> Works fine here, send example.
+
++	The only problem I have seen is when you create a moving brush or 2, then 
++	rebuild the map WITHOUT first setting the key 0 and 1 positions. If you do 
++	this, then the brush returns to its orientation it had when you first 
++	loaded it. I noticed this particularly with my large doors. The brush 
++	when loaded comes up laying flat, I have to roll and yaw the sucker to get 
++	it into position. If I forget to set the Key0 and 1 positions, after 
++	a rebuild, its laying flat again.
+
++	Note on zones with bWaterZone:
++	* Tiny wavy effect is applied to everything in water
+X	* Watery shimmer light effect is applied to everything -> must be done explicitly
+
++	Implement PlayerEntered, PlayerLeaving
++	SetActorZone called upon initial entry?
+
++	Are node bounding spheres used/needed?
++	Reduce size of palette resource
++	Get rid of all diffusion dithering remnants
++		UPalette::BuildBrightnessTable
++		Bidirectional traversal when remapping
++	Import texture highlight texture family name, def to Untitled.
+
++	Fixed the awful boolean import bug. It occured whenever a boolean value had trailing tabs.
++	Ortho bounding rect rejection is now totally screwed up
+
+X	There's an annoying bug that's been in the editor forever now, and dammit,
+X	it's got to be fixed.
+X	-Go into the 2d shape editor.
+X	-Make a square (large enough to make a hallway you can walk through)
+X	-Revolve it. (sides per 360= 12, number of sides = 6) This makes a "C"
+X	shaped hallway. (viewed from above)
+X	-Subtract this cool hallway from a solid cube.
+X	-Walk through the hallway. The surfaces at the ends of the hall (that you'd
+X	walk through) are screwed up 90% of the time. (either showing the grid
+X	through them, or a warped texture...)
+X
+X	-> I can duplicate this.  It's a 2D editor numerical precision problem due to
+X	roundoff error accumulating.  Robert.
+
++	Force ZoneDescriptor always to exist!
+
+///////////////////////////////////////////////////////////////////////////////
+10-11-96
+
++	Met with Legend Design.  Cool guys; hope we can do something together.
+
+///////////////////////////////////////////////////////////////////////////////
+10-12-96
+
++	Fixed texture blurring and slow import bug
++	Kill texture 'diffusion' in UnrealEd, fix importing-to-no-family bug
++	Delete GGfx.TrueColors etc
+
++	Need standard 16/32-bit palette cache routines; eliminate GGfx.TrueColorPalette and
++		terribly inefficient calls to HiColor565() in routines like DrawDepthLine.
+
+X	Save-intrinsic-classes-only option for saving classes, to fully eliminate root.h/actor.h redundency? -> Later maybe.
+
+///////////////////////////////////////////////////////////////////////////////
+10-13-96
+
++	UnrealEd level 'View Links' work using results window, ACTOR_GetLink PString
++	UnrealEd resource browser is still broken -> Don't need it
+
++	UnrealEd Level properties use level descriptor, make actor props browser multi-instance 
++		embeddable with fixed size and hidden props tab.
++	Faster meshsprite qsort
+
++	In UnrealEd, log/new camera crashes
+
++	LevelDescriptor needs good default gravity; no hardcoded anything.
++	Kill GGfx.BackdropTexture.
+
+///////////////////////////////////////////////////////////////////////////////
+10-14-96
+
++	Class browser quicksort doesn't sort counts (oops!)
+
+///////////////////////////////////////////////////////////////////////////////
+10-15-96
+
++	Fix radius 0 lighting problems.
+
+X	LevelDescriptor needs ramp/ambient info, background texture -> Just background palette.
++	Select-all don't select level descriptor
+
+///////////////////////////////////////////////////////////////////////////////
+10-16-96
+
++	Actor properties are now 4-aligned with #pragma pack (push,4). Justification: Portability
++	Endian hooks for Mac byte order
++	Add UResource::Flip(), byte swapper required for all resources.
++	Full postload and presave hooks
+
+X	No-shadow, no-incidence-effects lights, i.e. for SpecialLit situations -> No
++	Expand querying functions for non-iMe callback
+
+///////////////////////////////////////////////////////////////////////////////
+10-17-96
+
+X	Change backdrop colasecing to reflect inside-out world.
+
+///////////////////////////////////////////////////////////////////////////////
+10-18-96
+
++	Directional lighting works
++	Use cloud noise for dirty shadows!
+
++	Min, max, diff
+
++	Allow start grid for cloud noise and parameters to prevent full size clouding
+
++	All necessary class and Root.tcx changes for backdrops & satellites
++	Added 'AActor *Descriptor' to ILevel, points to level descriptor on NULL.
++	ULevel::Lock now grabs LevelDescriptor
++	Exporting enumeration to C++ header now includes tag_MAX
+
++	Finally bit the bullet and eliminated the AActor.h/Root.h redundency (sorry, Mark,
++	you were right all along!)  This required significant changes in AActor.h, but it doesn't
++	have much impact on any of the code.  From now on, everyone has to be careful not to
++	intermix game-specific code with the engine...
+
++	Deleted unused FActorAIStatus
+
++	Renamed math functions & templates Min, Max, etc and made global for consistency.
++	Removed FActorServerInfo, merged into ARoot.
++	LevelDescriptor time info is filled in each tick
+
++	Moved all AActor:: functions to the Game project for replaceability.
++	Renamed Root.tcx to Actor.tcx
++	The ARoot class no longer exists; it has been replaced directly with AActor.
++	Renamed Root.ucx to Unreal.ucx
+X	Are there now circular dependencies?
+
++	New/restructured files:
++		UnActor.cpp: Implementation of the AActor class.
++		UnActor.h:   Definition of AActor class, includes Root.h etc.
++		UnActLst.h:  Definition of UActorList.
++		UnClass.h:   Definition of UClass.
++		UnClsPrp.h:  Definition of FClassProperty.
++		UnMsgPar.h:  Definitions of all actor actor message parameter structures.
+
+///////////////////////////////////////////////////////////////////////////////
+Supplement 10-19-96: Actor class hierarchy notes
+
+I rearranged the class hierarchies to eliminate the duplicate definitions of
+ARoot and AActor that were in Unreal prior to 0.84.  Now, each actor class
+contains two C++ support classes:
+
+	ClassnameHelper: A helper class derived from its parent's helper class,
+	which contains only the actor's raw data.
+
+	Classname: A class whose size is guaranteed to be sizeof(AActor).
+
+Here is the derivation hierarchy:
+
+	AActorHelper
+		AActor
+		ARootHelper
+			ARoot
+			AWomanHelper
+				AWoman
+			...etc
+		ALightHelper
+			ALight
+		...etc
+
+When referring to actors generically, use AActor.  You can always safely convert from
+an actor class to a class above it in the derivation tree via typecast, and you can
+convert an actor of class A to an arbitrary class B if B.IsKindOf(A).
+
+Though the ClassnameHelper classes are of variable size, the Classname classes are of
+fixed size = sizeof(AActor).
+
+Files required:
+
+	UnActor.h			-	Definitions of all actor related stuff. Includes 
+							the following:
+		Root.h			-	Definition of all actor classes, exported from UnrealEd 
+							based on the scripts.  The scripts are contained in 
+							Classes\*.tcx.  They are rebuild by running the UnrealEd 
+							macro Classes\Classes.mac.
+			UnRoot.h	-	Supplement to Root.h which enables you to add class 
+							functions to the AActor class
+		UnActLst.h		-	UActorList definition.
+		UnClsPrp.h		-	FClassProperty definition.
+		UnClass.h		-	UClass definition.
+
+The reason I decided to go with this system and all its complexity is to enable
+actor logic to be written in both UnrealScript and C++ and intermixed freely.
+This necessitates defining all actor properties in the .ucx scripts, and making
+UnrealEd generate C++ code based on them.  If all actor logic were written in C++,
+the process would be much simpler, but my primary design goal in the actor system
+is to enable designers and users to greatly extend the world via a flexible scripting
+system.
+
+In a ground-up redesign, it would be smarter to allocate actors from a dynamic
+pool rather than using a fixed-length array, and it would be cleaner to do
+away with the Actor indices and simply use pointers, but that chaging that
+would mess up too much existing code.
+
+-Tim
+
+///////////////////////////////////////////////////////////////////////////////
+10-19-96
+
++	Expanded CLASS_PROP_EXTRA.
++	Cleanup the headers.
++	Camera actor is now APawn.
++	Scapped FActorCameraStatus and stuck its stuff directly in APawn instead.
++	FActorPrivate class encapsulates all internal actor info.
++	Documented actor class derivation layout and file layout above
+
++	Moved Camera variable from ARoot to APawn.
+X	Class default actor should be AActorHelper only -> Would require a lot of changes
+X	without gaining much.
+
++	Note: You can now include an optional class parameter to ILevel::SendMessage
++	Which is useful for routing messages to a parent class.
+
++	SpawnActor handle Location=NULL
++	Kill GMath.DefaultCameraStart, build into Camera def props
++	ZoneDescriptor needs ZoneBreadth, ZoneReflectivity. Kill GetSoundProperties.
+
++	Now compiling with maximum warnings
+
+///////////////////////////////////////////////////////////////////////////////
+10-20-96
+
++	Better equalized 8-bit brightnesses.
++	Mipmapping now accounts for FOV (zoom fix).
+
++	Backdrop:
++		Get scaling and panning speeds completely settable via LevelDescriptors.
++		Specifiable backdrop texture via LevelDescriptor.
++		Tune scaling and panning to liking.
+X		Scrapped interpolated daytime palette (lookup table slowdowns/discontinuities)
++		Specifiable sky palette via level descriptor.
++		Implement Satellite class for sun/moon
++		Proper day/night timing and scaling.
+
++		Make random number code available to all UnRender.
+
+X		Cloud mesh, proper alpha mixing of sky and clouds -> Doesn't look that good.
+X		Depth diminishing of cloud layer
+
+///////////////////////////////////////////////////////////////////////////////
+10-21-96
+
++		Backdrop diminish with 1/(Dist) not 1/Z
++		Delete cloud parameters in leveldescriptor
++		DayFraction, NightFraction
++		Set wavyness magnitude in LevelDescriptor
++		Added LT_Spotlight class
++		Sky fog for sky shading
+X		Special alpha palette for sky brightening with ambients -> Fog shader works cool enough
+
+///////////////////////////////////////////////////////////////////////////////
+10-23-96 (schedule wraparound)
+
++		DrawForward alignment bug? Thanks for the fix Mark.
++		Scrapped unused 256-color glow, ghost and average effects.
++		Replaced unused far-ceiling effect.
+
++		Fog is now depth based - this is beyond cool!
++		ZoneDescriptor/LevelDescriptor bTempLightingChange cleared on 1st tex pal?
+
++		Awesome sun/moon lighting effects via rect sampled lighting
++			All PolyFlags effect and backdrop wavyness effect via ApplyLatticeEffects
++			Light list lighting via ApplyLatticeEffects
++			Consolidate water wavy, cloud wavy, and all that stuff PF_WaterWavy, PF_CloudWavy
++			With Backdrop SetupForPoly, still build fast light list of backdrop lights
++			CalcRectSample use fast light list
++			Simple positional effect
++			LE_Sattelite
++			Fine tune backdrop radial lighting
++			Satellite rotation
+
+///////////////////////////////////////////////////////////////////////////////
+
+>>Mark: [old]
+	Opening multiple cameras during gameplay still acts funny.
+	We'd be more memory-efficient if SpawnActor allocated actors from the begining
+		of the list (i.e. starting with 0) rather than the top of the list. In
+		the future, I can shorten the size of the actor lists on small levels, but
+		that requires that the active actors be on the bottom of the list.
+	Let's hold off on significant AI changes till scripting is done...
+	In UnrealEd with player controls on, pause works but unpause doesn't.
+	Could your actor lists seem to be leaking memory?  You could just allocate them to the
+		size of Level->ActorList->Max so that they never need to be resized (I was 
+		hoping to avoid all memory allocation during gameplay, so that once a level is up
+		and running, there are no possible allocation/deallocation problems).
+	Is bBehindView somewhat broken? Looking up/down seems to tilt the player mesh rather than just 
+		the view as it was.
+	Note that zoneDescriptor is once again a child class of Keypoint.
+	New player control handling needed: When the player is in a zone whose zone descriptor
+		has bWaterZone=1, the controls should function a bit differently:
+		* Player's maximum speed should be reduced to 60% of its normal value.
+		* 'friction' damping when moving should be cut in half so that the player
+		  slides longer when he/she stops moving.
+		* Player momentum should be tracked in all 3 axes (X, Y, Z) rather than just (X, Y)
+		  as when the player is standing on the floor.  This enables the player to gain/lose
+		  momentum vertically while swimming.
+		* The look up and look down keys should not snap back.
+		* When the player presses the forward/backward keys, she should be moved in the
+		  full (X, Y, Z) direction vector generated by ViewRot rather than just (X, Y),
+		  enabling you to swim in whatever direction you're looking.
+		* The A & Z keys should enable the player to swim up and down (as happens in fly mode now).
+	Note that INDEX_NONE is now MAXINT instead of 65535
+	Note several replacements of MAXWORD with INDEX_NONE I made in the actor code
+	Note minor changes to: Root.tcx
+	All weapon classes need bNoSmooth=1 (to prevent dithering the weapon textures)
+	Screenshot key needs to go altogether; it doesn't 't work in new color depths, and isn't worth fixing.
+	UnMsgs changes:
+		* Deleted LevelClosing, SetPlayMode, GetProp, SetProp, Day, Night,
+		  Weapon, UnWeapon
+		* Added new comments
+		* Corresponding Root.cpp changes (minor).
+	Added EnumDef EClientUpdateType to Root.tcx
+	AWoman metrics: (1) Mesh needs to appear to stand exactly on the ground when added in
+		a level, and (2) when you walk up to another AWoman, you should see exactly
+		eye-to-eye.
+	Exporting enumeration to C++ header now includes tag_MAX, so please use different
+		enum prefixes on different enums (EAI_Task and EAI_Move both use EAI_...)
+	Do you have any insight into how to create automatic conversion functions that could
+		convert, for example, APawn's directly to AActor's without a cast?  I had to
+		set up the inheretance chart this way so that the actor list can be traversed via
+		AActor pointer walking:
+		AActorHelper
+			AActor
+			APawnHelper
+				APawn
+				...etc
+		The problem with this approach is that APawnHelper's aren't descendents of AActor's.
+		This is messy but I wanted to assure that sizeof(APawn)==sizeof(AActor) etc.
+	Note addition to Camera class in Pawn.utx default properties:
+		Location=(-500.0,-300.0,300.0)
+		DrawRot=(0,16384,0)
+
+///////////////////////////////////////////////////////////////////////////////
+
+>>Old: Mark & Ammon:
+	Make sure all of your code compiles with no warnings at level 4.  If you need
+		to use #pragma warning (disable : ####) that's fine.
+	The only info that should appear in the log is info that will be useful to us
+		in tracking down the cause of crashes.  Please remove any log messages that
+		aren't directly useful, like the GetProfileInteger stuff, and add any in which
+		will be useful, like major subsystem init/exit events.
+
+>>Old: Mark:
+	When playing in a window and mouse look is set to "always on", the view shouldn't
+		snap back to looking forward when the mouse buttons are released.
+	When gravity is reversed (i.e. GravityVector.Z >= 0.0), you should skip the
+		ZCollision check and treat the player as if he is always falling. To test,
+		go into "Level Properties" and set the level gravity's Z component to a
+		positive number.
+	New player control problems:
+		* Yawing with the keyboard suddenly got really slippery. It should be the way it was...
+		* All cheets lock up hard.
+		* Mouse looking up/down should move 2X faster (mouse moving forward/backward is fine as is).
+		* A lot of stairs which I could climb up previously are now unclimbable because they're too
+		  high.  All stairs climbable in previous versions should still be climbable.
+
+>>Old: Ammon:
+	Stuff that includes <windows.h> needs to go in the Windows project.  If you need
+		only a trivial function from Windows (GetTickCount? - this didn't seem to
+		be referenced...) then let Mark or I know and we can add it to FGlobalPlatform
+		so that you don't have to include the evil <windows.h>. :)
+	Music needs to be loadable/savable/browsable by resource so that I can finish off the 
+		new 'level properties' dialog.  You could either cram it into a UAmbient, or create
+		a new resource type and browser for it.  I guess it might as well be a UAmbient, since
+		that will simplify things.
+	Note that I added a new stub function USound::Flip to the sound resource type. Thiss
+		will be for byte order conversion.
+	Can you make all of the audio parameters in the "audio properties" dialog take effect
+		instantly? This is really needed for all options except for enabling/disabling
+		DirectSound. Players need to get instant feedback on the effect of these settings.
+	Need a selectable sampling rate (11K/22K/44K) since this will have a big impact
+		on performance. People with slower machines may want to turn this down (or they may
+		want to leave it up)...but either way, they need the option.
+	Panning is still messed up.  The panning of a gunshot which I'm firing depends on the
+		direction which I'm facing!  Obviously sounds emmanating from the player should not
+		be panned.  I think you need to handle this as with ambients, when sounds fade towards
+		center as they get really near to the player.
+
+>>Lion Entertainment:
+	* Let's start going with the "master source/platform-specific source" setup so that we're
+	  working with a common version of all of the main Unreal source.
+	* I hope your Mac compiler supports QWORD's (__int64's).  If not, make life easy and
+	  create a C++ class called __int64 with all of the needed operators and conversions.
+	  The rendering code makes heavy use of QWORD's.
+	* Let's hope that our compiler allocate bitfields the same way...
+
+///////////////////////////////////////////////////////////////////////////////

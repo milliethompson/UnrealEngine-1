@@ -12,7 +12,7 @@
 #pragma DISABLE_OPTIMIZATION /* Non performance critical code */
 
 /*-----------------------------------------------------------------------------
-	FGlobalDefaults implementation
+	FGlobalDefaults implementation.
 -----------------------------------------------------------------------------*/
 
 //
@@ -22,93 +22,90 @@
 // editor is active.
 //
 void FGlobalDefaults::Init(char *ThisCmdLine)
-	{
-	GUARD;
-	//
-	// Process command-line parameters:
-	//
+{
+	guard(FGlobalDefaults::Init);
+
+	// Process command-line parameters.
 	strcpy(CmdLine,ThisCmdLine);
-	if (*CmdLine) debugf (LOG_Info,"CmdLine is %s",CmdLine);
-	GApp->Log(LOG_Info,"CmdLine is so totally screwed.");
-	//
-	// Memory grabber:
-	//
+	if (*CmdLine)
+		debugf (LOG_Info,"CmdLine is '%s'",CmdLine);
+
+	// Memory grabber.
 	GlobalsMemSize	= 8 * 1024 * 1024;
 	DynamicsMemSize	= 8 * 1024 * 1024;
-	//
-	// Camera properties:
-	//
+
+	// Camera properties.
 	FrameRate		= 35;
 	CameraSXR 		= 320;
 	CameraSYR 		= 200;
-	//
+
     CameraSXR = GApp->GetProfileInteger("Screen","CameraSXR",320);
     CameraSYR = GApp->GetProfileInteger("Screen","CameraSYR",200);
-	//
-	// Resource manager properties:
-	//
+
+	// Resource manager properties.
 	MaxRes			= 4096;
-	MaxNames		= 8192; /* Must be at least 800 for actor system's hardcoded messages */
+	MaxNames		= 8192;
 	MaxFiles		= 32;
 	MaxTypes		= 64;
-	//
-	// Audio properties:
-	//
+	
+	// Audio properties.
 	AudioActive	= 1; GetONOFF (CmdLine,"AUDIO=",&AudioActive);
-	//
-	// Transaction tracking:
-	//
+
+	// Transaction tracking.
 	MaxTrans     	= 80;
 	MaxChanges		= 12000;
-	MaxDataOffset	= 2048 * 1024; // 2 megs
+	MaxDataOffset	= 2048 * 1024; // 2 megs undo buffer.
+
+	// Camera.
+	Fov	= 95.0; GetFLOAT (CmdLine,"FOV=",&Fov);
 	//
-	// Camera:
-	//
-	FOV	= 95.0; GetFLOAT (CmdLine,"FOV=",&FOV);
-	//
-	// Startup level (FILE= or first command-line parameter):
-	//
-	if (!GetSTRING (CmdLine,"FILE=",AutoLevel,256))
-		{
-		if ((!mystrstr(CmdLine,MAP_EXTENSION)) ||
+	// Startup level (FILE= or first command-line parameter).
+	if( !GetSTRING (CmdLine,"FILE=",AutoLevel,256) )
+	{
+		if( (!mystrstr(CmdLine,MAP_EXTENSION)) ||
 			((mystrstr(CmdLine,MAP_EXTENSION)>strstr(CmdLine,"=")) &&
-			strstr(CmdLine,"=")))
-			{
+			strstr(CmdLine,"=")) )
+		{
 			strcpy (AutoLevel,DEFAULT_STARTUP_FNAME);
-			}
+		}
 		else
-			{
+		{
 			strcpy(AutoLevel,CmdLine);
 			if (strchr(AutoLevel,' ')) *strchr(AutoLevel,' ')=0;
-			};
-		};
-	//
-	// Startup URL:
-	//
+		}
+	}
+
+	// Startup URL.
 	AutoURL[0]=0;
 	if (GetSTRING (CmdLine,"URL=",AutoURL,256))
-		{
+	{
 		appError("Sorry, Unreal URLs are not yet supported!");
-		};
-	//
-	// Editor:
-	//
+	}
+
+	// Editor.
 	LaunchEditor = GetParam (CmdLine,"EDITOR");
-	if (LaunchEditor)
-		{
+	if( LaunchEditor )
+	{
 		debug (LOG_Init,"UnrealServer spawned for editing");
-		}
+	}
 	else
-		{
+	{
 		debug (LOG_Init,"UnrealServer spawned for gameplay");
-		};
+	}
 	GetDWORD (CmdLine,"HWND=",&GApp->hWndParent);
 	GetINT   (CmdLine,"RATE=",&FrameRate);
-	//
-	UNGUARD("FGlobalParams::Init");
-	};
-void FGlobalDefaults::Exit(void) {};
+
+	unguard;
+}
+
+//
+// Shut down the defaults.
+//
+void FGlobalDefaults::Exit()
+{
+	// Nothing to do.
+}
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/

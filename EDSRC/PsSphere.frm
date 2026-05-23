@@ -3,8 +3,8 @@ Begin VB.Form frmParSolSphere
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Build a Sphere/Dome"
    ClientHeight    =   5475
-   ClientLeft      =   3060
-   ClientTop       =   3285
+   ClientLeft      =   6930
+   ClientTop       =   2715
    ClientWidth     =   2640
    ControlBox      =   0   'False
    BeginProperty Font 
@@ -20,13 +20,13 @@ Begin VB.Form frmParSolSphere
    Height          =   5835
    HelpContextID   =   154
    Icon            =   "PsSphere.frx":0000
-   Left            =   3000
+   Left            =   6870
    LinkTopic       =   "Form5"
    MaxButton       =   0   'False
    ScaleHeight     =   5475
    ScaleWidth      =   2640
    ShowInTaskbar   =   0   'False
-   Top             =   2985
+   Top             =   2415
    Width           =   2760
    Begin Threed.SSPanel SSPanel1 
       Height          =   2175
@@ -120,7 +120,7 @@ Begin VB.Form frmParSolSphere
       EndProperty
       Height          =   375
       Left            =   960
-      TabIndex        =   16
+      TabIndex        =   6
       Top             =   5040
       Width           =   735
    End
@@ -139,6 +139,7 @@ Begin VB.Form frmParSolSphere
       Left            =   720
       TabIndex        =   8
       Top             =   2400
+      Value           =   -1  'True
       Width           =   735
    End
    Begin VB.OptionButton IsHollow 
@@ -156,7 +157,6 @@ Begin VB.Form frmParSolSphere
       Left            =   1560
       TabIndex        =   9
       Top             =   2400
-      Value           =   -1  'True
       Width           =   855
    End
    Begin VB.TextBox Group 
@@ -294,7 +294,7 @@ Begin VB.Form frmParSolSphere
       Caption         =   "Trigger"
       Height          =   255
       Left            =   360
-      TabIndex        =   15
+      TabIndex        =   16
       Top             =   4800
       Visible         =   0   'False
       Width           =   615
@@ -314,7 +314,7 @@ Begin VB.Form frmParSolSphere
       EndProperty
       Height          =   255
       Left            =   240
-      TabIndex        =   14
+      TabIndex        =   15
       Top             =   4200
       Width           =   1095
    End
@@ -333,7 +333,7 @@ Begin VB.Form frmParSolSphere
       EndProperty
       Height          =   255
       Left            =   0
-      TabIndex        =   13
+      TabIndex        =   14
       Top             =   3840
       Width           =   1335
    End
@@ -352,7 +352,7 @@ Begin VB.Form frmParSolSphere
       EndProperty
       Height          =   255
       Left            =   120
-      TabIndex        =   12
+      TabIndex        =   13
       Top             =   2760
       Width           =   1215
    End
@@ -371,7 +371,7 @@ Begin VB.Form frmParSolSphere
       EndProperty
       Height          =   255
       Left            =   120
-      TabIndex        =   11
+      TabIndex        =   12
       Top             =   3120
       Width           =   1215
    End
@@ -390,7 +390,7 @@ Begin VB.Form frmParSolSphere
       EndProperty
       Height          =   255
       Left            =   120
-      TabIndex        =   10
+      TabIndex        =   11
       Top             =   3480
       Width           =   1215
    End
@@ -409,7 +409,7 @@ Begin VB.Form frmParSolSphere
       EndProperty
       Height          =   375
       Left            =   120
-      TabIndex        =   6
+      TabIndex        =   10
       Top             =   4560
       Width           =   2535
    End
@@ -703,5 +703,28 @@ End Sub
 
 Private Sub VerticalStripes_Change()
     DrawLines (2)
+End Sub
+
+'
+' Focus change highlighting routines.
+'
+Private Sub OuterRadius_GotFocus()
+    SelectAll OuterRadius
+End Sub
+
+Private Sub InnerRadius_GotFocus()
+    SelectAll InnerRadius
+End Sub
+
+Private Sub RadialStripes_GotFocus()
+    SelectAll RadialStripes
+End Sub
+
+Private Sub VerticalStripes_GotFocus()
+    SelectAll VerticalStripes
+End Sub
+
+Private Sub Group_GotFocus()
+    SelectAll Group
 End Sub
 

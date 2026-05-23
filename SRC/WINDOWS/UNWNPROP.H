@@ -1,12 +1,26 @@
-// UnWnProp.h : header file
+/*============================================================================
+UnWnProp.h: Properties dialog
+Used by: 
+
+Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
+
+Description:
+    This defines the CDialog-based MFC class to handle the properties dialog.
+
+Revision history:
+    * xx/xx/96: Created by Mark
+============================================================================*/
 
 /////////////////////////////////////////////////////////////////////////////
 // CDialogProperties dialog
 
+#include "Unreal.h"
+
 class CDialogProperties : public CDialog
 {
 public:
-	CDialogProperties(CWnd* pParent = NULL);   // standard constructor
+	CDialogProperties(UCamera * Camera, CWnd* pParent = NULL);   // standard constructor
     BOOL OnInitDialog();
     void DestroyCurrentPage(); // Destroy any existing window in PageDialog.
     void StartNewPage(); // Show a new page for the currently selected tab.
@@ -49,6 +63,8 @@ protected:
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 
+private:
+    UCamera * Camera;
     typedef enum // The various pages for the tab group, in the order they appear.
     {
         NoPage              // Indicates no page (always 0)

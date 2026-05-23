@@ -19,9 +19,9 @@
 // Will be replaced with FMovingBrushTracker after initial development
 //
 UNREAL_API void sporeInit(ULevel *Level);
-UNREAL_API void sporeExit(void);
+UNREAL_API void sporeExit();
 UNREAL_API void sporeLock(ILevel *Level);
-UNREAL_API void sporeUnlock(void);
+UNREAL_API void sporeUnlock();
 UNREAL_API void sporeUpdate(INDEX iActor);
 UNREAL_API void sporeFlush(INDEX iActor);
 UNREAL_API int  sporeSurfIsDynamic(INDEX iSurf);

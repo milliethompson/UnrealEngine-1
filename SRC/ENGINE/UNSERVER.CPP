@@ -8,10 +8,7 @@
 		* Created by Tim Sweeney
 =============================================================================*/
 
-#include "time.h"
-
 #include "Unreal.h"
-#include "UnAction.h"
 #include "UnCheat.h"
 
 enum {MAX_SERVER_PLAYERS	= 256};
@@ -24,13 +21,14 @@ enum {MAX_WORLD_LEVELS		= 64};
 //
 // Start up the server
 //
-void FUnrealServer::Init (void)
+void FUnrealServer::Init()
 	{
 	GUARD;
 	//
-	Ticks  = 0;
-	Rate   = 35; 
-	IsPaused = FALSE;
+	Ticks		= 0;
+	Rate		= 35; 
+	IsPaused	= FALSE;
+	NoCollision = 0;
 	//
 	// Allocate server array:
 	//
@@ -43,12 +41,12 @@ void FUnrealServer::Init (void)
 	// Add all newly-allocated resources to the server array for tracking:
 	//
 	ServerArray->Add(Players);
-	GRes.Root->Add(ServerArray);
+	GRes.AddToRoot(ServerArray);
 	//
 	// Allocate the world:
 	//
 	Levels = new("World",CREATE_Unique)TArray<ULevel >(MAX_WORLD_LEVELS);
-	GRes.Root->Add(Levels);
+	GRes.AddToRoot(Levels);
 	//
 	// Allocate first level:
 	//
@@ -66,7 +64,7 @@ void FUnrealServer::Init (void)
 //
 // Shut down the server
 //
-void FUnrealServer::Exit (void)
+void FUnrealServer::Exit()
 	{
 	GUARD;
 	//
@@ -92,8 +90,10 @@ void FUnrealServer::Exit (void)
 	//
 	// Remove from root array:
 	//
-	GRes.Root->Delete(ServerArray); ServerArray->Kill();
-	GRes.Root->Delete(Levels);
+	GRes.RemoveFromRoot(ServerArray); 
+	ServerArray->Kill();
+	//
+	GRes.RemoveFromRoot(Levels);
 	Levels->Kill();
 	//
 	debugf (LOG_Exit,"Server shut down, %i player(s) logged off",PlayerCount);
@@ -118,37 +118,41 @@ int FUnrealServer::Exec(const char *Cmd,FOutputDevice *Out)
 			}
 		else return 0;
 		}
-	else if (GetCMD(&Str,"LEVELS"))
-		{
-		Out->Log("Levels:");
-		for (int i=0; i<Levels->Num; i++)
-			{
-			ULevel *Level = Levels->Element(i);
-			//
-			int n=0;
-			for (int i=0; i<Players->Num; i++) if (Players->Element(i)->Level==Level) n++;
-			//
-			Out->Logf("   %s (%i players): %s",Level->Name,n,GLevelStateDescr[Level->GetState()]);
-			};
-		Out->Logf("%i level(s)",Levels->Num);
-		return 1;
-		}
 	else if (GetCMD(&Str,"PLAYERSONLY"))
 		{
 		PlayersOnly ^= 1;
 		Out->Log(PlayersOnly ? "Updating players only" : "Updating all actors");
 		return 1;
 		}
-	else if (GetCMD(&Str,"PLAYERS"))
+	else if (GetCMD(&Str,"COLLISION"))
 		{
-		Out->Log("Players:");
-		for (int i=0; i<Players->Num; i++)
-			{
-			UPlayer *Player = Players->Element(i);
-			Out->Logf("   %s (%s)",Player->Name,Player->Level ? Player->Level->Name : "none");
-			};
-		Out->Logf("%i player(s)",Players->Num);
+		NoCollision ^= 1;
 		return 1;
+		}
+	else if (GetCMD(&Str,"DEBUG"))
+		{
+		if (GetCMD(&Str,"CRASH"))
+			{
+			appError ("Unreal crashed at your request");
+			return 1;
+			}
+		else if (GetCMD(&Str,"GPF"))
+			{
+			Out->Log("Unreal crashing with voluntary GPF");
+			*(int *)NULL = 123;
+			return 1;
+			}
+		else if (GetCMD(&Str,"EATMEM"))
+			{
+			Out->Log("Eating up all available memory");
+			while (1)
+				{
+				void *Eat = GApp->Malloc(65536,"EatMem");
+				memset(Eat,0,65536);
+				};
+			return 1;
+			}
+		else return 0;
 		}
 	else return 0; // Not executed
 	//
@@ -222,7 +226,7 @@ void FUnrealServer::LogoutSocket (FSocket *Socket)
 //
 // Server task exit function.
 //
-void FUnrealServer::TaskExit(void)
+void FUnrealServer::TaskExit()
 	{
 	GUARD;
 	// Does nothing
@@ -253,7 +257,7 @@ char *FUnrealServer::TaskStatus(char *Name,char *Desc)
 // of all updating (when editing a level with player controls, the editor
 // cameras handle kTick calls).
 //
-void FUnrealServer::TaskTick(void)
+void FUnrealServer::TaskTick()
 {
 	GUARD;
 
@@ -280,8 +284,9 @@ void FUnrealServer::TaskTick(void)
 	// Update virtual (server-based) ticks:
 	if (!IsPaused) Ticks++;
 
-	// Refresh memory cache:
-	if(!IsPaused) GCache.Tick();
+	// Note: We don't refresh the cache here; we refresh it
+	// in the rendering code instead, since it's more sensible
+	// to tick it once per frame rendered than once per tick.
 
 	// Find active (input) camera:
 	ActiveCamera 	= NULL;
@@ -299,18 +304,6 @@ void FUnrealServer::TaskTick(void)
 		}
 	}
 
-	// Set time info:
-	time_t Time;	time(&Time);
-	tm LocalTime;	LocalTime = *localtime(&Time);
-
-	MSec	= 0;
-	Second	= LocalTime.tm_sec;
-	Minute	= LocalTime.tm_min;
-	Hour	= LocalTime.tm_hour;
-	Day		= LocalTime.tm_mday;
-	Month	= LocalTime.tm_mon+1;
-	Year	= LocalTime.tm_year;
-
 	// Update all in-play levels:
 	for (i=0; i<Levels->Num; i++)
 	{
@@ -321,9 +314,9 @@ void FUnrealServer::TaskTick(void)
 
 		if (IsPlay || (IsEdit && ActiveCamera && ActiveCamera->IsRealtime()))
 		{
-            if( Level==ActiveLevel && IsPlay && iActiveActor != INDEX_NONE && ActiveCamera != 0 )
+            if( Level==ActiveLevel /*&& IsPlay*/ && iActiveActor != INDEX_NONE && ActiveCamera != 0 && ActiveCamera->Current )
             {
-                GAction.UpdateStatus(GInput,ActiveCamera->Console->IsTyping());
+                ActiveCamera->Console->UpdateActionStatus();
             }
             if( !IsPaused )
             {
@@ -348,13 +341,21 @@ void UPlayer::Register(FResourceType *Type)
 	strcpy (Type->Descr,"Player");
 	UNGUARD("UPlayer::Register");
 	};
-void UPlayer::InitHeader(void)
+void UPlayer::InitHeader()
 	{
 	GUARD;
 	Socket	= NULL;
 	Level   = NULL;
 	iActor	= INDEX_NONE;
 	UNGUARD("UPlayer::InitHeader");
+	};
+void UPlayer::Flip()
+	{
+	GUARD;
+	//
+	appError("Not implemented; resource type is not saveable.");
+	//
+	UNGUARD("UPlayer::Flip");
 	};
 AUTOREGISTER_RESOURCE(RES_Player,UPlayer,0xB2D90874,0xCCD211cf,0x91360000,0xC028B992);
 

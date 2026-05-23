@@ -21,118 +21,119 @@ extern CUnrealWnApp theApp;
 	static char THIS_FILE[] = __FILE__;
 #endif
 
-#define ENABLE_TIMER /* Undefine this to disable timer support */
-
 void CALLBACK TimerCallback (UINT uID, UINT uMsg, DWORD dwUser, DWORD dw1, DWORD dw2);
 
 /////////////////////////////////////////////////////////////////////////////
-// Timer Callback: A non-class function
+// Timer Callback: A non-class function.
 /////////////////////////////////////////////////////////////////////////////
 
 void CALLBACK TimerCallback (UINT uID, UINT uMsg, DWORD dwUser, DWORD dw1, DWORD dw2)
-	{
+{
 	CUnrealTimer *ThisTimer = (CUnrealTimer *)dwUser;
-	//
-	if (!App.Platform.ServerAlive) return;
-	if (uID != ThisTimer->TimerHandle) ThisTimer->TimerBug=1;
-	//
+
+	if (!App.Platform.ServerAlive)
+		return;
+	
+	if (uID != ThisTimer->TimerHandle)
+		ThisTimer->TimerBug=1;
+
 	ThisTimer->TimerTicks++;
-	//
-	PostMessage(App.Dialog->m_hWnd,WM_UNREALTIMER,0,(LPARAM)App.Platform.TimeUSec());
-	};
+
+	PostMessage(App.Dialog->m_hWnd,WM_UNREALTIMER,0,(LPARAM)App.Platform.MicrosecondTime());
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// Constructor
+// Constructor.
 /////////////////////////////////////////////////////////////////////////////
 
-CUnrealTimer::CUnrealTimer(void)
-	{
+CUnrealTimer::CUnrealTimer()
+{
 	TimerHandle	= 0;
 	TimerPeriod	= 0;
 	TimerRate	= 1000;
 	TimerTicks	= 0;
 	TimerBug	= 0;
 	TimerAlive	= 0;
-	};
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// Enable and disable
+// Enable and disable.
 /////////////////////////////////////////////////////////////////////////////
 
-void CUnrealTimer::Enable (void)
-	{
+void CUnrealTimer::Enable()
+{
 	if (!TimerAlive)
-		{
+	{
 		return;
-		}
+	}
 	else if (TimerHandle!=0)
-		{
+	{
 		App.Platform.Log (LOG_Win,"CUnrealTimer::Enable: Already enabled");
-		}
+	}
 	else
-		{
-		#ifdef ENABLE_TIMER
-			TimerHandle = timeSetEvent(1000/TimerRate,250/TimerRate, TimerCallback,(DWORD)this,TIME_PERIODIC);
-			if (TimerHandle==0) App.Platform.Error ("CUnrealTimer::Enable: Timer failed");
-		#endif
-		};
-	};
-
-void CUnrealTimer::Disable (void)
 	{
+		TimerHandle = timeSetEvent(1000/TimerRate,250/TimerRate, TimerCallback,(DWORD)this,TIME_PERIODIC);
+		
+		if (TimerHandle==0) 
+			App.Platform.Error ("CUnrealTimer::Enable: Timer failed");
+	}
+}
+
+void CUnrealTimer::Disable()
+{
 	if (!TimerAlive)
-		{
-		return;
-		}
-	else if (TimerHandle==0)
-		{
-		App.Platform.Log(LOG_Win,"CUnrealTimer::Disable: Timer already disabled");
-		}
-	else
-		{
-		#ifdef ENABLE_TIMER
-			timeKillEvent (TimerHandle);
-		#endif
-		TimerHandle=0;
-		};
-	};
-
-/////////////////////////////////////////////////////////////////////////////
-// Init and exit
-/////////////////////////////////////////////////////////////////////////////
-
-void CUnrealTimer::Init (DWORD NewTimerRate)
 	{
+		return;
+	}
+	else if (TimerHandle==0)
+	{
+		App.Platform.Log(LOG_Win,"CUnrealTimer::Disable: Timer already disabled");
+	}
+	else
+	{
+		timeKillEvent (TimerHandle);
+		TimerHandle=0;
+	}
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Init and exit.
+/////////////////////////////////////////////////////////////////////////////
+
+void CUnrealTimer::Init(DWORD NewTimerRate)
+{
 	TIMECAPS Caps;
-	//
+
 	TimerTicks  = 0;
 	TimerRate   = NewTimerRate;
-	//
-	if (timeGetDevCaps(&Caps,sizeof(Caps))!=TIMERR_NOERROR) App.Platform.Error("CUnrealTimer::Enable: Timer is unavailable");
-	//
+
+	if (timeGetDevCaps(&Caps,sizeof(Caps))!=TIMERR_NOERROR) 
+		App.Platform.Error("CUnrealTimer::Enable: Timer is unavailable");
+
 	App.Platform.Logf (LOG_Init,"Timer initialized, %i fps",TimerRate);
-	//
+
 	TimerPeriod = timeBeginPeriod(250/TimerRate);
-	if (TimerPeriod!=TIMERR_NOERROR)App.Platform.Error ("CUnrealTimer::Enable: Timer is not working");
-	//
+	if (TimerPeriod!=TIMERR_NOERROR)
+		App.Platform.Error ("CUnrealTimer::Enable: Timer is not working");
+
 	TimerAlive = 1;
 	Enable();
-	};
+}
 
-void CUnrealTimer::Exit (void)
+void CUnrealTimer::Exit()
+{
+	if( TimerAlive )
 	{
-	if (TimerAlive)
-		{
 		Disable();
 		if (timeEndPeriod(250/TimerRate)!=TIMERR_NOERROR)
-			{
+		{
 			App.Platform.Log(LOG_Critical,"Error in timeEndPeriod");
-			};
+		}
 		App.Platform.Log(LOG_Exit,"Timer shut down");
-		};
+	}
 	TimerAlive = 0;
-	};
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// The End
+// The End.
 /////////////////////////////////////////////////////////////////////////////

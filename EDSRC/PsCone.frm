@@ -3,8 +3,8 @@ Begin VB.Form frmParSolCone
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Build a Cone/Spire"
    ClientHeight    =   6795
-   ClientLeft      =   8970
-   ClientTop       =   1335
+   ClientLeft      =   1695
+   ClientTop       =   1200
    ClientWidth     =   2850
    ControlBox      =   0   'False
    BeginProperty Font 
@@ -17,15 +17,15 @@ Begin VB.Form frmParSolCone
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   7200
+   Height          =   7155
    HelpContextID   =   150
-   Left            =   8910
+   Left            =   1635
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    ScaleHeight     =   6795
    ScaleWidth      =   2850
    ShowInTaskbar   =   0   'False
-   Top             =   990
+   Top             =   900
    Width           =   2970
    Begin VB.CheckBox chkAlignSide 
       Caption         =   "Align to Side"
@@ -40,7 +40,7 @@ Begin VB.Form frmParSolCone
       EndProperty
       Height          =   252
       Left            =   120
-      TabIndex        =   25
+      TabIndex        =   12
       Top             =   3120
       Value           =   1  'Checked
       Width           =   1572
@@ -48,7 +48,7 @@ Begin VB.Form frmParSolCone
    Begin Threed.SSPanel SSPanel1 
       Height          =   2535
       Left            =   120
-      TabIndex        =   20
+      TabIndex        =   21
       Top             =   120
       Width           =   2655
       _Version        =   65536
@@ -138,7 +138,7 @@ Begin VB.Form frmParSolCone
          EndProperty
          Height          =   495
          Left            =   2040
-         TabIndex        =   24
+         TabIndex        =   25
          Top             =   120
          Width           =   615
       End
@@ -157,7 +157,7 @@ Begin VB.Form frmParSolCone
          EndProperty
          Height          =   255
          Left            =   1320
-         TabIndex        =   23
+         TabIndex        =   24
          Top             =   2160
          Width           =   1215
       End
@@ -176,7 +176,7 @@ Begin VB.Form frmParSolCone
          EndProperty
          Height          =   255
          Left            =   240
-         TabIndex        =   22
+         TabIndex        =   23
          Top             =   2040
          Width           =   1095
       End
@@ -195,7 +195,7 @@ Begin VB.Form frmParSolCone
          EndProperty
          Height          =   255
          Left            =   240
-         TabIndex        =   21
+         TabIndex        =   22
          Top             =   600
          Width           =   615
       End
@@ -309,7 +309,7 @@ Begin VB.Form frmParSolCone
       EndProperty
       Height          =   375
       Left            =   1080
-      TabIndex        =   19
+      TabIndex        =   7
       Top             =   6360
       Width           =   615
    End
@@ -345,9 +345,8 @@ Begin VB.Form frmParSolCone
       EndProperty
       Height          =   255
       Left            =   1920
-      TabIndex        =   10
+      TabIndex        =   11
       Top             =   2760
-      Value           =   -1  'True
       Width           =   975
    End
    Begin VB.OptionButton optHollow 
@@ -363,7 +362,7 @@ Begin VB.Form frmParSolCone
       EndProperty
       Height          =   255
       Left            =   960
-      TabIndex        =   9
+      TabIndex        =   10
       Top             =   2760
       Width           =   855
    End
@@ -380,8 +379,9 @@ Begin VB.Form frmParSolCone
       EndProperty
       Height          =   255
       Left            =   120
-      TabIndex        =   8
+      TabIndex        =   9
       Top             =   2760
+      Value           =   -1  'True
       Width           =   735
    End
    Begin VB.CommandButton Command3 
@@ -398,7 +398,7 @@ Begin VB.Form frmParSolCone
       EndProperty
       Height          =   375
       Left            =   1800
-      TabIndex        =   7
+      TabIndex        =   8
       Top             =   6360
       Width           =   855
    End
@@ -523,7 +523,7 @@ Begin VB.Form frmParSolCone
       ForeColor       =   &H80000008&
       Height          =   252
       Left            =   2040
-      TabIndex        =   18
+      TabIndex        =   20
       Top             =   6000
       Visible         =   0   'False
       Width           =   612
@@ -544,7 +544,7 @@ Begin VB.Form frmParSolCone
       EndProperty
       Height          =   492
       Left            =   360
-      TabIndex        =   17
+      TabIndex        =   19
       Top             =   5760
       Width           =   2292
    End
@@ -566,7 +566,7 @@ Begin VB.Form frmParSolCone
       ForeColor       =   &H80000008&
       Height          =   252
       Left            =   120
-      TabIndex        =   16
+      TabIndex        =   18
       Top             =   5400
       Width           =   972
    End
@@ -587,7 +587,7 @@ Begin VB.Form frmParSolCone
       ForeColor       =   &H00000000&
       Height          =   252
       Left            =   600
-      TabIndex        =   15
+      TabIndex        =   17
       Top             =   4920
       Width           =   492
    End
@@ -608,7 +608,7 @@ Begin VB.Form frmParSolCone
       ForeColor       =   &H00000000&
       Height          =   252
       Left            =   120
-      TabIndex        =   14
+      TabIndex        =   16
       Top             =   4560
       Width           =   972
    End
@@ -629,7 +629,7 @@ Begin VB.Form frmParSolCone
       ForeColor       =   &H00000000&
       Height          =   252
       Left            =   600
-      TabIndex        =   13
+      TabIndex        =   15
       Top             =   3480
       Width           =   492
    End
@@ -650,7 +650,7 @@ Begin VB.Form frmParSolCone
       ForeColor       =   &H00000000&
       Height          =   252
       Left            =   240
-      TabIndex        =   12
+      TabIndex        =   14
       Top             =   3840
       Width           =   852
    End
@@ -671,7 +671,7 @@ Begin VB.Form frmParSolCone
       ForeColor       =   &H00000000&
       Height          =   252
       Left            =   120
-      TabIndex        =   11
+      TabIndex        =   13
       Top             =   4200
       Width           =   972
    End
@@ -1147,3 +1147,29 @@ Private Sub Trigger_Change()
     Build_Click
 End Sub
 
+'
+' Focus change highlighting routines.
+'
+Private Sub txtHeight_GotFocus()
+    SelectAll txtHeight
+End Sub
+
+Private Sub txtCapHeight_GotFocus()
+    SelectAll txtCapHeight
+End Sub
+
+Private Sub txtOuterRadius_GotFocus()
+    SelectAll txtOuterRadius
+End Sub
+
+Private Sub txtInnerRadius_GotFocus()
+    SelectAll txtInnerRadius
+End Sub
+
+Private Sub txtSides_GotFocus()
+    SelectAll txtSides
+End Sub
+
+Private Sub Group_GotFocus()
+    SelectAll Group
+End Sub

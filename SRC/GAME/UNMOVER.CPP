@@ -87,7 +87,6 @@ int AMover::Process(ILevel *Level, FName Message, void *Params)
 			// Must implement !!
 			return 1;
 		case ACTOR_Tick:
-			//
 			DrawRot += FreeRotation;
 			if (bMoving) // Moving
 				{
@@ -143,16 +142,29 @@ int AMover::Process(ILevel *Level, FName Message, void *Params)
 						break;
 					};
 				};
-			if (Brush && (Brush->Location != Location) || (Brush->Rotation != DrawRot))
+			if( Brush && (Brush->Location!=Location || Brush->Rotation!=DrawRot) )
 				{
 				for (int i=0; i<16; i++)
 					{
 					if (iSlaves[i]!=INDEX_NONE)
 						{
-						AActor *Slave = &Level->Actors->Element(iSlaves[i]);
-						Slave->Location    += Location    - Brush->Location;
-						Slave->DrawRot     += DrawRot     - Brush->Rotation;
-						Slave->ViewRot.Yaw += DrawRot.Yaw - Brush->Rotation.Yaw;
+						AActor &Slave = Level->Actors->Element(iSlaves[i]);
+
+						// Adjust for center of rotation.
+						FRotation AdjustRot;
+						FVector Out;
+						FCoords Coords;
+
+						AdjustRot.Make(0,MaskAngle(DrawRot.Yaw)-MaskAngle(Brush->Rotation.Yaw),0);
+						Coords = GMath.UnitCoords;
+						Coords.TransformByRotation(AdjustRot);
+						Out = Slave.Location - Brush->Location;
+						Out.TransformVector(Coords);
+						Slave.Location = Location + Out;
+
+						// Adjust for simple rotation.
+						Slave.DrawRot.Yaw += DrawRot.Yaw - Brush->Rotation.Yaw;
+						Slave.ViewRot.Yaw += DrawRot.Yaw - Brush->Rotation.Yaw;
 						};
 					};
 				sporeUpdate(iMe);
@@ -165,11 +177,14 @@ int AMover::Process(ILevel *Level, FName Message, void *Params)
 				{
 				case MT_TriggerOpenTimed:
 				case MT_TriggerControl:
+
 					// Open it
 					KeyInfo.KeyNum = 1;
 					Level->SendMessage(iMe,ACTOR_KeyMoveTo,&KeyInfo);
 					break;
+
 				case MT_TriggerToggle:
+
 					// Toggle it
 					KeyInfo.KeyNum = KeyNum ? 0 : 1;
 					Level->SendMessage(iMe,ACTOR_KeyMoveTo,&KeyInfo);
@@ -201,14 +216,15 @@ int AMover::Process(ILevel *Level, FName Message, void *Params)
 			{
 			if (BumpPlayerDamage != 0.0)
 				{
-			    //FActor & Mover  = FActor::Actor(*this);
-				//FActor & Target = FActor::Actor(((PHit *)Params)->iActor);
-				//Mover.CauseDamage(Target,BumpDamage,0.0);
+                const PTouch TouchInfo = PTouch::Convert(Params);
+			    FActor & Mover  = FActor::Actor(*this);
+				FActor & Target = FActor::Actor(TouchInfo.iActor);
+				Mover.CauseDamage(Target,BumpPlayerDamage);
 				};
 			PKeyMove KeyInfo;
-			if (bTrigger && (!bMoving) && (KeyNum==0) && (EventName!=NAME_NONE)) // Trigger other events
+			if (bTrigger && (!bMoving) && (KeyNum==0) && (Event!=NAME_NONE)) // Trigger other events
 				{
-				Level->SendMessageEx(ACTOR_Trigger,Params,INDEX_NONE,EventName,NULL);
+				Level->SendMessageEx(ACTOR_Trigger,Params,INDEX_NONE,Event,NULL);
 				if (bTriggerOnceOnly)
 					{
 					MoverTriggerType = MT_None;
@@ -225,14 +241,14 @@ int AMover::Process(ILevel *Level, FName Message, void *Params)
 					break;
 				};
 			};
-			return 1;
+			return 0;
 		case ACTOR_UnTouch:
 			PKeyMove KeyInfo;
-			if (bTrigger && (EventName!=NAME_NONE)) // Trigger other events
+			if (bTrigger && (Event!=NAME_NONE)) // Trigger other events
 				{
 				PTouch TouchParams;
 				TouchParams.iActor = iMe;
-				Level->SendMessageEx(ACTOR_UnTrigger,&TouchParams,INDEX_NONE,EventName,NULL);
+				Level->SendMessageEx(ACTOR_UnTrigger,&TouchParams,INDEX_NONE,Event,NULL);
 				};
 			switch (MoverTriggerType)
 				{

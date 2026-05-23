@@ -1,5 +1,5 @@
 '
-' Mover
+' Mover.
 '
 
 DeclareClass Name=Mover
@@ -8,61 +8,70 @@ Begin Class Name=Mover
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 '
-' This is a built-in Unreal class and it shouldn't be modified
+' The moving brush class.
+' This is a built-in Unreal class and it shouldn't be modified.
 '
-Class Mover Expands Root Intrinsic
+Class Mover Expands Actor Intrinsic
 
-' How the mover should react when it bumps into an actor
+' How the mover should react when it bumps into an actor.
 EnumDef EMoverBumpType = MB_StopWhenBump, MB_ReturnWhenBump, _
    MB_CrushWhenBump
 
-' How the mover should respond to Trigger/UnTrigger/Touch/UnTouch
+' How the mover should respond to Trigger/UnTrigger/Touch/UnTouch.
 EnumDef EMoverTriggerType = MT_None, MT_TriggerOpenTimed, MT_TriggerToggle, _
    MT_TriggerControl, MT_TriggerCycleOn, MT_TriggerCycleOff, MT_TriggerInstant, _
    MT_ProximityOpenTimed, MT_ProximityControl, _
    MT_StandOpenTimed
 
-' How the mover moves from one position to the other
+' How the mover moves from one position to the other.
 EnumDef EMoverGlideType = MV_MoveByTime, MV_GlideByTime, MV_Sinusoid
 
-Dim MoverBumpType as Editable EMoverBumpType
-Dim MoverTriggerType as Editable EMoverTriggerType
-Dim MoverGlideType as Editable EMoverGlideType
-Dim KeyNum as Editable Byte
-Dim WorldRaytraceKey as Editable Byte
-Dim BrushRaytraceKey as Editable Byte
-Dim PrevKeyNum as Byte
-Dim MoverTime as Editable Integer
-Dim RemainOpenTime as Editable Integer
-Dim BumpPlayerDamage as Editable Real
-Dim bCanInterruptMove as Editable Boolean
-Dim bSlave as Editable Boolean
-Dim bTrigger as Editable Boolean
-Dim bAdded as Boolean
-Dim bMoving as Boolean
-Dim bReverseWhenDone as Boolean
-Dim bDynamicShadows as Boolean
-Dim bTriggerOnceOnly as Editable Boolean
+' Mover style.
+Dim MoverBumpType    As Editable EMoverBumpType
+Dim MoverTriggerType As Editable EMoverTriggerType
+Dim MoverGlideType   As Editable EMoverGlideType
 
-Dim OpenSound as Editable Sound ' When hit full-open position
-Dim ClosedSound as Editable Sound ' When hit full-closed position
-Dim MoveAmbientSound as Editable Sound ' Ambient sound when moving
+' Keyframes.
+Dim KeyNum           As Editable Byte     ' Current (if still) or destination (if moving) keyframe.
+Dim PrevKeyNum       As Byte              ' If moving, the previous keyframe.
+Dim WorldRaytraceKey As Editable Byte     ' In UnrealEd, raytrace the world with the brush here.
+Dim BrushRaytraceKey As Editable Byte     ' In UnrealEd, raytrace the brush here.
 
-'
-' Array of 4 keyframe offsets:
-'
+' Movement parameters.
+Dim MoverTime        As Editable Integer  ' Time to spend moving between keyframes.
+Dim RemainOpenTime   As Editable Integer  ' How long to remain open before closing.
+Dim BumpPlayerDamage As Editable Real     ' How much to damage player if we bump him.
+Dim FreeRotation     As Editable Rotation ' For freely rotating brushes.
+
+' Mover flags.
+Dim bCanInterruptMove As Editable Boolean ' Whether additional trigger msgs interrupt movement.
+Dim bSlave           As Editable Boolean  ' This brush is a slave to its event.
+Dim bTrigger         As Editable Boolean  ' This brush acts as a trigger.
+Dim bMoving          As Boolean
+Dim bReverseWhenDone As Boolean
+Dim bTriggerOnceOnly As Editable Boolean
+
+' Audio.
+Dim OpenSound        As Editable Sound ' When hit full-open position
+Dim ClosedSound      As Editable Sound ' When hit full-closed position
+Dim MoveAmbientSound As Editable Sound ' Ambient sound when moving
+
+' Array of 4 keyframe position offsets.
 Dim KeyPos (4) as Vector
 Dim KeyRot (4) as Rotation
-Dim FreeRotation as Editable Rotation
 
-' Base absolute location and rotation
-Dim BasePos as Vector,   OldPos as Vector
-Dim BaseRot as Rotation, OldRot as Rotation
+' Base absolute location and rotation.
 
-' Movement parameters
-Dim CurTime as Integer
-Dim HoldTime as Integer
-Dim Slaves(16) as Actor
+' Internal: Do not modify these by script.
+Dim Slaves(16)   As Actor     ' List of actors standing on this brush.
+Dim BasePos      As Vector    ' For interpolating movement.
+Dim OldPos       As Vector    ' For interpolating movement.
+Dim BaseRot      As Rotation  ' For interpolating movement.
+Dim OldRot       As Rotation  ' For interpolating movement.
+Dim CurTime      As Integer
+Dim HoldTime     As Integer
+Dim bAdded       As Boolean
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -157,4 +166,3 @@ Dim Slaves(16) as Actor
 	  DefaultEdCategory=Mover
    End DefaultProperties
 End Class
-

@@ -79,6 +79,8 @@ Public GridX As Integer
 Public GridY As Integer
 Public GridZ As Integer
 Public AutoSaveTime As Integer ' Minutes
+Public AutoUnique As Integer
+Public AutoCounter As Integer
 Public InitialFiles As String
 Public InitialMacro As String
 
@@ -214,17 +216,6 @@ Public Sub HideEditor()
     '
 End Sub
 
-Sub CloseLevelWindows()
-    '
-    ' Close all windows related to the current level.
-    ' Done before loading or creating new levels so that
-    ' old information doesn't get sucked into new maps
-    ' via DDE.
-    '
-    Unload frmLevel
-    '
-End Sub
-
 '
 ' Open a camera with specified properties.
 '    X,Y   = location on screen, in pixels
@@ -232,7 +223,7 @@ End Sub
 '    Menu  = 1 for camera to have a menu, 0 for none.
 '
 Public Sub OpenCamera(Reopen As Boolean, _
-    X As Integer, y As Integer, _
+    X As Integer, Y As Integer, _
     XR As Integer, YR As Integer, _
     Flags As Long, _
     RenType As Long, Name As String)
@@ -243,7 +234,7 @@ Public Sub OpenCamera(Reopen As Boolean, _
     '
     Cmd = Cmd & " HWND=" & Trim(Str(frmMain.CameraHolder.hwnd))
     Cmd = Cmd & " X=" & Trim(Str(X))
-    Cmd = Cmd & " Y=" & Trim(Str(y))
+    Cmd = Cmd & " Y=" & Trim(Str(Y))
     Cmd = Cmd & " XR=" & Trim(Str(XR))
     Cmd = Cmd & " YR=" & Trim(Str(YR))
     Cmd = Cmd & " FOV=" & Trim(Str(Ed.FOV))
@@ -292,13 +283,13 @@ End Sub
 '
 ' Set the editor's grid size
 '
-Sub SetGridSize(X As Integer, y As Integer, _
+Sub SetGridSize(X As Integer, Y As Integer, _
     Z As Integer)
     '
-    Server.Exec "MAP GRID X=" & Trim(Str(X)) & " Y=" & Trim(Str(y)) & " Z=" & Trim(Str(Z))
+    Server.Exec "MAP GRID X=" & Trim(Str(X)) & " Y=" & Trim(Str(Y)) & " Z=" & Trim(Str(Z))
     '
     GridX = X
-    GridY = y
+    GridY = Y
     GridZ = Z
     '
     Call ResetGridSize
@@ -414,6 +405,8 @@ Public Sub SaveProfile()
     '
     Call SetUserHeading("Preferences")
     Call SetUserInfo("AutoSaveTime", Str(AutoSaveTime))
+    Call SetUserInfo("AutoUnique", Str(AutoUnique))
+    Call SetUserInfo("AutoCounter", Str(AutoCounter))
     Call SetUserInfo("InitialFiles060", InitialFiles)
     Call SetUserInfo("InitialMacro", InitialMacro)
     Call SetUserInfo("ToolbarPos", Str(ToolbarPos))
@@ -489,6 +482,8 @@ Public Sub GetProfile()
     '
     SetUserHeading ("Preferences")
     AutoSaveTime = Val(GetUserInfo("AutoSaveTime", "10"))
+    AutoUnique = Val(GetUserInfo("AutoUnique", "0"))
+    AutoCounter = Val(GetUserInfo("AutoCounter", "0"))
     InitialFiles = GetUserInfo("InitialFiles075", "")
     'InitialFiles = GetUserInfo("InitialFiles075", BaseDir + "Textures\Wood.utx")
     InitialMacro = GetUserInfo("InitialMacro", "")
@@ -582,7 +577,7 @@ End Sub
 ' OLE servers.
 '
 Public Sub SetOnTop(F As Variant, Name As String, Pos As Integer)
-    Dim X As Integer, y As Integer, i As Integer
+    Dim X As Integer, Y As Integer, i As Integer
     Dim R As RECT
     '
     Select Case Pos

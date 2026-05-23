@@ -153,6 +153,44 @@ BOOL FParse::GetFloat(const char * & Text, float & Value )
     return Found;
 }
 
+
+//----------------------------------------------------------------------------
+//               Get an integer value
+//----------------------------------------------------------------------------
+BOOL FParse::GetInteger(const char * & Text, int & Value )
+{
+    SkipWhiteSpace(Text);
+    int Total = 0; // Computed total as decimal digits are read.
+    int Sign = +1; // -1 for negative, +1 for positive.
+    Value = 0;
+    int DigitCount = 0;
+    const char * CheckText = Text;
+    if( CheckText[0] == '+' )
+    {
+        Sign = +1;
+        CheckText++;
+    }
+    else if( CheckText[0] == '-' )
+    {
+        Sign = -1;
+        CheckText++;
+    }
+    while( isdigit( CheckText[0] ) )
+    {
+        Value = Value*10 + int( CheckText[0] - '0' );
+        DigitCount++;
+        CheckText++;
+    }
+    const BOOL Found = DigitCount > 0 && ( isspace( CheckText[0] ) || CheckText[0]==0 );
+    if( Found )
+    {
+        Value = Sign * Value;
+        Text = CheckText;
+        SkipWhiteSpace(Text);
+    }
+    return Found;
+}
+
 //----------------------------------------------------------------------------
 //        Does the text end with a given string?
 //----------------------------------------------------------------------------

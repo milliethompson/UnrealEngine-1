@@ -45,7 +45,7 @@ static void Dump(const AIAnimations & Animations,int First, int Count)
 //               Copy an animation to an Actor
 //----------------------------------------------------------------------------
 // This makes the Actor start doing the animation.
-void AIAnimation::CopyTo(ARoot & Actor) const
+void AIAnimation::CopyTo(AActor & Actor) const
 {
     Actor.AnimSeq       = Sequence  ;
     Actor.AnimRate      = Rate      ;
@@ -61,7 +61,7 @@ void AIAnimation::CopyTo(ARoot & Actor) const
 //               Copy an Actor's animation 
 //----------------------------------------------------------------------------
 // This preserves the animation, although the current frame is not saved.
-void AIAnimation::CopyFrom(const ARoot & Actor)
+void AIAnimation::CopyFrom(const AActor & Actor)
 {
     Sequence    = Actor.AnimSeq     ;
     Rate        = Actor.AnimRate    ;
@@ -74,7 +74,7 @@ void AIAnimation::CopyFrom(const ARoot & Actor)
 //----------------------------------------------------------------------------
 //            Remove the next animation to Actor.
 //----------------------------------------------------------------------------
-void AIAnimations::MoveNextTo(ARoot & Actor)
+void AIAnimations::MoveNextTo(AActor & Actor)
 {
     if( Count() > 0 )
     {
@@ -87,7 +87,7 @@ void AIAnimations::MoveNextTo(ARoot & Actor)
 //----------------------------------------------------------------------------
 //      Move the animation in Actor to the front of the list.
 //----------------------------------------------------------------------------
-void AIAnimations::GetFirstFrom(ARoot & Actor)
+void AIAnimations::GetFirstFrom(AActor & Actor)
 {
     //tba (if we need this) or //tbd (if we don't need this)
     checkVital( FALSE, "GetFirstFrom not working" );

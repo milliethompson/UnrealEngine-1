@@ -1,33 +1,48 @@
 VERSION 4.00
 Begin VB.Form frmActorProperties 
-   AutoRedraw      =   -1  'True
    BorderStyle     =   5  'Sizable ToolWindow
    Caption         =   "Actor Properties"
-   ClientHeight    =   6720
-   ClientLeft      =   5715
-   ClientTop       =   3180
-   ClientWidth     =   5085
+   ClientHeight    =   6780
+   ClientLeft      =   6720
+   ClientTop       =   3315
+   ClientWidth     =   5115
    ForeColor       =   &H80000008&
-   Height          =   7125
+   Height          =   7140
    HelpContextID   =   113
    Icon            =   "ActPrp.frx":0000
    KeyPreview      =   -1  'True
-   Left            =   5655
+   Left            =   6660
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
    MinButton       =   0   'False
-   ScaleHeight     =   6720
-   ScaleWidth      =   5085
+   ScaleHeight     =   6780
+   ScaleWidth      =   5115
    ShowInTaskbar   =   0   'False
-   Top             =   2835
-   Width           =   5205
+   Top             =   3015
+   Width           =   5235
+   Begin VB.CommandButton NextCat 
+      Caption         =   ">"
+      Height          =   285
+      Left            =   1635
+      TabIndex        =   14
+      Top             =   30
+      Width           =   180
+   End
+   Begin VB.CommandButton PrevCat 
+      Caption         =   "<"
+      Height          =   285
+      Left            =   1455
+      TabIndex        =   13
+      Top             =   30
+      Width           =   180
+   End
    Begin VB.ComboBox Category 
       Height          =   315
-      Left            =   1620
+      Left            =   1845
       Style           =   2  'Dropdown List
       TabIndex        =   12
-      Top             =   20
-      Width           =   3435
+      Top             =   15
+      Width           =   3270
    End
    Begin VB.VScrollBar PropScroll 
       Height          =   5895
@@ -166,7 +181,7 @@ Begin VB.Form frmActorProperties
       Left            =   60
       TabIndex        =   11
       Top             =   60
-      Width           =   1455
+      Width           =   1335
    End
 End
 Attribute VB_Name = "frmActorProperties"
@@ -190,10 +205,10 @@ Dim ScreenRows As Integer
 Dim OldWidth As Integer
 Dim SettingCombo As Integer
 Dim WasEmpty As Boolean
+Dim HolderForm As Form
 '
 Const MinWidth = 3500
 Const MaxWidth = 7000
-Const AllString = "(All)"
 
 '
 ' Re-get properties from list of selected actors
@@ -206,7 +221,7 @@ Public Sub GetSelectedActors()
     '
     EndEdit (True)
     '
-    GActorPropsAction = 1
+    GActorPropsAction = AP_Selected
     GPropString = "Properties"
     GCatString = "PropCats"
     N = Val(Ed.Server.GetProp("Actor", "NumSelected"))
@@ -242,7 +257,7 @@ Public Sub GetClassDefaultActor(Classname As String)
     '
     EndEdit (True)
     '
-    GActorPropsAction = 2
+    GActorPropsAction = AP_Class
     GPropString = "DefaultProperties CLASS=" & Quotes(Classname)
     GCatString = "DefaultPropCats CLASS=" & Quotes(Classname)
     '
@@ -252,11 +267,27 @@ Public Sub GetClassDefaultActor(Classname As String)
 End Sub
 
 '
+' Get level descriptor properties
+'
+Public Sub GetLevelProperties()
+    '
+    EndEdit (True)
+    '
+    GActorPropsAction = AP_Level
+    GPropString = "LevelProperties"
+    GCatString = "DefaultPropCats CLASS=" & Quotes("LevelDescriptor")
+    '
+    Caption = "Level Properties"
+    '
+    ParsePropList
+End Sub
+
+'
 ' Notifys the actor properties dialog that properties have
 ' changed, used in script editor refresh logic
 '
 Public Sub NoteClassChange()
-    If GActorPropsAction <> 0 Then
+    If GActorPropsAction <> AP_None Then
         ParsePropList
     End If
 End Sub
@@ -388,9 +419,17 @@ Private Sub Form_Resize()
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
-    'Unload frmBrushMove
-    GActorPropsAction = 0
+    GActorPropsAction = AP_None
     Call Ed.EndOnTop(Me)
+    Set HolderForm = Nothing
+End Sub
+
+Private Sub NextCat_Click()
+    If Category.ListIndex < (Category.ListCount - 1) Then
+        Category.ListIndex = Category.ListIndex + 1
+    Else
+        Category.ListIndex = 0
+    End If
 End Sub
 
 Private Sub peText_Change()
@@ -448,6 +487,14 @@ Private Sub peText_KeyPress(KeyAscii As Integer)
         PressedEsc = True
         EndEdit (True) ' Abort current editing
         BeginEdit ' Restart editing with original property
+    End If
+End Sub
+
+Private Sub PrevCat_Click()
+    If Category.ListIndex > 0 Then
+        Category.ListIndex = Category.ListIndex - 1
+    Else
+        Category.ListIndex = Category.ListCount - 1
     End If
 End Sub
 
@@ -693,10 +740,10 @@ End Sub
 
 Private Sub ParsePropList()
     Dim PropList As String, PropCats As String
-    Dim iStart As Integer, iEnd As Integer, Y As Integer, i As Integer
+    Dim iStart As Integer, iEnd As Integer, Y As Integer, i As Integer, Z As Integer
     Dim S As String, Add As String
-    Dim DesiredName As String
-    Dim DesiredY As Integer
+    Dim DesiredName As String, DefCat As String
+    Dim DesiredY As Integer, j As Integer
     '
     Scrolling = Scrolling + 1
     PropGrid.SelStartCol = 3
@@ -705,9 +752,11 @@ Private Sub ParsePropList()
     ' If was empty previously, set default category
     ' ---------------------------------------------
     '
+    S = (Ed.Server.GetProp("Actor", GPropString & " NAME=DefaultEdCategory"))
+    Call GetString(S, "DefaultEdCategory=", DefCat)
+    '
     If WasEmpty Then
-        S = (Ed.Server.GetProp("Actor", GPropString & " NAME=DefaultEdCategory"))
-        Call GetString(S, "DefaultEdCategory=", CurCategory)
+        CurCategory = DefCat
     End If
     '
     ' Update categories
@@ -716,7 +765,9 @@ Private Sub ParsePropList()
     Category.Clear
     '
     i = 0
+    j = 0
     Y = 0
+    Z = 0
     PropCats = Ed.Server.GetProp("Actor", GCatString)
     While PropCats <> ""
         S = Trim(GrabString(PropCats))
@@ -724,15 +775,25 @@ Private Sub ParsePropList()
         If S = CurCategory Then
             Category.ListIndex = i
             Y = 1
+        ElseIf S = DefCat Then
+            j = i
+            Z = 1
         End If
         i = i + 1
     Wend
     '
-    Category.AddItem AllString
+    If Category.ListCount <> 1 Then
+        Category.AddItem AllString
+    End If
+    '
     If CurCategory = AllString Then
         Category.ListIndex = i
     ElseIf Y = 0 Then
-        Category.ListIndex = 0
+        If Z = 1 Then
+            Category.ListIndex = j
+        Else
+            Category.ListIndex = 0
+        End If
         CurCategory = Category.List(Category.ListIndex)
     End If
     '
@@ -772,7 +833,7 @@ ParseLoop:
     Loop
     '
 DoneParsing:
-    If PropGrid.Rows > 0 Then PropGrid.RemoveItem 0
+    If PropGrid.Rows > 1 Then PropGrid.RemoveItem 0
     '
     ' Reposition current property:
     '

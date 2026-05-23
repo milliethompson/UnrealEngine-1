@@ -15,13 +15,14 @@
 /*----------------------------------------------------------------------------
 	Platforms:
 		__WIN32__		Windows
+		__MAC__			Macintosh
+		__N64__			Nintendo 64
 
 	Compilers:
 		__MSVC__		Microsoft Visual C++ 4.0
 
 	Byte order:
-		__INTEL__		Intel byte order
-		__NONINTEL__	Non-intel byte order
+		__INTEL__		Intel byte order (otherwise non-Intel byte order)
 ----------------------------------------------------------------------------*/
 
 /*----------------------------------------------------------------------------
@@ -64,14 +65,14 @@
 #include <sys\types.h>
 #endif
 
-#if _MSC_VER
 /*----------------------------------------------------------------------------
-	PC Windows 95/NT: Microsoft Visual C++ 4.0
+	PC Windows 95/NT: Microsoft Visual C++ 4.0 or later
 ----------------------------------------------------------------------------*/
+#if _MSC_VER
 
-#define __MSVC__
-#define __WIN32__
-#define __INTEL__
+#define __MSVC__	1
+#define __WIN32__	1
+#define __INTEL__	1
 
 //
 // Undo any Windows defines
@@ -90,43 +91,8 @@
 	#undef MAXDWORD
 	#undef MAXINT
 	#undef VOID
+	#undef CDECL
 #endif
-
-//
-// Base datatypes
-//
-typedef unsigned char  		BYTE;
-typedef char    			CHAR;
-typedef unsigned short 		WORD;
-typedef unsigned long  		DWORD;
-typedef unsigned __int64	QWORD;
-typedef signed char    		SBYTE;
-typedef signed short   		SWORD;
-typedef signed int    		INT;
-typedef signed __int64 		SQWORD;
-typedef signed int          BOOL;
-typedef float               FLOAT;
-typedef double				DOUBLE;
-typedef void				VOID;
-typedef int					INDEX;		// Index into a list - actors, bsp, etc.
-typedef unsigned int		RESINDEX;	// Resource index into GRes table
-typedef int					ANGLE_TYPE;	// An angle. Only low word matters. 65536=360 degrees.
-
-//
-// Global constants
-//
-enum {MAXBYTE		= 0xff};
-enum {MAXWORD		= 0xffffU};
-enum {MAXDWORD		= 0xffffffffUL};
-enum {MAXSBYTE		= 0x7f};
-enum {MAXSWORD		= 0x7fff};
-enum {MAXINT		= 0x7fffffffL};
-enum {INDEX_NONE	= (INDEX)MAXWORD};
-enum {NAME_NONE		= INDEX_NONE};
-enum {FILE_NONE		= (BYTE)~0};
-enum {NAME_SIZE		= 32};
-enum {RESINDEX_NONE = (RESINDEX)~0};
-enum EBool {FALSE=0, TRUE=1};
 
 //
 // Optimization macros (preceeded by #pragma):
@@ -137,7 +103,7 @@ enum EBool {FALSE=0, TRUE=1};
 //
 // Assembly code
 //
-#ifdef ASM
+#if ASM
 	#define ASMVAR extern
 #else
 	#define ASMVAR
@@ -148,9 +114,8 @@ enum EBool {FALSE=0, TRUE=1};
 //
 #define DLL_IMPORT	__declspec(dllimport)	/* Import function from DLL */
 #define DLL_EXPORT  __declspec(dllexport)	/* Export function to DLL */
-#define IUNKNOWN    __stdcall				/* Component object model standard call */
-#define IUNKNOWNV   __cdecl					/* Component object model variable argument call */
 #define VARARGS     __cdecl					/* Functions with variable arguments */
+#define CDECL	    __cdecl					/* Standard C function */
 
 //
 // API defines used so that Unreal headers work both when 
@@ -195,43 +160,71 @@ enum EBool {FALSE=0, TRUE=1};
 //
 // Precision timing (Thanks to Erik de Nieve)
 //
-#ifdef ASM
+#if ASM
 	#pragma warning (disable : 4035) // legalize implied return value EAX
-	inline DWORD TimeCpuCycles(void)
-		{
+	inline unsigned int CPUTIME()
+	{
 		__asm
-			{
-			_emit 0x0F // RDTSC  -  Pentium+ time stamp register to EDX:EAX
-			_emit 0x31 //  use only 32 bits in EAX - even a Ghz cpu would have a 4+ sec
-			};
-		};
+		{
+			xor   eax,eax	// Required so that VC++ realizes EAX is modified
+			_emit 0x0F		// RDTSC  -  Pentium+ time stamp register to EDX:EAX.
+			_emit 0x31		// Use only 32 bits in EAX - even a Ghz cpu would have a 4+ sec period.
+			xor   edx,edx	// Required so that VC++ realizes EDX is modified
+		}
+	}
 	#pragma warning (default : 4035)
-    #define CYCLE_OVERHEAD 14  /* 14 cycles = RDTSC and SUB time */
+    enum{CPUTIME_OVERHEAD=14};  /* 14 cycles = RDTSC and SUB time */
 #else
-	inline DWORD TimeCpuCycles(void) {return 0;};
-	#define CYCLE_OVERHEAD 0
+	inline unsigned int CPUTIME() {return 0;}
+	enum{CPUTIME_OVERHEAD=0};
 #endif
 
-#define ALWAYS_BEGINTIME(StatName) StatName -= TimeCpuCycles();
-#define ALWAYS_ENDTIME(StatName)   StatName += TimeCpuCycles() - CYCLE_OVERHEAD;
-UNREAL_API extern float Cyc2Msec;
-//
-#ifdef STATS_TIMED
-    #define BEGINTIME(StatName)		ALWAYS_BEGINTIME(StatName)
-    #define ENDTIME(StatName)		ALWAYS_ENDTIME(StatName)
+#if NO_CLOCK
+	#define clock(Timer)
+	#define unclock(Timer)
 #else
-	#define BEGINTIME(StatName) /* Do nothing */
-	#define ENDTIME(StatName)   /* Do nothing */
+	#define clock(Timer)   Timer-=CPUTIME();
+	#define unclock(Timer) Timer+=CPUTIME()-CPUTIME_OVERHEAD;
+#endif
+
+#if NO_SLOW_CLOCK
+	#define clockSlow(Timer)
+	#define unclockSlow(Timer)
+#else
+	#define clockSlow(Timer)   Timer-=CPUTIME();
+	#define unclockSlow(Timer) Timer+=CPUTIME()-CPUTIME_OVERHEAD;
 #endif
 
 //
-// Unwanted VC++ warnings to disable:
+//	Base data types
+//
+// Unsigned base types.
+typedef unsigned	char	BYTE;			// 8-bit  unsigned
+typedef unsigned	short	WORD;			// 16-bit unsigned
+typedef unsigned	long	DWORD;			// 32-bit unsigned
+typedef unsigned	__int64	QWORD;			// 64-bit unsigned
+// Signed base types.
+typedef				char	CHAR;			// 8-bit  signed
+typedef signed		short	SWORD;			// 16-bit signed
+typedef signed		int  	INT;			// 32-bit signed
+typedef signed		int 	BOOL;			// 32-bit signed
+typedef signed		__int64 SQWORD;			// 64-bit signed
+// Special types.
+typedef signed		int		INDEX;			// 32-bit signed
+typedef	signed		int		ANGLE_TYPE;		// 32-bit signed
+typedef unsigned	int		RESINDEX;		// 32-bit unsigned
+// Other base types.
+typedef void		VOID;					// Void
+typedef float       FLOAT;					// 32-bit IEEE floating point
+typedef double		DOUBLE;					// 64-bit IEEE double
+
+//
+// Unwanted VC++ level 4 warnings to disable:
 //
 #pragma warning(disable : 4244) /* conversion to float, possible loss of data							*/
 #pragma warning(disable : 4761) /* integral size mismatch in argument; conversion supplied				*/
 #pragma warning(disable : 4699) /* creating precompiled header											*/
 #pragma warning(disable : 4055) /* void pointer casting													*/
-#pragma warning(disable : 4127) /* conditional 'while (1)' is constant									*/
 #pragma warning(disable : 4152) /* function/data pointer conversion										*/
 #pragma warning(disable : 4200) /* Zero-length array item at end of structure, a VC-specific extension	*/
 #pragma warning(disable : 4100) /* unreferenced formal parameter										*/
@@ -239,93 +232,122 @@ UNREAL_API extern float Cyc2Msec;
 #pragma warning(disable : 4201) /* nonstandard extension used : nameless struct/union					*/
 #pragma warning(disable : 4710) /* inline function not expanded											*/
 #pragma warning(disable : 4702) /* unreachable code in inline expanded function							*/
+#pragma warning(disable : 4711) /* function selected for autmatic inlining								*/
+#pragma warning(disable : 4725) /* Pentium fdiv bug														*/
+#pragma warning(disable : 4127) /* Conditional expression is constant									*/
+#pragma warning(disable : 4512) /* assignment operator could not be generated                           */
 
-//
-// VC++ warnings enabled:
-//
-#pragma warning(3       : 4706) /* assignment within conditional expression								*/
-#pragma warning(3       : 4705) /* statement has no effect												*/
-#pragma warning(3       : 4709) /* comma operator within array index expression							*/
-#pragma warning(3       : 4128) /* storage-class specifier after type									*/
-#pragma warning(3       : 4130) /* logical operation on address of string constant						*/
-#pragma warning(3       : 4131) /* function uses old-style declaration									*/
-#pragma warning(3       : 4132) /* const object should be initialized									*/
+#ifndef _CPPUNWIND /* C++ exception handling is disabled; force guarding to be off */
+	#undef NO_GUARD
+	#undef NO_SLOW_GUARD
+	#define NO_GUARD 1
+	#define NO_SLOW_GUARD 1
+#endif
 
-#else
+#ifdef _CHAR_UNSIGNED
+	#error Bad VC++ option: Characters must be signed.
+#endif
+
+#ifndef _M_IX86 /* Not compiling for x86 platform */
+	#undef ASM
+#endif
+
+/*----------------------------------------------------------------------------
+	Some specific mac compiler
+----------------------------------------------------------------------------*/
+#elif USING_SOME_SPECIFIC_MAC_COMPILER /* todo: [Lion] Stick Mac compiler options here */
+
+#define __MAC__		1
+
+/* 
+todo: [Lion]: add in macros and typedefs similar to the above for Windows/Visual C++.
+*/
+
 /*----------------------------------------------------------------------------
 	Unknown compiler
 ----------------------------------------------------------------------------*/
+#else
 
 #error Unknown compiler, not supported by Unreal!
 #endif
 
 /*----------------------------------------------------------------------------
-	Universal types
+	Global constants
 ----------------------------------------------------------------------------*/
 
-//
-// Globally unique identifier
-//
-class FGUID
-	{
-	public:
-    DWORD	Data1;
-    WORD	Data2;
-    WORD	Data3;
-    BYTE	Data4[8];
-	};
+enum {MAXBYTE		= 0xff};
+enum {MAXWORD		= 0xffffU};
+enum {MAXDWORD		= 0xffffffffU};
+enum {MAXSBYTE		= 0x7f};
+enum {MAXSWORD		= 0x7fff};
+enum {MAXINT		= 0x7fffffff};
+enum {INDEX_NONE	= -1};
 
-//
-// Definition of FUnknown, equivalant to Ole IUnknown.
-//
-class UNREAL_API FUnknown
-	{
-	public:
-    DWORD virtual IUNKNOWN AddRef(void);
-    DWORD virtual IUNKNOWN Release(void);
-    DWORD virtual IUNKNOWN QueryInterface(FGUID GUID, void** ppvObj);
-	};
+enum EBool {FALSE=0, TRUE=1};
 
-//
-// Byte swap
-//
-#define BS_WORD(x)  (((x)>>8) | (((x)&0xff)<<8))
-#define BS_DWORD(x) (((x)>>24) | (((x)&0xff0000)>>8) | (((x)&0xff00)<<8) | (((x)&0xff)<<24))
-#define BS_QWORD(x) )((QWORD)BS_DWORD(x)<<32) | ((QWORD)BS_DWORD(x>>32)))
+union RAINBOW_PTR // A union of pointers of all base types.
+{
+	// All pointers.
+	VOID  *PtrVOID;
+	BYTE  *PtrBYTE;
+	WORD  *PtrWORD;
+	DWORD *PtrDWORD;
+	QWORD *PtrQWORD;
+	FLOAT *PtrFLOAT;
 
-//
-// Intel functions
-//
-#ifdef	__INTEL__
-	#define	HOST_WORD(x)   ((WORD)x)
-	#define HOST_SWORD(x)  ((SWORD)x)
-	#define	HOST_DWORD(x)  ((DWORD)x)
-	#define	HOST_QWORD(x)  ((QWORD)x)
-	#define HOST_INT(x)	   ((INT)x)
-	//
-	#define	NET_WORD(x)		BS_WORD(x)
-	#define NET_SWORD(x)	((SWORD)BS_WORD((WORD)x))
-	#define	NET_DWORD(x)	BS_DWORD(x)
-	#define	NET_QWORD(x)	BS_QWORD(x)
-	#define NET_INT(x)		((INT)BS_WORD((DWORD)x))
+	// Conversion constructors.
+	RAINBOW_PTR() {}
+	RAINBOW_PTR(VOID *Ptr) : PtrVOID(Ptr) {};
+};
+
+/*----------------------------------------------------------------------------
+	Byte order conversion
+
+Definitions:
+	local byte order:
+		The natural byte order of the machine we're compiling for. This is
+		either Intel or non-Intel depending on whether __INTEL__ is defined.
+	TCP/IP byte order:
+		The byte order of TCP/IP network headers, always non-Intel.
+	Unreal byte order:
+		The byte order of stuff stored in Unreal resource files and network
+		data packets, always Intel.
+
+Notes:
+	Host and ToHost toggle Unreal byte order <-> local byte order
+	Net  and ToNet  toggle TCP/IP byte order <-> local byte order
+	Host(x)   and Net(x)   return x converted to the proper format.
+	ToHost(x) and ToNet(x) just convert x to the proper format.
+----------------------------------------------------------------------------*/
+
+// Unsigned swappers.
+inline BYTE   Swap(BYTE   x) { return x;                                                              }
+inline WORD   Swap(WORD   x) { return (x>>8) + ((x&0xff)<<8);                                         }
+inline DWORD  Swap(DWORD  x) { return (x>>24) + ((x&0xff0000)>>8) + ((x&0xff00)<<8) + ((x&0xff)<<24); }
+inline QWORD  Swap(QWORD  x) { return (QWORD)Swap((DWORD)x<<32) + (QWORD)Swap((DWORD)x>>32);          }
+
+// Signed swappers.
+inline CHAR   Swap(CHAR   x) { return x;             }
+inline SWORD  Swap(SWORD  x) { return Swap((WORD)x); }
+inline INT    Swap(INT    x) { return Swap((DWORD)x);}
+inline SQWORD Swap(SQWORD x) { return Swap((QWORD)x);}
+
+// Other swappers.
+inline FLOAT  Swap(FLOAT   x) { *(DWORD*)&x = Swap(*(DWORD*)&x); return x;};
+inline DOUBLE Swap(DOUBLE  x) { *(QWORD*)&x = Swap(*(QWORD*)&x); return x;};
+
+// Local platform specific converters.
+#ifdef	__INTEL__ /* Intel byte order */
+	template<class T> T Host(T x) { return x;       }
+	template<class T> T Net (T x) { return Swap(x); }
+#else /* Non-Intel byte order */
+	template<class T> Host(T x) { return Swap(x); }
+	template<class T> Net (T x) { return x;       }
 #endif
 
-//
-// Non-Intel functions
-//
-#ifdef	__NONINTEL__
-	#define	HOST_WORD(x)    BS_WORD(x)
-	#define HOST_SWORD(x)   ((SWORD)BS_WORD((WORD)x))
-	#define	HOST_DWORD(x)   BS_DWORD(x)
-	#define	HOST_QWORD(x)   BS_QWORD(x)
-	#define HOST_INT(x)	    ((INT)BS_WORD((DWORD)x))
-	//
-	#define	NET_WORD(x)		((WORD)x)
-	#define NET_SWORD(x)	((SWORD)x)
-	#define	NET_DWORD(x)	((DWORD)x)
-	#define	NET_QWORD(x)	((QWORD)x)
-	#define NET_INT(x)		((INT)x)
-#endif
+// In-place converters.
+template<class T> void ToHost(T &x) { x = Host (x);    }
+template<class T> void ToNet (T &x) { x = ToNet(x);    }
 
 /*----------------------------------------------------------------------------
 	The End

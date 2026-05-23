@@ -1,5 +1,16 @@
-// UnWnAudD.h : header file
-//
+/*============================================================================
+UnWnAudD.h: Dialog to handle the audio property page
+Used by: Properties dialog to display audio page
+
+Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
+
+Description:
+    This defines the class used to present the audio property page.
+
+Revision history:
+    * xx/xx/96, Created by Mark
+============================================================================*/
 
 /////////////////////////////////////////////////////////////////////////////
 // CDialogAudio dialog
@@ -11,6 +22,7 @@ public:
 	CDialogAudio(CWnd* pParent = NULL);   // standard constructor
     BOOL Accept(); 
     BOOL OnInitDialog();
+    void CDialogAudio::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
         // If input is valid, save the changes and return TRUE. Otherwise,
         // notify the user of errors and return FALSE.
 
@@ -19,8 +31,9 @@ public:
 	enum { IDD = IDD_AUDIO };
 	CSliderCtrl	SoundVolume;
 	CSliderCtrl	MusicVolume;
-	int		SampleRate;
+//	int		SampleRate;
 	BOOL	UseDirectSound;
+	BOOL	EnableFilter;
 	//}}AFX_DATA
 
 

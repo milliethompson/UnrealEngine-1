@@ -7,6 +7,36 @@ Compiled with Visual C++ 4.0.
 
 Description:
 
+    The player has various actions, such as jump, move forward, turn left, 
+    and so on. The actions can be assigned input combos, such as 
+    Shift+CursorUp to run forward. When an input combo is active, its
+    associated action is done. Input combos consist of keyboard keys,
+    mouse buttons, joystick buttons, mouse movements, and joystick movements.
+
+Input Action Mapping:
+
+    Refer to the file with FInput definitions for a description of input combos.
+
+    Each action is assigned a list of combos. Subject to some prioritization,
+    as described below, when a combo is active then the corresponding action
+    is active. A single input sequence (such as pressing a single key) can
+    activate many actions.
+
+    Combo prioritization:
+      This is fairly simple: active combos with more modifiers are
+      used instead of active combos with fewer modifiers, for the same
+      main input. This means, for example, that the combo Shift+CursorUp 
+      will take precedence over the combo CursorUp. Shift+CursorUp, however,
+      does not affect Shift+CursorDown since they do not share the same
+      main input.
+  
+      To be more explicit, the test is done like this: consider all combos
+      with main input X.
+        If there are any active combos with 1 modifier:
+            Activate all the actions associated with those combos.
+        Else If there are any active combos with no modifiers:
+            Activate all the actions associated with those combos.
+
 Revision history:
     * 05/30/96, Created by Mark
 ==============================================================================*/
@@ -34,6 +64,7 @@ public:
     ,   Accelerate              // Speed up.
     ,   BankLeft                // [F] Bank left at normal speed.
     ,   BankRight               // [F] Bank right at normal speed.
+    ,   Brightness              // Adjust fullscreen brightness
     ,   Chat                    // Send a chat message
     ,   ConsoleFull             // Full-sized console.
     ,   ConsoleHalf             // Half-sized console.
@@ -45,7 +76,6 @@ public:
     ,   KeyboardLookShift       // Change moves (originating from keyboard) into looks and turns.
     ,   Kick                    // Kick action.
     ,   LookDown                // Tilt the view up
-    ,   LookFromBehind          // Change view to behind player pawn.
     ,   LookStraight            // Look straight ahead (removes any up/down tilt or roll).
     ,   LookUp                  // Tilt the view up
     ,   LungeBackward           // Move backward with a sudden, short burst of speed.
@@ -72,7 +102,6 @@ public:
     ,   RunRight                // Move right fast.
     ,   RunUp                   // [F] Move up fast.
     ,   ScreenEnlarge           // Make the game window larger
-    ,   ScreenShot              // Take a snapshot of the screen.
     ,   ScreenShrink            // Make the game window smaller
     ,   SlideShift              // Change turns and looks to moves.
     ,   SpinShift               // Changes turns into spins.
@@ -109,6 +138,26 @@ public:
 
     static const char * ActionName(TAction Action);
     static const char * ActionHelp(TAction Action); // Descriptive "help text" for an action.
+    BOOL MustBeKeyboard(TAction Action) const; // Must the action be assigned only to keyboard inputs?
+
+    // Action callbacks:
+    //  For switch-triggered actions which require immediate processing,
+    //  callbacks are used. 
+    //WARNING: Callbacks are not implemented yet.
+    typedef void (*ActionCallbackType) // For immediate action callbacks...
+    (
+        UCamera     * Camera    // Camera for which action takes effect
+    ,   TAction       Action    // The action triggered
+    ,   DWORD         Datum     // Datum specified during RegisterCallback
+    );
+
+    void RegisterCallback( TAction Action, ActionCallbackType Callback, DWORD Datum = 0 );
+        // Register function Callback to be called when the specified Action
+        // is activated. Use Callback==0 to clear the callback for the specified
+        // action. At most one callback (the one specified in the latest call
+        // to this function) can be registered for any action.
+        // You should register callback functions for those actions which require
+        // immediate response. Actions are generally checked 
 
     // Classification of action... (useful for user interface)
     typedef enum
@@ -136,6 +185,7 @@ public:
         void Empty();
     };
 
+    //todo: Use DArray to simplify use of action combo lists:
     struct UNREAL_API TActionCombos // A list of action combos.
     {
         int MaxCount : 16 ; // Maximum actions that can currently fit in List.
@@ -148,7 +198,7 @@ public:
         void Empty(TAction Action); // Remove all definitions for the given action.
         void Empty() { Count = 0; }
         void Free(); 
-        void Finalize() { Free(); }
+        void Exit() { Free(); }
     private:
         void MakeRoom();
     };
@@ -176,6 +226,7 @@ public:
 
     TActionCombos SwitchCombos  [FInput::SwitchCount  ] ; // Action combos associated with switches.
     TActionCombos MovementCombos[FInput::MovementCount] ; // Action combos associated with movements.
+    BOOL IsSwitchedOn(TAction Action, FInput & Input, BOOL IgnoreTypingKeys); // Is the Action active, based on the given input (switches only)?
 
     typedef BYTE TActionStatus; // Defines the status of an action.
 
@@ -234,7 +285,7 @@ public:
     TActionStatus & operator[](TAction Action) { return Status[Action]; }
 
     void Initialize();
-    void Finalize();
+    void Exit();
     void Empty(); // Clear out all definitions.
     void Empty(TAction Action); // Remove all definitions for Action.
     void Reset(); // Reset the state of switches, and status of all actions.
@@ -285,29 +336,35 @@ public:
     TStringList Keys() const; // What are all the keys?
     char * Value(const char * Key) const; // What is the current value for the given key? 
     BOOL SetValue(const char * Key, const char * Value); // Set the value associated with a key.
+    const char * SectionName() const;
 
     void UsePlainMouseMovements( BOOL Use ) { State.UsePlainMouseMovements = Use; }
         // This is a bit of a hack, but sometimes we want to ignore
         // plain (unmodified) mouse movements, such as when playing in
         // a window on the desktop, where mouse movements are greatly
         // exaggerated as the mouse cursor enters or leaves the window.
-
+    void TriggerActions(FInput & Input, FInput::TSwitch Switch, UCamera * Camera); // Trigger any callbacks associated with actions activated by Switch.
+    
     void UpdateSwitchActions(FInput & Input, BOOL IgnoreTypingKeys); // Update state of actions triggered by switches.
     void UpdateMovementActions(FInput & Input); // Update movements and state of actions triggered by movements.
     void UpdateFixedActions(); // Update state of actions which are always on.
     void TransformActions(); // Do transformations on actions (move to turn, turn to slide, and so on)
 
 private:
+    struct CallbackInfoType
+    {
+        ActionCallbackType  Callback    ;
+        DWORD               Datum       ;
+    };
     struct
     {
         BOOL UsePlainMouseMovements ;
         BOOL MouseIsActive          ; // True if UsePlainMouseMovements or if a mouse switch is active.
+        CallbackInfoType Callbacks[ActionCount];
     }
     State;
     void CheckMouseState(FInput & Input); // Sets State.MouseIsActive if a mouse switch is active or if UsePlainMouseMovements.
-    
+    void CreateIndexes(); // Rebuilds any cross- or reverse-indexes.
 };
-
-extern UNREAL_API FAction GAction;
 
 #endif

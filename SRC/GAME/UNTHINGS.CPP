@@ -21,16 +21,35 @@ int ALight::Process(ILevel *Level, FName Message, void *Params)
 		{
 		case ACTOR_Tick:
 			return 0;
-		case ACTOR_Trigger: // Temporary hack for testing triggers. You can remove this
-			LightType = LT_Steady;
-			return 1;
-		case ACTOR_UnTrigger: // Temporary hack for testing triggers. You can remove this
-			LightType = LT_None;
-			return 1;
 		};
 	return 0;
 	UNGUARD("ALight::Process");
 	};
+
+int ASatellite::Process(ILevel *Level, FName Message, void *Params)
+	{
+	GUARD;
+	switch (Message.Index)
+		{
+		case ACTOR_Tick:
+			{
+			if (!Level->Descriptor) return 1;
+			FLOAT Time = 2.0 * PI * (Phase + Level->Descriptor->Time * Period);
+			//
+			FCoords Coords = GMath.UnitCoords;
+			Coords.TransformByRotation(DrawRot);
+			//
+			Location =
+				sin(Time) * Coords.ZAxis +
+				cos(Time) * Coords.XAxis;
+			return 1;
+			};
+		};
+	return 0;
+	UNGUARD("ALight::Process");
+	};
+
+int ASpotlight::Process(ILevel *Level, FName Message, void *Params){return 0;}
 
 /*-----------------------------------------------------------------------------
 	Camera base class

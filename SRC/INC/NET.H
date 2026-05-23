@@ -24,6 +24,7 @@
 ------------------------------------------------------------------------------*/
 
 enum {MAX_PACKET_SIZE = 512};
+enum {NET_NAME_SIZE   = 32};
 
 //
 // The action a particular socket is performing.
@@ -120,7 +121,7 @@ class NPacket
 	// Functions:
 	//
 	virtual void Init(NSocket *SocketToSendThrough);
-	inline void Finalize(void)
+	inline void Finalize()
 		{
 		GUARD;
 		if (Size>MaxSize) appError ("Packet size exceeds maximum");
@@ -138,7 +139,7 @@ class NPacket
 		else return 0;
 		UNGUARD("NPacket::AppendData");
 		};
-	inline int Remaining(void)
+	inline int Remaining()
 		{
 		return MaxSize-Size;
 		};
@@ -169,21 +170,21 @@ class NSocket
 	//
 	// Unreal-callable functions:
 	//
-	virtual ESocketAction GetAction(void);
+	virtual ESocketAction GetAction();
 	virtual void SetAction(ESocketAction NewAction);
 	//
 	// Virtual functions that must be overridden:
 	//
 	virtual int GetPacket (NPacket *PacketToGet) = 0;
 	virtual void SendPacket (NPacket *PacketToSend) = 0;
-	virtual int MaxPacketSize(void) = 0;
-	virtual void Tick(void);
-	virtual void Delete(void);
+	virtual int MaxPacketSize() = 0;
+	virtual void Tick();
+	virtual void Delete();
 	//
 	// Inline:
 	//
-	inline void AssertInitialized(void) {if (!Initialized) appError("Socket not initialized");};
-	inline int IsDead(void) {return GetAction()==NS_DISCONNECTED;};
+	inline void AssertInitialized() {if (!Initialized) appError("Socket not initialized");};
+	inline int IsDead() {return GetAction()==NS_DISCONNECTED;};
 	//
 	// Variables:
 	//
@@ -192,16 +193,16 @@ class NSocket
 	// Private implementation:
 	//
 	protected:
-	#ifdef COMPILING_NETWORK
+#ifdef COMPILING_NETWORK
 	NDriver *Driver;
 	//
 	NSocket() {Initialized=0;};
 	ESocketAction Action;
 	void AssertPacketValidBeforeSend(NPacket *Packet);
-	void AssertValid(void);
+	void AssertValid();
 	//
 	virtual void Init(NDriver *CreatingDriver);
-	#endif
+#endif
 	};
 
 /*------------------------------------------------------------------------------
@@ -230,17 +231,17 @@ class NManager : public FTask
 	virtual NSocket *ClientOpenServer(char *ServerURL,char *ErrorMessage);
 	virtual ENetworkPlayMode BeginGameByUI(char *ResultURL,NSocket **ClientSocket);
 	//
-	virtual void Init(void);
-	virtual void Exit(void);
+	virtual void Init();
+	virtual void Exit();
 	//
-	virtual void TaskTick(void);
-	virtual void TaskExit(void);
+	virtual void TaskTick();
+	virtual void TaskExit();
 	virtual char *TaskStatus(char *Name,char *Desc);
 	//
 	virtual int Exec(const char *Cmd,FOutputDevice *Out=GApp);
 	virtual int RegisterDriver(NDriver *Driver);
 	virtual void UnregisterDriver(NDriver *Driver);
-	virtual void AssertValid(void);
+	virtual void AssertValid();
 	//
 	/////////////
 	// Drivers //
@@ -264,7 +265,7 @@ class NManager : public FTask
 	char LaunchURL[256];
 	//
 	protected:
-	inline void AssertInitialized(void){if (!Initialized)appError("Not initialized");};
+	inline void AssertInitialized(){if (!Initialized)appError("Not initialized");};
 	//
 	int FindAvailableAd(char *LevelName);
 	void DeleteAd(int ServerID);

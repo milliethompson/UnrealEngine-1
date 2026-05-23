@@ -10,29 +10,21 @@
 
 #include "Unreal.h"
 
-//
-// Model spiffing parameters:
-//
-#define SPIFF_MIN 		256		/* Minimum available before more are allocated */
-#define SPIFF_ALLOC		2048	/* Number to alloc during */
-#define SPIFF_MAX		4096	/* Maximum available before shrinking */
-#define SPIFF_LIMIT		65535	/* Overflow */
-
 /*---------------------------------------------------------------------------------------
-	UBspNodes resource implementation
+	UBspNodes resource implementation.
 ---------------------------------------------------------------------------------------*/
 
 void UBspNodes::Register(FResourceType *Type)
-	{
+{
 	GUARD;
 	Type->HeaderSize = sizeof (UBspNodes);
 	Type->RecordSize = sizeof (FBspNode);
 	Type->Version    = 1;
 	strcpy (Type->Descr,"BspNodes");
 	UNGUARD("UBspNodes::Register");
-	};
-void UBspNodes::InitHeader(void)
-	{
+}
+void UBspNodes::InitHeader()
+{
 	GUARD;
 	Num				= 0;
 	Max				= 0;
@@ -40,22 +32,31 @@ void UBspNodes::InitHeader(void)
 	NumUniquePlanes	= 0;
 	for (int i=0; i<64; i++) Zones[i].Connectivity=((QWORD)1)<<i;
 	UNGUARD("UBspNodes::InitHeader");
-	};
-void UBspNodes::InitData(void)
-	{
+}
+void UBspNodes::InitData()
+{
 	GUARD;
 	Num  = 0;
 	for (int i=0; i<64; i++) Zones[i].Connectivity=((QWORD)1)<<i;
 	UNGUARD("UBspNodes::InitData");
-	};
+}
+void UBspNodes::Flip()
+{
+	GUARD;
+
+	UDatabase::Flip();
+	//todo:
+
+	UNGUARD("UBspNodes::Flip");
+}
 AUTOREGISTER_RESOURCE(RES_BspNodes,UBspNodes,0xB2D90860,0xCCD211cf,0x91360000,0xC028B992);
 
 /*---------------------------------------------------------------------------------------
-	UBspSurfs resource implementation
+	UBspSurfs resource implementation.
 ---------------------------------------------------------------------------------------*/
 
 //
-// Resource functions
+// Resource functions.
 //
 void UBspSurfs::Register(FResourceType *Type)
 	{
@@ -76,124 +77,169 @@ void UBspSurfs::QueryDataReferences(FResourceCallback &Callback)
 		};
 	UNGUARD("UBspSurfs::QueryDataReferences");
 	};
+void UBspSurfs::Flip()
+	{
+	GUARD;
+	//
+	UDatabase::Flip();
+	//todo:
+	//
+	UNGUARD("UBspSurfs::Flip");
+	};
 AUTOREGISTER_RESOURCE(RES_BspSurfs,UBspSurfs,0xB2D90861,0xCCD211cf,0x91360000,0xC028B992);
 
 /*---------------------------------------------------------------------------------------
-	ULightMesh implementation
+	ULightMesh implementation.
 ---------------------------------------------------------------------------------------*/
 
 void ULightMesh::Register(FResourceType *Type)
-	{
+{
 	GUARD;
 	Type->HeaderSize = sizeof (ULightMesh);
 	Type->RecordSize = 0;
 	Type->Version    = 1;
 	strcpy (Type->Descr,"LightMesh");
 	UNGUARD("ULightMesh::Register");
-	};
-void ULightMesh::InitHeader(void)
-	{
+}
+void ULightMesh::InitHeader()
+{
 	GUARD;
 	NumIndices   = 0;
 	NumDataBytes = 0;
 	UNGUARD("ULightMesh::InitHeader");
-	};
-void ULightMesh::InitData(void)
-	{
+}
+void ULightMesh::InitData()
+{
 	GUARD;
 	NumIndices   = 0;
 	NumDataBytes = 0;
 	UNGUARD("ULightMesh::InitData");
-	};
-int ULightMesh::QuerySize(void)
-	{
+}
+int ULightMesh::QuerySize()
+{
 	GUARD;
 	return NumDataBytes;
 	UNGUARD("ULightMesh::QuerySize");
-	};
-int ULightMesh::QueryMinSize(void)
-	{
+}
+int ULightMesh::QueryMinSize()
+{
 	GUARD;
 	return QuerySize();
 	UNGUARD("ULightMesh::QueryMinSize");
-	};
+}
+void ULightMesh::Flip()
+{
+	GUARD;
+
+	UResource::Flip();
+	//todo:
+
+	UNGUARD("ULightMesh::Flip");
+}
 AUTOREGISTER_RESOURCE(RES_LightMesh,ULightMesh,0xB2D90862,0xCCD211cf,0x91360000,0xC028B992);
 
 /*---------------------------------------------------------------------------------------
-	UVectors implementation
+	UVectors implementation.
 ---------------------------------------------------------------------------------------*/
 
 void UVectors::Register(FResourceType *Type)
-	{
+{
 	GUARD;
 	Type->HeaderSize = sizeof (UVectors);
 	Type->RecordSize = sizeof (FVector);
 	Type->Version    = 1;
 	strcpy (Type->Descr,"Vectors");
 	UNGUARD("UVectors::Register");
-	};
+}
+void UVectors::Flip()
+{
+	GUARD;
+	//
+	UDatabase::Flip();
+	//todo:
+	//
+	UNGUARD("UVectors::Flip");
+}
 AUTOREGISTER_RESOURCE(RES_Vectors,UVectors,0xB2D90863,0xCCD211cf,0x91360000,0xC028B992);
 
 /*---------------------------------------------------------------------------------------
-	UVertPool implementation
+	UVertPool implementation.
 ---------------------------------------------------------------------------------------*/
 
 void UVertPool::Register(FResourceType *Type)
-	{
+{
 	GUARD;
 	Type->HeaderSize = sizeof (UVertPool);
 	Type->RecordSize = sizeof (FVertPool);
 	Type->Version    = 1;
 	strcpy (Type->Descr,"VertPool");
 	UNGUARD("UVertPool::Register");
-	};
-void UVertPool::InitHeader(void)
-	{
+}
+void UVertPool::InitHeader()
+{
 	GUARD;
 	Max				= 0;
 	Num				= 0;
-	NumSharedSides  = 4; // First 4 shared sides are view frustrum sides
+	NumSharedSides  = 4; // First 4 shared sides are view frustrum sides.
 	UNGUARD("UVertPool::InitHeader");
-	};
-void UVertPool::InitData(void)
-	{
+}
+void UVertPool::InitData()
+{
 	GUARD;
 	Num				= 0;
 	NumSharedSides  = 4;
 	UNGUARD("UVertPool::InitData");
-	};
+}
+void UVertPool::Flip()
+{
+	GUARD;
+
+	UDatabase::Flip();
+	//todo:
+
+	UNGUARD("UVertPool::Flip");
+}
 AUTOREGISTER_RESOURCE(RES_VertPool,UVertPool,0xB2D90864,0xCCD211cf,0x91360000,0xC028B992);
 
 /*---------------------------------------------------------------------------------------
-	UBound implementation
+	UBound implementation.
 ---------------------------------------------------------------------------------------*/
 
 void UBounds::Register(FResourceType *Type)
-	{
+{
 	GUARD;
 	Type->HeaderSize = sizeof (UBounds);
-	Type->RecordSize = sizeof (FBoundingVolume);
+	Type->RecordSize = sizeof (FBoundingRect);
 	Type->Version    = 1;
 	strcpy (Type->Descr,"Bound");
 	UNGUARD("UBound::Register");
-	};
+}
+void UBounds::Flip()
+{
+	GUARD;
+	//
+	UDatabase::Flip();
+	//todo:
+	//
+	UNGUARD("UBounds::Flip");
+}
 AUTOREGISTER_RESOURCE(RES_Bounds,UBounds,0xB2D90865,0xCCD211cf,0x91360000,0xC028B992);
 
 /*---------------------------------------------------------------------------------------
-	UTerrain implementation
+	UTerrain implementation.
 ---------------------------------------------------------------------------------------*/
 
 void UTerrain::Register(FResourceType *Type)
-	{
+{
 	GUARD;
 	Type->HeaderSize = sizeof (UTerrain);
 	Type->RecordSize = sizeof (FTerrainIndex);
 	Type->Version    = 1;
 	strcpy (Type->Descr,"Terrain");
 	UNGUARD("UTerrain::Register");
-	};
-void UTerrain::InitHeader(void)
-	{
+}
+void UTerrain::InitHeader()
+{
 	GUARD;
 	Max = 0;
 	Num = 0;
@@ -208,26 +254,32 @@ void UTerrain::InitHeader(void)
 		TileRefs  [i] = NULL;
 		};
 	UNGUARD("UTerrain::InitHeader");
-	};
+}
 void UTerrain::QueryHeaderReferences(FResourceCallback &Callback)
-	{
+{
 	GUARD;
-	for (int i=0; i<MAX_TERRAIN_LAYERS; i++)
-		{
+	for( int i=0; i<MAX_TERRAIN_LAYERS; i++ )
+	{
 		Callback.Resource (this,(UResource **)&LayerFlags[i],0);
 		Callback.Resource (this,(UResource **)&HeightMaps[i],0);
 		Callback.Resource (this,(UResource **)&TileMaps  [i],0);
-		};
-	for (i=0; i<MAX_TILE_REFERENCES; i++)
-		{
+	}
+	for( i=0; i<MAX_TILE_REFERENCES; i++ )
+	{
 		Callback.Resource (this,(UResource **)&TileRefs  [i],0);
-		};
+	}
 	UNGUARD("UTerrain::QueryHeaderReferences");
-	};
+};
+void UTerrain::Flip()
+{
+	GUARD;
+	//todo:
+	UNGUARD("UTerrain::Flip");
+}
 AUTOREGISTER_RESOURCE(RES_Terrain,UTerrain,0xB2D90867,0xCCD211cf,0x91360000,0xC028B992);
 
 /*---------------------------------------------------------------------------------------
-	UModel resource implementation
+	UModel resource implementation.
 ---------------------------------------------------------------------------------------*/
 
 void UModel::Register(FResourceType *Type)
@@ -240,7 +292,7 @@ void UModel::Register(FResourceType *Type)
 	strcpy (Type->Descr,"Model");
 	UNGUARD("UModel::Register");
 	};
-void UModel::InitHeader(void)
+void UModel::InitHeader()
 	{
 	GUARD;
 	//
@@ -300,7 +352,7 @@ const char *UModel::Import(const char *Buffer, const char *BufferEnd,const char 
 			GetDWORD(StrPtr,"POLYFLAGS=",	&PolyFlags);
 			GetDWORD(StrPtr,"COLOR=",		&Color);
 			//
-			ModelFlags &= ~(MF_NOIMPORT);
+			ModelFlags &= ~(MF_NoImport);
 			}
 		else if (GetCMD(&StrPtr,"LOCATION"))		GetFVECTOR 	(StrPtr,&Location);
 		else if (GetCMD(&StrPtr,"PREPIVOT"))		GetFVECTOR 	(StrPtr,&PrePivot);
@@ -341,13 +393,13 @@ char *UModel::Export(char *Buffer,const char *FileType,int Indent)
 	//
 	UNGUARD("UModel::Export");
 	};
-int UModel::QuerySize(void)
+int UModel::QuerySize()
 	{
 	GUARD;
 	return 0;
 	UNGUARD("UModel::QuerySize");
 	};
-int UModel::QueryMinSize(void)
+int UModel::QueryMinSize()
 	{
 	GUARD;
 	return 0;
@@ -367,10 +419,19 @@ void UModel::QueryHeaderReferences(FResourceCallback &Callback)
 	Callback.Resource (this,(UResource **)&Bounds   ,0);
 	UNGUARD("UModel::QueryHeaderReferences");
 	};
+void UModel::Flip()
+	{
+	GUARD;
+	//
+	UResource::Flip();
+	//todo:
+	//
+	UNGUARD("UModel::Flip");
+	};
 AUTOREGISTER_RESOURCE(RES_Model,UModel,0xB2D90868,0xCCD211cf,0x91360000,0xC028B992);
 
 /*---------------------------------------------------------------------------------------
-	UModel custom implementation
+	UModel custom implementation.
 ---------------------------------------------------------------------------------------*/
 
 //
@@ -379,23 +440,27 @@ AUTOREGISTER_RESOURCE(RES_Model,UModel,0xB2D90868,0xCCD211cf,0x91360000,0xC028B9
 // model resource unstable (possibly invalid) until you unlock it.
 // Return 0 if success, nonzero if problem.
 //
-void UModel::Lock (IModel *ModelInfo,int NewLockType)
+void UModel::Lock( IModel *ModelInfo,int NewLockType )
+{
+	guard(UModel::Lock);
+
+	if( LockType != LOCK_None )
+		appError ("Already locked!");
+
+	// Save all headers for transactional undo/redo.
+	if( GTrans && (NewLockType == LOCK_Trans) )
 	{
-	GUARD;
-	if (LockType != LOCK_None) appError ("modelLock: Already locked!");
-	//
-	if (GTrans && (NewLockType == LOCK_Trans)) // Save all headers for transactional undo/redo:
-		{
 		GTrans->NoteResHeader (this);
 		GTrans->NoteResHeader (BspNodes);
 		GTrans->NoteResHeader (BspSurfs);
 		GTrans->NoteResHeader (Polys);
-		ModelInfo->Trans=1;
-		}
-	else ModelInfo->Trans=0;
-	//
-	LockType=NewLockType; // Lock the model after headers are saved transactionally
-	//
+		ModelInfo->Trans = 1;
+	}
+	else ModelInfo->Trans = 0;
+
+	// Lock the model after headers are saved transactionally.
+	LockType=NewLockType;
+
 	ModelInfo->Model				= this;
 	ModelInfo->BspNodesResource		= BspNodes;
 	ModelInfo->BspSurfsResource		= BspSurfs;
@@ -403,108 +468,109 @@ void UModel::Lock (IModel *ModelInfo,int NewLockType)
 	ModelInfo->LightMesh		 	= LightMesh;
 	ModelInfo->TerrainResource		= Terrain;
 	ModelInfo->BoundsResource		= Bounds;
-	//
-	// Set main info:
-	//
-	if (Vectors)
-		{
+
+	// Set main info.
+	if( Vectors )
+	{
 		ModelInfo->FVectors    = Vectors->GetData();
 		ModelInfo->MaxVectors  = Vectors->Max;
 		ModelInfo->NumVectors  = Vectors->Num;
-		}
+	}
 	else ModelInfo->FVectors = NULL;
-	//
-	if (Points)
-		{
+
+	if( Points )
+	{
 		ModelInfo->FPoints     = Points->GetData();
 		ModelInfo->NumPoints   = Points->Num;
 		ModelInfo->MaxPoints   = Points->Max;
-		}
+	}
 	else ModelInfo->FPoints = NULL;
-	//
-	if (BspNodes)
-		{
+
+	if( BspNodes )
+	{
 		ModelInfo->NumBspNodes		= BspNodes->Num;
 		ModelInfo->MaxBspNodes		= BspNodes->Max;
 		ModelInfo->NumZones			= BspNodes->NumZones;
 		ModelInfo->NumUniquePlanes	= BspNodes->NumUniquePlanes;
 		ModelInfo->BspNodes			= BspNodes->GetData();
-		}
+	}
 	else
-		{
+	{
 		ModelInfo->NumBspNodes		= 0;
 		ModelInfo->MaxBspNodes		= 0;
 		ModelInfo->NumZones			= 0;
 		ModelInfo->NumUniquePlanes	= 0;
 		ModelInfo->BspNodes			= NULL;
-		};
-	//
-	if (BspSurfs)
-		{
+	}
+
+	if( BspSurfs )
+	{
 		ModelInfo->NumBspSurfs = BspSurfs->Num;
 		ModelInfo->MaxBspSurfs = BspSurfs->Max;
 		ModelInfo->BspSurfs    = BspSurfs->GetData();
-		}
+	}
 	else
-		{
+	{
 		ModelInfo->NumBspSurfs = 0;
 		ModelInfo->MaxBspSurfs = 0;
 		ModelInfo->BspSurfs    = NULL;
-		};
-	//
-	if (VertPool)
-		{
+	}
+
+	if( VertPool )
+	{
 		ModelInfo->NumVertPool		= VertPool->Num;
 		ModelInfo->MaxVertPool		= VertPool->Max;
 		ModelInfo->NumSharedSides	= VertPool->NumSharedSides;
 		ModelInfo->VertPool			= VertPool->GetData();
-		}
+	}
 	else
-		{
+	{
 		ModelInfo->NumVertPool		= 0;
 		ModelInfo->MaxVertPool		= 0;
 		ModelInfo->NumSharedSides	= 4;
 		ModelInfo->VertPool			= NULL;
-		};
-	//
-	if (Polys)
-		{
+	}
+
+	if( Polys )
+	{
 		ModelInfo->NumFPolys   = Polys->Num;
 		ModelInfo->MaxFPolys   = Polys->Max;
 		ModelInfo->FPolys      = Polys->GetData();
-		}
+	}
 	else
-		{
+	{
 		ModelInfo->NumFPolys   = 0;
 		ModelInfo->MaxFPolys   = 0;
 		ModelInfo->FPolys      = NULL;
-		};
-	//
-	if (Terrain)
-		{
+	}
+
+	if( Terrain )
+	{
 		ModelInfo->TerrainIndex = Terrain->GetData();
 		ModelInfo->NumTerrain   = Terrain->Num;
 		ModelInfo->MaxTerrain   = Terrain->Max;
-		}
+	}
 	else
-		{
+	{
 		ModelInfo->TerrainIndex = NULL;
 		ModelInfo->NumTerrain   = 0;
 		ModelInfo->MaxTerrain   = 0;
-		};
-	//
-	if (Bounds)
-		{
+	}
+
+	if( Bounds )
+	{
 		ModelInfo->Bounds    = Bounds->GetData();
 		ModelInfo->NumBounds = Bounds->Num;
 		ModelInfo->MaxBounds = Bounds->Max;
-		}
+	}
 	else
-		{
+	{
 		ModelInfo->Bounds    = NULL;
 		ModelInfo->NumBounds = 0;
 		ModelInfo->MaxBounds = 0;
-		};
+	}
+	
+	// Set other info.
 	ModelInfo->Location		= Location;
 	ModelInfo->Rotation		= Rotation;
 	ModelInfo->Scale		= Scale;
@@ -515,9 +581,9 @@ void UModel::Lock (IModel *ModelInfo,int NewLockType)
 	ModelInfo->CsgOper		= CsgOper;
 	ModelInfo->ModelFlags	= ModelFlags;
 	ModelInfo->PolyFlags	= PolyFlags;
-	//
-	UNGUARD("UModel::Lock");
-	};
+
+	unguard;
+}
 
 //
 // Unlock a model.  Updates the necessary info, i.e. number of Bsp
@@ -609,7 +675,7 @@ UModel::UModel(int Editable)
 	int MaxBspNodes = 20000;
 	int MaxBspSurfs = 12000;
 	int MaxVectors  = 8192;
-	int MaxPoints   = 32768+16383;
+	int MaxPoints   = 65530;
 	int MaxVertPool = 65535*2;
 	int MaxBounds   = MaxBspNodes/2;
 	int MaxTerrain  = 4095;
@@ -636,7 +702,7 @@ UModel::UModel(int Editable)
 //
 // Kill a model and all stuff it relies on:
 //
-void UModel::Kill (void)
+void UModel::Kill()
 	{
 	GUARD;
 	UNGUARD("UModel::Kill");
@@ -721,7 +787,7 @@ void UModel::BuildBound(int Transformed)
 	UNGUARD("UModel::BuildBound");
 	};
 
-void UModel::Transform (void)
+void UModel::Transform()
 	{
 	GUARD;
 	IModel			ModelInfo;
@@ -790,7 +856,7 @@ void UModel::CopyPosRotScaleFrom(UModel *OtherModel)
 	};
 
 /*---------------------------------------------------------------------------------------
-	IModel basic implementation (not including physics)
+	IModel basic implementation (not including physics).
 ---------------------------------------------------------------------------------------*/
 
 //
@@ -814,5 +880,5 @@ void IModel::Empty(int EmptyPolyInfo)
 	};
 
 /*---------------------------------------------------------------------------------------
-	The End
+	The End.
 ---------------------------------------------------------------------------------------*/

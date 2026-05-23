@@ -34,7 +34,7 @@ void texQueryTextureForLink (char *FamilyName)
 	{
 	GUARD;
 	FName			Name;
-	int		  		All = !stricmp(FamilyName,"All");
+	int		  		All = !stricmp(FamilyName,"(All)");
 	UTexture		*Texture;
 	//
 	Name.Add(FamilyName);
@@ -71,7 +71,7 @@ void texQueryFamilyForLink (int All)
 	GCurFamResult  = 0;
 	GNumFamResults = 0;
 	//
-	GTempFamList [GNumFamResults++].Add("All");
+	GTempFamList [GNumFamResults++].Add("(All)");
 	FOR_ALL_TYPED_RES(Texture,RES_Texture,UTexture)
 		{
 		ListName = Texture->FamilyName;

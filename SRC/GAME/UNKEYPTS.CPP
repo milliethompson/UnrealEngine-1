@@ -10,6 +10,7 @@
 
 #include "UnGame.h"
 #include "UnFActor.h"
+#include "UnRandom.h"
 
 /*-----------------------------------------------------------------------------
 	Keypoint base class
@@ -50,8 +51,14 @@ int ATeleporter::Process(ILevel *Level, FName Message, void *Params)
                 // Toucher agreed to teleport.
                 // We don't do anything now - we count on the actor doing its own teleportation later.
                 }
-			return ProcessDone;
-            }
+    		return ProcessParent;
+            };
+		case ACTOR_GetLink:
+			{
+			PStringReturn *StringReturn = (PStringReturn *)Params;
+			strcpy(StringReturn->String,TeleportURL);
+			return 1;
+			};
 		};
 	return 0;
 	UNGUARD("ATeleporter::Process");

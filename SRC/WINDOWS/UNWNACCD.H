@@ -1,5 +1,18 @@
-// UnWnAcCD.h : header file
-//
+/*============================================================================
+UnWnAccD.h: Action dialog selection dialog
+Used by: Action dialog for selection which actions to show
+
+Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
+
+Description:
+    This is the class for a small dialog which lets the user
+    select the kinds of actions to show on the actions property
+    page.
+
+Revision history:
+    * xx/xx/96, Created by Mark
+============================================================================*/
 
 /////////////////////////////////////////////////////////////////////////////
 // CDialogSelectActionClasses dialog

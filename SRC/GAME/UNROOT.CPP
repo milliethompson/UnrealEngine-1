@@ -16,7 +16,7 @@
 	Root actor function
 -----------------------------------------------------------------------------*/
 
-int ARoot::Process(ILevel *Level, FName Message, void *Params)
+int AActor::Process(ILevel *Level, FName Message, void *Params)
 	{
 	GUARD;
     FActor & Actor = FActor::Actor(*this);
@@ -49,8 +49,7 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
                 TimerCountdown--;
                 if( TimerCountdown==0 )
                 {
-                    const EActorMessage Message = TimerMessage==0 ? ACTOR_Timer : EActorMessage(TimerMessage); //tbi?
-                    Level->SendMessage( iMe, Message, 0 );
+                    Level->SendMessage( iMe, (TimerMessage!=NAME_NONE)?TimerMessage:ACTOR_Timer, 0 );
                 }
             }
             if( iPendingTeleporter != INDEX_NONE )
@@ -62,7 +61,10 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 			};
 		case ACTOR_Spawn: // Actor was just created
             {
-            Actor.InitializeAI();
+            // Spawned actors don't count in level scoring...
+            Actor.bIsSecretGoal = FALSE;
+            Actor.bIsItemGoal   = FALSE;
+            Actor.bIsKillGoal   = FALSE;
 			return 1;
             }
 		case ACTOR_Destroy: // Actor is about to be destroyed
@@ -71,9 +73,44 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 			return 1;
 		case ACTOR_PreBeginPlay:
 			{
-			AActor *Actor = (AActor *)this;
-			Actor->InitServerInfo();
-			Actor->bSelected = 0;
+			Actor.bSelected = 0;
+			//
+			for( int i=0; i<AActor::MAX_TOUCHING_ACTORS; i++ )
+			{
+				Actor.iTouchingActors[i]=INDEX_NONE;
+			}
+            FActor::Actor(Actor).InitializeAI();
+            Actor.Age = 1;
+                // Notes about age:
+                // We start with an Age of 1. Age is incremented in the ARoot processing for Tick,
+                // which is expected to be called after class-specific processing.
+                // If this convention is followed, then class-specific Tick handlers will 
+                // behave as follows:
+                //  - during the first Tick, the age will be 1
+                //  - subsequent Tick's will have the age incremented by 1
+                //  - when the Tick reaches the LifeSpan (if LifeSpan != 0),
+                //    the root class processing will make the actor die, *but*
+                //    the class-specific handler will first get a Tick message
+                //    with the actor's age equal to LifeSpan.
+            {
+                //todo: Find a cleaner way (and better place) to initialize the level descriptor!
+                static BOOL FirstTime = TRUE; 
+                if( Level->Descriptor != 0 && FirstTime )
+                {
+                    FirstTime = FALSE;
+                    ALevelDescriptor & Descriptor = *Level->Descriptor;
+                    FRandom::Initialize( Descriptor.RandomSeed );
+                    Descriptor.RandomValue = FRandom::Value(0,32767); 
+                    debugf
+                    ( 
+                        LOG_Init
+                    ,   "Level seed: %i  value: %i"
+                    ,   int(Descriptor.RandomSeed)
+                    ,   int(Descriptor.RandomValue) 
+                    );
+                }
+            }
+	
 			//
 			// Kill this actor if its flags aren't appropriate for
 			// this mode of play:
@@ -92,8 +129,18 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 				;
             if( ChanceOfExistence > 0 && ChanceOfExistence < 100 )
             {
+                // Randomly destroy object based on ChanceOfExistence:
                 DestroyIt = DestroyIt || !FRandom::Percent(ChanceOfExistence);
             } 
+            if( !DestroyIt && RandomizerDivider != 0 )
+            {
+                if( Level->Descriptor != 0 )
+                {
+                    // Randomly destroy object based on RandomizerDivider and RandomizerRemainder:
+                    ALevelDescriptor & Descriptor = *Level->Descriptor;
+                    DestroyIt = (Descriptor.RandomValue % RandomizerDivider) != RandomizerRemainder;
+                }
+            }
             if( DestroyIt )
             {
 				Level->DestroyActor(iMe);
@@ -102,8 +149,27 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 			};
 		case ACTOR_BeginPlay:
 			{
-            Actor.InitializeAI();
 			PBeginPlay *PlayInfo = (PBeginPlay *)Params;
+            {
+                // Update the level info with secrets, items, and so on...
+                if( Level->Descriptor != 0 )
+                {
+                    ALevelDescriptor & Descriptor = *Level->Descriptor;
+                    if( bIsSecretGoal )
+                    {
+                        Descriptor.SecretGoals++;
+                    }
+                    if( bIsItemGoal )
+                    {
+                        Descriptor.ItemGoals++;
+                    }
+                    if( bIsKillGoal )
+                    {
+                        Descriptor.KillGoals++;
+                    }
+		}
+            }
+	
 			return 1;
 			};
 		case ACTOR_PostBeginPlay:
@@ -121,14 +187,21 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 			return 1;
 		case ACTOR_UnTarget:
 			return 1;
-		case ACTOR_Weapon:
-			return 1;
-		case ACTOR_UnWeapon:
-			return 1;
 		case ACTOR_Possess:
 			return 1;
 		case ACTOR_UnPossess:
 			return 1;
+		case ACTOR_KillCredit:
+        {
+            // Since the actor has declined to handle the credit, let's pass it
+            // on to the parent.
+			if( iParent != INDEX_NONE )
+            {
+                return Level->SendMessage( iParent, ACTOR_KillCredit, Params );
+            }
+			return 1;
+        }
+	
 		case ACTOR_Die:
 			Level->DestroyActor(iMe);
 			return 1;
@@ -140,7 +213,15 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 			// Reroute message to original class's generic ACTOR_DIE handler
 			return Level->SendMessage(iMe,ACTOR_Die,Params);;
 		case ACTOR_Hit:
+        {
+            PHit & Info = PHit::Convert(Params);
+            if( Info.Momentum != 0 && Info.iSourceActor != INDEX_NONE )
+            {
+                FActor & Source = FActor::Actor(Info.iSourceActor);
+                Actor.GainMomentum( Info.Momentum, Actor.Location - Source.Location );
+            }
 			return 1;
+        }
 		case ACTOR_PlayerCalcView:
 			((PCalcView *)Params)->ViewLocation = Location;
 			((PCalcView *)Params)->ViewRotation = ViewRot;
@@ -167,13 +248,14 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 			//
 			// Make sure we only use Inventory class descendents:
 			//
-			if (InvActor->Class->IsKindOf(GClasses.Inventory))
+			if (InvActor->IsKindOf("Inventory"))
 				{
 				//
 				// Link the inventory actor into the top of our inventory chain:
 				//
 				InvActor->iParent    = iMe;
 				InvActor->iInventory = iInventory;
+				InvActor->iInstigator = iMe;
 				iInventory           = iInvActor;
 				};
 			return 1;
@@ -228,20 +310,6 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 			PExec *ExecInfo = (PExec *)Params;
 			return 1;
 			};
-		case ACTOR_GetProp:
-			{
-			// Get an actor's property.
-			// Default action is to text-ize the property and return it.
-			PExec *ExecInfo = (PExec *)Params;
-			return 1;
-			};
-		case ACTOR_SetProp:
-			{
-			// Set an actor's property.
-			// Default action is set it if CPF_EditInPlay is set.
-			PExec *ExecInfo = (PExec *)Params;
-			return 1;
-			};
 		case ACTOR_Touch:
             {
             PTouch & Info = PTouch::Convert(Params);
@@ -249,13 +317,13 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
             #if 0 //todo: Add or delete touching momentum - whatever we decide
             if( bMomentum && Mass != 0 && iToucher != INDEX_NONE )
             {
-                ARoot & Toucher = FActor::Root(iToucher);
+                AActor & Toucher = FActor::Root(iToucher);
                 if( Toucher.bMomentum && Toucher.Mass != 0 )
                 {
                     // Let's heuristically alter the velocities of both the toucher
                     // and touched object. The touched object will have a fraction
                     // of the touching object's velocity added (scaled by mass).
-                    ARoot & Touched = *this;
+                    AActor & Touched = *this;
                     const FVector Momentum = Touched.Mass*Touched.Velocity + Toucher.Mass*Toucher.Velocity;
                     FVector TouchedVelocityChange = Toucher.Velocity;
                     TouchedVelocityChange *= Toucher.Mass / Touched.Mass / 5.0;
@@ -291,12 +359,13 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 		case ACTOR_QueryChildActors:
 			{
 			// Causes kernel to call QueryActorCallback for all child actors
+			PTouch *Touch = (PTouch*)Params;
 			AActor *Actor = &Level->Actors->Element(0);
 			for (INDEX iActor=0; iActor<Level->Actors->Max; iActor++)
 				{
 				if (Actor->Class && (Actor->iParent==iMe))
 					{
-					Level->SendMessage(iMe,ACTOR_QueryCallback,&iActor);
+					Level->SendMessage(Touch->iActor,ACTOR_QueryCallback,&iActor);
 					};
 				Actor++;
 				};
@@ -306,11 +375,12 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 			{
 			// Causes kernel to call QueryActorCallback for all actors using an event
 			AActor *Actor = &Level->Actors->Element(0);
+			PName  *Info  = (PName*)Params;
 			for (INDEX iActor=0; iActor<Level->Actors->Max; iActor++)
 				{
-				if (Actor->Class && (Actor->EventName==*(FName *)Params))
+				if (Actor->Class && (Actor->Event==Info->Name))
 					{
-					Level->SendMessage(iMe,ACTOR_QueryCallback,&iActor);
+					Level->SendMessage(Info->iActor,ACTOR_QueryCallback,&iActor);
 					};
 				Actor++;
 				};
@@ -320,11 +390,12 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
 			{
 			// Causes kernel to call QueryActorCallback for all actors using a name
 			AActor *Actor = &Level->Actors->Element(0);
+			PName  *Info  = (PName*)Params;
 			for (INDEX iActor=0; iActor<Level->Actors->Max; iActor++)
 				{
-				if (Actor->Class && (Actor->Name==*(FName *)Params))
+				if (Actor->Class && (Actor->Name==Info->Name))
 					{
-					Level->SendMessage(iMe,ACTOR_QueryCallback,&iActor);
+					Level->SendMessage(Info->iActor,ACTOR_QueryCallback,&iActor);
 					};
 				Actor++;
 				};
@@ -370,7 +441,7 @@ int ARoot::Process(ILevel *Level, FName Message, void *Params)
         }
 		};
 	return 0;
-	UNGUARD("ARoot::Process");
+	UNGUARD("AActor::Process");
 	};
 
 /*-----------------------------------------------------------------------------

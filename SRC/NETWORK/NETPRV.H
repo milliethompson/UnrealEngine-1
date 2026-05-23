@@ -32,7 +32,7 @@ class NServerAd
 	//
 	// Variables:
 	//
-	char Name[NAME_SIZE];
+	char Name[NET_NAME_SIZE];
 	//
 	// Functions:
 	//
@@ -65,7 +65,7 @@ class NDriver : public FTask
 	// Functions which must be overridden:
 	//
 	virtual int Init(char *ParamBuffer,char *ErrorMessage);
-	virtual void Exit(void);
+	virtual void Exit();
 	//
 	virtual int Exec(const char *Cmd,FOutputDevice *Out=GApp)=0;
 	//
@@ -81,10 +81,10 @@ class NDriver : public FTask
 	//
 	// Standard, non-overridden functions:
 	//
-	void AssertInitialized(void) {if (!Initialized) appError ("Network driver not initalized");};
-	void AssertValid(void);
+	void AssertInitialized() {if (!Initialized) appError ("Network driver not initalized");};
+	void AssertValid();
 	void RemoveSocketFromList(NSocket *Socket);
-	int FindAvailableSocketIndex(void);
+	int FindAvailableSocketIndex();
 	//
 	};
 

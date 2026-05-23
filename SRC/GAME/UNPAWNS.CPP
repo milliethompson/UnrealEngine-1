@@ -13,6 +13,7 @@
 #include "UnFActor.h"
 #include "UnRandom.h"
 
+
 //tbm: Convert degrees to WORD angle measurements.
 static inline int Degrees(int Degrees)
 {
@@ -489,28 +490,29 @@ int AManta::Process(ILevel *Level, FName Message, void *Params)
 };
 
 //----------------------------------------------------------------------------
-//                    Woman Pawn processing
+//                    Human Pawn processing
 //----------------------------------------------------------------------------
-int AWoman::Process(ILevel *Level, FName Message, void *Params)
+int AHuman::Process(ILevel *Level, FName Message, void *Params)
 {
     GUARD;
     FActor & Actor = FActor::Actor(*this);
     switch (Message.Index)
     {
-        case ACTOR_Spawn:
-        case ACTOR_BeginPlay:
+        case ACTOR_PreBeginPlay:
+        {
             AnimSeq = 0;
             return ProcessParent;
+        }
         case ACTOR_PlayerTick:
         {
 
             if ((GServer.Ticks & 3)==0)
             {
-                FLOAT Speed = Velocity.Size();
-                FixFrame += (int)(Speed * 65536.0 * 0.6);
-                while (FixFrame >= FIX(30)) FixFrame -= FIX(30);
+                //FLOAT Speed = Velocity.Size();
+                //FixFrame += (int)(Speed * 65536.0 * 0.6);
+                //while (FixFrame >= Fix(30)) FixFrame -= Fix(30);
             }
-            AnimBase = UNFIX(FixFrame);
+            //AnimBase = Unfix(FixFrame);
 
             if( LifeState == LS_Dead )
             {
@@ -530,19 +532,20 @@ int AWoman::Process(ILevel *Level, FName Message, void *Params)
                     return ProcessParent;
                 }
                 Actor.Send_RestartLevel();
+
                 //todo: Remove this when level restarting is *really* implemented.
                 // Move actor back to PlayerStart, and restock his vitals and ammo.
                 for (INDEX Which=0; Which<Level->Actors->Max; Which++)
                 {
                     FActor & TestActor = FActor::Actor(Which);
-                    if(TestActor.Class == GClasses.PlayerStart)
+                    if( TestActor.IsKindOf("PlayerStart") )
                     {
                         Actor.ViewRot.Yaw   = TestActor.DrawRot.Yaw;
                         Actor.DrawRot.Yaw    = TestActor.DrawRot.Yaw;
                         Health = 100.0;
                         bStatusChanged = TRUE;
                         Actor.Location = TestActor.Location;
-                        TargetPitch  = 0;
+                        TargetRot.Pitch  = 0;
                         ViewRot = GMath.ZeroRotation;
                         DrawRot = GMath.ZeroRotation;
                     }
@@ -569,7 +572,7 @@ int AWoman::Process(ILevel *Level, FName Message, void *Params)
                 if( EyeHeight <= -30.0 )
                 {
                     LifeState = LS_Dead;
-                    TargetPitch = 0;
+                    TargetRot.Pitch = 0;
                     Era = 0;
                 }
                 Level->SendMessage( iMe, ACTOR_Tick, 0 );
@@ -589,7 +592,7 @@ int AWoman::Process(ILevel *Level, FName Message, void *Params)
         }
     }
     return ProcessParent;
-    UNGUARD("Woman::Process");
+    UNGUARD("AHuman::Process");
     };
 
 //----------------------------------------------------------------------------
@@ -644,15 +647,6 @@ int ATentacle::Process(ILevel *Level, FName Message, void *Params)
     FActor & Actor = FActor::Actor(*this);
     switch (Message.Index)
     {
-        case ACTOR_Spawn:
-        case ACTOR_BeginPlay:
-        {
-            break;
-        }
-        case ACTOR_Tick:
-        {
-            break;
-        }
         //--------------------------------------------------------------------
         //                     Animation request.
         //--------------------------------------------------------------------
@@ -723,8 +717,7 @@ int ATentacle::Process(ILevel *Level, FName Message, void *Params)
                         else if( Projectile != 0 )
                         {
                             //todo: encapsulate this function.
-                            FVector Velocity = Actor.Target().Location - this->Location;
-                            Velocity.Normalize();
+                            FVector Velocity = (Actor.Target().Location - this->Location).Normal();
                             Velocity *= FActor::Actor(Projectile->DefaultActor).Projectile().Speed;
                             INDEX iProjectile = GGame.SpawnProjectile
                             (

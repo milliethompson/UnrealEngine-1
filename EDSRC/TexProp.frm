@@ -84,16 +84,16 @@ Begin VB.Form frmTexProp
       TabCaption(3)   =   "Fire Engine"
       Tab(3).ControlCount=   10
       Tab(3).ControlEnabled=   0   'False
-      Tab(3).Control(0)=   "Command2"
-      Tab(3).Control(1)=   "SparkType"
-      Tab(3).Control(2)=   "Command1"
-      Tab(3).Control(3)=   "FractalType"
-      Tab(3).Control(4)=   "Label3"
-      Tab(3).Control(5)=   "Slider2"
-      Tab(3).Control(6)=   "Label20"
-      Tab(3).Control(7)=   "Label2"
-      Tab(3).Control(8)=   "Slider1"
-      Tab(3).Control(9)=   "Label1"
+      Tab(3).Control(0)=   "Label1"
+      Tab(3).Control(1)=   "Slider1"
+      Tab(3).Control(2)=   "Label2"
+      Tab(3).Control(3)=   "Label20"
+      Tab(3).Control(4)=   "Slider2"
+      Tab(3).Control(5)=   "Label3"
+      Tab(3).Control(6)=   "FractalType"
+      Tab(3).Control(7)=   "Command1"
+      Tab(3).Control(8)=   "SparkType"
+      Tab(3).Control(9)=   "Command2"
       Begin VB.PictureBox PolyFlagsHolder 
          Height          =   1935
          Left            =   -74760

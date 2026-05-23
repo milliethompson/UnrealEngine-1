@@ -18,7 +18,7 @@ APP_32BIT equ 1
 include unrender.inc
 
 ;--------------------------------------------------------------------------------
-; Texture lighting inner loop
+; Texture lighting inner loop (LightInner)
 ;--------------------------------------------------------------------------------
 
 ;-----------;
@@ -65,14 +65,17 @@ SavedOffset	DD ?
 ; Floating point version               ;
 ; 25 cycles per point, cache-friendly  ;
 ;--------------------------------------;
+;
+; This routine is jumped to. Upon exit, it must do a popad/ret.
+;
 .CODE
 FOR UBits,<0,1,2,3,4,5,6,7,8,9,10,11>
 	LOCAL PrimeLoop,LightReLoop,LightLoopMain,FinishingUp
 	;
 	; All skip-in entries:
 	;
-	SkipIn = 32
-	REPEAT 32
+	SkipIn = 64
+	REPEAT 64
 		@CatStr(TLI_Proc,UBits,_,%SkipIn):
 		add ebx,ebp
 		adc esi,eax
@@ -97,14 +100,16 @@ FOR UBits,<0,1,2,3,4,5,6,7,8,9,10,11>
 		and		ebp,255					; ebp = Uf Alpha index into sinc table
 		add		eax,ecx					; Now eax = base address of illumination element
 		;
-		lea ecx,[esi+(1 SHL (32-UBits))]
-		and ecx,[TLI_AddrMask]
-		rol ecx,UBits+2
-		add ecx,[TLI_MeshFloat]
+		;lea ecx,[esi+(1 SHL (32-UBits))]
+		;and ecx,[TLI_AddrMask]
+		;rol ecx,UBits+2
+		;add ecx,[TLI_MeshFloat]
 		;
-		fld		DWORD PTR [ecx+(4 SHL UBits)]	; D
+		;fld		DWORD PTR [ecx+(4 SHL UBits)]	; D
+		fld		DWORD PTR [eax+(4 SHL UBits)+4] ; D-C
 		fsub	DWORD PTR [eax+(4 SHL UBits)] ; D-C
-		fld		DWORD PTR [ecx]			; B
+		;fld		DWORD PTR [ecx]			; B
+		fld		DWORD PTR [eax+4]			; B
 		fsub	DWORD PTR [eax]			; B-A
 		fxch
 		;
@@ -117,19 +122,19 @@ FOR UBits,<0,1,2,3,4,5,6,7,8,9,10,11>
 		ALIGN 16
 		faddp st(1),st					; AB + (CD-AB)*Beta
 		;
-		lea ecx,[esi+(1 SHL (32-UBits))]
-		and ecx,[TLI_AddrMask]
-		rol ecx,UBits+2
-		add ecx,[TLI_MeshFloat]
+		;lea ecx,[esi+(1 SHL (32-UBits))]
+		;and ecx,[TLI_AddrMask]
+		;rol ecx,UBits+2
+		;add ecx,[TLI_MeshFloat]
 		;
-		fld		DWORD PTR [ecx+(4 SHL UBits)] ; D
-		fld		DWORD PTR [ecx]			; B
+		;fld		DWORD PTR [ecx+(4 SHL UBits)] ; D
+		fld		DWORD PTR [eax+(4 SHL UBits)+4] ; D
+		;fld		DWORD PTR [ecx]			; B
+		fld		DWORD PTR [eax+4]			; B
 		fxch
 		fsub	DWORD PTR [eax+(4 SHL UBits)] ; D-C
 		fxch	st(2)
 		fstp	[TLI_Temp]				; Store floating-point light value to temporary location
-		fsub	DWORD PTR [eax]			; B-A
-		fxch
 		;
 		mov		ecx,[TLI_Temp]
 		and		ebp,255					; ebp = Uf Alpha index into sinc table
@@ -137,6 +142,9 @@ FOR UBits,<0,1,2,3,4,5,6,7,8,9,10,11>
 		and		ecx,03ff0h
 		;
 		mov		[edi-4],ecx				; Save light value
+		;
+		fsub	DWORD PTR [eax]			; B-A
+		fxch
 		;
 		;-------------
 		LightLoopMain:
@@ -188,6 +196,7 @@ FOR UBits,<0,1,2,3,4,5,6,7,8,9,10,11>
 		and		ecx,03ff0h
 		;
 		mov		[edi-4],ecx				; Save light value
+	popad
 	ret
 ENDM
 
@@ -200,11 +209,7 @@ TLI_ProcTable LABEL DWORD
 FOR UBits, <0,1,2,3,4,5,6,7,8,9,10,11>
 	SkipIn = 0
 	REPEAT 64
-		IF SkipIn LE 32
-			DD @CatStr(TLI_Proc,UBits,_,%SkipIn)
-		ELSE
-			DD 0
-		ENDIF
+		DD @CatStr(TLI_Proc,UBits,_,%SkipIn)
 		SkipIn = SkipIn + 1
 	ENDM
 ENDM
@@ -2158,25 +2163,14 @@ END_SELF_MOD_SEG
 DD_GLOBAL TLM_GBlitInterX
 DB_GLOBAL TLM_GBlitInterXBits2
 
-PUBLIC TLM_8P_Unlit
-TLM_8P_Unlit:
-	mov edi,[TLI_Dest]
-	mov esi,[TLI_DestEnd]
-	mov eax,01800h
-	;
-	UnlitFillLoop:
-	mov [edi   ],eax
-	mov [edi+4 ],eax
-	mov [edi+8 ],eax
-	mov [edi+12],eax
-	add edi,16
-	cmp edi,esi
-	jl  UnlitFillLoop
-ret
-
-PUBLIC TLM_8P_Lit
-TLM_8P_Lit:
-	pushad
+;
+; Find the valid rectangle corresponding to TLI_TopLattice and TLI_SkipIn.
+; Or return:
+;    edx = Lattice pointer
+;    ebx = Skip-in value
+;
+TLM_FindValidRect MACRO
+	LOCAL Bad1,Bad2,Bad3,LatticeOk,LatticeOkBump
 	;
 	mov edx,[TLI_TopLattice]				; edx = successful lattice pointer
 	mov ebx,[TLI_SkipIn]					; ebx = updated skip-in value
@@ -2198,17 +2192,15 @@ TLM_8P_Lit:
 	mov ecx,[TLO_LatticeBase]				; ecx = TLO_LatticeBase
 	;
 	mov edx,[ecx + eax*4 - 4]				; T = LatticeBase[-1]
-	mov ebx,TLM_GBlitInterX					; SkipIn = GBlit.InterX
 	;
 	test edx,edx							; Is LatticeBase[-1] null?
 	jz Bad2									; Yes, must update
 	mov edi,[edx].FTexLatticeD.RoutineOfs	; Get routine offset
 	test edi,edi							; Is routine offset 0?
-	jnz LatticeOk							; No, so lattice is ok
+	jnz LatticeOkBump						; No, so lattice is ok
 	;
 	Bad2:									; LatticeBase[-1] is null, so check LatticeBase[-MAX_XR]
 	mov edx,[ecx + eax*4 - MAX_XR*4]		; T = LatticeBase[-MAX_XR]
-	xor ebx,ebx								; SkipIn = 0
 	test edx,edx							; Is LatticeBase[-MAX_XR] null?
 	jz Bad3									; Yes, must update
 	mov edi,[edx].FTexLatticeD.RoutineOfs	; Get routine offset
@@ -2217,10 +2209,59 @@ TLM_8P_Lit:
 	;
 	Bad3:
 	mov edx,[ecx + eax*4 - MAX_XR*4 - 4]	; T = LatticeBase[-MAX_XR-1]
-	mov ebx,TLM_GBlitInterX					; SkipIn = GBlit.InterX
+	;
+	LatticeOkBump:
+	add ebx,[TLM_GBlitInterX]				; SkipIn += GBlit.InterX
 	;
 	ALIGN 16
 	LatticeOk:
+ENDM
+
+PUBLIC TLM_8P_Unlit
+TLM_8P_Unlit:
+	;
+	TLM_FindValidRect
+	;
+	mov eax,[edx].FTexLatticeD.SubLX
+	mov esi,[edx].FTexLatticeD.SubL
+	mov ecx,[edx].FTexLatticeD.SubLX
+	mov edi,[TLI_Dest]
+	;
+	mul ebx
+	;
+	add eax,esi
+	mov esi,[TLI_DestEnd]
+	;
+	UnlitFillLoop:
+	;
+	mov ebx,eax
+	add eax,ecx
+	mov edx,eax
+	add eax,ecx
+	and ebx,03ff8h
+	and edx,03ff8h
+	mov [edi   ],ebx
+	mov [edi+4 ],edx
+	;
+	mov ebx,eax
+	add eax,ecx
+	mov edx,eax
+	add eax,ecx
+	and ebx,03ff8h
+	and edx,03ff8h
+	mov [edi+8 ],ebx
+	mov [edi+12],edx
+	;
+	add edi,16
+	cmp edi,esi
+	jl  UnlitFillLoop
+ret
+
+PUBLIC TLM_8P_Lit
+TLM_8P_Lit:
+	pushad
+	;
+	TLM_FindValidRect
 	;
 	; Call inner loop with optional skip-in:
 	;
@@ -2236,8 +2277,7 @@ TLM_8P_Lit:
 	mov		ebp,[edx].FTexLatticeD.SubLX ; Only needed when skipping in
 	mov		eax,[edx].FTexLatticeD.SubHX ; Only needed when skipping in
 	;
-	call	DWORD PTR [ecx] ;jmp
-	popad
+	jmp		DWORD PTR [ecx]				; Callee performs popad/ret
 ret
 
 ;--------------------------------------------------------------------------------
@@ -3380,7 +3420,7 @@ LightOuter PROC
 	; Set up:
 	;
 	mov		edi,[TLO_BotBase]				; edi = TLO_BotBase
-	mov		ebx,[esi].FSpan.SpanEnd				; ebx = Span->End
+	mov		ebx,[esi].FSpan.SpanEnd			; ebx = Span->End
 	;
 	mov		eax,[esi].FSpan.SpanStart		; eax = Span->Start
 	mov		edx,[esi].FSpan.SpanNext		; edx = Span->Next
@@ -3403,7 +3443,7 @@ LightOuter PROC
 	mov		[TLI_SkipIn],edx				; TLI_SkipIn = Span->Start & GBlit.InterXMask
 	mov		edx,[ebx + eax*4]				; edx = TLO_LatticeBase[Span->Start >> GBlit.InterXBits]
 	;
-	mov	[TLI_TopLattice],edx ;!!
+	mov		[TLI_TopLattice],edx			; Save top lattice pointer
 	;
 	; Check whether we're drawing multiple rectspans:
 	;
@@ -3730,3 +3770,4 @@ ENDM
 ; The End
 ;--------------------------------------------------------------------------------
 END
+

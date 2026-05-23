@@ -3,8 +3,8 @@ Begin VB.Form frmResBrowse
    BorderStyle     =   1  'Fixed Single
    Caption         =   "Resource Browser"
    ClientHeight    =   4710
-   ClientLeft      =   5985
-   ClientTop       =   6090
+   ClientLeft      =   4275
+   ClientTop       =   5640
    ClientWidth     =   3750
    ClipControls    =   0   'False
    BeginProperty Font 
@@ -20,14 +20,14 @@ Begin VB.Form frmResBrowse
    Height          =   5070
    HelpContextID   =   122
    Icon            =   "ResBrws.frx":0000
-   Left            =   5925
+   Left            =   4215
    LinkTopic       =   "Form8"
    MaxButton       =   0   'False
    MinButton       =   0   'False
    ScaleHeight     =   4710
    ScaleWidth      =   3750
    ShowInTaskbar   =   0   'False
-   Top             =   5790
+   Top             =   5340
    Width           =   3870
    Begin VB.PictureBox Picture1 
       Height          =   4275
@@ -150,12 +150,12 @@ Private Sub Command2_Click()
 End Sub
 
 Private Sub Command3_Click()
-    Ed.Server.Exec "RESOURCE DEBUG"
+    Ed.Server.Exec "RES DEBUG"
     Refresh_Click
 End Sub
 
 Private Sub Command4_Click()
-    Ed.Server.Exec "RESOURCE PURGE"
+    Ed.Server.Exec "RES PURGE"
     Refresh_Click
 End Sub
 
@@ -178,7 +178,7 @@ Private Sub List_Expand(ListIndex As Integer)
     ResType = GrabString(Text)
     Name = GrabString(Text)
     '
-    Call ExpandOutline(List, "Res", "QueryRes", "RESOURCE QUERY TYPE=" & ResType & " NAME=" & Name, ListIndex, 0)
+    Call ExpandOutline(List, "Res", "QueryRes", "RES QUERY TYPE=" & ResType & " NAME=" & Name, ListIndex, 0)
 End Sub
 
 Private Sub List_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
@@ -194,6 +194,6 @@ Private Sub Refresh_Click()
     List.ListIndex = 0
     '
     QuerySource = List.ListIndex
-    Ed.Server.Exec "RESOURCE QUERY NAME=ROOT TYPE=Array"
+    Ed.Server.Exec "RES QUERY NAME=ACTOR TYPE=Array"
     Call UpdateOutline(List, "Res", "QueryRes")
 End Sub

@@ -12,70 +12,75 @@
 #define _INC_UNMEM
 
 /*-----------------------------------------------------------------------------
-	FMemPool
+	FMemPool.
 -----------------------------------------------------------------------------*/
 
-class UNREAL_API FMemPool // Simple linear-allocation memory pool
-	{
-	public:
+//
+// Simple linear-allocation memory pool.
+//
+class UNREAL_API FMemPool
+{
+public:
 	BYTE		*Start;			// Start of memory area
 	BYTE		*End;			// End of memory data
 	BYTE		*Top;			// Top of memory pool
 	int			Size;
-	//
-	// Operational functions:
-	//
-	inline void *Get(int AllocSize) // Get 8-aligned memory and increase pool top
-		{
+
+	// Operational functions.
+	inline void *Get(int AllocSize)
+	{
+		// Get 8-aligned memory and increase pool top.
 		void *Result = (void *)(((int)Top+7)&~7);
 		if (AllocSize<0) SizeError();
 		Top = (BYTE *)Result + AllocSize;
 		if (Top >= (Start+Size)) OverflowError();
 		return Result;
-		};
-	inline void *GetFast(int AllocSize) // Get 8-aligned with absolutely no error checking
-		{
+	}
+	inline void *GetFast(int AllocSize)
+	{
+		// Get 8-aligned with absolutely no error checking.
 		void *Result = (void *)(((int)Top+7)&~7);
 		Top = (BYTE *)Result + AllocSize;
 		return Result;
-		};
-	inline void *GetFast4(int AllocSize) // Get 4-aligned memory quickly
-		{
+	}
+	inline void *GetFast4(int AllocSize)
+	{
+		// Get 4-aligned memory quickly.
 		void *Result = (void *)(((int)Top+3)&~3);
 		Top = (BYTE *)Result + AllocSize;
 		return Result;
-		};
-	inline void Release(void *Mem) // Release all memory at and above Mem pointer
-		{
+	}
+	inline void Release(void *Mem)
+	{
+		// Release all memory at and above Mem pointer.
 		if ((Mem<Start)||(Mem>=End)) AccessError();
 		Top = (BYTE *)Mem;
-		};
+	}
 	inline void *GetZeroed(int AllocSize)
-		{
-		void *Result = Get (AllocSize);
-		mymemset(Result,0,AllocSize);
+	{
+		// Get zero-filled memory.
+		void *Result = Get((AllocSize+15)&~15);
+		mymemset(Result,0,(AllocSize+15)&~15);
 		return Result;
-		};
+	}
 	inline void *GetOned(int AllocSize)
-		{
+	{
+		// Get one-filled memory.
 		void *Result = Get (AllocSize);
 		mymemset(Result,(BYTE)255,AllocSize);
 		return Result;
-		};
-	//
-	// Startup/shutdown functions:
-	//
-	void AllocatePool(int Size, const char *Name); // Allocate the memory pool
-	void InitPool(void); // Initialize or reinitialize the memory pool to empty
-	void FreePool(void);
-	void OverflowError(void);
-	void AccessError(void);
-	void SizeError(void);
-	//
-	};
+	}
+
+	// Startup/shutdown functions.
+	void AllocatePool(int Size, const char *Name);
+	void InitPool();
+	void FreePool();
+	void OverflowError();
+	void AccessError();
+	void SizeError();
+};
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/
 #endif // _INC_UNMEM
-

@@ -12,7 +12,7 @@
 #include "UnRender.h"
 
 /*-----------------------------------------------------------------------------
-	Globals
+	Globals.
 -----------------------------------------------------------------------------*/
 
 //
@@ -43,7 +43,7 @@ int		GFixPanU=0,GFixPanV=0;
 int		GFixScale=0;
 
 /*-----------------------------------------------------------------------------
-   Selection callbacks
+   Selection callbacks.
 -----------------------------------------------------------------------------*/
 
 //
@@ -75,7 +75,7 @@ void DeselectPolyFunc (IModel *ModelInfo, INDEX iSurf)
 	};
 
 /*-----------------------------------------------------------------------------
-   Routines to calculate various types of movement & rotation
+   Routines to calculate various types of movement & rotation.
 -----------------------------------------------------------------------------*/
 
 //
@@ -109,7 +109,11 @@ void CalcFreeOrthoMoveRot (ICamera *CameraInfo,SWORD MouseX,SWORD MouseY,BYTE Bu
 		OrthoAxis2 = &Delta->Z; 			Axis2Sign=-1;
 		OrthoAngle = &DeltaRot->Roll; 		AngleSign=1.0; // Should rotate about X axis
 		}
-	else appError("Invalid rendering mode");
+	else
+		{
+		appError("Invalid rendering mode");
+		return;
+		}
 	//
 	// Special orthogonal view movement controls:
 	//
@@ -128,7 +132,7 @@ void CalcFreeOrthoMoveRot (ICamera *CameraInfo,SWORD MouseX,SWORD MouseY,BYTE Bu
 		CameraInfo->OrthoZoom -= CameraInfo->OrthoZoom/200.0 * (FLOAT)MouseY;
 		//
 		if (CameraInfo->OrthoZoom<500.0)    		CameraInfo->OrthoZoom = 500.0;
-		else if (CameraInfo->OrthoZoom>2000000.0) 	CameraInfo->OrthoZoom = 2000000.0;
+		if (CameraInfo->OrthoZoom>2000000.0) 		CameraInfo->OrthoZoom = 2000000.0;
 		}
 	else if (Buttons == BUT_RIGHT) // Right button: Rotate
 		{
@@ -168,7 +172,11 @@ void CalcAxialOrthoMove (ICamera *CameraInfo, SWORD MouseX,SWORD MouseY,BYTE But
 		OrthoAxis2 = &Delta->Z; 		Axis2Sign=-1;
 		OrthoAngle = &DeltaRot->Roll; 	AngleSign=1.0; // Should rotate about X axis
 		}
-	else appError("Invalid rendering mode");
+	else
+		{
+		appError("Invalid rendering mode");
+		return;
+		};
 	//
 	// Special orthogonal view movement controls:
 	//
@@ -204,7 +212,7 @@ void CalcFreePerspMoveRot (ICamera *CameraInfo, SWORD MouseX,SWORD MouseY,BYTE B
 	FVector *Delta,FFloatRotation *DeltaRot)
 	{
 	GUARD;
-	AActor *Actor = CameraInfo->Actor;
+	APawn *Actor = CameraInfo->Actor;
 	//
 	if (Buttons == BUT_LEFT) // Left button: move ahead and yaw
 		{
@@ -257,13 +265,13 @@ int ScaleIsWithinBounds (FVector *V, FLOAT Min, FLOAT Max)
 	//
 	GUARD;
 	//
-	Temp = OurAbs (V->X);
+	Temp = Abs (V->X);
 	if ((Temp<Min) || (Temp>Max)) return 0;
 	//
-	Temp = OurAbs (V->Y);
+	Temp = Abs (V->Y);
 	if ((Temp<Min) || (Temp>Max)) return 0;
 	//
-	Temp = OurAbs (V->Z);
+	Temp = Abs (V->Z);
 	if ((Temp<Min) || (Temp>Max)) return 0;
 	//
 	return 1;
@@ -271,7 +279,7 @@ int ScaleIsWithinBounds (FVector *V, FLOAT Min, FLOAT Max)
 	};
 
 /*-----------------------------------------------------------------------------
-   Camera movement computation
+   Camera movement computation.
 -----------------------------------------------------------------------------*/
 
 //
@@ -320,12 +328,12 @@ void CameraMoveRotWithPhysics (ICamera *CameraInfo,FVector *Delta,FFloatRotation
 		(!CameraInfo->Camera->IsOrtho()) && 
 		(!(CameraInfo->Level.ModelInfo.ModelFlags & MF_InvalidBsp)))
 		{
-		if (CameraInfo->Level.ModelInfo.PointClass(&CameraInfo->Actor->Location,NULL) != 0)
+		if (CameraInfo->Level.ModelInfo.PointClass(CameraInfo->Actor->Location,NULL,0) != 0)
 			{
 			//
 			// Move with collision; player is outside and collision is enabled:
 			//
-			if (CameraInfo->Level.ModelInfo.SphereMove(&CameraInfo->Actor->Location,Delta,20.0,1)==0)
+			if (CameraInfo->Level.ModelInfo.SphereMove(CameraInfo->Actor->Location,*Delta,20.0,1,0)==0)
 				{
 				if (!(CameraInfo->ShowFlags&SHOW_PlayerCtrl)) CameraInfo->Actor->Velocity = GMath.ZeroVector;
 				};
@@ -554,13 +562,13 @@ void BrushMoveRot (ICamera *CameraInfo,FVector *Delta,FFloatRotation *DeltaRot)
 	};
 
 /*-----------------------------------------------------------------------------
-   Editor camera movement
+   Editor camera movement.
 -----------------------------------------------------------------------------*/
 
 //
 // Move the edit-camera.
 //
-void FEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl)
+void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl)
 	{
 	ICamera 		CameraInfo;
 	IModel  		BrushInfo;
@@ -838,7 +846,7 @@ void FEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mous
 			//
 			NoteBrushMovement(&CameraInfo);
    			CameraInfo.Level.Brush->Lock (&BrushInfo,LOCK_Trans);
-			BrushInfo.Scale.SheerRate = OurMax(-4.0,OurMin(4.0,BrushInfo.Scale.SheerRate + (FLOAT)(-MouseY) / 240.0));
+			BrushInfo.Scale.SheerRate = Clamp(BrushInfo.Scale.SheerRate + (FLOAT)(-MouseY) / 240.0,-4.0,4.0);
 			CameraInfo.Level.Brush->Unlock (&BrushInfo);
 			break;
 		case EM_BrushScale:	/* Scale brush (proportionally along all axes) */
@@ -922,7 +930,7 @@ void FEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mous
 					ForceXSnap = 1;
 					if ((SnapMin.X>0.05) &&
 						((SnapMax.X<=0.05) ||
-						(OurAbs(SnapMin.X-BrushInfo.PostScale.Scale.X) < OurAbs(SnapMax.X-BrushInfo.PostScale.Scale.X))))
+						(Abs(SnapMin.X-BrushInfo.PostScale.Scale.X) < Abs(SnapMax.X-BrushInfo.PostScale.Scale.X))))
 						BrushInfo.PostScale.Scale.X = SnapMin.X;
 					else if (SnapMax.X>0.05)
 						BrushInfo.PostScale.Scale.X = SnapMax.X;
@@ -932,7 +940,7 @@ void FEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mous
 					ForceYSnap = 1;
 					if ((SnapMin.Y>0.05) &&
 						((SnapMax.Y<=0.05) ||
-						(OurAbs(SnapMin.Y-BrushInfo.PostScale.Scale.Y) < OurAbs(SnapMax.Y-BrushInfo.PostScale.Scale.Y))))
+						(Abs(SnapMin.Y-BrushInfo.PostScale.Scale.Y) < Abs(SnapMax.Y-BrushInfo.PostScale.Scale.Y))))
 						BrushInfo.PostScale.Scale.Y = SnapMin.Y;
 					else if (SnapMax.Y>0.05)
 						BrushInfo.PostScale.Scale.Y = SnapMax.Y;
@@ -942,7 +950,7 @@ void FEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mous
 					ForceZSnap = 1;
 					if ((SnapMin.Z>0.05) &&
 						((SnapMax.Z<=0.05) ||
-						(OurAbs(SnapMin.Z-BrushInfo.PostScale.Scale.Z) < OurAbs(SnapMax.Z-BrushInfo.PostScale.Scale.Z))))
+						(Abs(SnapMin.Z-BrushInfo.PostScale.Scale.Z) < Abs(SnapMax.Z-BrushInfo.PostScale.Scale.Z))))
 						BrushInfo.PostScale.Scale.Z = SnapMin.Z;
 					else if (SnapMax.Z>0.05)
 						BrushInfo.PostScale.Scale.Z = SnapMax.Z;
@@ -993,10 +1001,10 @@ void FEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mous
 			//
 			if (Buttons == (BUT_LEFT | BUT_RIGHT)) // Scale
 				{
-				GFixScale += FIX(MouseY)/64;
+				GFixScale += Fix(MouseY)/64;
 				//
 				TempFloat = 1.0;
-				Temp = UNFIX (GFixScale); 
+				Temp = Unfix(GFixScale); 
 				while (Temp>0) {TempFloat *= 0.5; Temp--;};
 				while (Temp<0) {TempFloat *= 2.0; Temp++;};
 				//
@@ -1011,14 +1019,14 @@ void FEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mous
 				}
 			else if (Buttons == BUT_LEFT)
 				{
-				GFixPanU += FIX(MouseX)/16;  GFixPanV += FIX(MouseY)/16;
-				GUnrealEditor.polyTexPan (&CameraInfo.Level.ModelInfo,UNFIX(GFixPanU),UNFIX(0),0);
+				GFixPanU += Fix(MouseX)/16;  GFixPanV += Fix(MouseY)/16;
+				GUnrealEditor.polyTexPan (&CameraInfo.Level.ModelInfo,Unfix(GFixPanU),Unfix(0),0);
 				GFixPanU &= 0xffff; GFixPanV &= 0xffff;
 				}
 			else // Right
 				{
-				GFixPanU += FIX(MouseX)/16;  GFixPanV += FIX(MouseY)/16;
-				GUnrealEditor.polyTexPan (&CameraInfo.Level.ModelInfo,UNFIX(0),UNFIX(GFixPanV),0);
+				GFixPanU += Fix(MouseX)/16;  GFixPanV += Fix(MouseY)/16;
+				GUnrealEditor.polyTexPan (&CameraInfo.Level.ModelInfo,Unfix(0),Unfix(GFixPanV),0);
 				GFixPanU &= 0xffff; GFixPanV &= 0xffff;
 				}
 			break;
@@ -1050,11 +1058,11 @@ void FEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mous
 					*NewV			= V * cos(TextureAngle) - U * sin(TextureAngle);
 					//
 					NewU->Align		= FVA_None;
-					NewU->iTransform= INDEX_NONE;
+					NewU->iTransform= MAXWORD;
 					NewU->Flags		= 0;
 					//
 					NewV->Align		= FVA_None;
-					NewV->iTransform= INDEX_NONE;
+					NewV->iTransform= MAXWORD;
 					NewV->Flags		= 0;
 					};
 				};
@@ -1085,14 +1093,14 @@ void FEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mous
 	};
 
 /*-----------------------------------------------------------------------------
-   Keypress handling
+   Keypress handling.
 -----------------------------------------------------------------------------*/
 
 //
 // Handle a regular ASCII key that was pressed in UnrealEd.
 // Returns 1 if proceesed, 0 if not.
 //
-int FEditor::edcamKey (UCamera *Camera, int Key)
+int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
 	{
 	GUARD;
 	ICamera CameraInfo;
@@ -1174,13 +1182,13 @@ int FEditor::edcamKey (UCamera *Camera, int Key)
 					break;
 				case 'U':		// Undo
 					Camera->Unlock(&CameraInfo,0);
-					if (GTrans->Undo ()) GCameraManager->RedrawLevel (Level);
+					if (GTrans->Undo(CameraInfo.Level.Level)) GCameraManager->RedrawLevel (Level);
 					Camera->Lock(&CameraInfo);
 					Processed=1;
 					break;
 				case 'R':		// Redo
 					Camera->Unlock(&CameraInfo,0);
-					if (GTrans->Redo()) GCameraManager->RedrawLevel (Level);
+					if (GTrans->Redo(CameraInfo.Level.Level)) GCameraManager->RedrawLevel (Level);
 					Camera->Lock(&CameraInfo);
 					Processed=1;
 					break;
@@ -1219,7 +1227,7 @@ int FEditor::edcamKey (UCamera *Camera, int Key)
 	};
 
 /*-----------------------------------------------------------------------------
-   Coordinates
+   Coordinates.
 -----------------------------------------------------------------------------*/
 
 void cameraShowCoords (ICamera *CameraInfo)
@@ -1324,98 +1332,122 @@ void cameraShowCoords (ICamera *CameraInfo)
 	};
 
 /*-----------------------------------------------------------------------------
-   Texture browser routines
+   Texture browser routines.
 -----------------------------------------------------------------------------*/
 
 void DrawViewerBackground(ICamera *CameraInfo)
 	{
 	GUARD;
-	UTexture		*Texture		= GGfx.BkgndTexture;
-	FColor			*Palette		= Texture->Palette->GetData();
-	BYTE			*Dest1			= CameraInfo->Screen;
-	BYTE			*TextureBits;
-	BYTE			*Src,*Dest;
-	int				USize,VSize,UMask,VMask,U,V,MipLevel=0;
 	//
-	TextureBits = GGfx.BkgndTexture->GetOriginalData(&MipLevel,&USize,&VSize);
-	UMask		= USize-1;
-	VMask		= VSize-1;
-	for (V=0; V<CameraInfo->SYR; V++)
-		{
-		Src  = &TextureBits[(V&VMask)*Texture->USize];
-		Dest = Dest1;
-		for (U=0; U<CameraInfo->SXR; U++)
-			{
-			*Dest++ = Palette[Src[U&UMask]].RemapIndex-0x10;
-			};
-		Dest1 += CameraInfo->SXStride;
-		};
+	GRend->DrawTiledTextureBlock(CameraInfo,GGfx.BkgndTexture,0,CameraInfo->SXR,0,CameraInfo->SYR,0,0);
+	//Alternatively: GGfx.Clearscreen(&CameraInfo,0);
+	//
 	UNGUARD("DrawViewerBackground");
 	};
 
-void DrawTextureRect(ICamera *CameraInfo,UTexture *Texture,int X,int Y,int Size,int DoText,int Highlight)
-	{
-	GUARD;
-	if (!Texture->Palette) appError("No palette");
+void DrawTextureRect
+(
+	ICamera		*Camera,
+	UTexture	*Texture,
+	int			X,
+	int			Y,
+	int			Size,
+	int			DoText,
+	int			Highlight
+)
+{
+	guard(DrawTextureRect);
+
+	if (!Texture->Palette)
+		appError("No palette");
+	
 	FColor			*Palette = Texture->Palette->GetData();
-	BYTE			VShift,*Dest1,*Dest,*TextureBits,B;
+	BYTE			VShift,*TextureBits,B;
 	int				OrigY=Y,U,U1=1,V=0,XL=Size,YL=Size,i,j,VOfs,USize,VSize,MipLevel=0,UMask,VMask,D;
 	char			Temp[80];
-	//
-	if (Texture->bNoTile)
+
+	TextureBits = Texture->GetOriginalData(&MipLevel,&USize,&VSize);
+	VMask		= VSize-1;
+	UMask		= USize-1;
+	VShift		= FLogTwo(USize);
+	D			= Fix(Max(USize,VSize))/Size;
+
+	if (Y<0) {V -=Y*D; YL+=Y; Y=0;};
+	if (X<0) {U1-=X*D; XL+=X; X=0;};
+	if ((Y+YL)>Camera->SYR) YL = Camera->SYR-Y;
+	if ((X+XL)>Camera->SXR) XL = Camera->SXR-X;
+
+	FCacheItem *Item;
+	RAINBOW_PTR Dest,Dest1,Table = Texture->Palette->GetColorDepthPalette(Item,Camera->Texture);
+	Dest1.PtrBYTE = &Camera->Screen[(X + Y*Camera->Stride)*Camera->ColorBytes];
+
+	for( i=0; i<YL; i++ )
+	{
+		Dest = Dest1;
+		U    = U1;
+		VOfs = (Unfix(V) & VMask) << VShift;
+
+		if( Camera->ColorBytes==1 )
 		{
-		DrawTextureRect(CameraInfo,GGfx.BadTexture,X,Y,Size,0,0);
-		}
-	else
-		{
-		TextureBits = Texture->GetOriginalData(&MipLevel,&USize,&VSize);
-		VMask		= VSize-1;
-		UMask		= USize-1;
-		VShift		= FLogTwo(USize);
-		D			= FIX(OurMax(USize,VSize))/Size;
-		//
-		if (Y<0) {V -=Y*D; YL+=Y; Y=0;};
-		if (X<0) {U1-=X*D; XL+=X; X=0;};
-		if ((Y+YL)>CameraInfo->SYR) YL = CameraInfo->SYR-Y;
-		if ((X+XL)>CameraInfo->SXR) XL = CameraInfo->SXR-X;
-		//
-		Dest1 = &CameraInfo->Screen[X + Y*CameraInfo->SXR];
-		for (i=0; i<YL; i++)
+			if( !(Texture->PolyFlags & PF_Masked)) for (j=0; j<XL; j++ )
 			{
-			Dest = Dest1;
-			U    = U1;
-			VOfs = (UNFIX(V) & VMask) << VShift;
-			if (!(Texture->PolyFlags & PF_Masked)) for (j=0; j<XL; j++)
-				{
-				*(Dest++) = Palette[TextureBits [VOfs + (UNFIX(U)&UMask)]].RemapIndex;
+				*Dest.PtrBYTE++ = Table.PtrBYTE[TextureBits [VOfs + (Unfix(U)&UMask)]];
 				U += D;
-				}
-			else for (j=0; j<XL; j++)
-				{
-				B=TextureBits [VOfs + (UNFIX(U)&UMask)];
-				if (B) *Dest = Palette[B].RemapIndex;
-				Dest++;
-				U += D;
-				};
-			V     += D;
-			Dest1 += CameraInfo->SXR;
-			};
-		};
-	if (DoText)
+			}
+			else for( j=0; j<XL; j++ )
+			{
+				B = TextureBits [VOfs + (Unfix(U)&UMask)];
+				if (B) *Dest.PtrBYTE = Table.PtrBYTE[B];
+				Dest.PtrBYTE++; U += D;
+			}
+		}
+		else if( Camera->ColorBytes==2 )
 		{
+			if( !(Texture->PolyFlags & PF_Masked) ) for( j=0; j<XL; j++ )
+			{
+				*Dest.PtrWORD++ = Table.PtrWORD[TextureBits [VOfs + (Unfix(U)&UMask)]];
+				U += D;
+			}
+			else for( j=0; j<XL; j++ )
+			{
+				B = TextureBits [VOfs + (Unfix(U)&UMask)];
+				if (B) *Dest.PtrWORD = Table.PtrWORD[B];
+				Dest.PtrWORD++; U += D;
+			}
+		}
+		else if( Camera->ColorBytes==4 )
+		{
+			if( !(Texture->PolyFlags & PF_Masked) ) for( j=0; j<XL; j++ )
+			{
+				*Dest.PtrDWORD++ = Table.PtrDWORD[TextureBits [VOfs + (Unfix(U)&UMask)]];
+				U += D;
+			}
+			else for( j=0; j<XL; j++ )
+			{
+				B = TextureBits [VOfs + (Unfix(U)&UMask)];
+				if (B) *Dest.PtrDWORD = Table.PtrDWORD[B];
+				Dest.PtrDWORD++; U += D;
+			}
+		}
+		V += D;
+		Dest1.PtrBYTE += Camera->ByteStride;
+	}
+	if( DoText )
+	{
 		strcpy(Temp,Texture->Name);
 		if (Size>=128) sprintf(Temp+strlen(Temp)," (%ix%i)",Texture->USize,Texture->VSize);
 		GGfx.StrLen (&XL,&YL,(Size>=128)?-1:0,0,GGfx.MedFont,Temp);
 		X = X+(Size-XL)/2;
-		GGfx.Printf (CameraInfo->Texture,X,OrigY+Size+1,-1,GGfx.MedFont,3,Temp);
-		};
-	UNGUARD("DrawTextureRect");
-	};
+		GGfx.Printf (Camera->Texture,X,OrigY+Size+1,-1,GGfx.MedFont,3,Temp);
+	}
+	Item->Unlock();
+	unguard;
+}
 
-int __cdecl ResNameCompare(const void *A, const void *B)
-	{
+int CDECL ResNameCompare(const void *A, const void *B)
+{
 	return stricmp((*(UResource **)A)->Name,(*(UResource **)B)->Name);
-	};
+}
 
 void DrawTextureBrowser(ICamera *CameraInfo)
 	{
@@ -1424,10 +1456,10 @@ void DrawTextureBrowser(ICamera *CameraInfo)
 	int i,n,Size,PerRow,Space,VSkip,YOfs,YL,All,X,Y;
 	//
 	if (CameraInfo->Camera->MiscName.IsNone()) return;
-	All = !stricmp(CameraInfo->Camera->MiscName.Name(),"All");
+	All = !stricmp(CameraInfo->Camera->MiscName.Name(),"(All)");
 	//
 	List   = (UTexture **)GMem.Get(32768*sizeof(UTexture *));
-	Size   = CameraInfo->Actor->CameraStatus.Misc1;
+	Size   = CameraInfo->Actor->Misc1;
 	PerRow = CameraInfo->SXR/Size;
 	Space  = (CameraInfo->SXR - Size*PerRow)/(PerRow+1);
 	if (Size>=64) VSkip=10;
@@ -1438,7 +1470,7 @@ void DrawTextureBrowser(ICamera *CameraInfo)
 		{
 		if ((All && (!Texture->FamilyName.IsNone())) || (Texture->FamilyName==CameraInfo->Camera->MiscName))
 			{
-			List[n++] = Texture;
+			if(!Texture->bUntiled) List[n++] = Texture;
 			};
 		}
 	END_FOR_ALL_TYPED_RES;
@@ -1448,7 +1480,7 @@ void DrawTextureBrowser(ICamera *CameraInfo)
 	YL = Space+(Size+Space+VSkip)*((n+PerRow-1)/PerRow);
 	if (YL>0)
 		{
-		YOfs = -((CameraInfo->Actor->CameraStatus.Misc2*CameraInfo->SYR)/512);
+		YOfs = -((CameraInfo->Actor->Misc2*CameraInfo->SYR)/512);
 		for (i=0; i<n; i++)
 			{
 			X = (Size+Space)*(i%PerRow);
@@ -1470,12 +1502,12 @@ void DrawTextureBrowser(ICamera *CameraInfo)
 		};
 	GMem.Release(List);
 	//
-	GLastScroll = OurMax(0,(512*(YL-CameraInfo->SYR))/CameraInfo->SYR);
+	GLastScroll = Max(0,(512*(YL-CameraInfo->SYR))/CameraInfo->SYR);
 	UNGUARD("DrawTextureBrowser");
 	};
 
 /*-----------------------------------------------------------------------------
-   Camera frame drawing
+   Camera frame drawing.
 -----------------------------------------------------------------------------*/
 
 //
@@ -1483,23 +1515,31 @@ void DrawTextureBrowser(ICamera *CameraInfo)
 //
 int DrawButton (ICamera *CameraInfo,UTexture *Texture,int X, int Y, int ScanCode)
 	{
-	BYTE *Data;
-	int USize,VSize,MipLevel=0;
-	//
-	if (GUnrealEditor.Scan.Active) GUnrealEditor.Scan.PreScan();
-	Data = Texture->GetOriginalData(&MipLevel,&USize,&VSize);
-	GRend->DrawSprite (CameraInfo,Data,USize,VSize,X,Y,0,BT_Normal,NULL,0);
-	if (GUnrealEditor.Scan.Active) GUnrealEditor.Scan.PostScan(EDSCAN_UIElement,ScanCode,0,0,&GMath.ZeroVector);
-	//
-	return USize+2;
+	if (GUnrealEditor.Scan.Active)
+		GUnrealEditor.Scan.PreScan();
+	GRend->DrawScaledSprite
+	(
+		CameraInfo,
+		Texture,
+		X+0.5,
+		Y+0.5,
+		Texture->USize,
+		Texture->VSize,
+		BT_Normal,
+		NULL,
+		0,
+		0
+	);
+	if (GUnrealEditor.Scan.Active)
+		GUnrealEditor.Scan.PostScan(EDSCAN_UIElement,ScanCode,0,0,&GMath.ZeroVector);
+	return Texture->USize+2;
 	};
 
 //
 // Draw the camera view:
 //
-void FEditor::edcamDraw (UCamera *Camera, int DoScan)
+void FGlobalEditor::edcamDraw (UCamera *Camera, int DoScan)
 	{
-	AActor				*Actor;
 	ICamera 			CameraInfo;
 	FVector				OriginalLocation;
 	FRotation			OriginalRotation;
@@ -1507,7 +1547,7 @@ void FEditor::edcamDraw (UCamera *Camera, int DoScan)
 	IMeshMap			MeshMapInfo;
 	DWORD				ShowFlags;
 	char				Temp[80];
-	int					InvalidBsp,ButtonX,Mode,ModeClass,RealClass;
+	int					InvalidBsp,ButtonX=2,Mode,ModeClass,RealClass;
 	static DWORD		LastTicks=0;
 	GUARD;
 	//
@@ -1530,10 +1570,10 @@ void FEditor::edcamDraw (UCamera *Camera, int DoScan)
 	//
 	GRend->RendIter++;
 	//
-	Actor					= CameraInfo.Actor;
-	ShowFlags				= Actor->CameraStatus.ShowFlags;
+	APawn *Actor			= CameraInfo.Actor;
+	ShowFlags				= Actor->ShowFlags;
 	//
-	switch (Actor->CameraStatus.RendMap)
+	switch (Actor->RendMap)
 		{
 		case REN_TexView:
 			Actor->bHiddenEd = 1;
@@ -1561,18 +1601,19 @@ void FEditor::edcamDraw (UCamera *Camera, int DoScan)
 			Actor->bHidden		= 1;
 			Actor->DrawType		= DT_MeshMap;
 			Actor->MeshMap		= (UMeshMap *)CameraInfo.Camera->MiscRes;
-			Actor->AnimSeq		= Actor->CameraStatus.Misc1;
+			Actor->AnimSeq		= Actor->Misc1;
+			Actor->Zone			= 0;
 			Actor->bCollideWorld = 0;
 			Actor->bCollideActors = 0;
 			//
 			UMeshMap *MeshMap = (UMeshMap*)CameraInfo.Camera->MiscRes;
 			MeshMap->Lock(&MeshMapInfo);
 			//
-			if (ShowFlags&SHOW_Brush) Actor->DrawRot.Yaw+=OurMin(4,(int)(GServer.Ticks-LastTicks))*256;
+			if (ShowFlags&SHOW_Brush) Actor->DrawRot.Yaw+=Min(4,(int)(GServer.Ticks-LastTicks))*256;
 			LastTicks=GServer.Ticks;
 			//
 			if (ShowFlags&SHOW_Backdrop) Actor->AnimBase=(GServer.Ticks/2) % MeshMapInfo.AnimSeqs[Actor->AnimSeq].SeqNumFrames;
-			else Actor->AnimBase=Actor->CameraStatus.Misc2;
+			else Actor->AnimBase=Actor->Misc2;
 			//
 			if		(ShowFlags&SHOW_Frame)		CameraInfo.RendMap = REN_Wire;
 			else if	(ShowFlags&SHOW_Coords)		CameraInfo.RendMap = REN_Polys;
@@ -1584,7 +1625,7 @@ void FEditor::edcamDraw (UCamera *Camera, int DoScan)
 			sprintf
 				(
 				Temp,"%s, Seq %i, Frame %i",
-				CameraInfo.Camera->MiscRes->Name,CameraInfo.Actor->CameraStatus.Misc1,
+				CameraInfo.Camera->MiscRes->Name,CameraInfo.Actor->Misc1,
 				(int)Actor->AnimBase
 				);
 			GGfx.Printf (CameraInfo.Texture,4,CameraInfo.SYR-12,-1,GGfx.MedFont,3,Temp);
@@ -1602,7 +1643,7 @@ void FEditor::edcamDraw (UCamera *Camera, int DoScan)
 	ModeClass	= edcamModeClass(Mode);
 	RealClass   = edcamModeClass(Mode);
 	//
-	if (CameraInfo.Camera->IsOrtho()||(Actor->CameraStatus.ShowFlags & SHOW_NoCapture)) Actor->bHiddenEd=1;
+	if (CameraInfo.Camera->IsOrtho()||(Actor->ShowFlags & SHOW_NoCapture)) Actor->bHiddenEd=1;
 	else Actor->bHiddenEd=0;
 	//
 	if (CameraInfo.ShowFlags & SHOW_PlayerCtrl)
@@ -1633,11 +1674,9 @@ void FEditor::edcamDraw (UCamera *Camera, int DoScan)
 	//
 	// Init stats:
 	//
-	#ifdef STATS
-	mymemset (GRend->Stat,0,sizeof(FRenderStats));
-	GRend->Stat->LastEndTime   = GRend->Stat->ThisEndTime;
-	GRend->Stat->ThisStartTime = GApp->TimeMSec();
-	#endif
+	STAT(mymemset(GRend->Stat,0,sizeof(FRenderStats)));
+	GRend->LastEndTime   = GRend->ThisEndTime;
+	GRend->ThisStartTime = GApp->MicrosecondTime()/1000;
 	//
 	// Draw background:
 	//
@@ -1673,7 +1712,7 @@ void FEditor::edcamDraw (UCamera *Camera, int DoScan)
 				constrainSimplePoint(&CameraInfo.Level.Brush->Bound[1].Min,&Constraints);
 				constrainSimplePoint(&CameraInfo.Level.Brush->Bound[1].Max,&Constraints);
 				//
-				GRend->DrawBoundingVolume(&CameraInfo,&CameraInfo.Level.Brush->Bound[1]);
+				GRend->DrawBoundingRect(&CameraInfo,&CameraInfo.Level.Brush->Bound[1]);
 				};
 			};
 		};
@@ -1685,7 +1724,6 @@ void FEditor::edcamDraw (UCamera *Camera, int DoScan)
 		{
 		GGfx.Printf (CameraInfo.Texture,8,20,0,GGfx.MedFont,3,"Map view - Geometry must be rebuilt");
 		};
-	ButtonX=2;
 	if ((CameraInfo.Level.Level->GetState()==LEVEL_UpEdit) &&
 		(!GCameraManager->FullscreenCamera) &&
 		(!(CameraInfo.ShowFlags & SHOW_NoButtons)))
@@ -1711,7 +1749,7 @@ void FEditor::edcamDraw (UCamera *Camera, int DoScan)
 	};
 
 /*-----------------------------------------------------------------------------
-   Brush pivot setting
+   Brush pivot setting.
 -----------------------------------------------------------------------------*/
 
 //
@@ -1743,13 +1781,13 @@ void SetWorldPivotPoint (ILevel *LevelInfo,UModel *Brush,FVector *PivotLocation,
 	};
 
 /*-----------------------------------------------------------------------------
-   Camera mouse click handling
+   Camera mouse click handling.
 -----------------------------------------------------------------------------*/
 
 //
 // Handle a mouse click in the camera window
 //
-void FEditor::edcamClick (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD MouseY,
+void FGlobalEditor::edcamClick (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD MouseY,
 	int Shift, int Ctrl)
 	{
 	GUARD;
@@ -1780,21 +1818,24 @@ void FEditor::edcamClick (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mou
 	//
 	// Check scan results:
 	//
-	if ((Mode == EM_AddActor) && (Buttons == BUT_LEFT) && (GUnrealEditor.Scan.Type != EDSCAN_Actor) && GClasses.AddClass)
+	if ((Mode == EM_AddActor) && (Buttons == BUT_LEFT) && 
+		(Scan.Type != EDSCAN_Actor) && 
+		(Scan.Type != EDSCAN_UIElement) && 
+		(AddClass  != NULL))
 		{
-		if (GClasses.AddClass->DefaultActor.bTemplateClass)
+		if (AddClass->DefaultActor.bTemplateClass)
 			{
 			char Temp[256];
-			sprintf(Temp,"Class %s is a base class.  You can't add actors of this type to the world.",GClasses.AddClass->Name);
+			sprintf(Temp,"Class %s is a base class.  You can't add actors of this type to the world.",AddClass->Name);
 			GApp->MessageBox(Temp,"Can't add actor",0);
 			}
-		else if (GRend->Deproject(&CameraInfo,MouseX,MouseY,&V,1,GClasses.AddClass->DefaultActor.CollisionRadius))
+		else if (GRend->Deproject(&CameraInfo,MouseX,MouseY,&V,1,AddClass->DefaultActor.CollisionRadius))
 			{
 			GTrans->Begin         (CameraInfo.Level.Level,"Add Actor");
 			GTrans->NoteResHeader (CameraInfo.Level.Actors);
 			//
-			if (!GClasses.AddClass) GClasses.AddClass = GClasses.Light;
-			iActor = CameraInfo.Level.SpawnActor(GClasses.AddClass,NAME_NONE,&V);
+			if (!AddClass) AddClass = GClasses.Light;
+			iActor = CameraInfo.Level.SpawnActor(AddClass,NAME_NONE,&V);
 			//
 			if (iActor != INDEX_NONE)
 				{
@@ -1809,9 +1850,9 @@ void FEditor::edcamClick (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mou
 					debug (LOG_Ed,"Actor doesn't fit there");
 					CameraInfo.Level.DestroyActor(iActor);
 					};
-				if (GClasses.AddClass->DefaultActor.Brush)
+				if (AddClass->DefaultActor.Brush)
 					{
-					Actor->Brush = csgDuplicateBrush(Camera->Level,GClasses.AddClass->DefaultActor.Brush,0,0);
+					Actor->Brush = csgDuplicateBrush(Camera->Level,AddClass->DefaultActor.Brush,0,0);
 					Actor->UpdateBrushPosition(&CameraInfo.Level,iActor,1);
 					};
 				};
@@ -1931,7 +1972,7 @@ void FEditor::edcamClick (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mou
 			iActor	= GUnrealEditor.Scan.Index;
 			Actor	= &CameraInfo.Level.Actors->Element(iActor);
 			//
-			if (Actor->Class != GClasses.Camera)
+			if( !Actor->IsKindOf("Camera") )
 				{
 				GTrans->Begin(CameraInfo.Level.Level,"clicking on actors");
 				if (Buttons==BUT_RIGHT)
@@ -1946,7 +1987,7 @@ void FEditor::edcamClick (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mou
 					{
 					if (GApp->KeyDown[K_ALT]) // Set default add-class
 						{
-						GClasses.AddClass = Actor->Class;
+						AddClass = Actor->Class;
 						GApp->EdCallback(EDC_CurClassChange,0);
 						}
 					else // Select/deselect actor
@@ -2006,13 +2047,13 @@ void FEditor::edcamClick (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD Mou
 	};
 
 /*-----------------------------------------------------------------------------
-   Editor camera mode
+   Editor camera mode.
 -----------------------------------------------------------------------------*/
 
 //
 // Set the editor mode.
 //
-void FEditor::edcamSetMode (int Mode)
+void FGlobalEditor::edcamSetMode (int Mode)
 	{
 	int i;
 	//
@@ -2045,10 +2086,10 @@ void FEditor::edcamSetMode (int Mode)
 // This handlers special keyboard mode overrides which should
 // affect the appearance of the mouse cursor, etc.
 //
-int FEditor::edcamMode (UCamera *Camera)
+int FGlobalEditor::edcamMode (UCamera *Camera)
 	{
 	GUARD;
-	if (Camera) switch (Camera->GetActor().CameraStatus.RendMap)
+	if (Camera) switch (Camera->GetActor().RendMap)
 		{
 		case REN_TexView:							return EM_TexView;
 		case REN_TexBrowser:						return EM_TexBrowser;
@@ -2104,7 +2145,7 @@ int FEditor::edcamMode (UCamera *Camera)
 //
 // Return classification of current mode:
 //
-int FEditor::edcamModeClass (int Mode)
+int FGlobalEditor::edcamModeClass (int Mode)
 	{
 	switch (Mode)
 		{
@@ -2137,7 +2178,7 @@ int FEditor::edcamModeClass (int Mode)
 	};
 
 /*-----------------------------------------------------------------------------
-	Ed link topic function
+	Ed link topic function.
 -----------------------------------------------------------------------------*/
 
 AUTOREGISTER_TOPIC("Ed",EdTopicHandler);
@@ -2147,7 +2188,7 @@ void EdTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, cha
 	//
 	if		(!stricmp(Item,"LASTSCROLL"))	itoa (GLastScroll,Data,10);
 	else if (!stricmp(Item,"CURTEX"))		strcpy(Data,GUnrealEditor.CurrentTexture ? GUnrealEditor.CurrentTexture->Name : "None");
-	else if (!stricmp(Item,"CURCLASS"))		strcpy(Data,GClasses.AddClass ? GClasses.AddClass->Name : "None");
+	else if (!stricmp(Item,"CURCLASS"))		strcpy(Data,GEditor->AddClass ? GEditor->AddClass->Name : "None");
 	//
 	UNGUARD("EdTopicHandler::Get");
 	};
@@ -2158,5 +2199,5 @@ void EdTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, con
 	};
 
 /*-----------------------------------------------------------------------------
-	Ed link topic function
+	The End.
 -----------------------------------------------------------------------------*/

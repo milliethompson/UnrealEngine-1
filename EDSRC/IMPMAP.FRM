@@ -2,21 +2,21 @@ VERSION 4.00
 Begin VB.Form frmImportMap 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Import a map"
-   ClientHeight    =   1605
+   ClientHeight    =   1530
    ClientLeft      =   2340
    ClientTop       =   5205
-   ClientWidth     =   3015
-   Height          =   1965
+   ClientWidth     =   2925
+   Height          =   1890
    Icon            =   "ImpMap.frx":0000
    Left            =   2280
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
-   ScaleHeight     =   1605
-   ScaleWidth      =   3015
+   ScaleHeight     =   1530
+   ScaleWidth      =   2925
    ShowInTaskbar   =   0   'False
    Top             =   4905
-   Width           =   3135
+   Width           =   3045
    Begin VB.Frame Frame1 
       Caption         =   "Import Map Options"
       BeginProperty Font 
@@ -57,7 +57,7 @@ Begin VB.Form frmImportMap
       Height          =   375
       Left            =   1920
       TabIndex        =   1
-      Top             =   1200
+      Top             =   1140
       Width           =   975
    End
    Begin VB.CommandButton Import 
@@ -66,7 +66,7 @@ Begin VB.Form frmImportMap
       Height          =   375
       Left            =   120
       TabIndex        =   0
-      Top             =   1200
+      Top             =   1140
       Width           =   975
    End
 End

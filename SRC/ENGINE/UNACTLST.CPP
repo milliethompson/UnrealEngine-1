@@ -11,241 +11,232 @@
 #include "Unreal.h"
 
 /*-----------------------------------------------------------------------------
-	AActorDraw implementation
------------------------------------------------------------------------------*/
-
-//
-// Update a moving brush's position based on its controlling actor's
-// position.  If Editor=1 and UnrealEd is active, snaps the brush to the
-// grid as needed.
-//
-void AActorDraw::UpdateBrushPosition(ILevel *Level,INDEX iActor,int Editor)
-	{
-	if (IsBrush())
-		{
-		Brush->Location = Location;
-		Brush->Rotation = DrawRot;
-		//
-		if (Editor && GEditor)
-			{
-			//
-			// Snap brush rotation and location to grid:
-			//
-			if (GEditor->Constraints.RotGridEnabled)
-				{
-				Brush->Rotation = Brush->Rotation.GridSnap(GEditor->Constraints.RotGrid);
-				};
-			if (GEditor->Constraints.GridEnabled)
-				{
-				Brush->Location = Brush->Location.GridSnap(GEditor->Constraints.Grid);
-				};
-			if (Level) Level->SendMessage(iActor,ACTOR_PostEditMove,NULL);
-			};
-		Brush->BuildBound(1);
-		};
-	};
-
-//
-// Returns 1 if the actor is a brush, 0 if not.
-//
-int AActorDraw::IsBrush(void)
-	{
-	return (DrawType==DT_Brush) && (Brush!=NULL);
-	};
-
-//
-// Returns 1 if the actor is a moving brush, 0 if not.
-//
-int AActorDraw::IsMovingBrush(void)
-	{
-	return (DrawType==DT_Brush) && (Brush!=NULL);
-	};
-
-/*-----------------------------------------------------------------------------
-	UActorList exportation helpers
+	UActorList exportation helpers.
 -----------------------------------------------------------------------------*/
 
 //
 // Set the text type, name, and value of a single actor property.  Used for
 // exporting actor properties.
 //
-void ExportActorProperty(char *Type,char *Name, char *Value, FClassProperty *ClassProperty,
-	AActor *Actor, int Flags, int Descriptive, int ArrayElement, AActor *Delta, FName Category)
-	{
-	GUARD;
-	BYTE *RawActor = (BYTE *)Actor;
-	//
-	Type[0]=0; Name[0]=0; Value[0]=0;
-	//
-	if (ClassProperty->PropertyName.IsNone()) appErrorf("Unknown name in class %s",Actor->Class->Name,1);
-	//
+void ExportActorProperty
+(
+	char			*Type,
+	char			*Name,
+	char			*Value,
+	int				iProperty,
+	AActor			*Actor, 
+	int				Flags, 
+	int				Descriptive, 
+	int				ArrayElement, 
+	AActor			*Delta, 
+	FName			Category
+)
+{
+	guard(ExportActorProperty);
+
+	// Init caller values.
+	Type[0]=0; 
+	Name[0]=0; 
+	Value[0]=0;
+
+	// Get property pointer.
+	FClassProperty *Property = &Actor->Class->Element(iProperty);
+
+	// Make sure property is valid.
+	if (Property->Name.IsNone())
+		appErrorf("Missing name in class %s %i",Actor->Class->Name,iProperty);
+
+	BYTE *RawActor = (BYTE*) Actor;
 	BYTE *PropertyValue = &RawActor
-		[
-		ClassProperty->PropertyOffset + ArrayElement * ClassProperty->PropertyElementSize
-		];
-	if (((ClassProperty->PropertyFlags & Flags) || !Flags) &&
-		((!Delta) || !ClassProperty->Compare(Actor,Delta,ArrayElement)) &&
-		((Category==NAME_NONE)||(Category==ClassProperty->PropertyCategory)))
+	[
+		Property->Offset + ArrayElement * Property->ElementSize
+	];
+	if 
+	(
+		((Property->Flags & Flags) || !Flags) &&
+		((!Delta) || !Property->Compare(Actor,Delta,ArrayElement)) &&
+		((Category==NAME_NONE)||(Category==Property->Category))
+	)
+	{
+		strcpy(Name,Property->Name.Name());
+
+		switch( Property->Type )
 		{
-		strcpy(Name,ClassProperty->PropertyName.Name());
-		switch (ClassProperty->PropertyType)
-			{
 			case CPT_Byte:
-				{
+			{
 				BYTE Temp = *(BYTE *)PropertyValue;
-				if (ClassProperty->Enum) sprintf(Type,"BYTE.%s",ClassProperty->Enum->Name);
-				else strcpy(Type,"BYTE");
-				//
-				if (ClassProperty->Enum && Descriptive)
-					{
-					sprintf(Value,"%i - %s",Temp,ClassProperty->Enum->Element(Temp).Name());
-					}
+
+				if (Property->Enum)
+					sprintf(Type,"BYTE.%s",Property->Enum->Name);
 				else
-					{
+					strcpy(Type,"BYTE");
+
+				if (Property->Enum && Descriptive)
+					sprintf(Value,"%i - %s",Temp,Property->Enum->Element(Temp).Name());
+				else
 					sprintf(Value,"%i",Temp);
-					};
-				};
 				break;
+			}
 			case CPT_Integer:
-				{
+			{
 				strcpy(Type,"INTEGER");
 				sprintf(Value,"%i",*(INT *)PropertyValue);
-				};
 				break;
+			}
 			case CPT_Real:
-				{
+			{
 				strcpy(Type,"REAL");
 				sprintf(Value,"%+013.6f",*(FLOAT *)PropertyValue);
-				};
 				break;
+			}
 			case CPT_String:
-				{
+			{
 				strcpy(Type,"STRING");
-				if (Descriptive)	sprintf(Value,"%s",(char *)PropertyValue);
-				else				sprintf(Value,"\"%s\"",(char *)PropertyValue);
+				if (Descriptive)
+					sprintf(Value,"%s",(char *)PropertyValue);
+				else
+					sprintf(Value,"\"%s\"",(char *)PropertyValue);
 				break;
-				};
+			}
 			case CPT_Boolean:
-				{
+			{
 				strcpy(Type,"BOOLEAN");
-				char *Temp = ((*(DWORD *)PropertyValue) & ClassProperty->BitMask) ? "True" : "False";
+				char *Temp = ((*(DWORD *)PropertyValue) & Property->BitMask) ? "True" : "False";
 				sprintf(Value,"%s",Temp);
 				break;
-				};
+			}
 			case CPT_Actor:
-				{
+			{
 				strcpy(Type,"ACTOR");
 				INDEX Temp = *(INDEX *)PropertyValue;
-				if (Temp!=INDEX_NONE) sprintf(Value,"%i",Temp);
-				else sprintf(Value,"None");
-				};
+				if (Temp!=INDEX_NONE)
+					sprintf(Value,"%i",Temp);
+				else
+					sprintf(Value,"None");
 				break;
+			}
 			case CPT_Resource:
-				{
-				strcpy(Type,GRes.Types[ClassProperty->PropertyResType].Descr);
+			{
+				strcpy(Type,GRes.GetTypeName(Property->ResType));
 				UResource *Temp = *(UResource **)PropertyValue;
-				if (Temp) strcpy(Value,Temp->Name);
-				else strcpy(Value,"None");
-				};
+				if (Temp)
+					strcpy(Value,Temp->Name);
+				else
+					strcpy(Value,"None");
 				break;
+			}
 			case CPT_Name:
-				{
+			{
 				strcpy(Type,"NAME");
 				FName Temp = *(FName *)PropertyValue;
 				strcpy(Value,Temp.Name());
-				};
 				break;
+			}
 			case CPT_Vector:
-				{
+			{
 				strcpy(Type,"VECTOR");
 				FVector *Temp = (FVector *)PropertyValue;
 				sprintf(Value,"(%+013.6f,%+013.6f,%+013.6f)",Temp->X,Temp->Y,Temp->Z);
-				};
 				break;
+			}
 			case CPT_Rotation:
-				{
+			{
 				strcpy(Type,"ROTATION");
 				FRotation *TempRot = (FRotation *)PropertyValue;
 				sprintf(Value,"(%i,%i,%i)",TempRot->Pitch,TempRot->Yaw,TempRot->Roll);
-				};
 				break;
+			}
 			default:
+			{
 				appErrorf("ExportActor: Unknown type in class %s",Actor->Class->Name);
 				break;
-			};
-		};
-	UNGUARD("ExportActorProperty");
-	};
+			}
+		}
+	}
+	unguard;
+}
 
 //
 // Export one entire actor, or the specified named property, to text.
 //
-int ExportActor (AActor *Actor,char *Ptr,FName PropertyName,
-	int Indent,int Descriptive,int Flags, AActor *Delta,int Resources,int ArrayElement,
-	FName Category)
-	{
-	GUARD;
+int ExportActor
+(
+	AActor		*Actor,
+	char		*Ptr,
+	FName		PropertyName,
+	int			Indent,
+	int			Descriptive,
+	int			Flags, 
+	AActor		*Delta,
+	int			Resources,
+	int			ArrayElement,
+	FName		Category
+)
+{
+	guard(ExportActor);
 	char			*NewPtr	= Ptr;
 	char			Type[128],Name[128],Value[128];
-	FClassProperty	*ClassProperty;
-	//
-	// Export actor
-	//
-	ClassProperty = &Actor->Class->Element(0);
+	FClassProperty	*Property;
+
+	// Export actor.
+
+	Property = &Actor->Class->Element(0);
 	for (int i=0; i<Actor->Class->Num; i++)
+	{
+		if( (PropertyName.IsNone()) || (PropertyName==Property->Name) )
 		{
-		if ((PropertyName.IsNone()) || (PropertyName==ClassProperty->PropertyName))
+			if( !(Property->Flags & CPF_Array) )
 			{
-			if ((ClassProperty->PropertyArrayDim==0)||(ClassProperty->PropertyType==CPT_String))
-				{
-				// Export single element
-				ExportActorProperty(Type,Name,Value,ClassProperty,Actor,Flags,Descriptive,0,Delta,Category);
+				// Export single element.
+				ExportActorProperty(Type,Name,Value,i,Actor,Flags,Descriptive,0,Delta,Category);
 				if (Type[0] && Name[0])
+				{
+					if( Resources && (Property->Type==CPT_Resource) &&
+						(Property->Flags & CPF_ExportResource) )
 					{
-					if (Resources && (ClassProperty->PropertyType==CPT_Resource) &&
-						(ClassProperty->PropertyFlags & CPF_ExportResource))
-						{
 						UResource *Res = *(UResource **)Actor->GetPropertyPtr(i);
-						if (Res && !(Res->Flags & RF_TagImp)) // Don't export more than once
-							{
+						if (Res && !(Res->Flags & RF_TagImp))
+						{
+							// Don't export more than once.
 							NewPtr = Res->Export(NewPtr,"",Indent+1);
 							Res->Flags |= RF_TagImp;
-							};
-						};
+						}
+					}
 					if (Descriptive!=2) NewPtr += sprintf(NewPtr,"%s%s %s=%s\r\n",spc(Indent),Descriptive?Type:"",Name,Value);
 					else                NewPtr += sprintf(NewPtr,"%s",Value);
 					//bug("%s%s %s=%s\r\n",spc(Indent),Descriptive?Type:"",Name,Value);
-					};
 				}
+			}
 			else
+			{
+				// Export array.
+				for( INT j=0; j<Property->ArrayDim; j++ )
 				{
-				// Export array
-				for (DWORD j=0; j<ClassProperty->PropertyArrayDim; j++)
+					ExportActorProperty(Type,Name,Value,i,Actor,Flags,Descriptive,j,Delta,Category);
+					if( Type[0] && Name[0] && ((ArrayElement==-1) || (ArrayElement==(int)j)) )
 					{
-					ExportActorProperty(Type,Name,Value,ClassProperty,Actor,Flags,Descriptive,j,Delta,Category);
-					if (Type[0] && Name[0] && ((ArrayElement==-1) || (ArrayElement==(int)j)))
+						if( Resources && (Property->Type==CPT_Resource) &&
+							(Property->Flags & CPF_ExportResource) )
 						{
-						if (Resources && (ClassProperty->PropertyType==CPT_Resource) &&
-							(ClassProperty->PropertyFlags & CPF_ExportResource))
-							{
 							UResource *Res = *(UResource **)Actor->GetPropertyPtr(i,j);
-							if (Res && !(Res->Flags & RF_TagImp)) // Don't export more than once
-								{
+							if (Res && !(Res->Flags & RF_TagImp))
+							{
+								// Don't export more than once.
 								NewPtr = Res->Export(NewPtr,"",Indent+1);
 								Res->Flags |= RF_TagImp;
-								};
-							};
+							}
+						}
 						if (Descriptive!=2) NewPtr += sprintf(NewPtr,"%s%s %s(%i)=%s\r\n",spc(Indent),Descriptive?Type:"",Name,j,Value);
 						else                NewPtr += sprintf(NewPtr,"%s",Value);
-						};
-					};
-				};
-			};
-		ClassProperty++;
-		};
+					}
+				}
+			}
+		}
+		Property++;
+	}
 	return (int)(NewPtr-Ptr);
-	UNGUARD("ExportActor");
-	};
+	unguard;
+}
 
 //
 // Export multiple selected actors for editing.  This sends only the properties that are
@@ -256,89 +247,111 @@ int ExportActor (AActor *Actor,char *Ptr,FName PropertyName,
 // Does not export arrays properly, except for strings (only exports first element of array).
 // Assumes that the script compiler prevents non-string arrays from being declared as editable.
 //
-int ExportMultipleActors (UActorList *Actors,char *Ptr,FName PropertyName,
-	int Indent,int Descriptive,FName Category)
-	{
-	GUARD;
-	AActor			*FirstActor,*Actor;
+int ExportMultipleActors
+(
+	UActorList	*Actors,
+	char		*Ptr,
+	FName		PropertyName,
+	int			Indent,
+	int			Descriptive,
+	FName		Category
+)
+{
+	guard(ExportMultipleActors);
+
+	AActor			*FirstActor=NULL,*Actor;
 	char			*NewPtr	= Ptr;
 	int				iActor,i,j,iStart=-1;
 	char			FirstType[128],FirstName[128],FirstValue[128];
 	char			Type[128],Name[128],Value[128];
-	//
-	// Find first actor:
-	//
+
+	// Find first actor.
 	for (iActor=0; iActor<Actors->Max; iActor++)
-		{
+	{
 		FirstActor = &Actors->Element(iActor);
 		if (FirstActor->Class && FirstActor->bSelected)
-			{
+		{
 			iStart = iActor+1;
 			break;
-			};
-		};
-	if (iStart>=0) // At least one actor is selected
-		{
-		//
-		// Find property in first actor:
-		//
-		FClassProperty *FirstClassProperty = &FirstActor->Class->Element(0);
+		}
+	}
+
+	// At least one actor is selected.
+	if (iStart>=0)
+	{
+		// Find property in first actor.
+		FClassProperty *FirstProperty = &FirstActor->Class->Element(0);
 		for (i=0; i<FirstActor->Class->Num; i++)
+		{
+			if ( ((PropertyName.IsNone()) || (PropertyName==FirstProperty->Name))
+			&&	(!(FirstProperty->Flags & CPF_Array)) )
 			{
-			if (((PropertyName.IsNone()) || (PropertyName==FirstClassProperty->PropertyName)) &&
-				(FirstClassProperty->PropertyArrayDim==0))
+				ExportActorProperty(FirstType,FirstName,FirstValue,i,FirstActor,CPF_Edit,Descriptive,0,NULL,Category);
+				if( FirstType[0] && FirstName[0] )
 				{
-				ExportActorProperty(FirstType,FirstName,FirstValue,FirstClassProperty,FirstActor,CPF_Edit,Descriptive,0,NULL,Category);
-				if (FirstType[0] && FirstName[0])
+					// Now go through all other actors and see if this property is shared.
+					for( iActor=iStart; iActor<Actors->Max; iActor++ )
 					{
-					//
-					// Now go through all other actors and see if this property is shared:
-					//
-					for (iActor=iStart; iActor<Actors->Max; iActor++)
-						{
 						Actor = &Actors->Element(iActor);
-						if (Actor->Class && Actor->bSelected)
+						if( Actor->Class && Actor->bSelected )
+						{
+							FClassProperty *Property = &Actor->Class->Element(0);
+							for( j=0; j<Actor->Class->Num; j++ )
 							{
-							FClassProperty *ClassProperty = &Actor->Class->Element(0);
-							for (j=0; j<Actor->Class->Num; j++)
+								if( Property->Name == FirstProperty->Name )
 								{
-								if (ClassProperty->PropertyName==FirstClassProperty->PropertyName)
-									{
-									if (ClassProperty->PropertyArrayDim != 0) goto NextProperty;
-									ExportActorProperty(Type,Name,Value,ClassProperty,Actor,CPF_Edit,Descriptive,0,NULL,Category);
-									if (stricmp(Type,FirstType)||stricmp(Name,FirstName))
-										{										
-										goto NextProperty; // Mismatch
-										};
+									if( Property->ArrayDim != 1 )
+										goto NextProperty;
+									
+									ExportActorProperty
+									(
+										Type,
+										Name,
+										Value,
+										j,
+										Actor,
+										CPF_Edit,
+										Descriptive,
+										0,
+										NULL,
+										Category
+									);
+									
+									if( stricmp(Type,FirstType) || stricmp(Name,FirstName) )
+									{					
+										// Mismatch.					
+										goto NextProperty;
+									}
 									if (stricmp(Value,FirstValue))
-										{
-										FirstValue[0]=0; // Blank out value if not identical
-										};
-									};
-								ClassProperty++;
-								};
-							};
-						};
-					if (strcmp(Value,FirstValue)==0)
-						{
-						NewPtr += sprintf(NewPtr,"%s%s %s=%s\r\n",spc(Indent),Descriptive?Type:"",Name,Value);
+									{
+										// Blank out value if not identical.
+										FirstValue[0]=0;
+									}
+								}
+								Property++;
+							}
 						}
+					}
+					if( strcmp(Value,FirstValue)==0 )
+					{
+						NewPtr += sprintf(NewPtr,"%s%s %s=%s\r\n",spc(Indent),Descriptive?Type:"",Name,Value);
+					}
 					else
-						{
+					{
 						NewPtr += sprintf(NewPtr,"%s%s %s=\r\n",spc(Indent),Descriptive?Type:"",Name);
-						};
-					};
-				};
+					}
+				}
+			}
 			NextProperty:;
-			FirstClassProperty++;
-			};
-		};
+			FirstProperty++;
+			}
+	}
 	return (int)(NewPtr-Ptr);
-	UNGUARD("ExportMultipleActors");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	UActorList importation helpers
+	UActorList importation helpers.
 -----------------------------------------------------------------------------*/
 
 //
@@ -349,81 +362,86 @@ int ExportMultipleActors (UActorList *Actors,char *Ptr,FName PropertyName,
 //
 // This requires that the actor's Class be set in advance.
 //
-const char *ImportActorProperties(AActor *Actor, const char *Data)
-	{
-	GUARD;
+const char *ImportActorProperties( AActor *Actor, const char *Data )
+{
+	guard(ImportActorProperties);
+
 	UClass	*Class		= Actor->Class;
 	BYTE	*RawActor	= (BYTE *)Actor;
 	char	*PropText	= (char *)GMem.Get(65536);
 	char	*Top		= &PropText[0];
 	char	*MemTop		= &PropText[0];
-	//
+
 	// Parse all resources stored in the actor.
 	// Build list of all text properties.
-	//
+
 	*PropText = 0;
 	char StrLine[256];
-	while (GetLINE (&Data,StrLine,256)==0)
-		{
+	while( GetLINE (&Data,StrLine,256)==0 )
+	{
 		const char *Str = &StrLine[0];
-		if (GetBEGIN(&Str,"BRUSH")) // Parse brush on this line
-			{
+		if( GetBEGIN(&Str,"BRUSH") )
+		{
+			// Parse brush on this line.
 			char BrushName[NAME_SIZE];
+
 			if (GetSTRING(Str,"NAME=",BrushName,NAME_SIZE))
-				{
-				//
+			{
 				// If a brush with this name already exists in the
 				// level, rename the existing one.  This is necessary
 				// because we can't rename the brush we're importing without
 				// losing our ability to associate it with the actor properties
 				// that reference it.
-				//
+
 				UModel *ExistingBrush = new(BrushName,FIND_Optional)UModel;
-				if (ExistingBrush)
-					{
+				if( ExistingBrush )
+				{
 					char TempName[NAME_SIZE];
 					GRes.MakeUniqueName(TempName,BrushName,"",RES_Model);
-					//
+
 					debugf(LOG_Info,"Renaming %s to %s",ExistingBrush->Name,TempName);
 					strcpy(ExistingBrush->Name,TempName);
-					if (ExistingBrush->Polys) strcpy(ExistingBrush->Polys->Name,TempName);
-					};
+
+					if (ExistingBrush->Polys)
+						strcpy(ExistingBrush->Polys->Name,TempName);
+				}
 				UModel *Brush = new(BrushName,CREATE_Unique)UModel;
 				Data = Brush->Import(Data,NULL,"");
-				};
 			}
-		else if (GetEND(&Str,"ACTOR") || GetEND(&Str,"DEFAULTPROPERTIES")) // End of actor properties
-			{
+		}
+		else if (GetEND(&Str,"ACTOR") || GetEND(&Str,"DEFAULTPROPERTIES"))
+		{
+			// End of actor properties.
 			break;
-			}
-		else // More actor properties
-			{
+		}
+		else
+		{
+			// More actor properties.
 			strcpy(Top,Str);
 			Top += strlen(Top);
-			};
-		};
-	//
-	// Parse all text properties
-	//
+		}
+	}
+
+	// Parse all text properties.
 	FClassProperty	*Property = Class->GetData();
 	for (int i=0; i<Class->Num; i++)
-		{
+	{
 		char LookFor[80];
-		//
-		int IsSingleElement = (Property->PropertyArrayDim==0) || (Property->PropertyType==CPT_String);
-		int n               = IsSingleElement ? 1 : Property->PropertyArrayDim;
-		//
-		for (int j=0; j<n; j++)
-			{
+
+		for( int j=0; j<Property->ArrayDim; j++ )
+		{
 			BYTE *Value	= &RawActor
 				[
-				Property->PropertyOffset + j*Property->PropertyElementSize
+				Property->Offset + j*Property->ElementSize
 				];
-			if (IsSingleElement)	sprintf(LookFor,"%s=",Property->PropertyName.Name());
-			else					sprintf(LookFor,"%s(%i)=",Property->PropertyName.Name(),j);
-			//
-			switch(Property->PropertyType)
-				{
+
+			if( Property->Flags & CPF_Array )
+				sprintf(LookFor,"%s(%i)=",Property->Name.Name(),j);
+			else
+				sprintf(LookFor,"%s=",Property->Name.Name());
+
+			switch( Property->Type )
+			{
 				case CPT_Byte:
 					GetBYTE(PropText,LookFor,(BYTE *)Value);
 					break;
@@ -433,10 +451,10 @@ const char *ImportActorProperties(AActor *Actor, const char *Data)
 				case CPT_Boolean:
 					int Result;
 					if (GetONOFF(PropText,LookFor,&Result))
-						{
+					{
 						if (Result) *(DWORD *)Value |=  Property->BitMask;
 						else		*(DWORD *)Value &= ~Property->BitMask;
-						};
+					}
 					break;
 				case CPT_Real:
 					GetFLOAT(PropText,LookFor,(FLOAT *)Value);
@@ -445,13 +463,13 @@ const char *ImportActorProperties(AActor *Actor, const char *Data)
 					GetINDEX(PropText,LookFor,(INDEX *)Value);
 					break;
 				case CPT_Resource:
-					GetRES(PropText,LookFor,Property->PropertyResType,(UResource **)Value);
+					GetRES(PropText,LookFor,Property->ResType,(UResource **)Value);
 					break;
 				case CPT_Name:
 					GetNAME(PropText,LookFor,(FName *)Value);
 					break;
 				case CPT_String:
-					GetSTRING(PropText,LookFor,(char *)Value,Property->PropertySize);
+					GetSTRING(PropText,LookFor,(char *)Value,Property->ElementSize);
 					break;
 				case CPT_Vector:
 					GetFVECTOR(PropText,LookFor,(FVector *)Value);
@@ -460,170 +478,275 @@ const char *ImportActorProperties(AActor *Actor, const char *Data)
 					GetFROTATION(PropText,LookFor,(FRotation *)Value,1);
 					break;
 				default:
-					appErrorf("Bad class property type %i in %s",Property->PropertyType,Class->Name);
-				};
-			};
+					appErrorf("Bad class property type %i in %s",Property->Type,Class->Name);
+					break;
+			}
+		}
 		Property++;
-		};
+	}
 	GMem.Release(MemTop);
 	return Data;
-	//
-	UNGUARD("ImportActorProperties");
-	};
+
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	UActorList resource implementation
+	UActorList resource implementation.
 -----------------------------------------------------------------------------*/
 
 //
-// Standard resource functions
+// Standard resource functions.
 //
 void UActorList::Register(FResourceType *Type)
-	{
-	GUARD;
+{
+	guard(UActorList::Register);
+
 	Type->HeaderSize = sizeof (UActorList);
 	Type->RecordSize = sizeof (AActor);
 	Type->Version    = 1;
 	strcpy (Type->Descr,"ActorList");
-	UNGUARD("UActorList::Register");
-	};
-void UActorList::InitHeader(void)
-	{
-	GUARD;
-	Max = 0;
-	Num = 0;
-	LockType  = LOCK_None;
+	
+	unguard;
+}
+void UActorList::InitHeader()
+{
+	guard(UActorList::InitHeader);
+
+	Max					= 0;
+	Num					= 0;
+	LockType			= LOCK_None;
     StaticActors        = 0;
     DynamicActors       = 0;
     CollidingActors     = 0;
     ActiveActors        = 0;
     UnusedActors        = 0;
     JustDeletedActors   = 0;
-	UNGUARD("UActorList::InitHeader");
-	};
-void UActorList::InitData(void)
-	{
-	GUARD;
+	
+	unguard;
+}
+void UActorList::InitData()
+{
+	guard(UActorList::InitData);
 	Num = 0;
-	UNGUARD("UActorList::InitData");
-	};
+	unguard;
+}
 const char *UActorList::Import(const char *Buffer, const char *BufferEnd,const char *FileType)
-	{
-	GUARD;
+{
+	guard(UActorList::Import);	
 	char StrLine[256];
-	//
-	// Empty all current actors:
-	//
-	for (INDEX i=0; i<Max; i++) Element(i).Class=NULL;
+
+	// Allocate working memory for remapping.
+	INDEX *Remaps  = (INDEX *)GMem.Get(Max * 4 * sizeof(INDEX));
+	INDEX *IsRemap = (INDEX *)GMem.Get(Max *     sizeof(INDEX));
+
+	for( int i=0; i<Max; i++ )
+		IsRemap[i] = 0;
+
+	for( i=0; i<Max*4; i++ )
+		Remaps[i] = INDEX_NONE;
+
+	// Empty the lists.
     StaticActors        ->Empty(TRUE);
     DynamicActors       ->Empty(TRUE);
     CollidingActors     ->Empty(TRUE);
     ActiveActors        ->Empty(TRUE);
     UnusedActors        ->Empty(TRUE);
     JustDeletedActors   ->Empty(TRUE);
-	//
-	// Import sparse actor list:
-	//
+
+	// Import a sparse actor list.
 	AActor *Actor = NULL;
-	while (GetLINE (&Buffer,StrLine,256)==0)
-		{
+	while( GetLINE (&Buffer,StrLine,256)==0 )
+	{
 		const char *Str = &StrLine[0];
-		if (GetBEGIN(&Str,"ACTOR"))
-			{
-			INDEX  iActor;
+		if( GetBEGIN(&Str,"ACTOR") )
+		{
+			INDEX  iNew;
 			UClass *TempClass;
-			if (GetINDEX(Str,"INDEX=",&iActor) && GetUClass(Str,"CLASS=",&TempClass))
+
+			if( GetUClass(Str,"CLASS=",&TempClass) )
+			{
+				// Find a new index for this actor.
+				iNew = INDEX_NONE;
+				for( i=0; i<Max; i++ )
 				{
-				if (iActor<Max)
+					if( Element(i).Class == NULL )
 					{
-					Actor			= &Element(iActor);
-					Actor->Class	= TempClass;
-					memcpy (Actor,&Actor->Class->DefaultActor,sizeof(AActor));
-					};
-				Buffer = ImportActorProperties(Actor,Buffer);
-				Actor->iMe = iActor;
-				};
+						iNew = i;
+						break;
+					}
+				}
+				if( iNew != INDEX_NONE )
+				{
+					// Import it.
+					Actor			 = &Element(iNew);
+					Actor->Class	 = TempClass;
+					memcpy(Actor,&Actor->Class->DefaultActor,sizeof(AActor));
+					Actor->SetBinPointers(Actor->Class);
+					Buffer			 = ImportActorProperties(Actor,Buffer);
+
+					if( Actor->iMe>=0 && Actor->iMe<Max*4 )
+					{
+						if( Actor->iMe==0 && Actor->IsKindOf("LevelDescriptor") )
+						{
+							// Replace the existing level descriptor with this one.
+							Element(0)   = *Actor;
+							Actor->Class = NULL;
+						}
+						else
+						{
+							// Remember to remap it.
+							IsRemap[iNew      ] = 1;
+							Remaps [Actor->iMe] = iNew;
+						}
+					}
+					else
+					{
+						// Kill the invalid actor.
+						Actor->Class = NULL;
+					}
+				}
 			}
-		else if (GetEND(&Str,"ACTORLIST")) break;
-		};
+		}
+		else if (GetEND(&Str,"ACTORLIST")) 
+		{
+			break;
+		}
+	}
+
+	// Remap the imported actors.
+	// Necessary because we may be merging two maps by importing
+	// a second map into the first, and the second map's actors will
+	// need new indices.
+	for( i=0; i<Max; i++ )
+	{
+		if( IsRemap[i] )
+		{
+			// Remap this actor.
+			AActor         *Actor    = &Element(i);
+			UClass		   *Class    = Actor->Class;
+			FClassProperty *Property = &Class->Element(0);
+			
+			if( Actor->iMe == INDEX_NONE ) appErrorf("!%s!",Actor->Class->Name);
+
+			// Check all properties.
+			for( int j=0; j<Class->Num; j++ )
+			{
+				if( Property->Type == CPT_Actor && Property->IsPerActor() )
+				{
+					for( int k=0; k<Property->ArrayDim; k++ )
+					{
+						INDEX *iActor = (INDEX *)Actor->GetPropertyPtr(j,k);
+						if( *iActor>=0 && *iActor<Max*4 )
+						{
+							// Remap this.
+							*iActor = Remaps[*iActor];
+						}
+					}
+				}
+				Property++;
+			}
+			if( Actor->iMe != i ) appErrorf("Remap failed %i %i",Actor->iMe,i);
+		}
+	}
+
 	Num=Max;
 	Realloc();
     RelistActors();
+	GMem.Release(Remaps);
 	return Buffer;
-	UNGUARD("UActorList::Import");
-	};
+
+	unguard;
+}
 char *UActorList::Export(char *Buffer,const char *FileType,int Indent)
-	{
-	GUARD;
-	//
-	// Export all active actors:
-	//
+{
+	guard(UActorList::Export);
+
+	// Export all active actors.
 	Buffer += sprintf (Buffer,"%sBegin ActorList Max=%i\r\n",spc(Indent),Max);
-	for (INDEX iActor=0; iActor<Num; iActor++)
-		{
+
+	for( INDEX iActor=0; iActor<Num; iActor++ )
+	{
 		AActor *Actor = &Element(iActor);
-		if (Actor->Class && (Actor->Class!=GClasses.Camera))
-			{
-			Buffer += sprintf(Buffer,"%s   Begin Actor Index=%i Class=%s\r\n",spc(Indent),iActor,Actor->Class->Name);
+		if( Actor->Class && !Actor->IsKindOf("Camera") )
+		{
+			Buffer += sprintf(Buffer,"%s   Begin Actor Class=%s\r\n",spc(Indent),Actor->Class->Name);
 			Buffer += ExportActor (Actor,Buffer,NAME_NONE,Indent+6,0,0,&Actor->Class->DefaultActor,1,-1,NAME_NONE);
 			Buffer += sprintf(Buffer,"%s   End Actor\r\n",spc(Indent));
-			};
-		};
+		}
+	}
 	Buffer += sprintf (Buffer,"%sEnd ActorList\r\n",spc(Indent));
 	return Buffer;
-	UNGUARD("UActorList::Export");
-	};
-void UActorList::QueryHeaderReferences(FResourceCallback &Callback)
-	{
-	GUARD;
-	UNGUARD("UActorList::QueryHeaderReferences");
-	};
-void UActorList::QueryDataReferences(FResourceCallback &Callback)
-	{
-	GUARD;
-	//
+	
+	unguard;
+}
+void UActorList::QueryHeaderReferences( FResourceCallback &Callback )
+{
+	guard(UActorList::QueryHeaderReferences);
+	unguard;
+}
+void UActorList::QueryDataReferences( FResourceCallback &Callback )
+{
+	guard(UActorList::QueryDataReferences);
+
 	AActor *Actor = &Element(0);
-	for (INDEX iActor=0; iActor<Num; iActor++)
-		{
-		if (Actor->Class) Actor->QueryReferences(this,Callback,0);
-		Actor++;
-		};
-	UNGUARD("UActorList::QueryDataReferences");
-	};
-void UActorList::PostLoad(void)
+	for( INDEX iActor=0; iActor<Num; iActor++ )
 	{
-	GUARD;
-	AActor *Actor = &Element(0);
-	for (int i=0; i<Num; i++)
-		{
 		if (Actor->Class)
-			{
-			FClassProperty	*Property = &Actor->Class->Element(0);
-			for (int j=0; j<Actor->Class->Num; j++)
-				{
-				if ((Property->PropertyType==CPT_Resource)&&(Property->PropertyFlags & CPF_NoSaveResource))
-					{
-					BYTE *RawActor = (BYTE *)Actor;
-					*(UResource **)(&RawActor[Property->PropertyOffset]) = NULL;
-					};
-				Property++;
-				};
-			};
+		{
+			Actor->QueryReferences( this,Callback,0,0 );
+		}
 		Actor++;
-		};
-    StaticActors        = 0;
-    DynamicActors       = 0;
-    CollidingActors     = 0;
-    ActiveActors        = 0;
-    UnusedActors        = 0;
-    JustDeletedActors   = 0;
+	}
+	unguard;
+}
+void UActorList::PostLoad()
+{
+	guard(UActorList::PostLoad);
+
+	Flip();
+	for( int i=0; i<Num; i++ )
+	{
+		AActor *Actor = &Element(i);
+		if( Actor->Class )
+			Actor->PostLoad(this,0);
+	}
+    StaticActors		= 0;
+	DynamicActors		= 0;
+	CollidingActors		= 0;
+	ActiveActors		= 0;
+	UnusedActors		= 0;
+	JustDeletedActors	= 0;
     RelistActors();
-	UNGUARD("UActorList::PostLoad");
-	};
+
+	unguard(UActorList::PostLoad);
+}
+void UActorList::PreKill()
+{
+	guard(UActorList::PreKill);
+
+	// Free the actor lists.
+    delete StaticActors;
+    delete DynamicActors;
+    delete CollidingActors;
+    delete ActiveActors;
+    delete UnusedActors;
+    delete JustDeletedActors;
+
+	unguard;
+}
+void UActorList::Flip()
+{
+	guard(UActorList::Flip);
+
+	UDatabase::Flip();
+	//todo:
+
+	unguard;
+}
 AUTOREGISTER_RESOURCE(RES_ActorList,UActorList,0xB2D90850,0xCCD211cf,0x91360000,0xC028B992);
 
 /*---------------------------------------------------------------------------------------
-   Actor link topic handler
+   Actor link topic handler.
 ---------------------------------------------------------------------------------------*/
 
 enum {MAX_PROP_CATS=64};
@@ -631,226 +754,283 @@ FName GPropCats[MAX_PROP_CATS];
 int GNumPropCats;
 
 void CheckPropCats(UClass *Class)
+{
+	for( int i=0; i<Class->Num; i++ )
 	{
-	for (int i=0; i<Class->Num; i++)
-		{
 		FClassProperty *Prop = &Class->Element(i);
-		FName CatName = Prop->PropertyCategory;
-		if ((CatName!=NAME_NONE) && (GNumPropCats < MAX_PROP_CATS))
-			{
-			for (int j=0; j<GNumPropCats; j++) if (GPropCats[j]==CatName) break;
-			if (j>=GNumPropCats) GPropCats[GNumPropCats++] = CatName;
-			};
-		};
-	};
+		FName CatName = Prop->Category;
+
+		if( (Prop->Flags & CPF_Edit) && 
+			(CatName!=NAME_NONE) && 
+			(GNumPropCats < MAX_PROP_CATS) )
+		{
+			for (int j=0; j<GNumPropCats; j++)
+				if (GPropCats[j]==CatName) 
+					break;
+			if (j>=GNumPropCats) 
+				GPropCats[GNumPropCats++] = CatName;
+		}
+	}
+}
 
 AUTOREGISTER_TOPIC("Actor",ActorTopicHandler);
 void ActorTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, char *Data)
-	{
-	GUARD;
+{
+	guard(ActorTopicHandler::Get);
+
 	UActorList	*Actors = Level->ActorList;
 	UClass		*AllClass   = NULL;
 	INDEX		i,n,AnyClass;
-	//
+
 	Actors->Lock(LOCK_Read);
 	n        = 0;
 	AnyClass = 0;
-	for (i=0; i<Actors->Max; i++)
+
+	for( i=0; i<Actors->Max; i++ )
+	{
+		if( Actors->Element(i).Class && Actors->Element(i).bSelected )
 		{
-		if (Actors->Element(i).Class && Actors->Element(i).bSelected)
-			{
-			n++;
-			if (AnyClass && (Actors->Element(i).Class != AllClass)) AllClass=NULL;
-			else AllClass = Actors->Element(i).Class;
+			if (AnyClass && (Actors->Element(i).Class != AllClass)) 
+				AllClass = NULL;
+			else 
+				AllClass = Actors->Element(i).Class;
+
 			AnyClass=1;
-			};
-		};
+			n++;
+		}
+	}
+
 	Actors->Unlock();
-	//
-	if ((!strnicmp(Item,"Properties",10)) || (!strnicmp(Item,"DefaultProperties",17)))
-		{
-		//
-		// Parse name and optional array element:
-		//
+
+	if
+	(
+		(!strnicmp(Item,"Properties",10)) ||
+		(!strnicmp(Item,"DefaultProperties",17)) ||
+		(!strnicmp(Item,"LevelProperties",15))
+	)
+	{
+		// Parse name and optional array element.
 		FName PropertyName = NAME_NONE;
 		int Element = -1;
 		char Temp[80];
-		if (GetSTRING(Item,"NAME=",Temp,80))
-			{
+
+		if( GetSTRING(Item,"NAME=",Temp,80) )
+		{
 			char *c = strstr(Temp,"(");
-			if (c)
-				{
+			if( c )
+			{
 				Element = atoi(&c[1]);
 				*c = 0;
-				};
-			if (!PropertyName.Find(Temp)) return;
-			};
-		int PropertyMask = CPF_Edit; // Only return editable properties
+			}
+			if (!PropertyName.Find(Temp)) 
+				return;
+		}
+		// Only return editable properties.
+		int PropertyMask = CPF_Edit;
 		int Descriptive  = 1;
-		//
+
 		int Raw=0; GetONOFF(Item,"RAW=",&Raw);
-		if (Raw)
-			{
-			PropertyMask = 0; // Return all requested properties
-			Descriptive  = 2; // Data only, not names or formatting
-			};
+		if( Raw )
+		{
+			PropertyMask = 0; // Return all requested properties.
+			Descriptive  = 2; // Data only, not names or formatting.
+		}
+
 		FName CategoryName=NAME_NONE;
 		GetNAME(Item,"CATEGORY=",&CategoryName);
-		//
-		if (!strnicmp(Item,"Properties",10))
+
+		if( !strnicmp(Item,"Properties",10) )
+		{
+			if( n==1 )
 			{
-			if (n==1) // 1 actor is selected - just send it
+				// 1 actor is selected - just send it.
+				for( i=0; i<Actors->Max; i++ )
 				{
-				for (i=0; i<Actors->Max; i++)
-					{
 					AActor *Actor = &Actors->Element(i);
-					if (Actor->Class && Actor->bSelected)
-						{
+					if( Actor->Class && Actor->bSelected )
+					{
 						ExportActor (Actor,(char *)Data,PropertyName,0,Descriptive,PropertyMask,NULL,0,Element,CategoryName);
 						break;
-						};
-					};
+					}
 				}
-			else if (n>1) ExportMultipleActors(Actors,(char *)Data,PropertyName,0,1,CategoryName);
 			}
-		else if (!strnicmp(Item,"DefaultProperties",17))
+			else if (n>1) 
 			{
+				// Export multiple actors.
+				ExportMultipleActors(Actors,(char *)Data,PropertyName,0,1,CategoryName);
+			}
+		}
+		else if( !strnicmp(Item,"DefaultProperties",17) )
+		{
 			UClass *Class;
 			if (GetUClass(Item,"CLASS=",&Class))
-				{
+			{
 				if(Class!=Class->DefaultActor.Class) appError ("Actor class mismatch");
 				ExportActor (&Class->DefaultActor,(char *)Data,PropertyName,0,1,PropertyMask,NULL,0,Element,CategoryName);
-				};
-			};
-		}
-	if ((!strnicmp(Item,"PropCats",8)) || (!strnicmp(Item,"DefaultPropCats",15)))
-		{
-		GNumPropCats=0;
-		if (!strnicmp(Item,"PropCats",8))
-			{
-			for (int i=0; i<Actors->Max; i++)
-				{
-				AActor *Actor = &Actors->Element(i);
-				if (Actor->Class && Actor->bSelected) CheckPropCats(Actor->Class);
-				};
 			}
-		else
-			{
-			UClass *Class;
-			if (GetUClass(Item,"CLASS=",&Class)) CheckPropCats(Class);
-			};
-		*Data=0;
-		for (int i=0; i<GNumPropCats; i++) Data += sprintf(Data,"%s ",GPropCats[i].Name());
 		}
-	else if (!stricmp(Item,"NumSelected"))
+		else if( (!strnicmp(Item,"LevelProperties",15)) && 
+			Actors->Element(0) &&
+			Actors->Element(0).IsKindOf("LevelDescriptor") )
 		{
-		sprintf(Data,"%i",n);
+			ExportActor (&Actors->Element(0),(char *)Data,PropertyName,0,1,PropertyMask,NULL,0,Element,CategoryName);
 		}
-	else if (!stricmp(Item,"ClassSelected"))
-		{
-		if (AnyClass && AllClass) sprintf(Data,"%s",AllClass->Name);
-		else sprintf(Data,"");
-		}
-	else if (!strnicmp(Item,"IsKindOf",8)) // Sees if the 1 selected actor belongs to a class
-		{
-		UClass *Class;
-		if (GetUClass(Item,"CLASS=",&Class) && AllClass && AllClass->IsKindOf(Class)) sprintf(Data,"1");
-		else sprintf(Data,"0");
-		};
-	UNGUARD("ActorTopicHandler::Get");
-	};
-void ActorTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, const char *Data)
+	}
+	if ( !strnicmp(Item,"PropCats",8) ||
+		 !strnicmp(Item,"DefaultPropCats",15))
 	{
-	GUARD;
+		GNumPropCats=0;
+		if( !strnicmp(Item,"PropCats",8) )
+		{
+			for( int i=0; i<Actors->Max; i++ )
+			{
+				AActor *Actor = &Actors->Element(i);
+				if (Actor->Class && Actor->bSelected) 
+					CheckPropCats(Actor->Class);
+			}
+		}
+		else if( !strnicmp(Item,"DefaultPropCats",15) )
+		{
+			UClass *Class;
+			if (GetUClass(Item,"CLASS=",&Class)) 
+				CheckPropCats(Class);
+		}
+		*Data=0;
+		for (int i=0; i<GNumPropCats; i++) 
+			Data += sprintf(Data,"%s ",GPropCats[i].Name());
+	}
+	else if( !stricmp(Item,"NumSelected") )
+	{
+		sprintf(Data,"%i",n);
+	}
+	else if( !stricmp(Item,"ClassSelected") )
+	{
+		if (AnyClass && AllClass)
+			sprintf(Data,"%s",AllClass->Name);
+		else
+			sprintf(Data,"");
+	}
+	else if( !strnicmp(Item,"IsKindOf",8) )
+	{
+		// Sees if the 1 selected actor belongs to a class.
+		UClass *Class;
+		if (GetUClass(Item,"CLASS=",&Class) && AllClass && AllClass->IsKindOf(Class))
+			sprintf(Data,"1");
+		else
+			sprintf(Data,"0");
+	}
+	unguard;
+}
+void ActorTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, const char *Data)
+{
+	guard(ActorTopicHandler::Set);
+	
 	UActorList	*Actors = Level->ActorList;
-	//
-	if (!stricmp(Item,"Properties"))
-	    {
+
+	if( !stricmp(Item,"Properties") )
+	{
 		GTrans->Begin(Level,"Changing actor property");
-		//
 		ILevel LevelInfo;
 		Level->Lock(&LevelInfo,LOCK_Trans);
-		//
+
 		for (int i=0; i<Actors->Max; i++)
-			{
+		{
 			AActor *Actor = &Actors->Element(i);
-			if (Actor->Class && Actor->bSelected)
-				{
+			if( Actor->Class && Actor->bSelected )
+			{
 				LevelInfo.SendMessageReverse(i,ACTOR_PreEditChange,NULL);
-				//
+
 				GTrans->NoteActor (Actors,i);
 				ImportActorProperties(&Actors->Element(i),Data);
 				Actors->Element(i).iMe = i;
-				//
+
 				LevelInfo.SendMessageReverse(i,ACTOR_PostEditChange,NULL);
-				//
+
 				Actor->bTempLightChanged = 1; // Force light meshes to be rebuilt
-				};
-			};
-		Level->Unlock(&LevelInfo);
-		//
-		GTrans->End();
+			}
 		}
-	else if (!strnicmp(Item,"DefaultProperties",17))
-	    {
+		Level->Unlock(&LevelInfo);
+		GTrans->End();
+	}
+	else if( !strnicmp(Item,"DefaultProperties",17) )
+	{
 		UClass *Class;
-		if (GetUClass(Item,"CLASS=",&Class))
-			{
+		if( GetUClass(Item,"CLASS=",&Class) )
+		{
 			GTrans->Begin			(Level,"Changing default actor property");
 			GTrans->NoteResHeader	(Class);
 			ImportActorProperties	(&Class->DefaultActor,Data);
 			GTrans->End				();
-			};
-		};
-	UNGUARD("ActorTopicHandler::Set");
-	};
+		}
+	}
+	else if( (!strnicmp(Item,"LevelProperties",15)) && 
+		Actors->Element(0) &&
+		Actors->Element(0).IsKindOf("LevelDescriptor") )
+	{
+		GTrans->Begin			(Level,"Changing level properties");
+		GTrans->NoteActor		(Actors,0);
+		ImportActorProperties	(&Actors->Element(0),Data);
+		Actors->Element(0).bTempLightChanged = 1;
+		GTrans->End				();
+	}
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Actor list locking and unlocking
+	Actor list locking and unlocking.
 -----------------------------------------------------------------------------*/
 
 //
-// Lock an actor list
+// Lock an actor list.
 //
-void UActorList::Lock (int NewLockType)
-	{
-	GUARD;
-	//
-	if (NewLockType == LOCK_None) 	appError ("LOCK_NONE");
-	if (LockType != LOCK_None) 		appErrorf("%s is already locked",Name);
-	//
+void UActorList::Lock(int NewLockType)
+{
+	guard(UActorList::Lock);
+
+	// Check state.
+	if (NewLockType == LOCK_None)
+		appError ("LOCK_NONE");
+	if (LockType != LOCK_None)
+		appErrorf("%s is already locked",Name);
+
 	if (GTrans && (NewLockType==LOCK_Trans))
-		{
+	{
 		GTrans->NoteResHeader(this);
 		Trans=1;
-		}
-	else Trans=0;
-	//
+	}
+	else
+	{
+		Trans=0;
+	}
+
 	LockType = NewLockType;
-	Modify(); // Mark as modified to prevent swapping
-	//
-	UNGUARD("UActorList::Lock");
-	};
+
+	 // Mark as modified.
+	Modify();
+
+	unguard;
+}
 
 //
-// Unlock an actor list
+// Unlock an actor list.
 //
-void UActorList::Unlock (void)
-	{
-	GUARD;
+void UActorList::Unlock()
+{
+	guard(UActorList::Unlock);
 	LockType = LOCK_None;
-	UNGUARD("UActorList::Unlock");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Actor list manipulations
+	Actor list manipulations.
 -----------------------------------------------------------------------------*/
+
 //
 // Rebuild the above redundant lists from scratch by scanning the actor list.
 //
 void UActorList::RelistActors()
 {
-    GUARD;
+    guard(UActorList::RelistActors);
 
     if( UnusedActors == 0 )
     {
@@ -870,7 +1050,26 @@ void UActorList::RelistActors()
         DynamicActors->Empty();
         CollidingActors->Empty();
     }
-    for( int Which = 0; Which < Max; Which++)
+
+    {
+        // We make enough room in each list for all the actors.
+        // This is important because sometimes we iterate over the lists
+        // using pointer iteration (instead of index iteration), and such 
+        // an approach is doomed to disaster if new elements are added to
+        // the array mid-iteration and the array is reallocated.
+        StaticActors        ->MakeRoom( Max );
+        DynamicActors       ->MakeRoom( Max );
+        CollidingActors     ->MakeRoom( Max );
+        ActiveActors        ->MakeRoom( Max );
+        UnusedActors        ->MakeRoom( Max );
+        JustDeletedActors   ->MakeRoom( Max );
+    }
+
+    // Traverse the list in reverse order so that unused actors are put
+    // on the UnusedActors list in reverse order. This lets us take
+    // actors off the end of the UnusedActors list and keep the actor indexes (iMe)
+    // low.
+    for( int Which = Max-1; Which >= 0; Which-- )
     {
         AActor * Actor = &Element(Which);
         if( Which >= Num )
@@ -893,36 +1092,38 @@ void UActorList::RelistActors()
             UnusedActors->Add(Actor);
         }
     }
-    UNGUARD("UActorList::RelistActors");
+    unguard;
 }
  
 //
 // Remove an actor from the appropriate main lists (based on its properties).
 //
 void UActorList::UnlistActor(AActor * Actor)
+{
+    if( Actor->bStatic )
     {
-        if( Actor->bStaticActor )
-        {
-            StaticActors->RemoveActor(Actor);
-        }
-        else
-        {
-            DynamicActors->RemoveActor(Actor);
-        }
-        if( Actor->bCollideActors )
-        {
-            CollidingActors->RemoveActor(Actor);
-        }
+        StaticActors->RemoveActor(Actor);
     }
+    else
+    {
+        DynamicActors->RemoveActor(Actor);
+    }
+    if( Actor->bCollideActors )
+    {
+        CollidingActors->RemoveActor(Actor);
+    }
+}
 
 //
 // Add an actor to appropriate main lists (based on its properties).
 //
 void UActorList::ListActor(AActor * Actor)
 {
+	guard(UActorList::ListActor);
+
     if( Actor->Class != 0 )
     {
-        if( Actor->bStaticActor )
+        if( Actor->bStatic )
         {
             StaticActors->Add(Actor);
         }
@@ -935,20 +1136,24 @@ void UActorList::ListActor(AActor * Actor)
             CollidingActors->Add(Actor);
         }
     }
+	unguard;
 }
 
 //
 // Debug: Check the redundant lists for correctness and completeness.
+//
 void UActorList::CheckLists()
 {
-    GUARD;
-    // As a bonus, let's give some info about the lists:
+	guard(UActorList::CheckLists);
+
+    // As a bonus, let's give some info about the lists.
     debugf( LOG_Info, "ActiveActors: %i", ActiveActors->Count() );
     debugf( LOG_Info, "UnusedActors: %i", UnusedActors->Count() );
     debugf( LOG_Info, "JustDeletedActors: %i", JustDeletedActors->Count() );
     debugf( LOG_Info, "StaticActors: %i", StaticActors->Count() );
     debugf( LOG_Info, "DynamicActors: %i", DynamicActors->Count() );
     debugf( LOG_Info, "CollidingActors: %i", CollidingActors->Count() );
+
     for( int Which = 0; Which < Num; Which++)
     {
         AActor * Actor = &Element(Which);
@@ -1001,21 +1206,21 @@ void UActorList::CheckLists()
         }
         if( Actor->Class != 0 )
         {
-            if( IsOnStaticList && !Actor->bStaticActor )
+            if( IsOnStaticList && !Actor->bStatic )
             {
-                debugf( LOG_Info, "Actor [%i] on static list with !bStaticActor", Which );
+                debugf( LOG_Info, "Actor [%i] on static list with !bStatic", Which );
             }
-            else if( !IsOnStaticList && Actor->bStaticActor )
+            else if( !IsOnStaticList && Actor->bStatic )
             {
-                debugf( LOG_Info, "Actor [%i] not on static list but has bStaticActor", Which );
+                debugf( LOG_Info, "Actor [%i] not on static list but has bStatic", Which );
             }
-            if( IsOnDynamicList && Actor->bStaticActor )
+            if( IsOnDynamicList && Actor->bStatic )
             {
-                debugf( LOG_Info, "Actor [%i] on dynamic list with bStaticActor", Which );
+                debugf( LOG_Info, "Actor [%i] on dynamic list with bStatic", Which );
             }
-            else if( !IsOnDynamicList && !Actor->bStaticActor )
+            else if( !IsOnDynamicList && !Actor->bStatic )
             {
-                debugf( LOG_Info, "Actor [%i] not on dynamic list but has !bStaticActor", Which );
+                debugf( LOG_Info, "Actor [%i] not on dynamic list but has !bStatic", Which );
             }
             if( IsOnCollidingList && !Actor->bCollideActors )
             {
@@ -1027,63 +1232,9 @@ void UActorList::CheckLists()
             }
         }
     }
-    UNGUARD("UActorList::CheckLists");
+    unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	AActor implementation
------------------------------------------------------------------------------*/
-
-//
-// Initialize all of the private, in-memory information used by UnrealServer.
-// 
-void AActor::InitServerInfo(void)
-	{
-	for (int i=0; i<FActorServerInfo::MAX_TOUCHING_ACTORS; i++)
-		{
-		ServerInfo.iTouchingActors[i] = INDEX_NONE;
-		};
-	};
-
-//
-// Compute the actor's view coordinate system.  Upon return:
-//
-// Coords->XAxis points in the direction that the actor perceives as 'right'.
-// Coords->YAxis points in the direction that the actor perceives as 'down'.
-// Coords->ZAxis points in the direction that the actor perceives as 'forward'.
-//
-void AActor::GetViewCoords(FCoords *Coords) const
-	{
-	*Coords = GMath.CameraViewCoords;
-	Coords->DeTransformByRotation (ViewRot);
-	};
-
-//
-// Compute the actor's rendering coordinate system.
-//
-void AActor::GetDrawCoords(FCoords *Coords) const
-	{
-	*Coords = GMath.CameraViewCoords;
-	Coords->DeTransformByRotation (DrawRot);
-	};
-
-//
-// Transform a world point into a point relative to the actor.  
-// On return:
-//
-// LocalPoint.X indicates how far right the point is of the actor.
-// LocalPoint.Y indicates how far the point is below the actor.
-// LocalPoint.Z indicates how far ahead the point is of the actor.
-//
-void AActor::TransformPoint(FVector *LocalPoint, const FVector *WorldPoint)
-	{
-	FCoords Coords;
-	GetViewCoords(&Coords);
-	//
-	*LocalPoint = *WorldPoint;
-	LocalPoint->TransformVector(Coords);
-	};
-
-/*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/

@@ -28,9 +28,9 @@ class FRenderDevice
 	int Active,Locked;
 	FRenderDevice();
 	~FRenderDevice();
-	virtual void Init3D(void)=0;
-	virtual void Exit3D(void)=0;
-	virtual void Flush3D(void)=0;
+	virtual void Init3D()=0;
+	virtual void Exit3D()=0;
+	virtual void Flush3D()=0;
 	//
 	// Lock & Unlock:
 	//

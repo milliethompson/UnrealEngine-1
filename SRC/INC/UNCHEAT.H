@@ -3,7 +3,7 @@ UnCheat.h: Manages Unreal cheats
 Used by: Various
 
 Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
-Compiled with Visual C++ 4.0, Calling method=__fastcall
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Revision history:
     * 08/11/96, Created by Mark
@@ -65,6 +65,9 @@ public:
     BOOL     NoBrains                ; // Turn off monsters AI (makes them just stand there)
     BOOL     IsWizard                ; // Turn wizard powers on/off.
     BOOL     MeasurePerformance      ; // Turn performance measurements on/off
+    BOOL     GluedMonsters           ; // Monsters are glued to their current spot.
+    BOOL     InvisibleWeapons        ; // Weapon's don't appear on screen.
+    BOOL     ShowPawnPhysics         ; // Display physics of pawn motion.
 
     // Values:
     int      MonsterSlowMotionValue  ; // 0 for normal motion, or the number of real ticks for each monster tick.
@@ -74,6 +77,7 @@ public:
     BOOL     LethalHit               ; // Next pawn hit is lethal.
     UClass * Spawn                   ; // Class of object to spawn in front of player.
     FLOAT    SpawnDistance           ; // Distance away from player to spawn object.
+    BOOL     Ghost                   ; // Turn ghost on or off.
 };
 
 extern UNREAL_API FCheat * GCheat;

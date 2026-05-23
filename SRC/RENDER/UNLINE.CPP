@@ -18,17 +18,11 @@
 	BYTE	*Screen;
 	INT		FixDX,FixX,X,Y,DY,Count,DestX,ScreenInc,ColorBytes;
 	//
-	#ifdef 	ANTIALIAS
-		FLOAT	FloatFixDY;
-		INT		FixDY,FixY,DX;
-	#endif
-	//
-	#ifdef  DEPTHSHADE
+#ifdef  DEPTHSHADE
 		FLOAT	G1,G2;
 		INT		FixG1,FixG2,FixDG,FixTemp;
-	#endif
-	//
-	GUARD;
+#endif
+	guard(UnLine);
 	//
 	// Bounds check
 	//
@@ -37,22 +31,22 @@
 		(X1 > Camera->FSXR) || (X2 > Camera->FSXR ) ||
 		(Y1 > Camera->FSYR) || (Y2 > Camera->FSYR))
 		{
-		debugf(LOG_Rend,"Line: Bounds (%i,%i) (%i,%i)",X1,Y1,X2,Y2);
-		return;
+		debugf(LOG_Rend,"Line: Bounds (%f,%f) (%f,%f)",X1,Y1,X2,Y2);
+		goto LABEL2(Out);
 		};
 	ColorBytes=Camera->ColorBytes;
 	//
 	// Depth shading
 	//
-	#ifdef  DEPTHSHADE
+#ifdef  DEPTHSHADE
 		#define DEPTHSETUP(Arclen) FixDG = (FixG2-FixG1)/Arclen;
 		G1 = 65536.0 * 12 - RZ1 * 65536.0 * 100000.0; if (G1<0.0) G1=0.0;
 		G2 = 65536.0 * 12 - RZ2 * 65536.0 * 100000.0; if (G2<0.0) G2=0.0;
 		FixG1 = ftoi(G1);
 		FixG2 = ftoi(G2);
-	#else
+#else
 		#define DEPTHSETUP(Arclen)
-	#endif
+#endif
 	//
 	// Arrange so that Y2 >= Y1
 	//
@@ -61,9 +55,9 @@
 		Temp = Y1; Y1 = Y2; Y2 = Temp;
 		Temp = X1; X1 = X2; X2 = Temp;
 		//
-		#ifdef DEPTHSHADE
+#ifdef DEPTHSHADE
 			FixTemp=FixG1; FixG1 = FixG2; FixG2 = FixTemp;
-		#endif
+#endif
 		};
 	DestX	= ftoi(X2);
 	Y		= ftoi(Y1-0.5);
@@ -79,18 +73,18 @@
 			{
 			X = ftoi(X2-0.5); Count = ftoi(X1-0.5) - X;
 			//
-			#ifdef DEPTHSHADE
-				OurExchange(FixG1,FixG2);
-			#endif
+#ifdef DEPTHSHADE
+				Exchange(FixG1,FixG2);
+#endif
 			};
-		#if ISDOTTED
+#if ISDOTTED
 			LineToggle = X&1;
-		#endif
+#endif
 		if (Count>0)
 			{
-			GUARD;
+			guard(Case 1);
 			DEPTHSETUP(Count);
-			Screen = Camera->Screen + ((X + Y*Camera->SXStride)<<SHIFT);
+			Screen = Camera->Screen + ((X + Y*Camera->Stride)<<SHIFT);
 			//
 			#if defined(ASM) && defined(ASMPIXEL)
 			__asm
@@ -98,11 +92,11 @@
 				mov edi,[Screen]
 				mov esi,[ColorBytes]
 				mov ecx,[Count]
-				#ifdef DEPTHSHADE
+#ifdef DEPTHSHADE
 					mov eax,[FixG1]
-				#else
+#else
 					mov eax,[NewColor]
-				#endif
+#endif
 				;
 				LABEL2(HInner):
 				L_ASMPIXEL(HInner)
@@ -117,137 +111,78 @@
 				Screen += ColorBytes;
 				};
 			#endif
-			UNGUARD("CASE 1");
+			unguard;
 			};
-		return;
+		goto LABEL2(Out);
 		};
 	FloatFixDX = 65536.0 * (X2-X1) / (Y2-Y1);
 	FixDX      = ftoi(FloatFixDX);
 	FixX       = ftoi(65536.0 * X1 + FloatFixDX * ((FLOAT)(Y+1) - Y1));
 	//
-	// Antialiased only:
-	//
-	#ifdef ANTIALIAS
-	if (OurAbs(FixDX) > FIX(1))
-		{
-		//
-		// Arrange so that X2 >= X1
-		//
-		if (X2 < X1)
-			{
-			Temp = Y1; Y1 = Y2; Y2 = Temp;
-			Temp = X1; X1 = X2; X2 = Temp;
-			#ifdef DEPTHSHADE
-			FixTemp = FixG1; FixG1 = FixG2; FixG2 = FixTemp;
-			#endif
-			};
-		X		  = ftoi(X1-0.5);
-		DX        = ftoi(X2-0.5) - X;
-		Screen	  = Camera->Screen + X * ColorBytes;
-		//
-		if (DX==0) return;
-		//
-		FloatFixDY = 65536.0 * (Y2-Y1) / (X2-X1); // X2-X1 guaranteed nonzero
-		FixDY      = ftoi(FloatFixDY);
-		FixY       = ftoi(65536.0 * Y1 + FloatFixDY * ((FLOAT)(X+1) - X1));
-		//
-		DEPTHSETUP(DX);
-		//
-		if (FixDY >= 0)
-			{
-			FixY -= FixDY;
-			if (FixY < 0) {FixY += FixDY; Screen += ColorBytes<<SHIFT; DX--;};
-			do {
-				L_DRAWPIXEL(Screen + ((UNFIX(FixY) * Camera->SXStride)<<SHIFT));
-				Screen 	+= ColorBytes;
-				FixY 	+= FixDY;
-				} while (--DX > 0);
-			}
-		else
-			{
-			do {
-				L_DRAWPIXEL(Screen + ((UNFIX(FixY) * Camera->SXStride)<<SHIFT));
-				Screen 	+= ColorBytes;
-				FixY 	+= FixDY;
-				} while (--DX > 0);
-			};
-		return;
-		}
-	#else
-	//
-	// Unantialiased only:
-	//
-	if (FixDX < -FIX(1)) // From -infinity to -1 (Horizontal major)
+	if (FixDX < -Fix(1)) // From -infinity to -1 (Horizontal major)
 		{		   
-		GUARD;
+		guard(Case 3);
 		X      = ftoi(X1-0.5);
-		Screen = Camera->Screen + ((X + Y*Camera->SXStride)<<SHIFT);
+		Screen = Camera->Screen + ((X + Y*Camera->Stride)<<SHIFT);
 		//
 		#if ISDOTTED
 			LineToggle = X&1;
 		#endif
 		//
-		DEPTHSETUP(OurMax(DY,X-ftoi(X2-0.5)));
+		DEPTHSETUP(Max(DY,X-ftoi(X2-0.5)));
 		//
 		while (--DY >= 0)
 			{
 			Count 	 = X;
-			X 		 = UNFIX(FixX);
+			X 		 = Unfix(FixX);
 			Count 	-= X;
 			while (Count-- > 0)
 				{
 				Screen -= ColorBytes; 
 				L_DRAWPIXEL(Screen);
 				};
-			Screen 	+= Camera->SXStride << SHIFT;
+			Screen 	+= Camera->Stride << SHIFT;
 			FixX   	+= FixDX;
 			};
 		while (X-- > DestX) {Screen -= ColorBytes; L_DRAWPIXEL(Screen);};
-		UNGUARD("CASE 3");
+		unguard;
 		}
-	else if (FixDX > FIX(1)) // From 1 to +infinity (Horizontal major)
+	else if (FixDX > Fix(1)) // From 1 to +infinity (Horizontal major)
 		{
-		GUARD;
+		guard(Case 4);
 		X 	   = ftoi(X1-0.5);
-		Screen = Camera->Screen + ((X + Y*Camera->SXStride)<<SHIFT);
+		Screen = Camera->Screen + ((X + Y*Camera->Stride)<<SHIFT);
 		//
 		#if ISDOTTED
 			LineToggle = X&1;
 		#endif
 		//
-		DEPTHSETUP(OurMax(DY,ftoi(X2-0.5)-X));
+		DEPTHSETUP(Max(DY,ftoi(X2-0.5)-X));
 		//
 		while (--DY >= 0)
 			{
 			Count 	 = X;
-			X 		 = UNFIX(FixX);
+			X 		 = Unfix(FixX);
 			Count 	-= X;
 			while (Count++ < 0)
 				{
 				L_DRAWPIXEL(Screen);
 				Screen += ColorBytes;
 				};
-			Screen 	+= Camera->SXStride << SHIFT;
+			Screen 	+= Camera->Stride << SHIFT;
 			FixX   	+= FixDX;
 			};
-		while (X++ < DestX)
+		while (++X < DestX)
 			{
-			L_DRAWPIXEL(Screen); Screen += ColorBytes;
+			L_DRAWPIXEL(Screen);
+			Screen += ColorBytes;
 			};
-		UNGUARD("CASE 4");
+		unguard;
 		}
-	#endif
-	//
 	else if (DY>0) // Vertical major
 		{
-		Screen = Camera->Screen + ((Y*Camera->SXStride)<<SHIFT);
-		/* Antialiased only
-		if (FixDX >= 0) // Fix up for from 0 to 1
-			{
-			FixX -= FixDX;
-			if (FixX < 0) {FixX += FixDX; Screen += Camera->SXStride<<SHIFT; if (--DY<==0) break;};
-			};*/
-		ScreenInc = Camera->SXStride << SHIFT;
+		Screen = Camera->Screen + ((Y*Camera->Stride)<<SHIFT);
+		ScreenInc = Camera->Stride << SHIFT;
 		#if ISDOTTED
 			LineToggle = Y & 1;
 		#endif
@@ -255,15 +190,15 @@
 		DEPTHSETUP(DY);
 		//
 		int D=DY,XX=FixX;
-		GUARD;
+		guard(Case 2);
 		#if defined(ASM) && defined(ASMPIXEL)
 		__asm
 			{
-			#ifdef DEPTHSHADE
+#ifdef DEPTHSHADE
 				mov eax,[FixG1]
-			#else
+#else
 				mov eax,[NewColor]
-			#endif
+#endif
 			;
 			LABEL2(VInner):
 			mov edx,[FixX]					; u Fixed point X location
@@ -287,13 +222,14 @@
 			};
 		#else
 		do  {
-			L_DRAWPIXEL(Screen + (UNFIX(FixX)<<SHIFT));
+			L_DRAWPIXEL(Screen + (Unfix(FixX)<<SHIFT));
 			FixX 	+= FixDX;
 			Screen 	+= ScreenInc;
 			} while (--DY > 0);
 		#endif
-		UNGUARD("CASE 2");
+		unguard;
 		};
 	#undef DEPTHSETUP
-	UNGUARD("UnLine");
+	unguard;
+	LABEL2(Out):;
 //	};

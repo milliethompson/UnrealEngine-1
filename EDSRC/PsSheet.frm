@@ -3,8 +3,8 @@ Begin VB.Form frmPsSheet
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Build a Sheet"
    ClientHeight    =   3915
-   ClientLeft      =   4920
-   ClientTop       =   3870
+   ClientLeft      =   7515
+   ClientTop       =   2895
    ClientWidth     =   2280
    BeginProperty Font 
       name            =   "MS Sans Serif"
@@ -19,13 +19,13 @@ Begin VB.Form frmPsSheet
    Height          =   4275
    HelpContextID   =   330
    Icon            =   "PsSheet.frx":0000
-   Left            =   4860
+   Left            =   7455
    LinkTopic       =   "Form8"
    MaxButton       =   0   'False
    ScaleHeight     =   3915
    ScaleWidth      =   2280
    ShowInTaskbar   =   0   'False
-   Top             =   3570
+   Top             =   2595
    Width           =   2400
    Begin VB.OptionButton SheetFloor 
       Caption         =   "Floor/Ceiling"
@@ -40,7 +40,7 @@ Begin VB.Form frmPsSheet
       EndProperty
       Height          =   255
       Left            =   240
-      TabIndex        =   8
+      TabIndex        =   6
       Top             =   360
       Value           =   -1  'True
       Width           =   1335
@@ -75,11 +75,12 @@ Begin VB.Form frmPsSheet
       EndProperty
       Height          =   255
       Left            =   240
-      TabIndex        =   6
+      TabIndex        =   8
       Top             =   840
       Width           =   1095
    End
    Begin VB.TextBox SheetU 
+      BackColor       =   &H00FFFFFF&
       BeginProperty Font 
          name            =   "MS Sans Serif"
          charset         =   0
@@ -91,12 +92,13 @@ Begin VB.Form frmPsSheet
       EndProperty
       Height          =   285
       Left            =   480
-      TabIndex        =   5
+      TabIndex        =   0
       Text            =   "128"
       Top             =   1425
       Width           =   1095
    End
    Begin VB.TextBox SheetV 
+      BackColor       =   &H00FFFFFF&
       BeginProperty Font 
          name            =   "MS Sans Serif"
          charset         =   0
@@ -108,12 +110,13 @@ Begin VB.Form frmPsSheet
       EndProperty
       Height          =   285
       Left            =   480
-      TabIndex        =   4
+      TabIndex        =   1
       Text            =   "128"
       Top             =   1665
       Width           =   1095
    End
    Begin VB.TextBox SheetGroup 
+      BackColor       =   &H00FFFFFF&
       BeginProperty Font 
          name            =   "MS Sans Serif"
          charset         =   0
@@ -125,7 +128,7 @@ Begin VB.Form frmPsSheet
       EndProperty
       Height          =   285
       Left            =   720
-      TabIndex        =   3
+      TabIndex        =   2
       Text            =   "Sheet"
       Top             =   2040
       Width           =   855
@@ -145,7 +148,7 @@ Begin VB.Form frmPsSheet
       EndProperty
       Height          =   375
       Left            =   120
-      TabIndex        =   2
+      TabIndex        =   3
       Top             =   3480
       Width           =   615
    End
@@ -163,7 +166,7 @@ Begin VB.Form frmPsSheet
       EndProperty
       Height          =   375
       Left            =   1560
-      TabIndex        =   1
+      TabIndex        =   5
       Top             =   3480
       Width           =   615
    End
@@ -182,7 +185,7 @@ Begin VB.Form frmPsSheet
       EndProperty
       Height          =   375
       Left            =   840
-      TabIndex        =   0
+      TabIndex        =   4
       Top             =   3480
       Width           =   615
    End
@@ -358,3 +361,17 @@ Private Sub SheetBuild_Click()
     Call Ed.StatusText("Built a Sheet")
 End Sub
 
+'
+' Focus change highlighting routines.
+'
+Private Sub SheetU_GotFocus()
+    SelectAll SheetU
+End Sub
+
+Private Sub SheetV_GotFocus()
+    SelectAll SheetV
+End Sub
+
+Private Sub SheetGroup_GotFocus()
+    SelectAll SheetGroup
+End Sub

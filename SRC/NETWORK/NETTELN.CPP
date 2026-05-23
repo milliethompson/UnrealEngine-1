@@ -8,6 +8,8 @@
 		* Created by Tim Sweeney
 =============================================================================*/
 
+#pragma warning (disable : 4201) /* nonstandard extension used : nameless struct/union */
+
 #include <windows.h>
 #include <windowsx.h>
 #include "UnBuild.h"
@@ -34,11 +36,11 @@ int FTaskTelnet::Exec(const char *Cmd,FOutputDevice *Out)
 	//
 	if (NetGetCMD(&Str,"LOGIN") || NetGetCMD(&Str,"_LOGIN"))
 		{
-		char Name[NAME_SIZE], Password[NAME_SIZE];
-		char MatchName[NAME_SIZE], MatchPassword[NAME_SIZE];
+		char Name[NET_NAME_SIZE], Password[NET_NAME_SIZE];
+		char MatchName[NET_NAME_SIZE], MatchPassword[NET_NAME_SIZE];
 		//
-		GApp->GetProfileValue("UnrealServer","TelnetName",    MatchName,    "god",NAME_SIZE);
-		GApp->GetProfileValue("UnrealServer","TelnetPassword",MatchPassword,"",NAME_SIZE);
+		GApp->GetProfileValue("UnrealServer","TelnetName",    MatchName,    "god",NET_NAME_SIZE);
+		GApp->GetProfileValue("UnrealServer","TelnetPassword",MatchPassword,"",NET_NAME_SIZE);
 		//
 		if (NetGrabSTRING(Str,Name,256) && NetGrabSTRING(Str,Password,256))
 			{
@@ -101,7 +103,7 @@ void FTaskTelnet::Init(SOCKET NewSocket,SOCKADDR_IN NewSockAddr)
 // Handle a timer tick on the telnet console.  This is the one and only
 // place where the FTaskTelnet object can be destroyed.
 //
-void FTaskTelnet::TaskTick(void)
+void FTaskTelnet::TaskTick()
 	{
 	GUARD;
 	//
@@ -165,7 +167,7 @@ void FTaskTelnet::TaskTick(void)
 //
 // Do all cleanup work for the telnet console.
 //
-void FTaskTelnet::TaskExit(void)
+void FTaskTelnet::TaskExit()
 	{
 	GUARD;
 	//

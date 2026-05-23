@@ -18,7 +18,7 @@
 // The global game object:
 //
 UNGAME_API FGame GGame;
-UNGAME_API FVirtualGame *GGamePtr=&GGame;
+UNGAME_API FGameBase *GGamePtr=&GGame;
 
 /*-----------------------------------------------------------------------------
 	Game init and exit
@@ -27,7 +27,7 @@ UNGAME_API FVirtualGame *GGamePtr=&GGame;
 //
 // Initialized all global game info.  Called once per run.
 //
-void FGame::Init(void)
+void FGame::Init()
 	{
 	GUARD;
 	//
@@ -38,7 +38,7 @@ void FGame::Init(void)
 	// Register all built-in messages as global names
 	//
 	ActorMessages = new("ActorMessages",CREATE_Unique)UEnum(1024);
-	GRes.Root->Add(ActorMessages);
+	GRes.AddToRoot(ActorMessages);
 	//
 	FName Name;
 	#define  REGISTER_MESSAGE(num,msg) \
@@ -47,7 +47,6 @@ void FGame::Init(void)
 	#include "UnMsgs.h"
 	#undef   REGISTER_MSG
 	//
-    FRandom::Initialize(); //tbm: Is there a better place for this?
 	debug(LOG_Init,GAME_DLL " initialized");
 	//
 	//////////////////////////////////
@@ -63,15 +62,11 @@ void FGame::Init(void)
 // Check state of game info.
 // Called between Init() and Exit().
 //
-void FGame::CheckState(void)
+void FGame::CheckState()
 	{
 	//
 	// Make sure built-in and generated structures match up properly:
 	//
-    if(sizeof(AActorRoot)!=sizeof(ARoot))
-		{
-		appError("Size mismatch: AActorRoot and ARoot");
-		};
     if( sizeof(AActor) != sizeof(FActor) )
         {
         appError( "Size mismatch: AActor and FActor" );
@@ -81,13 +76,13 @@ void FGame::CheckState(void)
 //
 // Shut down and deallocate all game-specific stuff
 //
-void FGame::Exit(void)
+void FGame::Exit()
 	{
 	GUARD;
 	//
 	// Delete all actor messages:
 	//
-	GRes.Root->Delete(ActorMessages);
+	GRes.RemoveFromRoot(ActorMessages);
 	ActorMessages->Kill();
 	//
 	debug(LOG_Exit,GAME_DLL " shut down");
@@ -103,7 +98,7 @@ void FGame::Exit(void)
 // Create a new game-specific console for the specific camera.  The console
 // includes a status bar, text console, and whatever other stuff is desired.
 //
-class FVirtualCameraConsole *FGame::CreateCameraConsole(UCamera *Camera)
+class FCameraConsoleBase *FGame::CreateCameraConsole(UCamera *Camera)
 	{
 	GUARD;
 	//
@@ -117,7 +112,7 @@ class FVirtualCameraConsole *FGame::CreateCameraConsole(UCamera *Camera)
 //
 // Destroy a camera console.
 //
-void FGame::DestroyCameraConsole(class FVirtualCameraConsole *Console)
+void FGame::DestroyCameraConsole(class FCameraConsoleBase *Console)
 	{
 	GUARD;
 	//

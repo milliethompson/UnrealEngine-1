@@ -16,27 +16,27 @@
 #include "UnRenDev.h"
 
 /*-----------------------------------------------------------------------------
-	FRenderDevice generic implementation
+	FRenderDevice generic implementation.
 -----------------------------------------------------------------------------*/
 
 //
 // Constructor.
 //
 FRenderDevice::FRenderDevice()
-	{
+{
 	Active = 0;
 	Locked = 0;
-	};
+}
 
 //
 // Destructor.
 //
 FRenderDevice::~FRenderDevice()
-	{
+{
 	Active = 0;
 	Locked = 0;
-	};
+}
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/

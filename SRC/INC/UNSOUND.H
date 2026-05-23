@@ -52,6 +52,7 @@ class UNREAL_API USound : public UResource
 	char *Export(char *Buffer,const char *FileType,int Indent);
 	void QueryHeaderReferences(FResourceCallback &Callback);
 	void QueryDataReferences(FResourceCallback &Callback);
+	void Flip();
 	};
 
 #endif // _INC_UNSOUND

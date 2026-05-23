@@ -1,6 +1,5 @@
 /*=============================================================================
-	UnWnEdSv.cpp: CUnrealEdServer's OLE interface
-	Used by: Unreal/Windows interface
+	UnEdSrv.cpp: CUnrealEdServer implementation
 
 	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
@@ -20,28 +19,28 @@
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealEdServer
+// CUnrealEdServer.
 /////////////////////////////////////////////////////////////////////////////
 
 IMPLEMENT_DYNCREATE(CUnrealEdServer, CWnd)
 
 CUnrealEdServer::CUnrealEdServer()
-	{
+{
 	EnableAutomation();
 	App.UnrealLockApp();
 	App.Platform.Log(LOG_Win,"Created CUnrealEdServer");
-	};
+}
 
 CUnrealEdServer::~CUnrealEdServer()
-	{
-	};
+{
+}
 
 void CUnrealEdServer::OnFinalRelease()
-	{
+{
 	App.Platform.Log(LOG_Win,"OnFinalRelease CUnrealEdServer");
 	App.UnrealUnlockApp();
 	CWnd::OnFinalRelease();
-	};
+}
 
 BEGIN_MESSAGE_MAP(CUnrealEdServer, CWnd)
 	//{{AFX_MSG_MAP(CUnrealEdServer)
@@ -76,97 +75,73 @@ BEGIN_INTERFACE_MAP(CUnrealEdServer, CWnd)
 END_INTERFACE_MAP()
 
 // {F936C3A7-1FF8-11CF-98C0-0000C06958A7}
-IMPLEMENT_OLECREATE(CUnrealEdServer, "Unreal.UnrealEdServer", 0xf936c3a7, 0x1ff8, 0x11cf, 0x98, 0xc0, 0x0, 0x0, 0xc0, 0x69, 0x58, 0xa7)
+SINGLEUSE_IMPLEMENT_OLECREATE(CUnrealEdServer, "Unreal.UnrealEdServer", 0xf936c3a7, 0x1ff8, 0x11cf, 0x98, 0xc0, 0x0, 0x0, 0xc0, 0x69, 0x58, 0xa7)
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealEdServer OLE handlers
+// CUnrealEdServer OLE handlers.
 /////////////////////////////////////////////////////////////////////////////
-
-void HandleOleError(char *Module)
-	{
-	App.InOle=0;
-	App.OleCrashed=1;
-	//
-	App.Platform.ShutdownAfterError();
-	//
-	strcat(App.Platform.ErrorHist," <- Ole call to ");
-	strcat(App.Platform.ErrorHist,Module);
-	App.FinalizeErrorText();
-	//
-	App.Platform.Logf("Exiting due to Ole error");
-	App.Platform.CloseLog();
-	//
-	if (App.Platform.Debugging) DebugBreak();
-	else AfxThrowOleDispatchException(1,App.Platform.ErrorHist);
-	};
-
-int inline CheckUnrealState(char *Descr)
-	{
-	if (App.PlatformCrashed)
-		{
-		char Error[16384];
-		strcpy(Error,"Unrecoverable: ");
-		strcat(Error,App.Platform.ErrorHist);
-		//
-		if (App.Platform.Debugging) DebugBreak();
-		else AfxThrowOleDispatchException(1,Error);
-		return 0;
-		}
-	else if (!App.Platform.ServerAlive)
-		{
-		App.Platform.Logf(LOG_Critical,"Ole '%s' after server shutdown",Descr);
-		return 0;
-		}
-	else return 1;
-	};
 
 void CUnrealEdServer::Exec(LPCTSTR Cmd) 
-	{
+{
 	static void *MemTop=GMem.Get(0);
-	//
-	if (!CheckUnrealState("Exec")) return;
-	try	{
+
+	if( !CheckUnrealState("Exec") )
+		return;
+	
+	try
+	{
 		App.InOle=1;
-		//
-		if (MemTop!=GMem.Get(0)) appError("Memory leak");
-		//
+
+		int Leak = (int)GMem.Get(0)-(int)MemTop;
+		if (Leak!=0)
+			appErrorf("Memory leak: %i",Leak);
+
 		App.Platform.Log(LOG_Cmd,Cmd);
-		//
+
 		GUnreal.Exec(Cmd);
-		//
+
 		App.InOle=0;
-		}
+	}
 	catch(...)
-		{
+	{
 		char C[256]="Exec (";
 		char *S=&C[strlen(C)];
-		strncpy(S,Cmd,80);
-		S[80]=0;
+		strncpy(S,Cmd,160);
+		S[160]=0;
 		strcat(S,")");
 		HandleOleError(C);
-		};
-	};
+	}
+}
 
 void CUnrealEdServer::SlowExec(LPCTSTR Cmd) 
+{
+	if( !CheckUnrealState("SlowExec") )
+		return;
+	
+	try
 	{
-	if (!CheckUnrealState("SlowExec")) return;
-	try	{
 		App.InOle=1;
 		HCURSOR SavedCursor = SetCursor(LoadCursor(NULL,IDC_WAIT));
 		App.Platform.Log(LOG_Cmd,Cmd);
-		//
+
 		GUnreal.Exec(Cmd);
-		//
+
 		SetCursor(SavedCursor);
 		App.InOle=0;
-		}
-	catch(...) {HandleOleError("SlowExec");};
-	};
+	}
+	catch(...)
+	{
+		HandleOleError("SlowExec");
+	}
+}
 
 BSTR CUnrealEdServer::GetProp(LPCTSTR Topic, LPCTSTR Item) 
+{
+	if( !CheckUnrealState("GetProp") )
+		return NULL;
+	
+	try
 	{
-	if (!CheckUnrealState("GetProp")) return NULL;
-	try	{
 		CString	strResult;
 		char	szResult[16384];
 		App.InOle=1;
@@ -174,42 +149,65 @@ BSTR CUnrealEdServer::GetProp(LPCTSTR Topic, LPCTSTR Item)
 		strResult = szResult;
 		App.InOle=0;
 		return strResult.AllocSysString();
-		}
-	catch(...) {HandleOleError("GetProp");};
+	}
+	catch(...)
+	{
+		HandleOleError("GetProp");
+	}
 	return NULL;
-	};
+}
 
 void CUnrealEdServer::SetProp(LPCTSTR Topic, LPCTSTR Item, LPCTSTR NewValue)
+{
+	if( !CheckUnrealState("SetProp") )
+		return;
+	
+	try
 	{
-	if (!CheckUnrealState("SetProp")) return;
-	try	{
 		App.InOle=1;
 		GTopics.Set(NULL,Topic,Item,const_cast<char *>(NewValue));
 		App.InOle=0;
-		}
-	catch(...) {HandleOleError("SetProp");};
-	};
+	}
+	catch(...)
+	{
+		HandleOleError("SetProp");
+	}
+}
 
 void CUnrealEdServer::Init(long hWndMain, long hWndEdCallback)
+{
+	if( !CheckUnrealState("Init") )
+		return;
+	
+	try
 	{
-	if (!CheckUnrealState("Init")) return;
-	try	{
 		App.InOle=1;
 		App.hWndMain       = (HWND)hWndMain;
-		App.hWndEdCallback = (HWND)hWndEdCallback;
+		App.hWndCallback   = (HWND)hWndEdCallback;
 		App.InOle=0;
-		}
-	catch(...) {HandleOleError("Init");};
-	};
+	}
+	catch(...)
+	{
+		HandleOleError("Init");
+	}
+}
 
 void CUnrealEdServer::Enable() 
-	{
-	if (!CheckUnrealState("Enable")) return;
+{
+	if (!CheckUnrealState("Enable")) 
+		return;
+	
 	App.Platform.Enable();
-	};
+}
 
 void CUnrealEdServer::Disable() 
-	{
-	if (!CheckUnrealState("Disable")) return;
+{
+	if (!CheckUnrealState("Disable")) 
+		return;
+	
 	App.Platform.Disable();
-	};
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// The End.
+/////////////////////////////////////////////////////////////////////////////

@@ -17,6 +17,7 @@
 ---------------------------------------------------------------------------------------*/
 
 enum {UNITS_PER_METER=32}; // Number of world units per meter
+enum {MESH_BORDER=2}; // Border surrounding mesh, minimum is 1
 
 //
 // Class used for storing all globally-accessible light generation parameters:
@@ -38,14 +39,14 @@ public:
 
 	// Functions:
 	void	AllocateLightCamera (ULevel *Level);
-	void	FreeLightCamera (void);
+	void	FreeLightCamera ();
 	void	SetCameraView (int ViewNum,FVector *Location);
 	void	ComputeLightVisibility (INDEX iLightActor,AActor *Actor);
 	int		ComputeAllLightVisibility(int Selected);
 	void	LightBspSurf(INDEX iSurf);
-	void	LightAllSurfs(void);
+	void	LightAllSurfs();
 	void	BuildSurfList(INDEX iNode);
-	void	InitLightMeshIndices(void);
+	void	InitLightMeshIndices();
 };
 
 /*---------------------------------------------------------------------------------------
@@ -55,19 +56,18 @@ public:
 //
 // Allocate a temporary camera for lighting purposes,
 //
-void FMeshIlluminator::AllocateLightCamera (ULevel *Level)
+void FMeshIlluminator::AllocateLightCamera(ULevel *Level)
 {
-	GUARD;
-	AActor *Actor;
+	guard(FMeshIlluminator::AllocateLightCamera);
 
 	Camera = new("Raytracer",CREATE_Replace)UCamera(Level);
 	if (!Camera) appError ("AllocateLightCamera: NewCamera failed");
 
-	Actor							= &Camera->GetActor();
-	Camera->SXR						= 128;
-	Camera->SYR						= 128;
-	Actor->CameraStatus.ShowFlags	= 0;
-	Actor->CameraStatus.RendMap		= REN_PlainTex;
+	APawn *Actor		= &Camera->GetActor();
+	Camera->SXR			= 128;
+	Camera->SYR			= 128;
+	Actor->ShowFlags	= 0;
+	Actor->RendMap		= REN_PlainTex;
 
 	Camera->OpenWindow(0,1); // Open a temporary (non-visible) camera
 
@@ -76,10 +76,10 @@ void FMeshIlluminator::AllocateLightCamera (ULevel *Level)
 	ModelInfo = &CameraInfo.Level.ModelInfo;
 	Actors    = CameraInfo.Level.Actors;
 
-	UNGUARD("FMeshIlluminator::AllocateLightCamera");
+	unguard;
 }
 
-void FMeshIlluminator::FreeLightCamera (void)
+void FMeshIlluminator::FreeLightCamera()
 {				
 	GUARD;
 	Camera->Unlock (&CameraInfo,0);
@@ -117,12 +117,11 @@ void FMeshIlluminator::ComputeLightVisibility (INDEX iLightActor,AActor *Actor)
 		void *MemTop    = GMem.Get(0);
 		void *DynMemTop = GDynMem.Get(0);
 
-		SetCameraView      	(i,&Actors->Element(iLightActor).Location);
-		GRend->InitTransforms(ModelInfo);
-		GRend->OccludeBsp(&CameraInfo,NULL);
+		SetCameraView      	  (i,&Actors->Element(iLightActor).Location);
+		GRend->InitTransforms (ModelInfo);
 
-		FBspDrawList *DrawList = &GRend->DrawList[0];
-		while (DrawList->iNode != INDEX_NONE)
+		for( FBspDrawList *DrawList = GRend->OccludeBsp(&CameraInfo,NULL);
+			DrawList != NULL; DrawList = DrawList->Next)
 		{
 			FBspSurf *Poly = &ModelInfo->BspSurfs[DrawList->iSurf];
 			if ((Poly->iLightMesh!=INDEX_NONE) && 
@@ -138,17 +137,19 @@ void FMeshIlluminator::ComputeLightVisibility (INDEX iLightActor,AActor *Actor)
 					FLightMeshIndex *Index = &LightMeshIndex[Poly->iLightMesh];
 					if (Index->NumStaticLights	< Index->MAX_POLY_LIGHTS)
 					{
+						int Duplicate=0;
 						for (INDEX j=0; j<Index->NumStaticLights; j++)
 						{
-							if (Index->iLightActor[j] == iLightActor) goto Skip;
-						};
-						Pairs++;
-						Index->iLightActor [Index->NumStaticLights++] = iLightActor;
-						Skip:;
+							if (Index->iLightActor[j] == iLightActor) Duplicate=1;
+						}
+						if (!Duplicate)
+						{
+							Pairs++;
+							Index->iLightActor [Index->NumStaticLights++] = iLightActor;
+						}
 					}
 				}
 			}
-		DrawList++;
 		}
 		GRend->ExitTransforms();
 
@@ -165,14 +166,23 @@ void FMeshIlluminator::ComputeLightVisibility (INDEX iLightActor,AActor *Actor)
 int FMeshIlluminator::ComputeAllLightVisibility(int Selected)
 	{
 	GUARD;
-	AActor *Actor = &Actors->Element(0);
-	INDEX i,n=0;
+	int n=0;
 	//
-	for (i=0; i<Actors->Max; i++)
+	AActor *Actor = &Actors->Element(0);
+	for (int i=0; i<Actors->Max; i++)
 		{
-		if (Actor->Class && (Actor->LightType!=LT_None) && Actor->bStaticActor)
+		if (Actor->Class && (Actor->LightType!=LT_None) && Actor->bStatic)
 			{
-			if (Actor->bSelected || !Selected)
+			int DoLight = (Actor->bSelected || !Selected);
+			if (!DoLight)
+				{
+				AZoneDescriptor *ZoneDescriptor = LevelInfo->GetZoneDescriptor(ModelInfo->PointZone(Actor->Location));
+				if (ZoneDescriptor)
+					{
+					DoLight = ZoneDescriptor->bSelected;
+					};
+				};
+			if (DoLight)
 				{
 				n++;
 				ComputeLightVisibility (i,Actor);
@@ -304,11 +314,14 @@ void FMeshIlluminator::LightBspSurf (INDEX iSurf)
 	//
 	while (1)
 		{
-		Index->TextureUStart = FIX(((INT)(MinU+0.01) & ~(Index->MeshSpacing-1))-2*Index->MeshSpacing);
-		Index->TextureVStart = FIX(((INT)(MinV+0.01) & ~(Index->MeshSpacing-1))-2*Index->MeshSpacing);
+		Index->TextureUStart = Fix(((INT)(MinU+0.01) & ~(Index->MeshSpacing-1))-MESH_BORDER*Index->MeshSpacing);
+		Index->TextureVStart = Fix(((INT)(MinV+0.01) & ~(Index->MeshSpacing-1))-MESH_BORDER*Index->MeshSpacing);
 		//
-		Index->MeshUSize = (((INT)(MaxU-0.01) - UNFIX(Index->TextureUStart)) >> Index->MeshShift) + 4;
-		Index->MeshVSize = (((INT)(MaxV-0.01) - UNFIX(Index->TextureVStart)) >> Index->MeshShift) + 4;
+		Index->MeshUSize = (((INT)(MaxU-0.01) - Unfix(Index->TextureUStart)) >> Index->MeshShift) + 2*MESH_BORDER;
+		Index->MeshVSize = (((INT)(MaxV-0.01) - Unfix(Index->TextureVStart)) >> Index->MeshShift) + 2*MESH_BORDER;
+		//
+		Index->MeshUBits = FLogTwo(Index->MeshUSize);
+		Index->MeshVBits = FLogTwo(Index->MeshVSize);
 		//
 		if ((Index->MeshUSize <= 1024) 
 			&& (Index->MeshVSize <= 1024) 
@@ -326,13 +339,12 @@ void FMeshIlluminator::LightBspSurf (INDEX iSurf)
 	ModelInfo->LightMesh->Realloc();
 	//
 	Index						= &ModelInfo->LightMesh->GetData()[Surf->iLightMesh];
-	BYTE *DataStart				= (BYTE *)ModelInfo->LightMesh->GetData() + Index->DataOffset;
-	int Size					= ((Index->MeshUSize+7)>>3) * Index->MeshVSize;
 	//
 	// Calculate new base point by moving polygon's base point forward by 4 units:
 	//
 	FVector		NewBase			= FPoints [Surf->pBase] + (*Normal)*4.0;
 	FLOAT		FMeshSpacing	= (FLOAT)Index->MeshSpacing;
+	int			MeshUByteSize	= ((Index->MeshUSize+7)>>3) * Index->MeshVSize;
 	//
 	// Calculate inverse U & V axes which map texels onto pixels:
 	//
@@ -342,17 +354,20 @@ void FMeshIlluminator::LightBspSurf (INDEX iSurf)
 	//
 	// Raytrace each lightsource
 	//
-	for (int i=0; i<Index->NumStaticLights; i++)
+	for( int i=0; i<Index->NumStaticLights; i++ )
 		{
+		BYTE *Data = 
+			(BYTE *)ModelInfo->LightMesh->GetData() + 
+			Index->DataOffset +
+			i * MeshUByteSize;
 		AActor  *Actor      = &Actors->Element(Index->iLightActor[i]);
 		FVector *Light		= &Actor->Location;
-		BYTE	*Data		= DataStart;
 		//
 		// Go through all lattice points and build lighting mesh.
 		// U,V units are texels.
 		//
-		FLOAT	U			= (FLOAT)UNFIX(Index->TextureUStart);
-		FLOAT	V			= (FLOAT)UNFIX(Index->TextureVStart);
+		FLOAT	U			= (FLOAT)Unfix(Index->TextureUStart);
+		FLOAT	V			= (FLOAT)Unfix(Index->TextureVStart);
 		FVector	Vertex0		= NewBase + InverseUAxis*U + InverseVAxis*V;
 		FVector VertexDU	= InverseUAxis * FMeshSpacing;
 		FVector VertexDV	= InverseVAxis * FMeshSpacing;
@@ -365,8 +380,8 @@ void FMeshIlluminator::LightBspSurf (INDEX iSurf)
 				BYTE B = 0;
 				BYTE M = 1;
 				for (int ByteUCounter=0; ByteUCounter < 8; ByteUCounter++)
-					{					
-					if (ModelInfo->LineClass(&Vertex, Light)) B |= M;
+					{
+					if (ModelInfo->LineClass(Vertex, *Light,NF_NotLightBlocking)) B |= M;
 					M = M << 1;
 					RaysTraced++;
 					Vertex += VertexDU;
@@ -375,7 +390,6 @@ void FMeshIlluminator::LightBspSurf (INDEX iSurf)
 				};
 			Vertex0 += VertexDV;
 			};
-		DataStart += Size;
 		};
 	if (iSurf >= ModelInfo->NumBspSurfs)
 		{
@@ -384,7 +398,7 @@ void FMeshIlluminator::LightBspSurf (INDEX iSurf)
 	UNGUARD("FMeshIlluminator::LightBspSurf");
 	};
 
-void FMeshIlluminator::LightAllSurfs(void)
+void FMeshIlluminator::LightAllSurfs()
 	{
 	GUARD;
 	//
@@ -453,7 +467,7 @@ void FMeshIlluminator::BuildSurfList(INDEX iNode)
 //
 // Initialize all light mesh indices
 //
-void FMeshIlluminator::InitLightMeshIndices(void)
+void FMeshIlluminator::InitLightMeshIndices()
 	{
 	GUARD;
 	//
@@ -472,7 +486,7 @@ void FMeshIlluminator::InitLightMeshIndices(void)
    High-level lighting routine
 ---------------------------------------------------------------------------------------*/
 
-void FEditor::shadowIlluminateBsp (ULevel *Level, int Selected)
+void FGlobalEditor::shadowIlluminateBsp (ULevel *Level, int Selected)
 	{
 	GUARD;
 	FMeshIlluminator Illum;
@@ -480,6 +494,7 @@ void FEditor::shadowIlluminateBsp (ULevel *Level, int Selected)
 	// Invalidate texture/illumination cache:
 	//
 	GCache.Flush();
+	if (GTrans) GTrans->Reset ("Rebuilding lighting");
 	//
 	GApp->BeginSlowTask ("Raytracing",1,0);
 	GApp->StatusUpdate  ("Allocating meshes",0,0);
@@ -625,7 +640,7 @@ void LightTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, 
     else if (stricmp(Item,"MaxSize")==0) 	itoa (MaxSize,Data,10);
     else if (stricmp(Item,"Meters")==0) 	itoa (Meters,Data,10);
     else if (stricmp(Item,"Count")==0) 		sprintf(Data,"%i (%i)",LightCount,SelCount);
-    else if (stricmp(Item,"AvgSize")==0) 	itoa (MeshPts/OurMax(1,Meshes),Data,10);
+    else if (stricmp(Item,"AvgSize")==0) 	itoa (MeshPts/Max(1,Meshes),Data,10);
     else if (stricmp(Item,"CacheSize")==0) {itoa(CacheSize/1000,Data,10); strcat (Data,"K");}
 	//
 	UNGUARD("LightTopicHandler::Get");

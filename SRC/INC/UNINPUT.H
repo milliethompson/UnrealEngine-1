@@ -20,23 +20,42 @@ Revision history:
 #include "Unreal.h"
 #include "UnInputP.h"
 #include "UnKeyVal.h"
+#include "UnArray.h"
 
 class UNREAL_API FInput
-    : public FPlatformInput // Platform-specific input information
-    , public FKeyValues     // We provide a key-value interface.
+//tbd:    : public FPlatformInput // Platform-specific input information
+    : public FKeyValues     // We provide a key-value interface.
 {
 public:
 
-    void Initialize();
-    void Finalize();
+    typedef FPlatformInput::TSwitch         TSwitch         ;
+    typedef FPlatformInput::TSwitchState    TSwitchState    ;
+    typedef FPlatformInput::TDevice         TDevice         ;
+    typedef FPlatformInput::TMovement       TMovement       ;
+    typedef FPlatformInput::TMovementKind   TMovementKind   ;
+    typedef FPlatformInput::TMovementInfo   TMovementInfo   ;
+
+    FPlatformInput * PlatformInput  ;
+    TSwitchState   * Switches       ; // Redundant (convenience) copy of PlatformInput->Switches.
+    TMovementInfo  * MovementsInfo  ; // Redundant (convenience) copy of PlatformInput->MovementsInfo.
+
+    void Initialize(FPlatformInput * PlatformInput);
+    void Exit();
     void Reset(); // Reset input information.
+
+    enum
+    {
+        SwitchCount     = FPlatformInput::SwitchCount
+    ,   MovementCount   = FPlatformInput::MovementCount
+    ,   DeviceCount     = FPlatformInput::DeviceCount
+    };
 
     struct UNREAL_API TMetaSwitch // A switch with some interpretations attached to it.
     {
         TSwitch Switch   :16; // Switch, 0 if none.
         BOOL    IsDouble :1 ; // Is the switch treated as a double-switch (activated with a double-press)?
         BOOL    IsToggle :1 ; // Is the switch treated as a toggle, being alternately turned on and off as it is pressed?
-        void Empty() { Switch = S_None; IsDouble = FALSE; IsToggle = FALSE; }
+        void Empty() { Switch = TSwitch(0); IsDouble = FALSE; IsToggle = FALSE; }
         BOOL IsEmpty() const { return Switch==0; }
         const char * Text(BOOL Descriptive) const; // Return a textual description of the meta-switch, "" if IsEmpty().
             // If Descriptive, return a longer, user-readable form.
@@ -64,7 +83,7 @@ public:
     {
         TMovement     Movement :8 ; // Movement, 0 if none.
         TMovementKind Kind     :8 ; // How to interpret the movement.
-        void Empty() { Movement = M_None; Kind = NoMovementKind; }
+        void Empty() { Movement = TMovement(0); Kind = TMovementKind(0); }
         BOOL IsEmpty() const { return Movement==0; }
         const char * Text(BOOL Descriptive) const; // Return a textual description of the meta-movement, "" if IsEmpty()..
             // If Descriptive, return a longer, user-readable form.
@@ -157,6 +176,8 @@ public:
         void Normalize(); // Normalizes this by clearing unused information.
     };
 
+    typedef DArray<TCombo,5,5> TCombos;
+
     //         Parse a movement name out of a text string.    
     // Look for a movement name at the beginning of Text, after any whitespace.
     // If found, move Text beyond the movement name and return the identified movement.
@@ -182,6 +203,7 @@ public:
     TStringList Keys() const; // What are all the keys?
     char * Value(const char * Key) const; // What is the current value for the given key? 
     BOOL SetValue(const char * Key, const char * Value); // Set the value associated with a key.
+    const char * SectionName() const;
 
     static BOOL SetValue(const char * Key, const char * Value, TMovementInfo * Info );
         // Fill in Info (an array of MovementCount items) with the value interpreted from Key=Value.
@@ -193,19 +215,19 @@ public:
         // Fills in Info (an array of MovementCount items) with parsed values from PairList.
         // Return TRUE if there was one or more errors, FALSE otherwise.
     
-    static const char * Name(TSwitch Switch, BOOL Descriptive) // Cryptic or descriptive switch name
+    const char * Name(TSwitch Switch, BOOL Descriptive) // Cryptic or descriptive switch name
     {
-        return Descriptive ? Description(Switch) : Abbreviation(Switch);
+        return Descriptive ? PlatformInput->Description(Switch) : PlatformInput->Abbreviation(Switch);
     }
 
-    static const char * Name(TMovement Movement, BOOL Descriptive) // Cryptic or descriptive movement name
+    const char * Name(TMovement Movement, BOOL Descriptive) // Cryptic or descriptive movement name
     {
-        return Descriptive ? Description(Movement) : Abbreviation(Movement);
+        return Descriptive ? PlatformInput->Description(Movement) : PlatformInput->Abbreviation(Movement);
     }
 
-    static const char * Name(TMovementKind MovementKind, BOOL Descriptive) // Cryptic or descriptive TMovementKind name
+    const char * Name(TMovementKind MovementKind, BOOL Descriptive) // Cryptic or descriptive TMovementKind name
     {
-        return Descriptive ? Description(MovementKind) : Abbreviation(MovementKind);
+        return Descriptive ? PlatformInput->Description(MovementKind) : PlatformInput->Abbreviation(MovementKind);
     }
 };
 

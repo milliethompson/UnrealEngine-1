@@ -1,5 +1,5 @@
 /*=============================================================================
-	UnEdSrv.cpp: FEditor implementation, the Unreal editing server
+	UnEdSrv.cpp: FGlobalEditor implementation, the Unreal editing server
 
 	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
@@ -22,7 +22,6 @@
 // Global hacks:
 //
 void UNREAL_API AudioCmdLine(const char *Str);
-void UNREAL_API resQueryForLink(UResource *Res,EResourceType Type); // Resource ID or MAXWORD-2=Root, MAXWORD-1=All
 void UNREAL_API classQueryForLink(UResource *Res); // Class ID or NULL-2=Root, NULL-1=All
 void texQueryTextureForLink(char *FamilyName);
 void texQueryFamilyForLink(int All);
@@ -34,7 +33,7 @@ void texQueryFamilyForLink(int All);
 //
 // Process an incoming network message meant for the editor server
 //
-int FEditor::Exec(const char *Stream,FOutputDevice *Out)
+int FGlobalEditor::Exec(const char *Stream,FOutputDevice *Out)
 	{
 	char ErrorTemp[256]="Setup: ";
 	//
@@ -45,6 +44,7 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 	FVector 		TempVector;
 	FRotation		TempRotation;
 	UModel			*Brush,*LevelModel;
+	UClass			*Class;
 	WORD	 		Word1,Word2,Word3,Word4;
 	INDEX			Index1;
 	ETexAlign		TexAlign;
@@ -279,6 +279,9 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 			Actor->DrawRot		= Brush->Rotation;
 			Actor->Brush		= csgDuplicateBrush(Level,Brush,0,0);
 			//
+			LevelInfo.SendMessageReverse(iActor,ACTOR_PreEditChange,NULL);
+			LevelInfo.SendMessageReverse(iActor,ACTOR_PostEditChange,NULL);
+			//
 			Level->Unlock				(&LevelInfo);
 			GTrans->End					();
 			GCameraManager->RedrawLevel	(Level);
@@ -417,7 +420,7 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 					//
 					if (!TempModel->Polys->ImportFromFile(TempFname))
 						{
-						GTrans->Rollback();
+						GTrans->Rollback(Level);
 						goto ImportBrushError;
 						};
 					};
@@ -428,7 +431,7 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 						TempModel->Polys->Element(Word2).PolyFlags |= DWord1;
 						};
 					};
-				if (DWord2) bspMergeCoplanars (TempModel,0);
+				if (DWord2) bspMergeCoplanars (TempModel,0,1);
 				bspValidateBrush	(TempModel,0,1);
 				GTrans->End			();
 				//
@@ -476,7 +479,7 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 			bspBuildFPolys		(LevelModel,1);
 			//
 			GApp->StatusUpdate  ("Merging planars",0,0);
-			bspMergeCoplanars	(LevelModel,0);
+			bspMergeCoplanars	(LevelModel,0,0);
 			//
 			GApp->StatusUpdate  ("Partitioning",0,0);
 			bspBuild			(LevelModel,BspOpt,Word2,0);
@@ -491,8 +494,6 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 				GApp->StatusUpdate("Optimizing geometry",0,0);
 				bspOptGeom		(LevelModel);
 				};
-			GApp->StatusUpdate("Building unique planes",0,0);
-			bspBuildUniquePlanes(LevelModel);
 			//
 			// Empty EdPolys:
 			//
@@ -551,7 +552,6 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 				GTrans->Reset ("map editing"); // Can't be transaction-tracked
 				csgInvalidateBsp (Level);
 				};
-			mapSelectNone		(Level);
 			GCameraManager->RedrawLevel(Level);
 			//
 			Processed=1;
@@ -668,13 +668,13 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 			Level->ReconcileActors	(1);				
 			Level->SetState 		(LEVEL_UpEdit,NULL);
 			//
-			GCameraManager->RedrawLevel		(Level);
+			GCameraManager->RedrawLevel(Level);
 			//
 			GApp->EdCallback		(EDC_MapChange,0);
 			GApp->EdCallback		(EDC_SelPolyChange,0);
 			GApp->EdCallback		(EDC_SelActorChange,0);
 			//
-			GRes.Purge(0);
+			//GRes.Purge(0);
 			//
 			Processed=1;
 			}
@@ -700,7 +700,7 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 				GApp->EdCallback	(EDC_SelPolyChange,0);
 				GApp->EdCallback	(EDC_SelActorChange,0);
 				//
-				GRes.Purge(0);
+				//GRes.Purge(0);
 				}
 			else Out->Log(LOG_ExecError,"Missing filename");
 			Processed=1;
@@ -735,7 +735,7 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 				if (Word1) mapSelectNone(Level);
 				//
 				GApp->EndSlowTask   	();
-				GCameraManager->RedrawLevel		(Level);
+				GCameraManager->RedrawLevel(Level);
 				GApp->EdCallback		(EDC_MapChange,0);
 				GApp->EdCallback		(EDC_SelPolyChange,0);
 				GApp->EdCallback		(EDC_SelActorChange,0);
@@ -786,13 +786,17 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 			{
 			if (GetSTRING(Str,"FILE=",TempFname,79))
 				{
+				if (!GetONOFF (Str, "MERGE=",&DWord2)) DWord2=1;
+				//
 				GApp->BeginSlowTask	("Exporting map polys",1,0);
 				GApp->StatusUpdate  ("Building polygons",0,0);
 				bspBuildFPolys		(LevelModel,0);
 				//
-				GApp->StatusUpdate  ("Merging planars",0,0);
-				bspMergeCoplanars	(LevelModel,0);
-				//
+				if (DWord2)
+					{
+					GApp->StatusUpdate  ("Merging planars",0,0);
+					bspMergeCoplanars	(LevelModel,0,1);
+					};
 				LevelModel->Lock	(&ModelInfo,LOCK_NoTrans); 
 				ModelInfo.PolysResource->ExportToFile(TempFname);
 				ModelInfo.NumFPolys = 0; // Empty edpolys
@@ -802,34 +806,6 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 				GCameraManager->RedrawLevel	(Level);
 				}
 			else Out->Log(LOG_ExecError,"Missing filename");
-			Processed=1;
-			};
-		}
-	//------------------------------------------------------------------------------------
-	// RESOURCE
-	//
-	else if (GetCMD(&Str,"RESOURCE"))
-		{
-		if (GetCMD(&Str,"QUERY"))
-			{
-			SaveAsMacro = 0;
-			if (GetRESTYPE(Str,"TYPE=",&ResType))
-				{
-				UResource *Res;
-				if (GetRES(Str,"NAME=",ResType,&Res)) resQueryForLink(Res,ResType);
-				else resQueryForLink(NULL,ResType);
-				}
-			else Out->Log(LOG_ExecError,"Missing resource type");
-			Processed=1;
-			}
-		else if (GetCMD(&Str,"DEBUG")) // Build list of unclaimed resources
-			{
-			GRes.FindUnclaimed();
-			Processed=1;
-			}
-		else if (GetCMD(&Str,"PURGE")) // Purge unclaimed resources
-			{
-			GRes.KillUnclaimed();
 			Processed=1;
 			};
 		}
@@ -941,21 +917,7 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 			}
 		else if (GetCMD(&Str,"SET")) // ACTOR SET [ADDCLASS=class]
 			{
-			GetUClass(Str,"ADDCLASS=",&GClasses.AddClass);
-			Processed=1;
-			}
-		else if (GetCMD(&Str,"RESET")) // ACTOR RESET
-			{
-			GTrans->Begin		(Level,"Actor Reset");
-			//
-			Level->Lock			(&LevelInfo,LOCK_Trans);
-			edactResetSelected	(&LevelInfo);
-			Level->Unlock		(&LevelInfo);
-			//
-			GTrans->End			();
-			GCameraManager->RedrawLevel	(Level);
-			//
-			GApp->EdCallback(EDC_SelActorChange,0);
+			GetUClass(Str,"ADDCLASS=",&AddClass);
 			Processed=1;
 			}
 		else if (GetCMD(&Str,"DELETE")) // ACTOR DELETE (selected)
@@ -1219,7 +1181,6 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 					{
 					GetDWORD(Str,"FLAGS=",			&Texture->PolyFlags);
 					GetNAME (Str,"FAMILY=",			&Texture->FamilyName);
-					GetFLOAT(Str,"PALDIFFUSION=",	&Texture->PalDiffusionC);
 					//
 					if ((!Palette) && DWord2) // Import palette
 						{
@@ -1408,19 +1369,14 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 		{
 		if (GetCMD(&Str,"UNDO"))
 			{
-			if (GTrans->Undo ()) GCameraManager->RedrawLevel (Level);
+			if (GTrans->Undo (Level)) GCameraManager->RedrawLevel (Level);
 			Processed=1;
 			}
 		else if (GetCMD(&Str,"REDO"))
 			{
-			if (GTrans->Redo()) GCameraManager->RedrawLevel (Level);
+			if (GTrans->Redo(Level)) GCameraManager->RedrawLevel (Level);
 			Processed=1;
 			}
-		else if (GetCMD(&Str,"REDOALL"))
-			{
-			if (GTrans->RedoAll()) GCameraManager->RedrawLevel (Level);
-			Processed=1;
-			};
 		GApp->EdCallback(EDC_SelActorChange,0);
 		GApp->EdCallback(EDC_SelPolyChange,0);
 		GApp->EdCallback(EDC_MapChange,0);
@@ -1552,7 +1508,6 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 			}
 		else if (GetCMD(&Str,"SAVEBELOW")) // CLASS SAVEBELOW
 			{
-			UClass *Class;
 			if (GetSTRING (Str,"FILE=",TempFname,80) &&
 				GetUClass (Str,"NAME=",&Class))
 				{
@@ -1583,7 +1538,6 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 			}
 		else if (GetCMD(&Str,"SAVE")) // CLASS SAVE
 			{
-			UClass *Class;
 			if (GetSTRING (Str,"FILE=",TempFname,80) &&
 				GetUClass (Str,"NAME=",&Class))
 				{
@@ -1866,33 +1820,6 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 		Processed=1;
 		}
 	//------------------------------------------------------------------------------------
-	// DEBUG: Misc debugging
-	//
-	else if (GetCMD(&Str,"DEBUG"))
-		{
-		if (GetCMD(&Str,"CRASH"))
-			{
-			appError ("Unreal crashed at your request");
-			Processed=1;
-			}
-		else if (GetCMD(&Str,"GPF"))
-			{
-			Out->Log("Unreal crashing with voluntary GPF");
-			*(int *)NULL = 123;
-			Processed=1;
-			}
-		else if (GetCMD(&Str,"EATMEM"))
-			{
-			Out->Log("Eating up all available memory");
-			while (1)
-				{
-				void *Eat = GApp->Malloc(65536,"EatMem");
-				memset(Eat,0,65536);
-				};
-			Processed=1;
-			};
-		}
-	//------------------------------------------------------------------------------------
 	// SCRIPT: script compiler
 	//
 	else if (GetCMD(&Str,"SCRIPT"))
@@ -1909,8 +1836,8 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 			};
 		if (GetCMD(&Str,"MAKE")) // Make all scripts
 			{
-			if (GetCMD(&Str,"ALL")) MakeScripts(GClasses.Root,1); // Make all
-			else					MakeScripts(GClasses.Root,0); // Make changed scripts
+			if (GetCMD(&Str,"ALL")) MakeScripts(GClasses.Actor,1); // Make all
+			else					MakeScripts(GClasses.Actor,0); // Make changed scripts
 			Processed=1;
 			};
 		}
@@ -1924,6 +1851,29 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 			GCameraManager->RedrawLevel(Level);
 			Processed=1;
 			}
+		else if (GetCMD(&Str,"LINKS"))
+			{
+			UTextBuffer *Results = new("Results",CREATE_Replace)UTextBuffer(16384);
+			char *Dest = Results->GetData();
+			int Internal=0,External=0;
+			Dest += sprintf(Dest,"Level links:\r\n");
+			//
+			Level->Lock(&LevelInfo,LOCK_NoTrans);
+			AActor* Actor = &LevelInfo.Actors->Element(0);
+			for(int i=0; i<LevelInfo.Actors->Num; i++)
+				{
+				PStringReturn StringReturn;
+				*StringReturn.String=0;
+				if(LevelInfo.SendMessage(i,ACTOR_GetLink,&StringReturn) && *StringReturn.String)
+					{
+					Dest += sprintf(Dest,"   %s\r\n",StringReturn.String);
+					if(strchr(StringReturn.String,'/')) External++;
+					else Internal++;
+					};
+				};
+			Level->Unlock(&LevelInfo);
+			Dest += sprintf(Dest,"End, %i internal link(s), %i external.\r\n",Internal,External);
+			};
 		}
 	//------------------------------------------------------------------------------------
 	// AUDIO: audio functions
@@ -1985,7 +1935,7 @@ int FEditor::Exec(const char *Stream,FOutputDevice *Out)
 	return Processed;
 	//
 	UNGUARD_BEGIN
-	UNGUARD_MSGF("FEditor::Exec(%s)%s",ErrorTemp,(strlen(ErrorTemp)>=69)?"..":"");
+	UNGUARD_MSGF("FGlobalEditor::Exec(%s)%s",ErrorTemp,(strlen(ErrorTemp)>=69)?"..":"");
 	UNGUARD_END
 	};
 

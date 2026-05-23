@@ -8,6 +8,7 @@
 		* Created by Tim Sweeney
 =============================================================================*/
 
+#pragma warning (disable : 4201) /* nonstandard extension used : nameless struct/union */
 #include <windows.h>
 #include "DPlay.h"
 #include "Resource.h"
@@ -84,7 +85,7 @@ void NSocket::Init(NDriver *CreatingDriver)
 // routines after they have performed their own specialized exit code.  
 // Frees any generic socket-related stuff that has been allocated.
 //
-void NSocket::Delete(void)
+void NSocket::Delete()
 	{
 	GUARD;
 	//
@@ -107,7 +108,7 @@ void NSocket::Delete(void)
 // the socket statistics, perform any background file transfer, or other
 // actions that must be done.
 //
-void NSocket::Tick(void)
+void NSocket::Tick()
 	{
 	GUARD;
 	//
@@ -119,7 +120,7 @@ void NSocket::Tick(void)
 // Return the action of the specified socket.
 // Performs a validity check.
 //
-ESocketAction NSocket::GetAction(void)
+ESocketAction NSocket::GetAction()
 	{
 	GUARD;
 	switch (Action)
@@ -194,7 +195,7 @@ void NSocket::AssertPacketValidBeforeSend(NPacket *Packet)
 //
 // Assure that this socket is in a valid state.
 //
-void NSocket::AssertValid(void)
+void NSocket::AssertValid()
 	{
 	GUARD;
 	GetAction(); // Validates the current action
@@ -213,7 +214,7 @@ void NServerAd::GenericAssign(char *LevelName)
 	GUARD;
 	//
 	if (Name[0]) appError("Server ad is already in use");
-	if (strlen(LevelName) > NAME_SIZE) appErrorf("Level name %s too large",LevelName);
+	if (strlen(LevelName) > NET_NAME_SIZE) appErrorf("Level name %s too large",LevelName);
 	strcpy(Name,LevelName);
 	//
 	UNGUARD("NServerAd::Empty");
@@ -394,7 +395,7 @@ void NManager::UnregisterDriver(NDriver *Driver)
 //
 // Initialize the generic internals of the network manager:
 //
-void NManager::Init(void)
+void NManager::Init()
 	{
 	GUARD;
 	//
@@ -425,7 +426,7 @@ void NManager::Init(void)
 	UNGUARD("NManager::Init");
 	};
 
-void NManager::Exit(void)
+void NManager::Exit()
 	{
 	GUARD;
 	AssertInitialized();
@@ -509,7 +510,7 @@ void NManager::DeleteAd(int ServerID)
 //
 // Make sure that the manager and everything it references are valid.
 //
-void NManager::AssertValid(void)
+void NManager::AssertValid()
 	{
 	GUARD;
 	AssertInitialized();
@@ -564,7 +565,7 @@ int NManager::Exec(const char *Cmd,FOutputDevice *Out)
 // Retracts all still-active server ads from all drivers.
 // Shuts down all registered drivers.
 //
-void NManager::TaskExit(void)
+void NManager::TaskExit()
 	{
 	GUARD;
 	UNGUARD("NManager::TaskExit");
@@ -587,7 +588,7 @@ char *NManager::TaskStatus(char *Name,char *Desc)
 //
 // Network manager tick function.
 //
-void NManager::TaskTick(void)
+void NManager::TaskTick()
 	{
 	GUARD;
 	//
@@ -655,7 +656,7 @@ void NDriver::RemoveSocketFromList(NSocket *Socket)
 // Find an available index position to add a
 // socket at.  Returns index, or 0 if failure.
 //
-int NDriver::FindAvailableSocketIndex(void)
+int NDriver::FindAvailableSocketIndex()
 	{
 	GUARD;
 	AssertInitialized();
@@ -693,7 +694,7 @@ int NDriver::Init(char *ParamBuffer,char *ErrorMessage)
 // Close all sockets.
 // Note as deinitialized.
 //
-void NDriver::Exit(void)
+void NDriver::Exit()
 	{
 	GUARD;
 	AssertInitialized();
@@ -710,7 +711,7 @@ void NDriver::Exit(void)
 // Make sure this driver is in a valid state:
 // All sockets are in an acceptable state and are properly linked to the driver.
 //
-void NDriver::AssertValid(void)
+void NDriver::AssertValid()
 	{
 	GUARD;
 	//
@@ -1003,11 +1004,11 @@ BOOL CALLBACK JoinTypeDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 			{
 			hWndReturn = (HWND)lParam;
 			// Set up IDC_DPLAY or IDC_INET buttons:
-			EnableWindow(GetDlgItem(hDlg,IDC_DPLAY),!!NetManager.DirectPlayDriver);
-			EnableWindow(GetDlgItem(hDlg,IDC_INET ),!!NetManager.InternetDriver);
+			EnableWindow(GetDlgItem(hDlg,IDC_DPLAY),NetManager.DirectPlayDriver!=NULL);
+			EnableWindow(GetDlgItem(hDlg,IDC_INET ),NetManager.InternetDriver!=NULL);
 			EnableWindow(GetDlgItem(hDlg,ID_NEXT ),NetManager.InternetDriver || NetManager.DirectPlayDriver);
 			// Look up default option from profile:
-			int InternetGame = GApp->GetProfileInteger("NetGame","InternetGame",!!NetManager.InternetDriver);
+			int InternetGame = GApp->GetProfileInteger("NetGame","InternetGame",NetManager.InternetDriver!=NULL);
 			if (!NetManager.DirectPlayDriver) InternetGame = 1;
 			if (!NetManager.InternetDriver)   InternetGame = 0;
 			CheckDlgButton(hDlg,InternetGame ? IDC_INET : IDC_DPLAY,1);
@@ -1069,11 +1070,11 @@ BOOL CALLBACK HostTypeDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 			{
 			hWndReturn = (HWND)lParam;
 			// Set up IDC_DPLAY or IDC_INET buttons:
-			EnableWindow(GetDlgItem(hDlg,IDC_DPLAY),!!NetManager.DirectPlayDriver);
-			EnableWindow(GetDlgItem(hDlg,IDC_INET ),!!NetManager.InternetDriver);
+			EnableWindow(GetDlgItem(hDlg,IDC_DPLAY),NetManager.DirectPlayDriver!=NULL);
+			EnableWindow(GetDlgItem(hDlg,IDC_INET ),NetManager.InternetDriver!=NULL);
 			EnableWindow(GetDlgItem(hDlg,ID_NEXT  ),NetManager.InternetDriver || NetManager.DirectPlayDriver);
 			// Look up game type from profile:
-			int InternetGame = GApp->GetProfileInteger("NetGame","InternetGame",!!NetManager.InternetDriver);
+			int InternetGame = GApp->GetProfileInteger("NetGame","InternetGame",NetManager.InternetDriver!=NULL);
 			if (!NetManager.DirectPlayDriver) InternetGame = 1;
 			if (!NetManager.InternetDriver)   InternetGame = 0;
 			CheckDlgButton(hDlg,InternetGame ? IDC_INET : IDC_DPLAY,1);

@@ -11,15 +11,7 @@
 #include "Unreal.h"
 #include "UnDynBsp.h"
 
-/*
-#define PARANOID // Perform slow validity checks
-#undef SLOW_GUARD
-#undef SLOW_UNGUARD
-#define SLOW_GUARD GUARD
-#define SLOW_UNGUARD UNGUARD
-*/
-
-#define PRECOMPUTE_FILTER /* Precompute sphere filter for optimization */
+#define PRECOMPUTE_FILTER 1	/* Precompute sphere filter for optimization */
 
 /*---------------------------------------------------------------------------------------
 	This code handles all moving brushes with a level.  These are objects which move
@@ -51,7 +43,7 @@
 	Major optimizations that could be performed:
 
 +		Reduce FlushActorBrush thrash via iParent
-		Brush bounding boxes and bounding spheres for filtering precompute.
++		Brush bounding spheres for filtering precompute.
 		Store each brush as a brep with its own point and vector tables.  Then:
 		- Preallocate space for all of the brep's points and vectors, so that only
 		  points on clipped poly lines need to be sporadically maintained.
@@ -66,7 +58,7 @@
 	they are named/intended:
 
 	* UModel::Color - First node index in the linked list of sporadic brush nodes.
-	* FBspNode::iUniquePlane - Next node in the linked list of sporadic brush nodes.
+	* FBspNode::iBound - Next node in the linked list of sporadic brush nodes.
 	* FPoly::iLink - Bsp surface index corresponding to the FPoly
 	* FPoly::iBrushPoly - Light mesh index that applies to the FPoly, or INDEX_NONE if none
 	* FBspSurf::iActor - Index of actor whose moving brush owns the surface
@@ -94,34 +86,34 @@ class FMovingBrushTracker
 	FMovingBrushTracker() {Initialized=0; Locked=0;};
 	//
 	void Init(ULevel *ThisLevel);
-	void Exit(void);
+	void Exit();
 	//
 	// Lock:
 	//
 	void Lock(ILevel *ThisLevel);
-	void Unlock(void);
+	void Unlock();
 	//
 	// Operations that can be done while locked:
 	//
-	void SetupAllBrushes(void);
-	void RemoveAllBrushes(void);
-	void UpdateBrushes(INDEX *iActors,int Num);
+	void SetupAllBrushes();
+	void RemoveAllBrushes();
+	void UpdateBrushes(AActor **Actors,int Num);
 	//
 	// Helper functions:
 	//
 	static int Locked;
 	int Initialized;
-	void AssertInitialized(void)	{if (!Initialized)appError("Not initialized");};
-	void AssertLocked(void)			{if (!Initialized)appError("Not initialized"); if (!Locked)appError("Not locked");};
+	void AssertInitialized()	{if (!Initialized)appError("Not initialized");};
+	void AssertLocked()			{if (!Initialized)appError("Not initialized"); if (!Locked)appError("Not locked");};
 	//
 	// Private functions:
 	//
-	inline int  NewPointIndex(INDEX iActor);
-	inline int  NewVectorIndex(INDEX iActor);
-	inline int  NewNodeIndex(INDEX iActor,INDEX iParent);
-	inline int  NewSurfIndex(INDEX iActor);
-	inline int  NewVertPoolIndex(INDEX iActor,int NumVerts);
-	inline int	NewBrushMapIndex(INDEX iActor);
+	inline int  NewPointIndex(AActor *Actor);
+	inline int  NewVectorIndex(AActor *Actor);
+	inline int  NewNodeIndex(AActor *Actor,INDEX iParent);
+	inline int  NewSurfIndex(AActor *Actor);
+	inline int  NewVertPoolIndex(AActor *Actor,int NumVerts);
+	inline int	NewBrushMapIndex(AActor *Actor);
 	//
 	inline void FreePointIndex(INDEX i);
 	inline void FreeVectorIndex(INDEX i);
@@ -130,11 +122,11 @@ class FMovingBrushTracker
 	inline void FreeVertPoolIndex(DWORD i,int NumVerts);
 	inline void FreeBrushMapIndex(INDEX i);
 	//
-	void SetupActorBrush(INDEX iActor);
-	void RemoveActorBrush(INDEX iActor);
+	void SetupActorBrush(AActor *Actor);
+	void RemoveActorBrush(AActor *Actor);
 	//
-	void AddActorBrush(INDEX iActor);
-	void FlushActorBrush(INDEX iActor,int Group);
+	void AddActorBrush(AActor *Actor);
+	void FlushActorBrush(AActor *Actor,int Group);
 	//
 	inline void ForceGroupFlush(INDEX iNode);
 	void ForceTouchFlush(INDEX iDynamic);
@@ -157,28 +149,29 @@ class FMovingBrushTracker
 	static FVector FPolyNormal;
 	//
 	int iTopNode,iTopSurf,iTopPoint,iTopVector,iTopVertPool,iTopBrushMap;
-	INDEX iAddActor,iAddSurf;
+	AActor *AddActor;
+	INDEX iAddSurf;
 	FBspSurf *AddSurf;
 	//
 	// Tracking which actors' brushes are valid:
 	UModel **ActorBrushes;
 	//
 	// Mechanism to pair actor indices with Bsp surfaces:
-	INDEX *iBrushMapOwners;
-	INDEX *iBrushMapSurfs;
+	AActor **BrushMapOwners;
+	INDEX  *iBrushMapSurfs;
+	INDEX  *iNodeParents;
 	//
 	// Owner actor indices for things that are deleted and realllocated whenever a brush moves:
-	INDEX *iNodeOwners;
-	INDEX *iNodeParents;
-	INDEX *iPointOwners;
-	DWORD *iVertPoolOwners;
+	AActor **NodeOwners;
+	AActor **PointOwners;
+	AActor **VertPoolOwners;
 	// 
 	// Owner actor indices for things that are only updated (not deleted/reallocated) whenever a brush moves:
-	INDEX *iSurfOwners;
-	INDEX *iVectorOwners;
+	AActor **SurfOwners;
+	AActor **VectorOwners;
 	//
 	// List of actors to update in a multi-brush update:
-	static INDEX iGroupActors[MAX_MOVING_BRUSH_ACTORS];
+	static AActor *GroupActors[MAX_MOVING_BRUSH_ACTORS];
 	static int NumGroupActors;
 	//
 	static INDEX iTouchActors[MAX_MOVING_BRUSH_ACTORS];
@@ -192,7 +185,7 @@ ILevel*		FMovingBrushTracker::Level;
 AActor*		FMovingBrushTracker::Actors;
 IModel		FMovingBrushTracker::ModelInfo;
 FVector		FMovingBrushTracker::FPolyNormal;
-INDEX		FMovingBrushTracker::iGroupActors[MAX_MOVING_BRUSH_ACTORS];
+AActor*		FMovingBrushTracker::GroupActors[MAX_MOVING_BRUSH_ACTORS];
 int			FMovingBrushTracker::NumGroupActors;
 INDEX		FMovingBrushTracker::iTouchActors[MAX_MOVING_BRUSH_ACTORS];
 int			FMovingBrushTracker::NumTouchActors;
@@ -203,14 +196,14 @@ INDEX*		FMovingBrushTracker::iActorNodePrevLink;
 //
 FMovingBrushTracker GLST;
 UNREAL_API void sporeInit(ULevel *Level)	{GLST.Init(Level);};
-UNREAL_API void sporeExit(void)				{GLST.Exit();};
+UNREAL_API void sporeExit()					{GLST.Exit();};
 UNREAL_API void sporeLock(ILevel *Level)	{if (GLST.Initialized) GLST.Lock(Level);};
-UNREAL_API void sporeUnlock(void)			{if (GLST.Initialized) GLST.Unlock();};
-UNREAL_API void sporeFlush(INDEX iActor)	{if (GLST.Initialized) GLST.FlushActorBrush(iActor,0);};
+UNREAL_API void sporeUnlock()				{if (GLST.Initialized) GLST.Unlock();};
+UNREAL_API void sporeFlush(INDEX iActor)	{if (GLST.Initialized) GLST.FlushActorBrush(&GLST.Level->Actors->Element(iActor),0);};
 UNREAL_API int sporeSurfIsDynamic(INDEX iSurf)
 	{
 	if (iSurf<GLST.ModelInfo.NumBspSurfs) return 0;
-	return GLST.iSurfOwners[iSurf - GLST.ModelInfo.NumBspSurfs] != INDEX_NONE;
+	return GLST.SurfOwners[iSurf - GLST.ModelInfo.NumBspSurfs] != NULL;
 	};
 UNREAL_API void sporeUpdate(INDEX iActor)
 	{
@@ -224,7 +217,7 @@ UNREAL_API void sporeUpdate(INDEX iActor)
 			// Must handle collision response
 			Brush->Location		= Actor->Location;
 			Brush->Rotation		= Actor->DrawRot;
-			GLST.UpdateBrushes(&iActor,1);
+			GLST.UpdateBrushes(&Actor,1);
 			};
 		};
 	};
@@ -251,6 +244,19 @@ INDEX *AllocDbIndex(UDatabase *Res,char *Descr)
 	//
 	UNGUARD("AllocDbIndex");
 	};
+AActor **AllocDbActor(UDatabase *Res,char *Descr)
+	{
+	GUARD;
+	//
+	AActor **Result = (AActor **)appMallocArray(Res->Max - Res->Num,AActor *,Descr);
+	for (int i=Res->Num; i<Res->Max; i++)
+		{
+		Result[i - Res->Num] = NULL;
+		};
+	return Result;
+	//
+	UNGUARD("AllocDbActor");
+	};
 
 //
 // Set a vector in the Bsp points or vectors table to a specified
@@ -259,7 +265,7 @@ INDEX *AllocDbIndex(UDatabase *Res,char *Descr)
 inline void SetVector(FVector &Dest,FVector &Value)
 	{
 	Dest            = Value;
-	Dest.iTransform = INDEX_NONE;
+	Dest.iTransform = MAXWORD;
 	Dest.Flags      = 0;
 	Dest.Align      = 0;
 	};
@@ -271,7 +277,7 @@ inline void SetVector(FVector &Dest,FVector &Value)
 //
 int inline ShortenDb(UDatabase *Res)
 	{
-	if (!GEditor) Res->Max = OurMin(Res->Max,Res->Num + 2048 + (Res->Num>>1));
+	if (!GEditor) Res->Max = Min(Res->Max,Res->Num + 2048 + (Res->Num>>1));
 	return Res->Num;
 	};
 
@@ -301,19 +307,19 @@ void FMovingBrushTracker::Init(ULevel *ThisLevel)
 	ActorBrushes		= (UModel **)appMallocArray(LevelRes->ActorList->Max,UModel **,"ActorBrushes");
 	for (int i=0; i<LevelRes->ActorList->Max; i++) ActorBrushes[i]=NULL;
 	//
-	iBrushMapOwners		= (INDEX *)appMallocArray(MAX_MOVING_BRUSH_POLYS,INDEX,"iBrushMapOwners");
-	for (i=0; i<MAX_MOVING_BRUSH_POLYS; i++) iBrushMapOwners[i]=INDEX_NONE;
+	BrushMapOwners		= (AActor **)appMallocArray(MAX_MOVING_BRUSH_POLYS,AActor*,"BrushMapOwners");
+	for (i=0; i<MAX_MOVING_BRUSH_POLYS; i++) BrushMapOwners[i]=NULL;
 	//
 	iBrushMapSurfs		= (INDEX *)appMallocArray(MAX_MOVING_BRUSH_POLYS,INDEX,"BrushMapSurfs");
 	//
-	iVertPoolOwners		= (DWORD *)appMallocArray(LevelRes->Model->VertPool->Max - LevelRes->Model->VertPool->Num,DWORD,"iVertPoolOwners");
-	for (i=0; i<(LevelRes->Model->VertPool->Max - LevelRes->Model->VertPool->Num); i++) iVertPoolOwners[i]=MAXDWORD;
+	VertPoolOwners		= (AActor **)appMallocArray(LevelRes->Model->VertPool->Max - LevelRes->Model->VertPool->Num,AActor,"VertPoolOwners");
+	for (i=0; i<(LevelRes->Model->VertPool->Max - LevelRes->Model->VertPool->Num); i++) VertPoolOwners[i]=NULL;
 	//
-	iNodeOwners			= AllocDbIndex(LevelRes->Model->BspNodes,"iNodeOwners");
-	iNodeParents		= AllocDbIndex(LevelRes->Model->BspNodes,"iNodeParents");
-	iSurfOwners			= AllocDbIndex(LevelRes->Model->BspSurfs,"iSurfOwners");
-	iPointOwners		= AllocDbIndex(LevelRes->Model->Points,  "iPointOwners");
-	iVectorOwners		= AllocDbIndex(LevelRes->Model->Vectors, "iVectorOwners");
+	NodeOwners			= AllocDbActor(LevelRes->Model->BspNodes,"NodeOwners");
+	iNodeParents		= AllocDbIndex(LevelRes->Model->BspNodes,"NodeParents");
+	SurfOwners			= AllocDbActor(LevelRes->Model->BspSurfs,"SurfOwners");
+	PointOwners			= AllocDbActor(LevelRes->Model->Points,  "PointOwners");
+	VectorOwners		= AllocDbActor(LevelRes->Model->Vectors, "VectorOwners");
 	//
 	// Successfully initialized structure:
 	//
@@ -331,7 +337,7 @@ void FMovingBrushTracker::Init(ULevel *ThisLevel)
 	//
 	// Make sure that multiple actors don't share the same brush.
 	//
-	#ifdef PARANOID
+#if PARANOID
 	AActor *Actor1 = &Level->Actors->Element(0);
 	for (i=0; i<Level->Actors->Max; i++)
 		{
@@ -349,7 +355,7 @@ void FMovingBrushTracker::Init(ULevel *ThisLevel)
 			};
 		Actor1++;
 		};
-	#endif
+#endif
 	//
 	UNGUARD("FMovingBrushTracker::Init");
 	};
@@ -357,7 +363,7 @@ void FMovingBrushTracker::Init(ULevel *ThisLevel)
 //
 // Clear out the world and free all moving brush data.
 //
-void FMovingBrushTracker::Exit(void)
+void FMovingBrushTracker::Exit()
 	{
 	GUARD;
 	AssertInitialized();
@@ -375,14 +381,14 @@ void FMovingBrushTracker::Exit(void)
 	// Free memory:
 	//
 	appFree(ActorBrushes);
-	appFree(iBrushMapOwners);
+	appFree(BrushMapOwners);
 	appFree(iBrushMapSurfs);
-	appFree(iNodeOwners);
+	appFree(NodeOwners);
 	appFree(iNodeParents);
-	appFree(iSurfOwners);
-	appFree(iPointOwners);
-	appFree(iVectorOwners);
-	appFree(iVertPoolOwners);
+	appFree(SurfOwners);
+	appFree(PointOwners);
+	appFree(VectorOwners);
+	appFree(VertPoolOwners);
 	//
 	debugf(LOG_Bsp,"Shut down moving brush tracker for %s",LevelRes->Name);
 	//
@@ -400,12 +406,12 @@ void FMovingBrushTracker::Exit(void)
 inline int NewThingIndex(int &TopThing, const int &NumThings,const int &MaxThings,
 	INDEX *iThingOwners,INDEX iActor)
 	{
-	#ifdef PARANOID
+#if PARANOID
 	if ((TopThing<NumThings) || (TopThing>=MaxThings)) 
 		{
 		appErrorf ("TopThing inconsistency %i<%i>%i",NumThings,TopThing,MaxThings);
 		};
-	#endif
+#endif
 	//
 	int   StartThing   = TopThing;
 	INDEX *iThingOwner = &iThingOwners[TopThing-NumThings];
@@ -423,111 +429,142 @@ inline int NewThingIndex(int &TopThing, const int &NumThings,const int &MaxThing
 		TopThing++;
 		iThingOwner++;
 		};
-	#ifdef PARANOID
+#if PARANOID
 		appError("NewThingIndex overflow");
+#endif
+	return -1;
+	};
+inline int NewThingActor(int &TopThing, const int &NumThings,const int &MaxThings,
+	AActor **ThingOwners,AActor *Actor)
+	{
+#if PARANOID
+	if ((TopThing<NumThings) || (TopThing>=MaxThings)) 
+		{
+		appErrorf ("TopThing inconsistency %i<%i>%i",NumThings,TopThing,MaxThings);
+		};
 	#endif
 	//
-	return -1;
+	int   StartThing    = TopThing;
+	AActor **ThingOwner = &ThingOwners[TopThing-NumThings];
+	while (TopThing < MaxThings)
+		{
+		if (*ThingOwner==NULL) {*ThingOwner = Actor; return TopThing;};
+		TopThing++;
+		ThingOwner++;
+		};
+	TopThing    = NumThings;
+	ThingOwner  = &ThingOwners[0];
+	while (TopThing<StartThing)
+		{
+		if (*ThingOwner==NULL) {*ThingOwner = Actor; return TopThing;};
+		TopThing++;
+		ThingOwner++;
+		};
+#if PARANOID
+		appError("NewThingIndex overflow");
+#endif
+	//
+	return INDEX_NONE;
 	};
 
 //
 // Routines to allocate new elements of particular types, for moving brush usage.
 // These all call NewThingIndex to do their work.
 //
-inline int FMovingBrushTracker::NewNodeIndex(INDEX iActor,INDEX iParent)
+inline int FMovingBrushTracker::NewNodeIndex(AActor *Actor,INDEX iParent)
 	{
-	SLOW_GUARD;
+	guardSlow(FMovingBrushTracker::NewNodeIndex);
 	//
-	INDEX Result = NewThingIndex(iTopNode,ModelInfo.NumBspNodes,ModelInfo.MaxBspNodes,iNodeOwners,iActor);
+	INDEX Result = NewThingActor(iTopNode,ModelInfo.NumBspNodes,ModelInfo.MaxBspNodes,NodeOwners,Actor);
 	//
-	#ifdef PARANOID
+#if PARANOID
 	if (iNodeParents[Result - ModelInfo.NumBspNodes]!=INDEX_NONE) appError("Parent duplicate");
-	#endif
+#endif
 	//
 	if (Result!=INDEX_NONE) iNodeParents[Result - ModelInfo.NumBspNodes] = iParent;
 	return Result;
 	//
-	SLOW_UNGUARD("FMovingBrushTracker::NewNodeIndex");
+	unguardSlow;
 	};
-inline int FMovingBrushTracker::NewSurfIndex(INDEX iActor)
+inline int FMovingBrushTracker::NewSurfIndex(AActor *Actor)
 	{
-	SLOW_GUARD;
-	return NewThingIndex(iTopSurf,ModelInfo.NumBspSurfs,ModelInfo.MaxBspSurfs,iSurfOwners,iActor);
-	SLOW_UNGUARD("FMovingBrushTracker::NewSurfIndex");
+	guardSlow(FMovingBrushTracker::NewSurfIndex);
+	return NewThingActor(iTopSurf,ModelInfo.NumBspSurfs,ModelInfo.MaxBspSurfs,SurfOwners,Actor);
+	unguardSlow;
 	};
-inline int FMovingBrushTracker::NewPointIndex(INDEX iActor)
+inline int FMovingBrushTracker::NewPointIndex(AActor *Actor)
 	{
-	SLOW_GUARD;
-	return NewThingIndex(iTopPoint,ModelInfo.NumPoints,ModelInfo.MaxPoints,iPointOwners,iActor);
-	SLOW_UNGUARD("FMovingBrushTracker::NewPointIndex");
+	guardSlow(FMovingBrushTracker::NewPointIndex);
+	return NewThingActor(iTopPoint,ModelInfo.NumPoints,ModelInfo.MaxPoints,PointOwners,Actor);
+	unguardSlow;
 	};
-inline int FMovingBrushTracker::NewVectorIndex(INDEX iActor)
+inline int FMovingBrushTracker::NewVectorIndex(AActor *Actor)
 	{
-	SLOW_GUARD;
-	return NewThingIndex(iTopVector,ModelInfo.NumVectors,ModelInfo.MaxVectors,iVectorOwners,iActor);
-	SLOW_UNGUARD("FMovingBrushTracker::NewVectorIndex");
+	guardSlow(FMovingBrushTracker::NewVectorIndex);
+	return NewThingActor(iTopVector,ModelInfo.NumVectors,ModelInfo.MaxVectors,VectorOwners,Actor);
+	unguardSlow;
 	};
-inline int FMovingBrushTracker::NewBrushMapIndex(INDEX iActor)
+inline int FMovingBrushTracker::NewBrushMapIndex(AActor *Actor)
 	{
-	SLOW_GUARD;
-	return NewThingIndex(iTopBrushMap,0,MAX_MOVING_BRUSH_POLYS,iBrushMapOwners,iActor);
-	SLOW_UNGUARD("FMovingBrushTracker::NewBrushMapIndex");
+	guardSlow(FMovingBrushTracker::NewBrushMapIndex);
+	return NewThingActor(iTopBrushMap,0,MAX_MOVING_BRUSH_POLYS,BrushMapOwners,Actor);
+	unguardSlow;
 	};
-inline int FMovingBrushTracker::NewVertPoolIndex(INDEX iActor,int NumVerts)
+inline int FMovingBrushTracker::NewVertPoolIndex(AActor *Actor,int NumVerts)
 	{
-	SLOW_GUARD;
+	guardSlow(FMovingBrushTracker::NewVertPoolIndex);
 	//
-	#ifdef PARANOID
+#if PARANOID
 	if ((iTopVertPool<ModelInfo.NumVertPool) || (iTopVertPool>=ModelInfo.MaxVertPool))
 		{
 		appError("TopThing inconsistency");
 		};
-	#endif
+#endif
 	//
-	int		iStart  = iTopVertPool;
-	int		NumFree = 0;
-	DWORD	*iOwner	= &iVertPoolOwners[iTopVertPool - ModelInfo.NumVertPool];
+	int		iStart		= iTopVertPool;
+	int		NumFree		= 0;
+	AActor	**Owner		= &VertPoolOwners[iTopVertPool - ModelInfo.NumVertPool];
 	//
 	while (iTopVertPool < (ModelInfo.MaxVertPool - NumVerts))
 		{
-		if (*iOwner==MAXDWORD)
+		if (*Owner==NULL)
 			{
 			if (++NumFree >= NumVerts)
 				{
-				while (NumFree-- > 0) *iOwner-- = iActor;
+				while (NumFree-- > 0) *Owner-- = Actor;
 				return iTopVertPool+1-NumVerts;
 				}
 			}
 		else NumFree=0;
 		//
 		iTopVertPool++;
-		iOwner++;
+		Owner++;
 		};
 	iTopVertPool	= ModelInfo.NumVertPool;
 	NumFree			= 0;
-	iOwner			= &iVertPoolOwners[0];
+	Owner			= &VertPoolOwners[0];
 	//
 	while (iTopVertPool < (iStart - NumVerts))
 		{
-		if (*iOwner==MAXDWORD)
+		if (*Owner==NULL)
 			{
 			if (++NumFree >= NumVerts)
 				{
-				while (NumFree-- > 0) *iOwner-- = iActor;
+				while (NumFree-- > 0) *Owner-- = Actor;
 				return iTopVertPool+1-NumVerts;
 				}
 			}
 		else NumFree=0;
 		//
 		iTopVertPool++;
-		iOwner++;
+		Owner++;
 		};
-	#ifdef PARANOID
+#if PARANOID
 		appError("NewVertPoolIndex overflow");
-	#endif
+#endif
 	return -1;
 	//
-	SLOW_UNGUARD("FMovingBrushTracker::NewVertPoolIndex");
+	unguardSlow;
 	};
 
 //
@@ -535,51 +572,52 @@ inline int FMovingBrushTracker::NewVertPoolIndex(INDEX iActor,int NumVerts)
 //
 inline void FMovingBrushTracker::FreePointIndex(INDEX i)
 	{
-	#ifdef PARANOID
-		if (iPointOwners[i-ModelInfo.NumPoints]==INDEX_NONE) appError("FreePointIndex inconsistency");
-	#endif
-	iPointOwners[i-ModelInfo.NumPoints] = INDEX_NONE;
+#if PARANOID
+		if (PointOwners[i-ModelInfo.NumPoints]==NULL) 
+			appError("FreePointIndex inconsistency");
+#endif
+	PointOwners[i-ModelInfo.NumPoints] = NULL;
 	};
 inline void FMovingBrushTracker::FreeVectorIndex(INDEX i)
 	{
-	#ifdef PARANOID
-		if (iVectorOwners[i-ModelInfo.NumVectors]==INDEX_NONE) appError("FreeVectorIndex inconsistency");
-	#endif
-	iVectorOwners[i-ModelInfo.NumVectors] = INDEX_NONE;
+#if PARANOID
+		if (VectorOwners[i-ModelInfo.NumVectors]==NULL) appError("FreeVectorIndex inconsistency");
+#endif
+	VectorOwners[i-ModelInfo.NumVectors] = NULL;
 	};
 inline void FMovingBrushTracker::FreeNodeIndex(INDEX i)
 	{
-	#ifdef PARANOID
-		if (iNodeOwners [i-ModelInfo.NumBspNodes]==INDEX_NONE) appError("FreeNodeIndex node inconsistency");
-		if (iNodeParents[i-ModelInfo.NumBspNodes]==INDEX_NONE) appError("FreeNodeIndex parent inconsistency");
-	#endif
-	iNodeOwners [i-ModelInfo.NumBspNodes] = INDEX_NONE;
+#if PARANOID
+		if (NodeOwners  [i-ModelInfo.NumBspNodes]==NULL) appError("FreeNodeIndex node inconsistency");
+		if (iNodeParents[i-ModelInfo.NumBspNodes]==NULL) appError("FreeNodeIndex parent inconsistency");
+#endif
+	NodeOwners  [i-ModelInfo.NumBspNodes] = NULL;
 	iNodeParents[i-ModelInfo.NumBspNodes] = INDEX_NONE;
 	};
 inline void FMovingBrushTracker::FreeSurfIndex(INDEX i)
 	{
-	#ifdef PARANOID
-		if (iSurfOwners[i-ModelInfo.NumBspSurfs]==INDEX_NONE) appError("FreeSurfIndex inconsistency");
-	#endif
-	iSurfOwners[i-ModelInfo.NumBspSurfs] = INDEX_NONE;
+#if PARANOID
+		if (SurfOwners[i-ModelInfo.NumBspSurfs]==NULL) appError("FreeSurfIndex inconsistency");
+#endif
+	SurfOwners[i-ModelInfo.NumBspSurfs] = NULL;
 	};
 inline void FMovingBrushTracker::FreeVertPoolIndex(DWORD i,int NumVerts)
 	{
-	DWORD *iVertPoolOwner = &iVertPoolOwners[i - ModelInfo.NumVertPool];
+	AActor **VertPoolOwner = &VertPoolOwners[i - ModelInfo.NumVertPool];
 	for (int j=0; j<NumVerts; j++)
 		{
-		#ifdef PARANOID
-			if (*iVertPoolOwner==MAXDWORD) appError("FreeVertPoolIndex inconsistency");
-		#endif
-		*iVertPoolOwner++ = MAXDWORD;
+#if PARANOID
+			if (*VertPoolOwner==NULL) appError("FreeVertPoolIndex inconsistency");
+#endif
+		*VertPoolOwner++ = NULL;
 		};
 	};
 inline void FMovingBrushTracker::FreeBrushMapIndex(INDEX i)
 	{
-	#ifdef PARANOID
-		if (iBrushMapOwners[i]==INDEX_NONE) appError("FreeBrushMapIndex inconsistency");
-	#endif
-	iBrushMapOwners[i]=INDEX_NONE;
+#if PARANOID
+		if (BrushMapOwners[i]==NULL) appError("FreeBrushMapIndex inconsistency");
+#endif
+	BrushMapOwners[i]=NULL;
 	};
 
 /*---------------------------------------------------------------------------------------
@@ -607,7 +645,7 @@ void FMovingBrushTracker::Lock(ILevel *ThisLevel)
 //
 // Unlock the moving brush tracker for a particular level.
 //
-void FMovingBrushTracker::Unlock(void)
+void FMovingBrushTracker::Unlock()
 	{
 	GUARD;
 	AssertLocked();
@@ -625,17 +663,16 @@ void FMovingBrushTracker::Unlock(void)
 // Setup permanenent information (surfaces, vectors, base points) for a moving
 // brush.
 //
-void FMovingBrushTracker::SetupActorBrush(INDEX iActor)
+void FMovingBrushTracker::SetupActorBrush(AActor *Actor)
 	{
 	GUARD;
 	AssertLocked();
-	if (ActorBrushes [iActor]) appError("Brush already setup");
+	if (ActorBrushes[Actor->iMe]) appError("Brush already setup");
 	//
-	AActor *Actor  = &Actors[iActor];
 	UModel *Brush  = Actor->Brush;
 	if (Brush==NULL) appError("Null brush");
 	//
-	ActorBrushes [iActor] = Brush;
+	ActorBrushes [Actor->iMe] = Brush;
 	*(INDEX *)&Brush->Color=INDEX_NONE;
 	//
 	// Create permanent maps for all moving brush FPolys:
@@ -649,25 +686,25 @@ void FMovingBrushTracker::SetupActorBrush(INDEX iActor)
 		//
 		// Create new surface elements:
 		//
-		int iBrushMap = NewBrushMapIndex(iActor);
+		int iBrushMap = NewBrushMapIndex(Actor);
 		if (iBrushMap==-1) goto Over1; // Safe overflow
 		//
-		iSurf = NewSurfIndex(iActor);
+		iSurf = NewSurfIndex(Actor);
 		if (iSurf==INDEX_NONE) goto Over2;
 		//
 		iBrushMapSurfs[iBrushMap] = iSurf;
 		Surf = &ModelInfo.BspSurfs[iSurf];
 		//
-		Surf->vNormal = NewVectorIndex(iActor);
+		Surf->vNormal = NewVectorIndex(Actor);
 		if (Surf->vNormal==INDEX_NONE) goto Over3;
 		//
-		Surf->vTextureU = NewVectorIndex(iActor);
+		Surf->vTextureU = NewVectorIndex(Actor);
 		if (Surf->vTextureU==INDEX_NONE) goto Over4;
 		//
-		Surf->vTextureV = NewVectorIndex(iActor);
+		Surf->vTextureV = NewVectorIndex(Actor);
 		if (Surf->vTextureV==INDEX_NONE) goto Over5;
 		//
-		Surf->pBase = NewPointIndex(iActor);
+		Surf->pBase = NewPointIndex(Actor);
 		if (Surf->pBase==INDEX_NONE) goto Over6;
 		//
 		Surf->iLightMesh = Poly->iBrushPoly; // May be INDEX_NONE
@@ -683,7 +720,7 @@ void FMovingBrushTracker::SetupActorBrush(INDEX iActor)
 		Surf->iBrushPoly	= i;
 		Surf->LastStartY	= 0;
 		Surf->LastEndY		= 0;
-		Surf->iActor		= iActor;
+		Surf->iActor		= Actor->iMe;
 		//
 		// Link FPoly to this Bsp surface:
 		//
@@ -702,14 +739,14 @@ void FMovingBrushTracker::SetupActorBrush(INDEX iActor)
 		Over3:	FreeSurfIndex(iSurf);
 		Over2:	FreeBrushMapIndex(iBrushMap);
 		Over1:	;
-		#ifdef PARANOID
-			appErrorf("Overflowed",Actors[iActor].Class->Name);
-		#endif
+#if PARANOID
+			appErrorf("Overflowed",Actor->Class->Name);
+#endif
 		break;
 		};
-	#ifdef PARANOID
-		debugf(LOG_Bsp,"SetupActorBrush for %s",Actors[iActor].Class->Name);
-	#endif
+#if PARANOID
+		debugf(LOG_Bsp,"SetupActorBrush for %s",Actor->Class->Name);
+#endif
 	//
 	UNGUARD("FMovingBrushTracker::SetupActorBrush");
 	};
@@ -718,18 +755,18 @@ void FMovingBrushTracker::SetupActorBrush(INDEX iActor)
 // Remove all permanent information (surfaces, vectors, base points) for a moving brush from 
 // the level.
 //
-void FMovingBrushTracker::RemoveActorBrush(INDEX iActor)
+void FMovingBrushTracker::RemoveActorBrush(AActor *Actor)
 	{
 	GUARD;
 	AssertLocked();
-	if (!ActorBrushes[iActor]) appError("No brush found for actor");
+	if (!ActorBrushes[Actor->iMe]) appError("No brush found for actor");
 	//
 	// Find all surfaces owned by this actor, and free them and their contents:
 	//
-	INDEX *iBrushMapOwner = &iBrushMapOwners[0];
+	AActor **BrushMapOwner = &BrushMapOwners[0];
 	for (int i=0; i<MAX_MOVING_BRUSH_POLYS; i++)
 		{
-		if (*iBrushMapOwner==iActor)
+		if (*BrushMapOwner==Actor)
 			{
 			//
 			// Free all stuff owned by this surface:
@@ -737,12 +774,12 @@ void FMovingBrushTracker::RemoveActorBrush(INDEX iActor)
 			INDEX    iSurf = iBrushMapSurfs[i];
 			FBspSurf *Surf = &ModelInfo.BspSurfs[iSurf];
 			//
-			#ifdef PARANOID
+#if PARANOID
 				if (Surf->vNormal  ==INDEX_NONE) appError("Bad vNormal");
 				if (Surf->vTextureU==INDEX_NONE) appError("Bad vTextureU");
 				if (Surf->vTextureV==INDEX_NONE) appError("Bad vTextureV");
 				if (Surf->pBase    ==INDEX_NONE) appError("Bad pBase");
-			#endif
+#endif
 			//
 			FreeSurfIndex		(iSurf);
 			FreePointIndex		(Surf->pBase);
@@ -751,9 +788,9 @@ void FMovingBrushTracker::RemoveActorBrush(INDEX iActor)
 			FreeVectorIndex		(Surf->vNormal);
 			FreeBrushMapIndex	(i);
 			};
-		iBrushMapOwner++;
+		BrushMapOwner++;
 		};
-	ActorBrushes [iActor]=NULL;
+	ActorBrushes[Actor->iMe]=NULL;
 	//
 	UNGUARD("FMovingBrushTracker::RemoveActorBrush");
 	};
@@ -766,15 +803,20 @@ void FMovingBrushTracker::AddPolyFragment(INDEX iParent, INDEX iCoplanarParent,
 	int IsFront, FPoly *EdPoly)
 	{
 	GUARD;
-	FBspNode	*Node,*Parent;
+	FBspNode	*Node,*Parent,*ZoneParent,*FirstParent;
 	FVertPool	*VertPool;
 	INDEX		iNode;
 	int			i,iVertPool;
 	//
+	int ZoneFront = IsFront;
+	Parent = ZoneParent = FirstParent = &ModelInfo.BspNodes[iParent];
+	//
 	// If this node is meant to be added as a coplanar, handle it now:
 	//
+	int Different=0;
 	if (iCoplanarParent!=INDEX_NONE)
 		{
+		Different = iParent!=iCoplanarParent;
 		iParent = iCoplanarParent;
 		IsFront = 2;
 		};
@@ -782,6 +824,7 @@ void FMovingBrushTracker::AddPolyFragment(INDEX iParent, INDEX iCoplanarParent,
 	// Find parent:
 	//
 	Parent = &ModelInfo.BspNodes[iParent];
+	FirstParent = Parent;
 	if (IsFront==2) // Coplanar
 		{
 		while (Parent->iPlane!=INDEX_NONE)
@@ -793,7 +836,7 @@ void FMovingBrushTracker::AddPolyFragment(INDEX iParent, INDEX iCoplanarParent,
 	//
 	// Create a new sporadic node:
 	//
-	iNode = NewNodeIndex(iAddActor,iParent);
+	iNode = NewNodeIndex(AddActor,iParent);
 	if (iNode==INDEX_NONE) goto Over1;
 	Node = &ModelInfo.BspNodes[iNode];
 	//
@@ -804,19 +847,30 @@ void FMovingBrushTracker::AddPolyFragment(INDEX iParent, INDEX iCoplanarParent,
 	Node->iDynamic[1] 	= INDEX_NONE;
 	Node->NodeFlags   	= NF_IsNew | NF_Sporadic;
 	Node->iBound		= INDEX_NONE;
-	Node->iZone			= IsFront ? Parent->iZone : Parent->iBackZone;
-	Node->iBackZone		= Node->iZone;
 	Node->ZoneMask		= Parent->ZoneMask;
 	Node->NumVertices	= EdPoly->NumVertices;
-	Node->iUniquePlane	= INDEX_NONE;
+	//
+	if ((iCoplanarParent==INDEX_NONE) || Different)
+		{
+		Node->iZone[0] = Node->iZone[1]	= ZoneParent->iZone[ZoneFront];
+		}
+	else
+		{
+		int IsFlipped  = (Node->Plane|Parent->Plane)<0.0;
+		Node->iZone[0] = Parent->iZone[IsFlipped];
+		Node->iZone[1] = Parent->iZone[1-IsFlipped];
+		};
+	FirstParent->ZoneMask |= ((QWORD)1 << Node->iZone[0]) | ((QWORD)1 << Node->iZone[1]);
 	//
 	Node->iFront		= INDEX_NONE;
 	Node->iBack			= INDEX_NONE;
 	Node->iPlane		= INDEX_NONE;
 	//
+	Node->Plane.MakePlane(EdPoly->Base,EdPoly->Normal);
+	//
 	// Allocate this node's vertex pool and vertices:
 	//
-	iVertPool = NewVertPoolIndex(iAddActor,EdPoly->NumVertices);
+	iVertPool = NewVertPoolIndex(AddActor,EdPoly->NumVertices);
 	if (iVertPool==MAXDWORD) goto Over2;
 	//
 	Node->iVertPool = iVertPool;
@@ -824,7 +878,7 @@ void FMovingBrushTracker::AddPolyFragment(INDEX iParent, INDEX iCoplanarParent,
 	//
 	for (i=0; i<EdPoly->NumVertices; i++)
 		{
-		INDEX pVertex		= NewPointIndex(iAddActor);
+		INDEX pVertex		= NewPointIndex(AddActor);
 		if (pVertex==INDEX_NONE) goto Over3;
 		//
 		VertPool->iSide		= INDEX_NONE;
@@ -837,20 +891,18 @@ void FMovingBrushTracker::AddPolyFragment(INDEX iParent, INDEX iCoplanarParent,
 	// Success; link this node to its parent and return.
 	// (Can't fail past this point)
 	//
-	if (Node->iZone) Parent->ZoneMask |= (QWORD)1 << Node->iZone;
-	//
-	#ifdef PARANOID
+#if PARANOID
 	if		((IsFront==2)&&(Parent->iPlane!=INDEX_NONE)) appError("iPlane exists");
 	else if ((IsFront==1)&&(Parent->iFront!=INDEX_NONE)) appError("iFront exists");
 	else if ((IsFront==0)&&(Parent->iBack !=INDEX_NONE)) appError("iBack exists");
-	#endif
+#endif
 	//
 	if		(IsFront==2) Parent->iPlane = iNode;
 	else if (IsFront==1) Parent->iFront = iNode;
 	else				 Parent->iBack  = iNode;
 	//
 	*iActorNodePrevLink = iNode;
-	iActorNodePrevLink  = &Node->iUniquePlane;
+	iActorNodePrevLink  = &Node->iBound;
 	//
 	return;
 	//
@@ -859,9 +911,9 @@ void FMovingBrushTracker::AddPolyFragment(INDEX iParent, INDEX iCoplanarParent,
 	Over3:	while(--i >= 0) FreePointIndex((--VertPool)->pVertex);
 	Over2:	FreeNodeIndex(iNode);
 	Over1:	;
-	#ifdef PARANOID
+#if PARANOID
 		appError("Overflowed");
-	#endif
+#endif
 	//
 	UNGUARD("FMovingBrushTracker::AddPolyFragment");
 	};
@@ -887,15 +939,15 @@ void FMovingBrushTracker::FilterFPoly(INDEX iNode, INDEX iCoplanarParent,
 		EdPoly->SplitInHalf(TempFrontEdPoly);
 		FilterFPoly(iNode,iCoplanarParent,TempFrontEdPoly,Outside);
 		};
-	#ifndef PARANOID
-	#ifdef  PRECOMPUTE_FILTER
+#if PARANOID
+#if PRECOMPUTE_FILTER
 	if (Surf->PolyFlags & (PF_IsFront | PF_IsBack)) // Filter status was precomputed based on bounding sphere
 		{
 		if (Surf->PolyFlags & PF_IsFront) goto Front;
 		else goto Back;
 		};
-	#endif
-	#endif
+#endif
+#endif
 	//
 	SplitResult = EdPoly->SplitWithPlaneFast
 		(
@@ -906,9 +958,9 @@ void FMovingBrushTracker::FilterFPoly(INDEX iNode, INDEX iCoplanarParent,
 		);
 	if (SplitResult==SP_Front)
 		{
-		#ifdef PARANOID
+#if PARANOID
 			if (Surf->PolyFlags & PF_IsBack) appError("Precompute error 1");
-		#endif
+#endif
 		//
 		Front:
 		Outside = Outside || Node->IsCsg();
@@ -921,9 +973,9 @@ void FMovingBrushTracker::FilterFPoly(INDEX iNode, INDEX iCoplanarParent,
 		}
 	else if (SplitResult==SP_Back)
 		{
-		#ifdef PARANOID
+#if PARANOID
 			if (Surf->PolyFlags & PF_IsFront) appError("Precompute error 2");
-		#endif
+#endif
 		//
 		Back:
 		Outside = Outside && !Node->IsCsg();
@@ -936,18 +988,18 @@ void FMovingBrushTracker::FilterFPoly(INDEX iNode, INDEX iCoplanarParent,
 		}
 	else if (SplitResult==SP_Coplanar)
 		{
-		#ifdef PARANOID
+#if PARANOID
 			if (Surf->PolyFlags & (PF_IsFront | PF_IsBack)) appError("Precompute error 3");
-		#endif
+#endif
 		//
 		if ((ModelInfo.FVectors[Surf->vNormal] | FPolyNormal) >= 0.0) iCoplanarParent = iNode;
 		goto Front;
 		}
 	else if (SplitResult==SP_Split)
 		{
-		#ifdef PARANOID
+#if PARANOID
 			if (Surf->PolyFlags & (PF_IsFront | PF_IsBack)) appError("Precompute error 4");
-		#endif
+#endif
 		//
 		// Handle front fragment:
 		//
@@ -971,38 +1023,37 @@ void FMovingBrushTracker::FilterFPoly(INDEX iNode, INDEX iCoplanarParent,
 // level.  Assumes that no Bsp nodes coming from this actor's brush already exist in the 
 // level (those Bsp nodes, if any, must have already been cleaned out by FlushActorBrush).
 //
-void FMovingBrushTracker::AddActorBrush(INDEX iActor)
+void FMovingBrushTracker::AddActorBrush(AActor *Actor)
 	{
 	GUARD;
 	AssertLocked();
-	if (!ActorBrushes[iActor]) appError("No brush found for actor");
+	if (!ActorBrushes[Actor->iMe]) appError("No brush found for actor");
 	//
-	iActorNodePrevLink = (INDEX *)&ActorBrushes[iActor]->Color;
+	iActorNodePrevLink = (INDEX *)(&ActorBrushes[Actor->iMe]->Color);
 	//
-	iAddActor = iActor;
+	AddActor = Actor;
 	//
-	AActor *Actor = &Actors[iActor];
 	UModel *Brush = Actor->Brush;
 	if (!Brush) appError("Null brush");
 	//
-	#ifdef PARANOID
+#if PARANOID
 		{
 		//
 		// Verify that no Bsp nodes coming from this actor's brush already exist in the level.
 		//
 		for (int i=ModelInfo.NumBspNodes; i<ModelInfo.MaxBspNodes; i++)
 			{
-			if (iNodeOwners[i-ModelInfo.NumBspNodes]==iActor) appError("Brush nodes already exist");
+			if (NodeOwners[i-ModelInfo.NumBspNodes]==Actor) appError("Brush nodes already exist");
 			};
 		//
-		// Verify that that each FPoly in the brush is referenced once and only once by iBrushMapOwners.
+		// Verify that that each FPoly in the brush is referenced once and only once by BrushMapOwners.
 		//
 		for (i=0; i<Brush->Polys->Num; i++)
 			{
 			int Found=0;
 			for (int j=0; j<MAX_MOVING_BRUSH_POLYS; j++)
 				{
-				if (iBrushMapOwners[j]==iActor)
+				if (BrushMapOwners[j]==Actor)
 					{
 					FBspSurf *Surf = &ModelInfo.BspSurfs[iBrushMapSurfs[j]];
 					if (Surf->iBrushPoly == i) Found++;
@@ -1011,7 +1062,7 @@ void FMovingBrushTracker::AddActorBrush(INDEX iActor)
 			if (Found!=1) appErrorf("Surf/FPoly dissociation %i",Found);
 			};
 		};
-	#endif
+#endif
 	//
 	// Build coordinate system to transform Brush's original polygons into the world according
 	// to the Brush's current rotation:
@@ -1032,19 +1083,17 @@ void FMovingBrushTracker::AddActorBrush(INDEX iActor)
 		{
 		*DestPoly = *SrcPoly++;
 		DestPoly->Transform(Coords,&Brush->PrePivot,&Location,Orientation);
-		//
-		#ifdef PRECOMPUTE_FILTER
+#if PRECOMPUTE_FILTER
 			for (int j=0; j<DestPoly->NumVertices; j++) *Pt++ = DestPoly->Vertex[j];
 			NumPts += DestPoly->NumVertices;
-		#endif
-		//
+#endif
 		DestPoly++;
 		};
-	#ifdef PRECOMPUTE_FILTER
+#if PRECOMPUTE_FILTER
 	FBoundingVolume Bound;
 	Bound.Init(FirstPt,NumPts);
-	ModelInfo.PrecomputeSphereFilter(&Bound.Sphere);
-	#endif
+	ModelInfo.PrecomputeSphereFilter(Bound.Sphere);
+#endif
 	//
 	// Go through list of all brush FPolys and update their corresponding Bsp surfaces.
 	//
@@ -1054,9 +1103,9 @@ void FMovingBrushTracker::AddActorBrush(INDEX iActor)
 		INDEX    iSurf  = Poly->iLink;
 		FBspSurf *Surf  = &ModelInfo.BspSurfs[iSurf];
 		//
-		#ifdef PARANOID
-			if (iSurfOwners[iSurf-ModelInfo.NumBspSurfs]!=iActor) appError("iSurfOwner mismatch");
-		#endif
+#if PARANOID
+			if (SurfOwners[iSurf-ModelInfo.NumBspSurfs]!=Actor) appError("iSurfOwner mismatch");
+#endif
 		//
 		FPolyNormal = Poly->Normal;
 		SetVector(ModelInfo.FPoints [Surf->pBase    ],Poly->Base);
@@ -1074,7 +1123,7 @@ void FMovingBrushTracker::AddActorBrush(INDEX iActor)
 			//
 			Surf->PolyFlags &= ~(PF_IsFront | PF_IsBack);
 			//
-			void *MemTop=GMem.GetFast(0);
+			void *MemTop = GMem.GetFast(0);
 			//
 			iAddSurf = iSurf;
 			if (ModelInfo.NumBspNodes>0) FilterFPoly(0,INDEX_NONE,Poly,1);
@@ -1094,12 +1143,12 @@ void FMovingBrushTracker::AddActorBrush(INDEX iActor)
 		{
 		FBspNode *Node   = &ModelInfo.BspNodes[iNode];
 		//
-		#ifdef PARANOID
-			if (iNodeOwners[iNode-ModelInfo.NumBspNodes]!=iActor) appError("Add node inconsistency");
-		#endif
+#if PARANOID
+			if (NodeOwners[iNode-ModelInfo.NumBspNodes]!=Actor) appError("Add node inconsistency");
+#endif
 		//
 		Node->NodeFlags &= ~NF_IsNew;
-		iNode            = Node->iUniquePlane;
+		iNode            = Node->iBound;
 		};
 	UNGUARD("FMovingBrushTracker::AddActorBrush");
 	};
@@ -1112,16 +1161,16 @@ void FMovingBrushTracker::ForceGroupFlush(INDEX iNode)
 	{
 	GUARD;
 	//
-	INDEX iOwnerActor = iNodeOwners[iNode - ModelInfo.NumBspNodes];
-	if (iOwnerActor==INDEX_NONE) return; // Already flushed it
+	AActor *OwnerActor = NodeOwners[iNode - ModelInfo.NumBspNodes];
+	if (OwnerActor==NULL) return; // Already flushed it
 	//
 	for (int i=0; i<NumGroupActors; i++)
 		{
-		if (iGroupActors[i]==iOwnerActor) return; // Already in flush list
+		if (GroupActors[i]==OwnerActor) return; // Already in flush list
 		};
 	if (NumGroupActors < MAX_MOVING_BRUSH_ACTORS)
 		{
-		iGroupActors[NumGroupActors++] = iOwnerActor;
+		GroupActors[NumGroupActors++] = OwnerActor;
 		};
 	UNGUARD("FMovingBrushTracker::ForceGroupFlush");
 	};
@@ -1156,36 +1205,36 @@ void FMovingBrushTracker::ForceTouchFlush(INDEX iDynamic)
 
 //
 // Flush all sporadic information (nodes, poly points) for a moving brush from 
-// the level.  If Group is true, expects that NumGroupActors and iGroupActors 
+// the level.  If Group is true, expects that NumGroupActors and GroupActors 
 // are valid.
 //
-void FMovingBrushTracker::FlushActorBrush(INDEX iActor,int Group)
+void FMovingBrushTracker::FlushActorBrush(AActor *Actor,int Group)
 	{
 	GUARD;
 	AssertLocked();
-	if (!ActorBrushes[iActor]) appError("No brush found for actor");
+	if (!ActorBrushes[Actor->iMe]) appError("No brush found for actor");
 	//
 	// Go through all sporadic nodes in the Bsp and find ones owned by this actor:
 	//
-	INDEX iNode = ActorBrushes[iActor]->Color;
+	INDEX iNode = ActorBrushes[Actor->iMe]->Color;
 	while(iNode!=INDEX_NONE)
 		{
 		FBspNode *Node = &ModelInfo.BspNodes[iNode];
 		INDEX iParent    = iNodeParents        [iNode-ModelInfo.NumBspNodes];
 		FBspNode *Parent = &ModelInfo.BspNodes [iParent];
 		//
-		#ifdef PARANOID
-			if (iNodeOwners[iNode-ModelInfo.NumBspNodes]!=iActor) appError("Flush node inconsistency");
-		#endif
+#if PARANOID
+			if (NodeOwners[iNode-ModelInfo.NumBspNodes]!=Actor) appError("Flush node inconsistency");
+#endif
 		//
 		// Remove references to this node from its parents:
 		//
 		if		(Parent->iFront==iNode) Parent->iFront=INDEX_NONE;
 		else if (Parent->iBack ==iNode) Parent->iBack =INDEX_NONE;
 		else if (Parent->iPlane==iNode) Parent->iPlane=INDEX_NONE;
-		#ifdef PARANOID
+#if PARANOID
 			else appError("Parent mismatch");
-		#endif
+#endif
 		//
 		// If those node has any children belonging to moving brushes that
 		// aren't in our group list, tag them for subsequent flushing. This
@@ -1212,7 +1261,7 @@ void FMovingBrushTracker::FlushActorBrush(INDEX iActor,int Group)
 		FreeVertPoolIndex    (Node->iVertPool,Node->NumVertices);
 		FreeNodeIndex        (iNode);
 		//
-		iNode = Node->iUniquePlane;
+		iNode = Node->iBound;
 		};
 	UNGUARD("FMovingBrushTracker::FlushActorBrush");
 	};
@@ -1227,7 +1276,7 @@ void FMovingBrushTracker::FlushActorBrush(INDEX iActor,int Group)
 // sets up permanent data (surfaces, vectors) for all moving brushes.  Sporadic data
 // isn't added until the next call to UpdateAllBrushes.
 //
-void FMovingBrushTracker::SetupAllBrushes(void)
+void FMovingBrushTracker::SetupAllBrushes()
 	{
 	GUARD;
 	AssertLocked();
@@ -1237,7 +1286,8 @@ void FMovingBrushTracker::SetupAllBrushes(void)
 	AActor *Actor = &Level->Actors->Element(0);
 	for (int i=0; i<Level->Actors->Max; i++)
 		{
-		if (Actor->Class && Actor->IsMovingBrush()) SetupActorBrush(i);
+		if (Actor->Class && Actor->IsMovingBrush())
+			SetupActorBrush(Actor);
 		Actor++;
 		};
 	UNGUARD("FMovingBrushTracker::SetupAllBrushes");
@@ -1249,7 +1299,7 @@ void FMovingBrushTracker::SetupAllBrushes(void)
 // should be leaves will reference nodes in the range from Num-Max that don't exist 
 // in the saved file resulting.
 //
-void FMovingBrushTracker::RemoveAllBrushes(void)
+void FMovingBrushTracker::RemoveAllBrushes()
 	{
 	GUARD;
 	AssertLocked();
@@ -1259,13 +1309,14 @@ void FMovingBrushTracker::RemoveAllBrushes(void)
 	AActor *Actor = &Level->Actors->Element(0);
 	for (int i=0; i<Level->Actors->Max; i++)
 		{
-		if (Actor->Class && Actor->IsMovingBrush() && ActorBrushes[i]) FlushActorBrush(i,0);
+		if (Actor->Class && Actor->IsMovingBrush() && ActorBrushes[i])
+			FlushActorBrush(Actor,0);
 		Actor++;
 		};
 	//
 	// Verify that all dynamic nodes were actually removed:
 	//
-	#ifdef PARANOID
+#if PARANOID
 	int n = LevelRes->Model->BspNodes->Num;
 	for (i=0; i<n; i++)
 		{
@@ -1275,14 +1326,15 @@ void FMovingBrushTracker::RemoveAllBrushes(void)
 		if ((Node->iBack !=INDEX_NONE) && (Node->iBack  >= n))	appErrorf("Bad iBack %i",i);
 		if ((Node->iPlane!=INDEX_NONE) && (Node->iPlane >= n))	appErrorf("Bad iPlane %i",i);
 		};
-	#endif
+#endif
 	//
 	// Remove all permanent data:
 	//
 	Actor = &Level->Actors->Element(0);
 	for (i=0; i<Level->Actors->Max; i++)
 		{
-		if (Actor->Class && Actor->IsMovingBrush() && ActorBrushes[i]) RemoveActorBrush(i);
+		if (Actor->Class && Actor->IsMovingBrush() && ActorBrushes[i])
+			RemoveActorBrush(Actor);
 		Actor++;
 		};
 	UNGUARD("FMovingBrushTracker::RemoveAllBrushes");
@@ -1294,47 +1346,49 @@ void FMovingBrushTracker::RemoveAllBrushes(void)
 // specified moving brushes (and brushes interwoved with their Bsp's) are cleaned out of the 
 // Bsp, and then re-added.
 //
-void FMovingBrushTracker::UpdateBrushes(INDEX *iActors,int Num)
+void FMovingBrushTracker::UpdateBrushes(AActor **Actors,int Num)
 	{
 	GUARD;
 	AssertLocked();
 	int Group;
 	//
-	if (iActors==NULL) // Update all actor brushes
+	if (Actors==NULL) // Update all actor brushes
 		{
 		Group = 0;
 		NumGroupActors = 0;
-		AActor *Actor = &Actors[0];
-		for (int i=0; i<Level->Actors->Max; i++)
+		//
+		AActor **ActorPtr = &Level->Actors->ActiveActors->First();
+		AActor **LastPtr  = &Level->Actors->ActiveActors->Last();
+		//
+		while( ActorPtr <= LastPtr )
 			{
-			if (Actor->Class && Actor->IsMovingBrush() && 
-				(NumGroupActors < MAX_MOVING_BRUSH_ACTORS))
+			AActor *Actor = *ActorPtr++;
+			if (Actor->Class &&	Actor->IsMovingBrush())
 				{
-				iGroupActors[NumGroupActors++] = i;
+				GroupActors[NumGroupActors++] = Actor;
+				if (NumGroupActors >= MAX_MOVING_BRUSH_ACTORS) 
+					break;
 				};
-			Actor++;
 			};
 		}
 	else // Update specified actor brushes
 		{
 		Group = 1;
-		NumGroupActors = OurMin(Num,(int)MAX_MOVING_BRUSH_ACTORS);
-		memcpy(iGroupActors,iActors,Num*sizeof(INDEX));
+		NumGroupActors = Min(Num,(int)MAX_MOVING_BRUSH_ACTORS);
+		memcpy(GroupActors,Actors,Num*sizeof(AActor *));
 		};
 	NumTouchActors;
 	//
 	// Flush all actor brushes.  Calls to FlushActorBrush with Group set to true
-	// cause iGroupActors to be expanded to include all brushes interwoven with the
+	// cause GroupActors to be expanded to include all brushes interwoven with the
 	// specified brushes.
 	//
 	for (int i=0; i<NumGroupActors; i++)
 		{
-		INDEX  iActor = iGroupActors [i];
-		AActor *Actor = &Actors      [iActor];
-		//
-		if (Actor->Class && Actor->IsMovingBrush() && ActorBrushes[iActor])
+		AActor *Actor = GroupActors[i];
+		if (Actor->Class && Actor->IsMovingBrush() && ActorBrushes[Actor->iMe])
 			{
-			FlushActorBrush(iActor,Group);
+			FlushActorBrush(Actor,Group);
 			};
 		};
 	//
@@ -1342,13 +1396,11 @@ void FMovingBrushTracker::UpdateBrushes(INDEX *iActors,int Num)
 	//
 	for (i=0; i<NumGroupActors; i++)
 		{
-		INDEX  iActor = iGroupActors [i];
-		AActor *Actor = &Actors      [iActor];
-		//
+		AActor *Actor = GroupActors[i];
 		if (Actor->Class && Actor->IsMovingBrush())
 			{
-			if (!ActorBrushes[iActor]) SetupActorBrush(iActor);
-			AddActorBrush(iActor);
+			if (!ActorBrushes[Actor->iMe]) SetupActorBrush(Actor);
+			AddActorBrush(Actor);
 			};
 		};
 	//

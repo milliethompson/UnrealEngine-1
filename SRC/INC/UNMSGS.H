@@ -11,9 +11,11 @@
         * Aug 30, 1996: Mark added PLevel, PreTeleport, PostTeleport.
 =============================================================================*/
 
-//
-// Macro to define a message as an enumeration
-//
+/*-----------------------------------------------------------------------------
+	Macros.
+-----------------------------------------------------------------------------*/
+
+// Define a message as an enumeration.
 #ifndef REGISTER_MESSAGE
 	#define REGISTER_MESSAGE(num,msg) ACTOR_##msg = num,
 	#define REGISTERING_ENUM
@@ -21,7 +23,7 @@
 #endif
 
 /*-----------------------------------------------------------------------------
-	All standard actor messages (must be 1-15 characters)
+	All standard actor messages (must be 1-15 characters).
 -----------------------------------------------------------------------------*/
 
 // In the description for each message, the type of parameter associated with the
@@ -35,15 +37,15 @@
 REGISTER_MESSAGE( 400,Null				) // [null] No effect
 REGISTER_MESSAGE( 401,Spawn				) // [null] Reverse-sent to actor immediately after spawning
 REGISTER_MESSAGE( 402,Destroy			) // [null] Called immediately before actor is removed from actor list
-REGISTER_MESSAGE( 403,Debug				) // [????] Sent to an actor when debugging info is desired
+REGISTER_MESSAGE( 403,Debug				) // [null] Sent to an actor when debugging info is desired
 REGISTER_MESSAGE( 404,Exec				) // [PExec] Execute a text command (ignored by root)
-REGISTER_MESSAGE( 405,GetProp			) // [????] Ask for a property (handled by root)
-REGISTER_MESSAGE( 406,SetProp			) // [????] Set a property (handled by root)
+//REGISTER_MESSAGE( 405,Available		) // []
+//REGISTER_MESSAGE( 406,Available		) // []
 REGISTER_MESSAGE( 407,PostEditChange	) // [null] Called after editing properties
-REGISTER_MESSAGE( 408,PostEditMove		) // [????] Called after an actor is moved in the editor
-REGISTER_MESSAGE( 409,GainedChild		) // [????] Sent to a parent actor when another actor attaches to it
-REGISTER_MESSAGE( 410,LostChild			) // [????] Sent to a parent actor when another actor detaches from it
-REGISTER_MESSAGE( 411,QueryCallback		) // [????] Called by kernel in response to query messages
+REGISTER_MESSAGE( 408,PostEditMove		) // [null] Called after an actor is moved in the editor
+REGISTER_MESSAGE( 409,GainedChild		) // [PTouch] Sent to a parent actor when another actor attaches to it
+REGISTER_MESSAGE( 410,LostChild			) // [PTouch] Sent to a parent actor when another actor detaches from it
+REGISTER_MESSAGE( 411,QueryCallback		) // [PTouch] Called by kernel in response to query messages
 REGISTER_MESSAGE( 412,PreRaytrace		) // [null] Called by editor before raytracing begins
 REGISTER_MESSAGE( 413,PostRaytrace		) // [null] Called by editor after raytracing ends
 REGISTER_MESSAGE( 414,RaytraceWorld		) // [null] Tell actor to position itself for world raytracing
@@ -56,8 +58,8 @@ REGISTER_MESSAGE( 420,BeginPlay			) // [PBeginPlay] Play has just begin
 REGISTER_MESSAGE( 421,EndPlay			) // [null] Play has just ended
 REGISTER_MESSAGE( 422,BeginEdit			) // [null] Editing has just begin
 REGISTER_MESSAGE( 423,EndEdit			) // [null] Editing has just ended
-REGISTER_MESSAGE( 424,LevelClosing		) // [????] Level is closing and play will end soon
-REGISTER_MESSAGE( 425,SetPlayMode		) // [????] Called with difficulty/net flags so undesired actors can kill themselves
+//REGISTER_MESSAGE( 424,Available		) // []
+//REGISTER_MESSAGE( 425,Available		) // []
 REGISTER_MESSAGE( 426,PreBeginPlay		) // [PBeginPlay] Sent right before BeginPlay, for root initialization
 REGISTER_MESSAGE( 427,PostBeginPlay		) // [PBeginPlay] Sent right after BeginPlay, for root processing
 REGISTER_MESSAGE( 428,RestartLevel      ) // [null] Sent to restart the current level.
@@ -72,16 +74,12 @@ REGISTER_MESSAGE( 443,InventoryCalcView	) // [null] Calculate inventory/weapon v
 // 
 // Actor timing:
 //
-REGISTER_MESSAGE( 455,Timer				) // [null] Actor timer has fired
-REGISTER_MESSAGE( 456,Minute			) // [????] A minute has passed
-REGISTER_MESSAGE( 457,Hour				) // [????] An hour has passed
-REGISTER_MESSAGE( 458,Day				) // [????] Daytime has just begun
-REGISTER_MESSAGE( 459,Night				) // [????] Nighttime has just begun
+REGISTER_MESSAGE( 455,Timer				) // [null] The per-actor timer has fired
 //
 // Inventory:
 //
 REGISTER_MESSAGE( 460,PickupQuery		) // [PPickupQuery] Pickup actor asks its toucher if it wants to pick the thing up (PPickupQuery)
-// 461 is available for use
+//REGISTER_MESSAGE( 461,Available		) // []
 REGISTER_MESSAGE( 462,PreemptPickupQuery) // [PPickupQuery] Ask existing inventory whether a pickup should be allowed to occur, give them the action of overriding it
 REGISTER_MESSAGE( 463,PickupNotify      ) // [PActor] Actor just picked up this inventory actor
 REGISTER_MESSAGE( 464,AddInventory		) // [PActor] Add an actor to recipient's inventory (PTouch)
@@ -100,18 +98,18 @@ REGISTER_MESSAGE( 476,Deactivated       ) // [null] Sent to a weapon after it ha
 //
 // User-callable messages:
 //
-REGISTER_MESSAGE( 480,SetParent			) // [????] Sets this actors parent to the specified actor
-REGISTER_MESSAGE( 481,QueryChildActors	) // [????] Causes kernel to call QueryActorCallback for all child actors
-REGISTER_MESSAGE( 482,QueryEventActors	) // [????] Causes kernel to call QueryActorCallback for all actors using an event
-REGISTER_MESSAGE( 483,QueryNameActors	) // [????] Causes kernel to call QueryActorCallback for all actors using a name
+REGISTER_MESSAGE( 480,SetParent			) // [PTouch] Sets this actors parent to the specified actor
+REGISTER_MESSAGE( 481,QueryChildActors	) // [PTouch] Causes kernel to call QueryActorCallback for all child actors
+REGISTER_MESSAGE( 482,QueryEventActors	) // [PName] Causes kernel to call QueryActorCallback for all actors using an event
+REGISTER_MESSAGE( 483,QueryNameActors	) // [PName] Causes kernel to call QueryActorCallback for all actors using a name
 //
 // Commonly used messages
 //
 REGISTER_MESSAGE( 500,TextMsg			) // [PText] Text chat message from somewhere
-REGISTER_MESSAGE( 501,Target			) // [????] Target has become active (must be requested)
+REGISTER_MESSAGE( 501,Target			) // [null] Target has become active (must be requested)
 REGISTER_MESSAGE( 502,UnTarget			) // [null] Target has been destroyed
-REGISTER_MESSAGE( 503,Weapon			) // [????] Weapon has become active
-REGISTER_MESSAGE( 504,UnWeapon			) // [null] Weapon has been destroyed
+REGISTER_MESSAGE( 503,GetLink			) // [PStringReturn] Return link name of teleporter
+//REGISTER_MESSAGE( 504,Available		) // []
 REGISTER_MESSAGE( 505,Touch				) // [PTouch] Actor was just touched by another actor
 REGISTER_MESSAGE( 506,UnTouch			) // [PTouch] Actor touch just ended, always sent sometime after Touch
 REGISTER_MESSAGE( 507,Possess			) // [UCamera] Actor was just possessed by a user
@@ -119,12 +117,13 @@ REGISTER_MESSAGE( 508,UnPossess			) // [null] Actor was just unpossessed
 REGISTER_MESSAGE( 509,Trigger			) // [PTouch] Message sent by Trigger actors
 REGISTER_MESSAGE( 510,UnTrigger			) // [PTouch] Message sent by Trigger actors
 REGISTER_MESSAGE( 511,Bump				) // [PTouch] Actor was just touched and blocked. No interpenetration. No UnBump.
-REGISTER_MESSAGE( 512,MoverBump			) // [????] Actor was bumped by a keyframe mover and moved.
-REGISTER_MESSAGE( 513,PlayerEntered		) // [????] Sent to a zone descriptor actor when a player enters
-REGISTER_MESSAGE( 514,StandMover		) // [PTouch] Sent to actor when it first stands on a mover
-REGISTER_MESSAGE( 515,UnStandMover		) // [PTouch] Sent to actor when it gets off a mover
-REGISTER_MESSAGE( 516,SteppedOn			) // [PTouch] Sent to mover when actor first steps on it
-REGISTER_MESSAGE( 517,UnSteppedOn		) // [PTouch] Sent to mover when actor steps off it
+REGISTER_MESSAGE( 512,MoverBump			) // [PTouch] Actor was bumped by a keyframe mover and moved.
+REGISTER_MESSAGE( 513,PlayerEntered		) // [PTouch] Sent to a zone descriptor actor when a player enters
+REGISTER_MESSAGE( 514,PlayerLeaving		) // [PTouch] Sent to a zone descriptor actor when a player is leaving
+REGISTER_MESSAGE( 515,StandMover		) // [PTouch] Sent to actor when it first stands on a mover
+REGISTER_MESSAGE( 516,UnStandMover		) // [PTouch] Sent to actor when it gets off a mover
+REGISTER_MESSAGE( 517,SteppedOn			) // [PTouch] Sent to mover when actor first steps on it
+REGISTER_MESSAGE( 518,UnSteppedOn		) // [PTouch] Sent to mover when actor steps off it
 //
 // Feedback from other actors or the world
 //
@@ -171,7 +170,7 @@ REGISTER_MESSAGE( 645,DieMoverHit		) // [null] Die because of crushing mover
 // Keyframers
 //
 REGISTER_MESSAGE( 660,KeyMoveTo			) // [PMoveTo] Move to a keyframe
-REGISTER_MESSAGE( 661,KeyStop			) // [????] Stop moving immediately
+REGISTER_MESSAGE( 661,KeyStop			) // [null] Stop moving immediately
 REGISTER_MESSAGE( 662,KeyReverse		) // [null] Reverse course of KeyMoveTo
 REGISTER_MESSAGE( 663,SetKeyPoint		) // [????] Set a keyframe position to that of a named keypoint actor
 
@@ -180,7 +179,7 @@ REGISTER_MESSAGE( 663,SetKeyPoint		) // [????] Set a keyframe position to that o
 #endif
 
 /*-----------------------------------------------------------------------------
-	Closing
+	Closing.
 -----------------------------------------------------------------------------*/
 
 #ifdef REGISTERING_ENUM
@@ -189,5 +188,5 @@ REGISTER_MESSAGE( 663,SetKeyPoint		) // [????] Set a keyframe position to that o
 #endif
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/

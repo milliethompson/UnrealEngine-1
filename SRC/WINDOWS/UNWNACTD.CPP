@@ -1,10 +1,9 @@
-// InpActDi.cpp : implementation file
-//
 /*
 ==============================================================================
+UnWnActD.cpp: Actions dialog class
 
 Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
-Compiled with Visual C++ 4.0, Calling method=__fastcall
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
     This is the CDialog-based class for handling the Unreal input
@@ -35,9 +34,11 @@ static char THIS_FILE[] = __FILE__;
 // CDialogInputActions dialog
 
 
-CDialogInputActions::CDialogInputActions(CWnd* pParent /*=NULL*/)
+CDialogInputActions::CDialogInputActions(UCamera * Camera, CWnd* pParent /*=NULL*/)
 	: CDialog(CDialogInputActions::IDD, pParent)
 {
+    this->Camera = Camera;
+    Actions = Camera->Console->GetActions();
 	//{{AFX_DATA_INIT(CDialogInputActions)
 	ActionDescription = _T("");
 	//}}AFX_DATA_INIT
@@ -58,7 +59,7 @@ BOOL CDialogInputActions::OnInitDialog()
             TActionState & State = ActionStates[Action];
             State.IsShown = FALSE;
             State.WasChanged = FALSE;
-            GAction.GetCombos( Action, State.ComboCount, &State.Combos );
+            Actions->GetCombos( Action, State.ComboCount, &State.Combos );
         }
     }
     UserOperation = NoOperation;
@@ -132,7 +133,7 @@ void CDialogInputActions::ArrangeSelectedActions(int TopPosition, int Selection)
         }
     }
     AllCombos.SetTopIndex( TopPosition < 0 ? 0 : TopPosition );
-    Selection = OurMin( Selection, AllCombos.GetCount()-1 );
+    Selection = Min( Selection, AllCombos.GetCount()-1 );
     AllCombos.SetCurSel(Selection < 0 ? 0 : Selection);
     ArrangeCurrentCombo();
 }
@@ -257,8 +258,8 @@ BOOL CDialogInputActions::Accept()
         TActionState & State = ActionStates[Action];
         if( State.WasChanged )
         {
-            GAction.Empty(Action); // Remove current definitions for action.
-            GAction.Add( Action, State.ComboCount, State.Combos );
+            Actions->Empty(Action); // Remove current definitions for action.
+            Actions->Add( Action, State.ComboCount, State.Combos );
             ChangesWereSaved = TRUE;                
         }
     }
@@ -363,7 +364,7 @@ void CDialogInputActions::SavePositions()
 void CDialogInputActions::RestorePositions()
 {
     AllCombos.SetTopIndex( SavedTopPosition < 0 ? 0 : SavedTopPosition );
-    int Selection = OurMin( SavedSelection, AllCombos.GetCount()-1 );
+    int Selection = Min( SavedSelection, AllCombos.GetCount()-1 );
     AllCombos.SetCurSel(Selection < 0 ? 0 : Selection);
 }
 
@@ -434,14 +435,21 @@ void CDialogInputActions::ChangeCurrentCombo(int X, int Y)
             // *** WARNING ***
             // This code assumes the following structure in IDR_COMBO_POPUP:
             //    Top
-            //    [0]  Change             (identified by position)  
-            //           [?] Always on    (identified by command)
+            //    [0]  Change             (identified by position)
+            //           Intro  
+            //           Keyboard
+            //           Mouse            (identified by position)  
+            //           Joystick 1       (identified by position)  
+            //           Joystick 2       (identified by position)   
             //    [1]  Advanced           (identified by position)  
             //           [0]Double        (identified by command)
             //           [1]Toggle        (identified by command)
             //           [2]MovementKind  (identified by position)
             //           [3]Modifier      (identified by position) 
-            //                 ...
+            //                 Keyboard   
+            //                 Mouse      (identified by position)
+            //                 Joystick1  (identified by position)
+            //                 Joystick2  (identified by position)
             //                 Double     (identified by command) 
             //                 Toggle     (identified by command) 
             //                 Delete     (identified by position) 
@@ -454,6 +462,15 @@ void CDialogInputActions::ChangeCurrentCombo(int X, int Y)
             CMenu * ChangeMenu      = PopUp->GetSubMenu(0);
             CMenu * AdvancedMenu    = PopUp->GetSubMenu(1); 
             CMenu * Modifier1Menu   = AdvancedMenu->GetSubMenu(3); 
+            if( Actions->MustBeKeyboard(Action) )
+            {
+                ChangeMenu->EnableMenuItem( 2, MF_BYPOSITION | MF_GRAYED );
+                ChangeMenu->EnableMenuItem( 3, MF_BYPOSITION | MF_GRAYED );
+                ChangeMenu->EnableMenuItem( 4, MF_BYPOSITION | MF_GRAYED );
+                Modifier1Menu->EnableMenuItem( 1, MF_BYPOSITION | MF_GRAYED );
+                Modifier1Menu->EnableMenuItem( 2, MF_BYPOSITION | MF_GRAYED );
+                Modifier1Menu->EnableMenuItem( 3, MF_BYPOSITION | MF_GRAYED );
+            }
             if( Combo.IsSwitch() )
             {
                 AdvancedMenu->CheckMenuItem( ID_ACI_DOUBLE, MF_BYCOMMAND | CheckFlag(Combo.MetaSwitch.IsDouble) );
@@ -541,8 +558,10 @@ void CDialogInputActions::AddNewCombo()
         //    Top
         //      Change  ->   
         //                 Intro
-        //                 ...
-        //                 Always on     (identified by command)
+        //                 Keyboard
+        //                 Mouse         (identified by position)  
+        //                 Joystick 1    (identified by position)   
+        //                 Joystick 2    (identified by position)  
         //      ...
         CMenu * PopUp = Menu.GetSubMenu(0);
         CMenu * ChangePopUp = PopUp == 0 ? 0 : PopUp->GetSubMenu(0);
@@ -552,6 +571,12 @@ void CDialogInputActions::AddNewCombo()
             char Intro[30];
             sprintf( Intro, "New input for %s", FAction::ActionName(Action) );
             ChangePopUp->ModifyMenu(0,MF_BYPOSITION|MF_STRING, 0, Intro );
+            if( Actions->MustBeKeyboard(Action) )
+            {
+                ChangePopUp->EnableMenuItem( 2, MF_BYPOSITION | MF_GRAYED );
+                ChangePopUp->EnableMenuItem( 3, MF_BYPOSITION | MF_GRAYED );
+                ChangePopUp->EnableMenuItem( 4, MF_BYPOSITION | MF_GRAYED );
+            }
             ChangePopUp->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, ItemRegion.left, ItemRegion.top, this);
         }
     }
@@ -678,18 +703,18 @@ void CDialogInputActions::AddNewCombo(FAction::TAction Action, const FInput::TCo
 // could extend this to include mouse buttons and joystick buttons.
 FInput::TSwitch CDialogInputActions::SelectSwitch()
 {
-    FInput::TSwitch Switch = FInput::S_None;
+    FPlatformInput::TSwitch Switch = FPlatformInput::S_None;
     CDialogKeySelect * Dialog = new CDialogKeySelect;
     BOOL IsAllowed[256];
     for( int VirtualKey = 0; VirtualKey <= 255; VirtualKey++ )
     {
-        IsAllowed[VirtualKey] = FInput::WindowsKeySwitches[VirtualKey] != 0;
+        IsAllowed[VirtualKey] = GApp->Input->WindowsKeySwitches[VirtualKey] != 0;
     }
     Dialog->IsAllowed = IsAllowed;
     if( Dialog->DoModal() == IDOK && Dialog->SelectedKey != 0 )
     {
         //debugf( LOG_Info, "Selected vkey=%i", Dialog->SelectedKey );
-        Switch = FInput::WindowsKeySwitches[Dialog->SelectedKey];
+        Switch = GApp->Input->WindowsKeySwitches[Dialog->SelectedKey];
     }
     return Switch;
 }
@@ -702,8 +727,8 @@ BOOL CDialogInputActions::ProcessMenuPopUpCommand(int CommandId)
     BOOL Processed = TRUE; // Set FALSE if we don't process the command.
     FInput::TCombo Combo; // We store most of the changes here, temporarily.
     Combo.Empty(); 
-    FInput::TSwitch NewMainSwitch = FInput::S_None; // We store the new main input switch here, if appropriate.
-    FInput::TMovement NewMainMovement = FInput::M_None; // We store the new main movement here, if appropriate.
+    FInput::TSwitch NewMainSwitch = FPlatformInput::S_None; // We store the new main input switch here, if appropriate.
+    FInput::TMovement NewMainMovement = FPlatformInput::M_None; // We store the new main movement here, if appropriate.
     FAction::TAction Action;
     int WhichCombo;
     GetCurrentCombo(Action,WhichCombo);
@@ -741,125 +766,125 @@ BOOL CDialogInputActions::ProcessMenuPopUpCommand(int CommandId)
             Canceled = Modifier1.Switch==0;
             break; 
         }
-        case ID_ACI_MBLEFT          : { NewMainSwitch       = FInput::S_LeftMouse           ; break; }
-        case ID_ACI_MBMIDDLE        : { NewMainSwitch       = FInput::S_MiddleMouse         ; break; }
-        case ID_ACI_MBRIGHT         : { NewMainSwitch       = FInput::S_RightMouse          ; break; }
+        case ID_ACI_MBLEFT          : { NewMainSwitch       = FPlatformInput::S_LeftMouse           ; break; }
+        case ID_ACI_MBMIDDLE        : { NewMainSwitch       = FPlatformInput::S_MiddleMouse         ; break; }
+        case ID_ACI_MBRIGHT         : { NewMainSwitch       = FPlatformInput::S_RightMouse          ; break; }
 
-        case ID_ACI_MLEFT           : { NewMainMovement     = FInput::M_MouseL              ; break; }
-        case ID_ACI_MRIGHT          : { NewMainMovement     = FInput::M_MouseR              ; break; }
-        case ID_ACI_MFORWARD        : { NewMainMovement     = FInput::M_MouseF              ; break; }
-        case ID_ACI_MBACKWARD       : { NewMainMovement     = FInput::M_MouseB              ; break; }
+        case ID_ACI_MLEFT           : { NewMainMovement     = FPlatformInput::M_MouseL              ; break; }
+        case ID_ACI_MRIGHT          : { NewMainMovement     = FPlatformInput::M_MouseR              ; break; }
+        case ID_ACI_MFORWARD        : { NewMainMovement     = FPlatformInput::M_MouseF              ; break; }
+        case ID_ACI_MBACKWARD       : { NewMainMovement     = FPlatformInput::M_MouseB              ; break; }
 
-        case ID_ACI_J1B1            : { NewMainSwitch       = FInput::S_J1B1    ; break; }
-        case ID_ACI_J1B2            : { NewMainSwitch       = FInput::S_J1B2    ; break; }
-        case ID_ACI_J1B3            : { NewMainSwitch       = FInput::S_J1B3    ; break; }
-        case ID_ACI_J1B4            : { NewMainSwitch       = FInput::S_J1B4    ; break; }
-        case ID_ACI_J1B5            : { NewMainSwitch       = FInput::S_J1B5    ; break; }
-        case ID_ACI_J1B6            : { NewMainSwitch       = FInput::S_J1B6    ; break; }
-        case ID_ACI_J1B7            : { NewMainSwitch       = FInput::S_J1B7    ; break; }
-        case ID_ACI_J1B8            : { NewMainSwitch       = FInput::S_J1B8    ; break; }
-        case ID_ACI_J1B9            : { NewMainSwitch       = FInput::S_J1B9    ; break; }
-        case ID_ACI_J1B10           : { NewMainSwitch       = FInput::S_J1B10   ; break; }
-        case ID_ACI_J1HATON         : { NewMainSwitch       = FInput::S_J1HatOn      ; break; }
-        case ID_ACI_J1HATN          : { NewMainSwitch       = FInput::S_J1HatN       ; break; }
-        case ID_ACI_J1HATS          : { NewMainSwitch       = FInput::S_J1HatS       ; break; }
-        case ID_ACI_J1HATW          : { NewMainSwitch       = FInput::S_J1HatW       ; break; }
-        case ID_ACI_J1HATE          : { NewMainSwitch       = FInput::S_J1HatE       ; break; }
-        case ID_ACI_J1HATNW         : { NewMainSwitch       = FInput::S_J1HatNW      ; break; }
-        case ID_ACI_J1HATNE         : { NewMainSwitch       = FInput::S_J1HatNE      ; break; }
-        case ID_ACI_J1HATSW         : { NewMainSwitch       = FInput::S_J1HatSW      ; break; }
-        case ID_ACI_J1HATSE         : { NewMainSwitch       = FInput::S_J1HatSE      ; break; }
+        case ID_ACI_J1B1            : { NewMainSwitch       = FPlatformInput::S_J1B1    ; break; }
+        case ID_ACI_J1B2            : { NewMainSwitch       = FPlatformInput::S_J1B2    ; break; }
+        case ID_ACI_J1B3            : { NewMainSwitch       = FPlatformInput::S_J1B3    ; break; }
+        case ID_ACI_J1B4            : { NewMainSwitch       = FPlatformInput::S_J1B4    ; break; }
+        case ID_ACI_J1B5            : { NewMainSwitch       = FPlatformInput::S_J1B5    ; break; }
+        case ID_ACI_J1B6            : { NewMainSwitch       = FPlatformInput::S_J1B6    ; break; }
+        case ID_ACI_J1B7            : { NewMainSwitch       = FPlatformInput::S_J1B7    ; break; }
+        case ID_ACI_J1B8            : { NewMainSwitch       = FPlatformInput::S_J1B8    ; break; }
+        case ID_ACI_J1B9            : { NewMainSwitch       = FPlatformInput::S_J1B9    ; break; }
+        case ID_ACI_J1B10           : { NewMainSwitch       = FPlatformInput::S_J1B10   ; break; }
+        case ID_ACI_J1HATON         : { NewMainSwitch       = FPlatformInput::S_J1HatOn      ; break; }
+        case ID_ACI_J1HATN          : { NewMainSwitch       = FPlatformInput::S_J1HatN       ; break; }
+        case ID_ACI_J1HATS          : { NewMainSwitch       = FPlatformInput::S_J1HatS       ; break; }
+        case ID_ACI_J1HATW          : { NewMainSwitch       = FPlatformInput::S_J1HatW       ; break; }
+        case ID_ACI_J1HATE          : { NewMainSwitch       = FPlatformInput::S_J1HatE       ; break; }
+        case ID_ACI_J1HATNW         : { NewMainSwitch       = FPlatformInput::S_J1HatNW      ; break; }
+        case ID_ACI_J1HATNE         : { NewMainSwitch       = FPlatformInput::S_J1HatNE      ; break; }
+        case ID_ACI_J1HATSW         : { NewMainSwitch       = FPlatformInput::S_J1HatSW      ; break; }
+        case ID_ACI_J1HATSE         : { NewMainSwitch       = FPlatformInput::S_J1HatSE      ; break; }
 
-        case ID_ACI_J1XP            : { NewMainMovement     = FInput::M_J1XP     ; break; }
-        case ID_ACI_J1XN            : { NewMainMovement     = FInput::M_J1XN     ; break; }
-        case ID_ACI_J1YP            : { NewMainMovement     = FInput::M_J1YP     ; break; }
-        case ID_ACI_J1YN            : { NewMainMovement     = FInput::M_J1YN     ; break; }
-        case ID_ACI_J1ZP            : { NewMainMovement     = FInput::M_J1ZP     ; break; }
-        case ID_ACI_J1ZN            : { NewMainMovement     = FInput::M_J1ZN     ; break; }
-        case ID_ACI_J1RP            : { NewMainMovement     = FInput::M_J1RP     ; break; }
-        case ID_ACI_J1RN            : { NewMainMovement     = FInput::M_J1RN     ; break; }
+        case ID_ACI_J1XP            : { NewMainMovement     = FPlatformInput::M_J1XP     ; break; }
+        case ID_ACI_J1XN            : { NewMainMovement     = FPlatformInput::M_J1XN     ; break; }
+        case ID_ACI_J1YP            : { NewMainMovement     = FPlatformInput::M_J1YP     ; break; }
+        case ID_ACI_J1YN            : { NewMainMovement     = FPlatformInput::M_J1YN     ; break; }
+        case ID_ACI_J1ZP            : { NewMainMovement     = FPlatformInput::M_J1ZP     ; break; }
+        case ID_ACI_J1ZN            : { NewMainMovement     = FPlatformInput::M_J1ZN     ; break; }
+        case ID_ACI_J1RP            : { NewMainMovement     = FPlatformInput::M_J1RP     ; break; }
+        case ID_ACI_J1RN            : { NewMainMovement     = FPlatformInput::M_J1RN     ; break; }
 
-        case ID_ACI_J2B1            : { NewMainSwitch       = FInput::S_J2B1    ; break; }
-        case ID_ACI_J2B2            : { NewMainSwitch       = FInput::S_J2B2    ; break; }
-        case ID_ACI_J2B3            : { NewMainSwitch       = FInput::S_J2B3    ; break; }
-        case ID_ACI_J2B4            : { NewMainSwitch       = FInput::S_J2B4    ; break; }
-        case ID_ACI_J2B5            : { NewMainSwitch       = FInput::S_J2B5    ; break; }
-        case ID_ACI_J2B6            : { NewMainSwitch       = FInput::S_J2B6    ; break; }
-        case ID_ACI_J2B7            : { NewMainSwitch       = FInput::S_J2B7    ; break; }
-        case ID_ACI_J2B8            : { NewMainSwitch       = FInput::S_J2B8    ; break; }
-        case ID_ACI_J2B9            : { NewMainSwitch       = FInput::S_J2B9    ; break; }
-        case ID_ACI_J2B10           : { NewMainSwitch       = FInput::S_J2B10   ; break; }
+        case ID_ACI_J2B1            : { NewMainSwitch       = FPlatformInput::S_J2B1    ; break; }
+        case ID_ACI_J2B2            : { NewMainSwitch       = FPlatformInput::S_J2B2    ; break; }
+        case ID_ACI_J2B3            : { NewMainSwitch       = FPlatformInput::S_J2B3    ; break; }
+        case ID_ACI_J2B4            : { NewMainSwitch       = FPlatformInput::S_J2B4    ; break; }
+        case ID_ACI_J2B5            : { NewMainSwitch       = FPlatformInput::S_J2B5    ; break; }
+        case ID_ACI_J2B6            : { NewMainSwitch       = FPlatformInput::S_J2B6    ; break; }
+        case ID_ACI_J2B7            : { NewMainSwitch       = FPlatformInput::S_J2B7    ; break; }
+        case ID_ACI_J2B8            : { NewMainSwitch       = FPlatformInput::S_J2B8    ; break; }
+        case ID_ACI_J2B9            : { NewMainSwitch       = FPlatformInput::S_J2B9    ; break; }
+        case ID_ACI_J2B10           : { NewMainSwitch       = FPlatformInput::S_J2B10   ; break; }
 
-        case ID_ACI_J2HATON         : { NewMainSwitch       = FInput::S_J2HatOn      ; break; }
-        case ID_ACI_J2HATN          : { NewMainSwitch       = FInput::S_J2HatN       ; break; }
-        case ID_ACI_J2HATS          : { NewMainSwitch       = FInput::S_J2HatS       ; break; }
-        case ID_ACI_J2HATW          : { NewMainSwitch       = FInput::S_J2HatW       ; break; }
-        case ID_ACI_J2HATE          : { NewMainSwitch       = FInput::S_J2HatE       ; break; }
-        case ID_ACI_J2HATNW         : { NewMainSwitch       = FInput::S_J2HatNW      ; break; }
-        case ID_ACI_J2HATNE         : { NewMainSwitch       = FInput::S_J2HatNE      ; break; }
-        case ID_ACI_J2HATSW         : { NewMainSwitch       = FInput::S_J2HatSW      ; break; }
-        case ID_ACI_J2HATSE         : { NewMainSwitch       = FInput::S_J2HatSE      ; break; }
+        case ID_ACI_J2HATON         : { NewMainSwitch       = FPlatformInput::S_J2HatOn      ; break; }
+        case ID_ACI_J2HATN          : { NewMainSwitch       = FPlatformInput::S_J2HatN       ; break; }
+        case ID_ACI_J2HATS          : { NewMainSwitch       = FPlatformInput::S_J2HatS       ; break; }
+        case ID_ACI_J2HATW          : { NewMainSwitch       = FPlatformInput::S_J2HatW       ; break; }
+        case ID_ACI_J2HATE          : { NewMainSwitch       = FPlatformInput::S_J2HatE       ; break; }
+        case ID_ACI_J2HATNW         : { NewMainSwitch       = FPlatformInput::S_J2HatNW      ; break; }
+        case ID_ACI_J2HATNE         : { NewMainSwitch       = FPlatformInput::S_J2HatNE      ; break; }
+        case ID_ACI_J2HATSW         : { NewMainSwitch       = FPlatformInput::S_J2HatSW      ; break; }
+        case ID_ACI_J2HATSE         : { NewMainSwitch       = FPlatformInput::S_J2HatSE      ; break; }
 
-        case ID_ACI_J2XP            : { NewMainMovement     = FInput::M_J2XP     ; break; }
-        case ID_ACI_J2XN            : { NewMainMovement     = FInput::M_J2XN     ; break; }
-        case ID_ACI_J2YP            : { NewMainMovement     = FInput::M_J2YP     ; break; }
-        case ID_ACI_J2YN            : { NewMainMovement     = FInput::M_J2YN     ; break; }
-        case ID_ACI_J2ZP            : { NewMainMovement     = FInput::M_J2ZP     ; break; }
-        case ID_ACI_J2ZN            : { NewMainMovement     = FInput::M_J2ZN     ; break; }
-        case ID_ACI_J2RP            : { NewMainMovement     = FInput::M_J2RP     ; break; }
-        case ID_ACI_J2RN            : { NewMainMovement     = FInput::M_J2RN     ; break; }
+        case ID_ACI_J2XP            : { NewMainMovement     = FPlatformInput::M_J2XP     ; break; }
+        case ID_ACI_J2XN            : { NewMainMovement     = FPlatformInput::M_J2XN     ; break; }
+        case ID_ACI_J2YP            : { NewMainMovement     = FPlatformInput::M_J2YP     ; break; }
+        case ID_ACI_J2YN            : { NewMainMovement     = FPlatformInput::M_J2YN     ; break; }
+        case ID_ACI_J2ZP            : { NewMainMovement     = FPlatformInput::M_J2ZP     ; break; }
+        case ID_ACI_J2ZN            : { NewMainMovement     = FPlatformInput::M_J2ZN     ; break; }
+        case ID_ACI_J2RP            : { NewMainMovement     = FPlatformInput::M_J2RP     ; break; }
+        case ID_ACI_J2RN            : { NewMainMovement     = FPlatformInput::M_J2RN     ; break; }
 
-        case ID_ACI_ANALOG          : { Combo.MetaMovement.Kind = FInput::AnalogMovementKind                ; break; }
-        case ID_ACI_DIFFERENTIAL    : { Combo.MetaMovement.Kind = FInput::DifferentialMovementKind          ; break; }
-        case ID_ACI_DIGITAL         : { Combo.MetaMovement.Kind = FInput::DigitalMovementKind               ; break; }
+        case ID_ACI_ANALOG          : { Combo.MetaMovement.Kind = FPlatformInput::AnalogMovementKind                ; break; }
+        case ID_ACI_DIFFERENTIAL    : { Combo.MetaMovement.Kind = FPlatformInput::DifferentialMovementKind          ; break; }
+        case ID_ACI_DIGITAL         : { Combo.MetaMovement.Kind = FPlatformInput::DigitalMovementKind               ; break; }
 
         case ID_ACI_DELETE          : { Deleting = TRUE;                                    ; break; }
         case ID_ACI_DOUBLE          : { Combo.MetaSwitch.IsDouble = !Combo.MetaSwitch.IsDouble; break; }
         case ID_ACI_TOGGLE          : { Combo.MetaSwitch.IsToggle = !Combo.MetaSwitch.IsToggle; break; }
 
-        case ID_ACM1_MBLEFT         : { Modifier1.Switch    = FInput::S_LeftMouse           ; break; }
-        case ID_ACM1_MBMIDDLE       : { Modifier1.Switch    = FInput::S_MiddleMouse         ; break; }
-        case ID_ACM1_MBRIGHT        : { Modifier1.Switch    = FInput::S_RightMouse          ; break; }
+        case ID_ACM1_MBLEFT         : { Modifier1.Switch    = FPlatformInput::S_LeftMouse           ; break; }
+        case ID_ACM1_MBMIDDLE       : { Modifier1.Switch    = FPlatformInput::S_MiddleMouse         ; break; }
+        case ID_ACM1_MBRIGHT        : { Modifier1.Switch    = FPlatformInput::S_RightMouse          ; break; }
 
-        case ID_ACM1_J1B1           : { Modifier1.Switch    = FInput::S_J1B1    ; break; }
-        case ID_ACM1_J1B2           : { Modifier1.Switch    = FInput::S_J1B2    ; break; }
-        case ID_ACM1_J1B3           : { Modifier1.Switch    = FInput::S_J1B3    ; break; }
-        case ID_ACM1_J1B4           : { Modifier1.Switch    = FInput::S_J1B4    ; break; }
-        case ID_ACM1_J1B5           : { Modifier1.Switch    = FInput::S_J1B5    ; break; }
-        case ID_ACM1_J1B6           : { Modifier1.Switch    = FInput::S_J1B6    ; break; }
-        case ID_ACM1_J1B7           : { Modifier1.Switch    = FInput::S_J1B7    ; break; }
-        case ID_ACM1_J1B8           : { Modifier1.Switch    = FInput::S_J1B8    ; break; }
-        case ID_ACM1_J1B9           : { Modifier1.Switch    = FInput::S_J1B9    ; break; }
-        case ID_ACM1_J1B10          : { Modifier1.Switch    = FInput::S_J1B10   ; break; }
-        case ID_ACM1_J1HATON        : { Modifier1.Switch    = FInput::S_J1HatOn      ; break; }
-        case ID_ACM1_J1HATN         : { Modifier1.Switch    = FInput::S_J1HatN       ; break; }
-        case ID_ACM1_J1HATS         : { Modifier1.Switch    = FInput::S_J1HatS       ; break; }
-        case ID_ACM1_J1HATW         : { Modifier1.Switch    = FInput::S_J1HatW       ; break; }
-        case ID_ACM1_J1HATE         : { Modifier1.Switch    = FInput::S_J1HatE       ; break; }
-        case ID_ACM1_J1HATNW        : { Modifier1.Switch    = FInput::S_J1HatNW      ; break; }
-        case ID_ACM1_J1HATNE        : { Modifier1.Switch    = FInput::S_J1HatNE      ; break; }
-        case ID_ACM1_J1HATSW        : { Modifier1.Switch    = FInput::S_J1HatSW      ; break; }
-        case ID_ACM1_J1HATSE        : { Modifier1.Switch    = FInput::S_J1HatSE      ; break; }
+        case ID_ACM1_J1B1           : { Modifier1.Switch    = FPlatformInput::S_J1B1    ; break; }
+        case ID_ACM1_J1B2           : { Modifier1.Switch    = FPlatformInput::S_J1B2    ; break; }
+        case ID_ACM1_J1B3           : { Modifier1.Switch    = FPlatformInput::S_J1B3    ; break; }
+        case ID_ACM1_J1B4           : { Modifier1.Switch    = FPlatformInput::S_J1B4    ; break; }
+        case ID_ACM1_J1B5           : { Modifier1.Switch    = FPlatformInput::S_J1B5    ; break; }
+        case ID_ACM1_J1B6           : { Modifier1.Switch    = FPlatformInput::S_J1B6    ; break; }
+        case ID_ACM1_J1B7           : { Modifier1.Switch    = FPlatformInput::S_J1B7    ; break; }
+        case ID_ACM1_J1B8           : { Modifier1.Switch    = FPlatformInput::S_J1B8    ; break; }
+        case ID_ACM1_J1B9           : { Modifier1.Switch    = FPlatformInput::S_J1B9    ; break; }
+        case ID_ACM1_J1B10          : { Modifier1.Switch    = FPlatformInput::S_J1B10   ; break; }
+        case ID_ACM1_J1HATON        : { Modifier1.Switch    = FPlatformInput::S_J1HatOn      ; break; }
+        case ID_ACM1_J1HATN         : { Modifier1.Switch    = FPlatformInput::S_J1HatN       ; break; }
+        case ID_ACM1_J1HATS         : { Modifier1.Switch    = FPlatformInput::S_J1HatS       ; break; }
+        case ID_ACM1_J1HATW         : { Modifier1.Switch    = FPlatformInput::S_J1HatW       ; break; }
+        case ID_ACM1_J1HATE         : { Modifier1.Switch    = FPlatformInput::S_J1HatE       ; break; }
+        case ID_ACM1_J1HATNW        : { Modifier1.Switch    = FPlatformInput::S_J1HatNW      ; break; }
+        case ID_ACM1_J1HATNE        : { Modifier1.Switch    = FPlatformInput::S_J1HatNE      ; break; }
+        case ID_ACM1_J1HATSW        : { Modifier1.Switch    = FPlatformInput::S_J1HatSW      ; break; }
+        case ID_ACM1_J1HATSE        : { Modifier1.Switch    = FPlatformInput::S_J1HatSE      ; break; }
 
-        case ID_ACM1_J2B1           : { Modifier1.Switch    = FInput::S_J2B1    ; break; }
-        case ID_ACM1_J2B2           : { Modifier1.Switch    = FInput::S_J2B2    ; break; }
-        case ID_ACM1_J2B3           : { Modifier1.Switch    = FInput::S_J2B3    ; break; }
-        case ID_ACM1_J2B4           : { Modifier1.Switch    = FInput::S_J2B4    ; break; }
-        case ID_ACM1_J2B5           : { Modifier1.Switch    = FInput::S_J2B5    ; break; }
-        case ID_ACM1_J2B6           : { Modifier1.Switch    = FInput::S_J2B6    ; break; }
-        case ID_ACM1_J2B7           : { Modifier1.Switch    = FInput::S_J2B7    ; break; }
-        case ID_ACM1_J2B8           : { Modifier1.Switch    = FInput::S_J2B8    ; break; }
-        case ID_ACM1_J2B9           : { Modifier1.Switch    = FInput::S_J2B9    ; break; }
-        case ID_ACM1_J2B10          : { Modifier1.Switch    = FInput::S_J2B10   ; break; }
-        case ID_ACM1_J2HATON        : { Modifier1.Switch    = FInput::S_J2HatOn      ; break; }
-        case ID_ACM1_J2HATN         : { Modifier1.Switch    = FInput::S_J2HatN       ; break; }
-        case ID_ACM1_J2HATS         : { Modifier1.Switch    = FInput::S_J2HatS       ; break; }
-        case ID_ACM1_J2HATW         : { Modifier1.Switch    = FInput::S_J2HatW       ; break; }
-        case ID_ACM1_J2HATE         : { Modifier1.Switch    = FInput::S_J2HatE       ; break; }
-        case ID_ACM1_J2HATNW        : { Modifier1.Switch    = FInput::S_J2HatNW      ; break; }
-        case ID_ACM1_J2HATNE        : { Modifier1.Switch    = FInput::S_J2HatNE      ; break; }
-        case ID_ACM1_J2HATSW        : { Modifier1.Switch    = FInput::S_J2HatSW      ; break; }
-        case ID_ACM1_J2HATSE        : { Modifier1.Switch    = FInput::S_J2HatSE      ; break; }
+        case ID_ACM1_J2B1           : { Modifier1.Switch    = FPlatformInput::S_J2B1    ; break; }
+        case ID_ACM1_J2B2           : { Modifier1.Switch    = FPlatformInput::S_J2B2    ; break; }
+        case ID_ACM1_J2B3           : { Modifier1.Switch    = FPlatformInput::S_J2B3    ; break; }
+        case ID_ACM1_J2B4           : { Modifier1.Switch    = FPlatformInput::S_J2B4    ; break; }
+        case ID_ACM1_J2B5           : { Modifier1.Switch    = FPlatformInput::S_J2B5    ; break; }
+        case ID_ACM1_J2B6           : { Modifier1.Switch    = FPlatformInput::S_J2B6    ; break; }
+        case ID_ACM1_J2B7           : { Modifier1.Switch    = FPlatformInput::S_J2B7    ; break; }
+        case ID_ACM1_J2B8           : { Modifier1.Switch    = FPlatformInput::S_J2B8    ; break; }
+        case ID_ACM1_J2B9           : { Modifier1.Switch    = FPlatformInput::S_J2B9    ; break; }
+        case ID_ACM1_J2B10          : { Modifier1.Switch    = FPlatformInput::S_J2B10   ; break; }
+        case ID_ACM1_J2HATON        : { Modifier1.Switch    = FPlatformInput::S_J2HatOn      ; break; }
+        case ID_ACM1_J2HATN         : { Modifier1.Switch    = FPlatformInput::S_J2HatN       ; break; }
+        case ID_ACM1_J2HATS         : { Modifier1.Switch    = FPlatformInput::S_J2HatS       ; break; }
+        case ID_ACM1_J2HATW         : { Modifier1.Switch    = FPlatformInput::S_J2HatW       ; break; }
+        case ID_ACM1_J2HATE         : { Modifier1.Switch    = FPlatformInput::S_J2HatE       ; break; }
+        case ID_ACM1_J2HATNW        : { Modifier1.Switch    = FPlatformInput::S_J2HatNW      ; break; }
+        case ID_ACM1_J2HATNE        : { Modifier1.Switch    = FPlatformInput::S_J2HatNE      ; break; }
+        case ID_ACM1_J2HATSW        : { Modifier1.Switch    = FPlatformInput::S_J2HatSW      ; break; }
+        case ID_ACM1_J2HATSE        : { Modifier1.Switch    = FPlatformInput::S_J2HatSE      ; break; }
 
         case ID_ACM1_DELETE         : { Modifier1.Empty();                                  ; break; }
         case ID_ACM1_DOUBLE         : { Modifier1.IsDouble  = !Modifier1.IsDouble           ; break; }
@@ -899,7 +924,7 @@ BOOL CDialogInputActions::ProcessMenuPopUpCommand(int CommandId)
                 {
                     // Changed from a switch to a movement or a movement to a different movement.
                     Combo.MetaMovement.Movement = NewMainMovement;
-                    Combo.MetaMovement.Kind     = FInput::DefaultMovementKind(NewMainMovement);
+                    Combo.MetaMovement.Kind     = GApp->Input->DefaultMovementKind(NewMainMovement);
                     Combo.IsASwitch             = FALSE;
                 }
             }
@@ -925,7 +950,7 @@ BOOL CDialogInputActions::ProcessMenuPopUpCommand(int CommandId)
         else if( Adding && NewMainMovement != 0 )
         {
             Combo.MetaMovement.Movement = NewMainMovement;
-            Combo.MetaMovement.Kind     = FInput::DefaultMovementKind(NewMainMovement);
+            Combo.MetaMovement.Kind     = GApp->Input->DefaultMovementKind(NewMainMovement);
             Combo.IsASwitch             = FALSE;
             Combo.Normalize();
             AddNewCombo( Action, Combo );
@@ -1001,9 +1026,9 @@ void CDialogInputActions::OnUseDefault()
     {
         // Get the default value for the action:
         const char * Key = FAction::ActionName(Action);
-        char * Default = GConfiguration.Get
+        char * Default = GConfiguration.GetValue
         (
-            FConfiguration::ActionSection
+            Actions->SectionName()
         ,   Key
         ,   GApp->FactoryProfileFileName()
         );
@@ -1012,12 +1037,12 @@ void CDialogInputActions::OnUseDefault()
         State.WasChanged = TRUE; 
         if( Default != 0 ) // If there is a default...
         {
-            FAction * Actions = new FAction; // Place to hold new value.
-            Actions->Initialize();
-            Actions->SetValue(Key,Default);
-            Actions->GetCombos( Action, State.ComboCount, &State.Combos );
-            Actions->Finalize();
-            delete Actions;
+            FAction * NewActions = new FAction; // Place to hold new value.
+            NewActions->Initialize();
+            NewActions->SetValue(Key,Default);
+            NewActions->GetCombos( Action, State.ComboCount, &State.Combos );
+            NewActions->Exit();
+            delete NewActions;
             FParse::FreeString(Default);
         }
         SavePositions();
@@ -1034,13 +1059,13 @@ void CDialogInputActions::OnUseDefaultForAll()
     // Get the default values:
     FKeyValues::TStringList DefaultValues = FConfiguration::GetSection
     (
-        FConfiguration::ActionSection
+        Actions->SectionName()
     ,   GApp->FactoryProfileFileName()
     );
 
-    FAction * Actions = new FAction; // Place to hold new value.
-    Actions->Initialize();
-    Actions->SetValues(DefaultValues);
+    FAction * NewActions = new FAction; // Place to hold new value.
+    NewActions->Initialize();
+    NewActions->SetValues(DefaultValues);
     DefaultValues.Free();
 
     for( int Action_ = 1; Action_ < FAction::ActionCount; Action_++ )
@@ -1049,106 +1074,15 @@ void CDialogInputActions::OnUseDefaultForAll()
         TActionState & State = ActionStates[Action];
         State.Free(); // Free any existing combos
         State.WasChanged = TRUE; 
-        Actions->GetCombos( Action, State.ComboCount, &State.Combos ); // Copy over new combos.
+        NewActions->GetCombos( Action, State.ComboCount, &State.Combos ); // Copy over new combos.
     }
-    Actions->Finalize();
+    NewActions->Exit();
     delete Actions;
 
     SavePositions();
     ArrangeSelectedActions();
     RestorePositions();
 }
-
-#if 0 //tbd:
-//todo: This is temporary - it gives a little bit of help for the action/input mappings.
-void CDialogInputActions::OnTutorial() 
-{
-    static const char * Tutorial[] = 
-    {
-        "Overview:"             
-    ,   ""
-    ,   "You have various actions, such as jump, move forward, turn left, "
-    ,   "and so on. The actions can be assigned input combos, such as "
-    ,   "Shift+CursorUp to run forward. When an input combo is active, its"
-    ,   "associated action is done. Input combos consist of keyboard keys,"
-    ,   "mouse buttons, joystick buttons, mouse movements, and joystick movements."
-    ,   ""
-    ,   "You define input combos in the Actions property page of Unreal Properties."
-    ,   "An input combo has 3 parts:"
-    ,   "   - a main input (key, mouse button or movement, joystick button or movement)"
-    ,   "   - up to two modifiers (key, mouse button, or joystick button)"
-    ,   "An input combo is active if its modifiers are active (if there are any)"
-    ,   "and if the main input is active."
-    ,   ""
-    ,   "Combo prioritization:"
-    ,   "  Input combos with more active modifiers are used instead of input combos with"
-    ,   "  fewer active modifiers, for the same main input. This means, for example,"
-    ,   "  that the combo Shift+CursorUp will take precedence over the combo CursorUp."
-    ,   "  Shift+CursorUp, however, does not affect Shift+CursorDown since they do not"
-    ,   "  share the same main input."
-    ,   ""
-    ,   "Advanced settings:"
-    ,   ""
-    ,   "A key, mouse button, or joystick button can be Double, Toggle, or both."
-    ,   "If Double, the key or button must be pressed twice quickly to be activated."
-    ,   "If Toggle, the key or button is alternately activated and deactivated"
-    ,   "as it is pressed. Note that you don't have to hold down a Toggle, it remains"
-    ,   "active every other time you press it (like the CapsLock key)."
-    ,   ""
-    ,   "A key or button which is both Double and Toggle is activated and deactivated"
-    ,   "every other time it is double-pressed."
-    ,   ""
-    ,   "The movement kind defines how mouse or joystick movements are to be treated."
-    ,   " (Digital)"
-    ,   "     The movement is either on or off, depending on how far away the"
-    ,   "     movement is from the neutral or center position. For example,"
-    ,   "     moving the joystick forward might turn on the MoveForward action."
-    ,   "     Once you start moving, pushing the joystick further forward doesn't"
-    ,   "     make you move any faster (this is the digital nature of the movement)."
-    ,   " "
-    ,   " (Analog)"
-    ,   "     The position of the movement translates to the size or position of"
-    ,   "     the player action. For example, if moving a joystick forward causes"
-    ,   "     the player to move forward, then moving the joystick forward some"
-    ,   "     more causes the player to move forward faster. "
-    ,   "     "
-    ,   " (FastAnalog)"
-    ,   "     This is the same as (Analog) except that the response of the movement"
-    ,   "     accelerates." 
-    ,   ""
-    ,   " (Change)"
-    ,   "     The *change* in the movement translates to a change in the player's"
-    ,   "     action. For example, moving the mouse forward a little moves the"
-    ,   "     player forward a little. Note that it doesn't matter where the mouse"
-    ,   "     is - it is the change in movement that results in the action."
-    ,   "     Change (and FastChange) movements are typically used for mouse movements."
-    ,   " "
-    ,   " (FastChange)"
-    ,   "     This is the same as (Change) except that the response of the"
-    ,   "     movements is accelerated."
-    ,   ""
-    ,   0 // Ends the text.
-    };
-    CDialog * Dialog = new CDialog(IDD_ACTION_TUTORIAL,this);
-    Dialog->Create(IDD_ACTION_TUTORIAL,0);
-    CListBox * ListBox = (CListBox*)Dialog->GetDlgItem(IDC_ACTION_TUTORIAL);
-    if( ListBox != 0 )
-    {
-        const char * * Strings = Tutorial;
-        while( *Strings != 0 )
-        {
-            ListBox->SetTabStops(70);
-            ListBox->AddString( *Strings );
-            Strings++;
-        }
-        Dialog->ShowWindow(SW_SHOW);
-    }
-    else
-    {
-        delete Dialog;
-    }
-}
-#endif
 
 //----------------------------------------------------------------------------
 //   Check other actions for use of Switch - see if they should be deleted
@@ -1169,14 +1103,14 @@ BOOL CDialogInputActions::CheckMainInputUsers(FInput::TSwitch Switch, FAction::T
             ( 
                 Text
             ,   "%s is also used for action %s."
-            ,   FInput::Description(Switch)
+            ,   GApp->Input->Description(Switch)
             ,   FAction::ActionName(Action)
             );
             Text += sprintf
             ( 
                 Text
             ,   "\nWould you like to remove all uses of %s from action %s?"
-            ,   FInput::Description(Switch)
+            ,   GApp->Input->Description(Switch)
             ,   FAction::ActionName(Action)
             );
             if( IDYES == AfxMessageBox( Question, MB_YESNO | MB_DEFBUTTON2 ) )
@@ -1208,14 +1142,14 @@ BOOL CDialogInputActions::CheckMainInputUsers(FInput::TMovement Movement, FActio
             ( 
                 Text
             ,   "%s is also used for action %s."
-            ,   FInput::Description(Movement)
+            ,   GApp->Input->Description(Movement)
             ,   FAction::ActionName(Action)
             );
             Text += sprintf
             ( 
                 Text
             ,   "\nWould you like to remove all uses of %s from action %s?"
-            ,   FInput::Description(Movement)
+            ,   GApp->Input->Description(Movement)
             ,   FAction::ActionName(Action)
             );
             if( IDYES == AfxMessageBox( Question, MB_YESNO | MB_DEFBUTTON2 ) )
@@ -1235,7 +1169,7 @@ BOOL CDialogInputActions::CheckOppositeOf(FInput::TMovement Movement, FAction::T
 {
     BOOL WasChanged = FALSE;
     const FAction::TAction OppositeAction = FAction::Opposite(Action);
-    const FInput::TMovement OppositeMovement = FInput::OppositeMovement(Movement);
+    const FInput::TMovement OppositeMovement = GApp->Input->OppositeMovement(Movement);
     if( OppositeAction != 0 )
     {
         TActionState & OppositeState = ActionStates[OppositeAction];
@@ -1248,14 +1182,14 @@ BOOL CDialogInputActions::CheckOppositeOf(FInput::TMovement Movement, FAction::T
             ( 
                 Text
             ,   "You have chosen [%s] for action %s.\n"
-            ,   FInput::Description(Movement)
+            ,   GApp->Input->Description(Movement)
             ,   FAction::ActionName(Action)
             );
             Text += sprintf
             ( 
                 Text
             ,   "Would you like to use [%s] for action %s?"
-            ,   FInput::Description(OppositeMovement)
+            ,   GApp->Input->Description(OppositeMovement)
             ,   FAction::ActionName(OppositeAction)
             );
             if( IDYES == AfxMessageBox( Question, MB_YESNO | MB_DEFBUTTON2 ) )
@@ -1264,7 +1198,7 @@ BOOL CDialogInputActions::CheckOppositeOf(FInput::TMovement Movement, FAction::T
                 Combo.Empty();
                 Combo.IsASwitch = FALSE;
                 Combo.MetaMovement.Movement = OppositeMovement;
-                Combo.MetaMovement.Kind     = FInput::DefaultMovementKind(OppositeMovement);
+                Combo.MetaMovement.Kind     = GApp->Input->DefaultMovementKind(OppositeMovement);
                 AddNewCombo( OppositeAction, Combo );
                 CheckMainInputUsers(OppositeMovement, OppositeAction );
                 WasChanged = TRUE;

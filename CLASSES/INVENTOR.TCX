@@ -30,68 +30,80 @@ Begin Class Name=Inventory
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 '
-' This is a built-in Unreal class and it shouldn't be modified
+' This is a built-in Unreal class and it shouldn't be modified.
 '
 ' Parent class of all items that players can hold onto and
 ' use, such as weapons.
 '
-Class Inventory Expands Root Intrinsic
+Class Inventory Expands Actor Intrinsic
 
 EnumDef EInvState = INV_None, INV_Active, INV_Activating, INV_DeActivating, INV_Using1, INV_Using2, INV_UsingCloseUp, INV_Reloading, INV_Playing
 EnumDef EInventorySet = _
-    INV_NoSet         _
-,   INV_WeaponSet1    _
-,   INV_WeaponSet2    _
-,   INV_WeaponSet3    _
-,   INV_WeaponSet4    _
-,   INV_WeaponSet5    _
-,   INV_WeaponSet6    _
-,   INV_WeaponSet7    _
-,   INV_WeaponSet8    _
-,   INV_WeaponSet9    _
-,   INV_WeaponSet10
+    INVS_NoSet         _
+,   INVS_WeaponSet1    _
+,   INVS_WeaponSet2    _
+,   INVS_WeaponSet3    _
+,   INVS_WeaponSet4    _
+,   INVS_WeaponSet5    _
+,   INVS_WeaponSet6    _
+,   INVS_WeaponSet7    _
+,   INVS_WeaponSet8    _
+,   INVS_WeaponSet9    _
+,   INVS_WeaponSet10
 Dim InvState as EInvState
 Dim NextActive as Actor
 
-Dim bInPickupState as Boolean ' Weapon is a pickup, not in inventory
-Dim bActiveInSet     As Boolean ' Inventory item is the active one for a particular set.
-Dim bNeedsReloading  As Boolean ' True when the inventory item (weapon) needs to be reloaded
+Dim bInPickupState      As Boolean ' Weapon is a pickup, not in inventory.
+Dim bActiveInSet        As Boolean ' Inventory item is the active one for a particular set.
+Dim bNeedsReloading     As Boolean ' True when the inventory item (weapon) needs to be reloaded.
 
 '
-' Information valid while in pickup state:
+' Information valid while in pickup state.
 '
-Dim PickupSound as Editable Sound
-Dim RespawnSound as Editable Sound
-Dim bRespawnNetOnly as Editable Boolean
-Dim RespawnTime as Editable Integer     ' Respawn after this time, or 0 for no respawn.
-Dim PickupMessage as Editable String(64)
-Dim bTakesDamage        As Editable Boolean ' True if the pickup takes damage
-Dim EffectWhenDestroyed As Editable Class ' If non-0, the pyrotechnic or explosion when pick-up is shot. Only when bTakesDamage==True.
+Dim PickupSound         As Editable Sound      ' Sound to play when picked up.
+Dim RespawnSound        As Editable Sound      ' Sound to play when respawns.
+Dim bRespawnNetOnly     As Editable Boolean    ' Respawn in network play only.
+Dim RespawnTime         As Editable Integer    ' Respawn after this time, or 0 for no respawn.
+Dim PickupMessage       As Editable String(64) ' Human readable description when picked up.
+Dim bTakesDamage        As Editable Boolean    ' True if the pickup takes damage.
+
+' If nonzero, the pyrotechnic or explosion when pick-up is shot. 
+' Only used when bTakesDamage==True.
+Dim EffectWhenDestroyed As Editable Class
 
 '
-' Information valid while in inventory:
+' Information valid while in inventory.
 '
-Dim OwningSet as Editable EInventorySet
-Dim AutoSwitchPriority as Editable Byte
-Dim DrawForward as Editable Real
-Dim DrawDown as Editable Real
-Dim DrawPitch   As Editable Integer ' Additional pitch for drawing purposes (should not affect projectile direction)
-Dim DrawRoll    As Integer ' Additional roll for drawing purposes (should not affect projectile direction)
-Dim DrawYaw     As Integer ' Additional yaw for drawing purposes (should not affect projectile direction)
-Dim PlayerViewMesh as Editable MeshMap
-Dim PlayerViewScale as Editable Real 
-Dim PickupMesh as Editable MeshMap
-Dim PickupScale as Editable Real 
+Dim OwningSet           As Editable EInventorySet
+Dim AutoSwitchPriority  As Editable Byte
+Dim DrawForward         As Editable(Display) Real
+Dim DrawDown            As Editable(Display) Real
+Dim DrawPitch           As Editable Integer ' Additional pitch for drawing purposes (should not affect projectile direction)
+Dim DrawRoll            As Integer ' Additional roll for drawing purposes (should not affect projectile direction)
+Dim DrawYaw             As Integer ' Additional yaw for drawing purposes (should not affect projectile direction)
 
 '
-' Information about icons to be shown in status bar
+' Meshes used in each state.
+'
+
+' Used when pickup.
+Dim PickupMesh          As Editable(Display) MeshMap
+Dim PickupScale         As Editable(Display) Real 
+
+' Used when in inventory.
+Dim PlayerViewMesh      As Editable(Display) MeshMap
+Dim PlayerViewScale     As Editable(Display) Real 
+
+'
+' Information about icons to be shown in status bar.
 '
 Dim AmmoStatusIcon      As Editable Texture ' Icon used with ammo/charge/power count.
 
+'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 Dim YawSpeed as Editable Integer
 Dim PitchSpeed as Editable Integer  ' Unused? (delete)
 Dim RollSpeed as Editable Integer
-
+'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
@@ -103,6 +115,7 @@ Dim RollSpeed as Editable Integer
       bCollideActors=True
       bTemplateClass=False
       NextActive=None
+      bIsItemGoal=True
       bInPickupState=True
       PickupMessage="Snagged an item"
       InventoryStatusIcon=None
@@ -118,16 +131,20 @@ End Class
 Begin Class Name=Weapon
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+'
+' Parent class of all weapons.
+'
 Class Weapon Expands Inventory Intrinsic
 
+' Enumeration describing the weapon.
 EnumDef EWeaponType = WEAP_Projectile, WEAP_InstantHit, WEAP_Custom
 
-' Weapon aiming and rendering:
-Dim bAutoVTarget as Editable Boolean     ' Auto-seek targets vertically?
-Dim bAutoHTarget as Editable Boolean     ' Auto-seek targets horizontally?
-Dim bWasReleased As          Boolean     ' Was the weapon firing control "released"?
-Dim MaxTargetRange as Editable Real      ' Maximum distance to target
-Dim SeekDamping as Editable Real         ' Determines auto-seek speed
+' Weapon aiming and rendering.
+Dim bAutoVTarget as Editable Boolean     ' Auto-seek targets vertically.
+Dim bAutoHTarget as Editable Boolean     ' Auto-seek targets horizontally.
+Dim bWasReleased As          Boolean     ' Was the weapon firing control "released".
+Dim MaxTargetRange as Editable Real      ' Maximum distance to target.
+Dim SeekDamping as Editable Real         ' Determines auto-seek speed.
 
 ' Weapon ammo/firing information:
 ' Notes:
@@ -174,6 +191,7 @@ Dim Dispersion(2)        As Editable Real         ' Dispersion amount, 0=none, 1
       MaxTargetRange=+04096.000000
       SeekDamping=+00000.960000
       AmmoType=11
+      bNoSmooth=True
       bNeedsReloading=False
       ReusePeriod(0)=0
       ReusePeriod(1)=0
@@ -428,13 +446,14 @@ Dim Unused as Byte
    End Text
    Begin DefaultProperties
       Class=Pickup
+      bIsItemGoal=True
    End DefaultProperties
 End Class
 
 Begin Class Name=Ammo
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class Ammo Expands Pickup Intrinsic
+Class Ammo Expands Pickup
 Dim AmmoCount(10) As Editable Integer ' Indexed by EAmmoType
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
@@ -448,7 +467,7 @@ End Class
 Begin Class Name=Clip
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class Clip Expands Ammo Intrinsic
+Class Clip Expands Ammo
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -467,7 +486,7 @@ End Class
 Begin Class Name=Shells
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class Shells Expands Ammo Intrinsic
+Class Shells Expands Ammo
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -486,7 +505,7 @@ End Class
 Begin Class Name=StingerAmmo
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class StingerAmmo Expands Ammo Intrinsic
+Class StingerAmmo Expands Ammo
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -528,7 +547,7 @@ End Class
 Begin Class Name=Armor
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class Armor Expands PowerUp Intrinsic
+Class Armor Expands PowerUp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -548,7 +567,7 @@ End Class
 Begin Class Name=Health
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class Health Expands PowerUp Intrinsic
+Class Health Expands PowerUp
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties

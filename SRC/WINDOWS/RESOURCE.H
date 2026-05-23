@@ -30,6 +30,7 @@
 #define CG_IDS_MISMATCH_MSG             111
 #define IDC_TEXSET                      111
 #define IDC_TEXGRAB                     112
+#define IDC_ENABLE_FILTER               112
 #define IDC_TEXPAN                      113
 #define IDC_TEXSCALE                    114
 #define IDC_TEXROT                      115
@@ -459,6 +460,6 @@
 #define _APS_NEXT_RESOURCE_VALUE        157
 #define _APS_NEXT_COMMAND_VALUE         32850
 #define _APS_NEXT_CONTROL_VALUE         1021
-#define _APS_NEXT_SYMED_VALUE           112
+#define _APS_NEXT_SYMED_VALUE           113
 #endif
 #endif

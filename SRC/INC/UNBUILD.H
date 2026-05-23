@@ -26,8 +26,6 @@ COMPILING_RENDER	If compiling UnRender.dll
 COMPILING_WINDOWS	If compiling UnServer.exe
 COMPILING_NETWORK	If compiling UnNet.dll
 COMPILING_EDITOR	If compiling UnEditor.dll
-
-ASM                 To use inline assembly and MASM
 -----------------------------------------------------------------------------*/
 
 /*-----------------------------------------------------------------------------
@@ -35,16 +33,41 @@ ASM                 To use inline assembly and MASM
 -----------------------------------------------------------------------------*/
 
 //
-// Runtime checks
+// Runtime checks.
 //
-#define STATS				/* Support rendering statistics */
-#undef  STATS_TIMED			/* Perform CPU-intense timing of critical loops */
-#undef  REQUIRE_MMX			/* Require MMX hardware to run */
-#undef  REQUIRE_3D			/* Require 3D hardware to run */
-#define EDITOR				/* Include Unreal editor code */
-#undef  PARANOID			/* Perform slow, expensive validity checks */
-#undef  NO_GUARD			/* Don't trap errors */
-#define	IEEE				/* Use optimizations that take advantage of IEEE floating point format */
+#ifndef PARANOID
+	#define	PARANOID		0	/* Perform slow, expensive validity checks */
+#endif
+
+#ifndef STATS
+	#define STATS			1	/* Support rendering statistics */
+#endif
+
+#ifndef NO_CLOCK
+	#define NO_CLOCK		0	/* Don't perform simple timing of critical loops */
+#endif
+
+#ifndef NO_SLOW_CLOCK
+	#define NO_SLOW_CLOCK	1	/* Don't perform CPU-intense timing of critical loops */
+#endif
+
+#ifndef NO_GUARD
+	#define NO_GUARD		0	/* Don't trap errors */
+#endif
+
+#ifndef NO_SLOW_GUARD
+	#define NO_SLOW_GUARD	0	/* Don't trap errors where that would slow down the code significantly */
+#endif
+
+//
+// Modules to compile.
+//
+#define EDITOR				1	/* Include Unreal editor code */
+
+//
+// Code to generate.
+//
+#define ASM					1	/* Use Intel assembler code */
 
 /*-----------------------------------------------------------------------------
 	Defines for all platforms
@@ -57,33 +80,33 @@ ASM                 To use inline assembly and MASM
 #define ENGINE_NAME		"Unreal Engine"
 #define CAMERA_NAME		"Unreal Camera"
 
-#define GAME_VERSION	"0.82"
-#define ENGINE_VERSION  "0.82"
+#define GAME_VERSION	"0.84"
+#define ENGINE_VERSION  "0.84"
 
 #define CONSOLE_SPAWN_1	"UnrealServer " ENGINE_VERSION
 #define CONSOLE_SPAWN_2	"Copyright 1996 Epic MegaGames, Inc."
 
 //
-// File version number.  Prevents outdated resource files from being loaded.
+// Gatekeeper information.
 //
-#define RES_FILE_VERSION (0x0009)
-#define RES_FILE_TAG     "Unreal Resource\x1A"
+#define GK_VER		    "10"
+#define GK_APP          "Unreal"
+#define GK_APP_VER		"84"
 
 //
-// Optional splash message
+// Resource file version number.  
+// Prevents outdated resource files from being loaded.
 //
-#undef  SPLASH_CONFIDENTIAL /* Whether to include "Confidential" splash scree */
-#define SPLASH_1				" Confidential version - Trade secret"
-#define SPLASH_2				" Copyright 1996 Epic MegaGames, Inc."
-#define SPLASH_3				" www.epicgames.com"
+#define RES_FILE_VERSION (0x000A)
+#define RES_FILE_TAG     "Unreal Resource\x1A"
 
 //
 // Hardcoded filenames, paths, and extensions:
 //
 #define DEFAULT_STARTUP_FNAME	"..\\Maps\\Unreal.unr"
-#define DEFAULT_CLASS_FNAME		"..\\Classes\\Root.ucx"
+#define DEFAULT_CLASS_FNAME		"..\\Classes\\Unreal.ucx"
 #define DEFAULT_PALETTE_FNAME	"..\\Graphics\\Palette.pcx"
-#define WEB_LINK_FNAME			"..\\Help\\Unreal.htm"
+#define WEB_LINK_FNAME			"http://www.epicgames.com/"
 #define HELP_LINK_FNAME			"..\\Help\\Unreal.hlp"
 #define EDITOR_FNAME			"..\\UnrealEd.exe"
 #define PROFILE_RELATIVE_FNAME	"\\Unreal.ini"

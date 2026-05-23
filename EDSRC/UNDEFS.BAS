@@ -18,8 +18,8 @@ Option Explicit
 Global Const MAXSWORD = 32767 ' Max signed word
 Global Const MAXVERTICES = 12 ' Max vertices per polygon
 Global Const MAXBRUSHPOLYS = 250 ' Max polys per brush
-Const GWW_HWNDPARENT As Integer = -8 ' For SetWindowWord
-
+Global Const GWW_HWNDPARENT As Integer = -8 ' For SetWindowWord
+Global Const Pi As Double = 3.14159265358979
 '
 ' Types:
 '
@@ -69,7 +69,7 @@ Global Const PF_GHOST = &H4000&
 Global Const PF_FARCEILING = &H20000
 Global Const PF_BLUR = &H40000
 Global Const PF_HIGH_LEDGE = &H80000
-Global Const PF_GLOW = &H200000
+Global Const PF_GOURAUD = &H200000
 Global Const PF_ZONE_PORTAL = &H4000000
 Global Const PF_DIRTY = &H8000000
 Global Const PF_SPECIALLIT = &H100000
@@ -118,6 +118,14 @@ Global Const REN_MESHBROWSER = 19 ' Viewing a mesh browser (no actor)
 Global Const TOP_NORMAL = 0
 Global Const TOP_BROWSER = 1
 Global Const TOP_PANEL = 2
+
+'
+' Values for GActorPropsAction
+'
+Global Const AP_None = 0        ' Window not open
+Global Const AP_Selected = 1    ' Selected actors
+Global Const AP_Class = 2       ' Class default actor
+Global Const AP_Level = 3       ' Level properties
 
 '
 ' Ed callback codes:
@@ -227,6 +235,8 @@ Public Const EM_SETTABSTOPS = &HCB
 Public Const EM_UNDO = &HC7
 
 ' Registry constants
+Public NoReadRegistry As Boolean
+
 Public Const HKEY_CLASSES_ROOT = &H80000000
 Public Const HKEY_CURRENT_USER = &H80000001
 Public Const HKEY_LOCAL_MACHINE = &H80000002
@@ -783,21 +793,25 @@ Function GetUserInfo(Name As String, Default As String) As String
     Dim hKey As Long
     Dim LengthVar As Long
     '
-    hKey = RegUserHeadingKey
-    If hKey = 0 Then hKey = RegUserUnrealAppKey
-    '
-    LengthVar = 1024
-    GetUserInfo = Space(1024)
-    Call RegQueryValueEx(hKey, Name, 0, REG_SZ, ByVal GetUserInfo, LengthVar)
-    '
-    GetUserInfo = Trim(GetUserInfo)
-    If (GetUserInfo = "") Then
+    If NoReadRegistry Then
         GetUserInfo = Default
     Else
-        GetUserInfo = Left(GetUserInfo, LengthVar)
-        If Len(GetUserInfo) > 0 Then
-            If Asc(Right(GetUserInfo, 1)) = 0 Then
-                GetUserInfo = Left(GetUserInfo, Len(GetUserInfo) - 1)
+        hKey = RegUserHeadingKey
+        If hKey = 0 Then hKey = RegUserUnrealAppKey
+        '
+        LengthVar = 1024
+        GetUserInfo = Space(1024)
+        Call RegQueryValueEx(hKey, Name, 0, REG_SZ, ByVal GetUserInfo, LengthVar)
+        '
+        GetUserInfo = Trim(GetUserInfo)
+        If (GetUserInfo = "") Then
+            GetUserInfo = Default
+        Else
+            GetUserInfo = Left(GetUserInfo, LengthVar)
+            If Len(GetUserInfo) > 0 Then
+                If Asc(Right(GetUserInfo, 1)) = 0 Then
+                    GetUserInfo = Left(GetUserInfo, Len(GetUserInfo) - 1)
+                End If
             End If
         End If
     End If
@@ -840,25 +854,28 @@ Function GetMachineInfo(Name As String, Default As String) As String
     Dim hKey As Long
     Dim LengthVar As Long
     '
-    hKey = RegMachineHeadingKey
-    If hKey = 0 Then hKey = RegMachineUnrealAppKey
-    '
-    LengthVar = 1024
-    GetMachineInfo = Space(1024)
-    Call RegQueryValueEx(hKey, Name, 0, REG_SZ, ByVal GetMachineInfo, LengthVar)
-    '
-    GetMachineInfo = Trim(GetMachineInfo)
-    If (GetMachineInfo = "") Then
+    If NoReadRegistry Then
         GetMachineInfo = Default
     Else
-        GetMachineInfo = Left(GetMachineInfo, LengthVar)
-        If Len(GetMachineInfo) > 0 Then
-            If Asc(Right(GetMachineInfo, 1)) = 0 Then
-                GetMachineInfo = Left(GetMachineInfo, Len(GetMachineInfo) - 1)
+        hKey = RegMachineHeadingKey
+        If hKey = 0 Then hKey = RegMachineUnrealAppKey
+        '
+        LengthVar = 1024
+        GetMachineInfo = Space(1024)
+        Call RegQueryValueEx(hKey, Name, 0, REG_SZ, ByVal GetMachineInfo, LengthVar)
+        '
+        GetMachineInfo = Trim(GetMachineInfo)
+        If (GetMachineInfo = "") Then
+            GetMachineInfo = Default
+        Else
+            GetMachineInfo = Left(GetMachineInfo, LengthVar)
+            If Len(GetMachineInfo) > 0 Then
+                If Asc(Right(GetMachineInfo, 1)) = 0 Then
+                    GetMachineInfo = Left(GetMachineInfo, Len(GetMachineInfo) - 1)
+                End If
             End If
         End If
     End If
-    '
 End Function
 
 Function OnOff(ByVal Value As Integer) As String
@@ -952,7 +969,7 @@ Function SubEval(Str As String, Result As Double, Prec As Integer) As Boolean
     SubEval = False
     '
     c = GrabChar(Str)
-    If c >= "0" And c <= "9" Then ' Number
+    If (c >= "0" And c <= "9") Or c = "." Then ' Number
         V = 0#
         While c >= "0" And c <= "9"
             V = V * 10 + Val(c)
@@ -1225,3 +1242,10 @@ Function GrabLine(S As String) As String
     End If
 End Function
 
+'
+' Select all stuff in a textbox.
+'
+Sub SelectAll(Ctl As Object)
+    Ctl.SelStart = 0
+    Ctl.SelLength = Len(Ctl.Text)
+End Sub

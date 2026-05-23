@@ -31,7 +31,7 @@
 #define arrayCount_(Array) ( sizeof(Array) / sizeof((Array)[0]) )
 
 #if DebuggingAI || DebuggingMotion || DebuggingActions || DebuggingExploration
-    static void __cdecl Debug(const char * Message, ...)
+    static void CDECL Debug(const char * Message, ...)
     {
         static int Count = 0;
         if( Count <= 300 ) // To reduce total messages.
@@ -53,14 +53,13 @@
         Debug(Message);
     }
 #else
-    static inline void __cdecl Debug(const char * Message, ...)
+    static inline void CDECL Debug(const char * Message, ...)
     {
     }
     #define DebugVector(Text,Vector)
 #endif
 
 static const FLOAT StopThresholdSpeed = 0.04; // Speeds below this are set to 0.
-static const FLOAT MotionDamping = 0.9;
 
 //tbm: Convert degrees to WORD angle measurements.
 static inline int Degrees(int Degrees)
@@ -202,12 +201,11 @@ static inline void Pitch(FVector & This, WORD Angle) //tbi:word
 // Special cases:
 //   1. For an actor unaffected by gravity, no search is made
 //      for the floor beneath.
-static FLOAT ZChange( FActor & Actor, const FVector & _NewLocation )
+static FLOAT ZChange( FActor & Actor, const FVector &NewLocation )
 {
     IModel & Model = GLevel->ModelInfo;
     FLOAT dZ; // Change in Z location.
-    FVector NewLocation = _NewLocation; //tbi!! constness problem
-    if( Model.PointClass(&NewLocation,NULL) == 0 )
+    if( Model.PointClass(NewLocation,NULL,0) == 0 )
     {
         // The NewLocation is inside something.
         dZ = +100000.0; // A large value is used in this case.
@@ -223,7 +221,7 @@ static FLOAT ZChange( FActor & Actor, const FVector & _NewLocation )
         // Search for the floor below the NewLocation.
         FVector Floor;
         INDEX iActorHit;
-        const BOOL FloorFound = Model.ZCollision(&NewLocation,&Floor,&iActorHit) != INDEX_NONE;
+        const BOOL FloorFound = Model.ZCollision(NewLocation,Floor,iActorHit,0) != INDEX_NONE;
         dZ = 
             FloorFound
         ?   Floor.Z - (Actor.Location.Z - Actor.CollisionHeight)
@@ -242,16 +240,14 @@ static void DirectActorTowards( FActor & Actor, const FVector & TargetLocation, 
     FVector Direction = TargetLocation - Actor.Location; // Vector from actor to target.
     //tbd? Direction.Z = 0; //tbi: assumes 2-D
     FLOAT Distance = Direction.Size();
-    if( Distance < NoCloserThan || Pawn.NormalSpeed == 0 )
+    if( Distance < NoCloserThan || Pawn.GroundSpeed == 0 )
     {
         //tbd?Pawn.Velocity = GMath.ZeroVector;
     }
     else
     {
-        const FLOAT Acceleration = Pawn.NormalSpeed * ( 1.0 - MotionDamping); //tbe
-        FVector Change = Direction;
-        Change.Normalize();
-        Change *= Acceleration;
+        const FLOAT Acceleration = Pawn.GroundSpeed * ( 1.0 - Pawn.GroundDamping); //tbe
+        FVector Change = Direction.Normal() * Acceleration;
 
         Pawn.Velocity += Change;
         // We don't want to step over an edge, so look ahead to see what is ahead of us:
@@ -652,11 +648,12 @@ static TExploreInfo Explore
         FVector OutOfWallAdjustment;
         Stopped = !Model.SphereTestMove
         (
-            &ExploreHere
-        ,   &ExploreDirection
-        ,   &OutOfWallAdjustment
+            ExploreHere
+        ,   ExploreDirection
+        ,   OutOfWallAdjustment
         ,   Actor.CollisionRadius
         ,   0
+		,	0
         );
         if( Stopped && DebuggingExploration )
         {
@@ -668,7 +665,7 @@ static TExploreInfo Explore
         {
             FVector Floor;
             INDEX iActorHit;
-            const BOOL FloorFound = Model.ZCollision(&NewLocation,&Floor,&iActorHit) != INDEX_NONE;
+            const BOOL FloorFound = Model.ZCollision(NewLocation,Floor,iActorHit,0) != INDEX_NONE;
             const FLOAT dZ = 
                 FloorFound
             ?   Floor.Z - (ExploreHere.Z - Actor.CollisionHeight)
@@ -717,7 +714,7 @@ static TExploreInfo Explore
             Info.Frontier = ExploreHere;
             if( TargetPoint != 0 )
             {
-                Info.TargetViewedAtFrontier = Model.LineClass( (FVector*)&NewLocation, (FVector*)TargetPoint ) == 1; // Unobstructed line? //tbi: cast
+                Info.TargetViewedAtFrontier = Model.LineClass( NewLocation, *TargetPoint, 0 ) == 1; // Unobstructed line? //tbi: cast
                 if( Info.TargetViewedAtFrontier )
                 {
                     Info.TargetViewCount++;
@@ -814,7 +811,7 @@ static void continueActorTask( INDEX iActor )
         }
         default:
         {
-            checkLogic( 0 ); // False seems to not be defined in debug version -Tim
+            checkLogic( FALSE );
         }
     }
 }
@@ -837,7 +834,7 @@ static void actorAI( INDEX iActor )
         static DWORD TotalCycleCount = 0; // Total cycles spent handling message
         static int   ExecutionCount  = 0; // Number of times this code was executed
         static DWORD MaxCycleCount   = 0; // Max cycles spent any one time
-        const DWORD StartTime = TimeCpuCycles();
+        const DWORD StartTime = CPUTIME();
     #endif
     FActor      &   Actor   = FActor::Actor(iActor);
     AActorAI    &   AI      = Actor.AI()       ;
@@ -861,7 +858,7 @@ static void actorAI( INDEX iActor )
 	                for( int Which = 0; iTarget == INDEX_NONE && Which < Actors.DynamicActors->Count(); Which++)
                     {
                         AActor * const CheckActor = (*Actors.DynamicActors)[Which];
-                        if( CheckActor != 0 && CheckActor->Class->IsKindOf(GClasses.Player) )
+                        if( CheckActor != 0 && CheckActor->Class->IsKindOf("Human") )
                         {
                             FActor & TargetActor = FActor::Actor( *CheckActor );
                             if( Actor.CanSense( TargetActor.Pawn() ) )
@@ -1008,7 +1005,7 @@ static void actorAI( INDEX iActor )
     }
     #if AllowPerformanceMeasurements
     {
-        const DWORD EndTime = TimeCpuCycles();
+        const DWORD EndTime = CPUTIME();
         const DWORD CycleCount = EndTime-StartTime;
         TotalCycleCount += CycleCount;
         ExecutionCount++;
@@ -1036,7 +1033,7 @@ void actorTick (INDEX iActor)
     IModel  &   Model       = GLevel->ModelInfo;
     FActor  &   Actor       = FActor::Actor(iActor);
     APawn   &   Pawn        = Actor.Pawn();
-    Pawn.Velocity *= MotionDamping;
+    Pawn.Velocity *= Pawn.GroundDamping;
     if( Pawn.Velocity.Size2D() < StopThresholdSpeed*StopThresholdSpeed )
     {
         Pawn.Velocity = GMath.ZeroVector;
@@ -1049,8 +1046,8 @@ void actorTick (INDEX iActor)
     FBspNode            *FloorNode;
     FBspSurf            *FloorPoly;
     FVector                Floor,*FloorNormal,MoveVector,Gravity;
-    Pawn.DrawRot.Yaw += Pawn.YawSpeed; // Update yaw.
-    if (Model.PointClass (&Pawn.Location,NULL) == 0)
+    Pawn.DrawRot.Yaw += Pawn.RotSpeed.Yaw; // Update yaw.
+    if (Model.PointClass (Pawn.Location,NULL,0) == 0)
     {
         // Trapped in wall
         Pawn.Location.MoveBounded(Pawn.Velocity);
@@ -1058,8 +1055,8 @@ void actorTick (INDEX iActor)
     else
     {
         INDEX iActorHit;
-        iCollisionNode = Model.ZCollision(&Pawn.Location,&Floor,&iActorHit);
-        if (iCollisionNode != MAXWORD) // Don't fall if standing on air
+        iCollisionNode = Model.ZCollision(Pawn.Location,Floor,iActorHit,0);
+        if (iCollisionNode != INDEX_NONE) // Don't fall if standing on air
         {
             FloorNode   = &Model.BspNodes [iCollisionNode];
             FloorPoly   = &Model.BspSurfs [FloorNode->iSurf];
@@ -1090,13 +1087,14 @@ void actorTick (INDEX iActor)
             MoveVector = Pawn.Velocity ;
             //tbd? ModelInfo->SphereMove(&Pawn.Location, &MoveVector,COLLISION_SPHERE_RADIUS,1);
 //tbd?            if( MoveVector.Size() > 0.1 )
+            if( !GCheat->GluedMonsters )
             {
                 GLevel->MoveActor(iActor,&MoveVector);
             }
         }
 
-        WORD iCollisionNode = Actor.bGravity ? Model.ZCollision(&Pawn.Location,&Floor,&iActorHit) : MAXWORD;
-        if( iCollisionNode != MAXWORD )
+        WORD iCollisionNode = Actor.bGravity ? Model.ZCollision(Pawn.Location,Floor,iActorHit,0) : INDEX_NONE;
+        if( iCollisionNode != INDEX_NONE )
         {
             const FLOAT DistanceAboveFloor = Pawn.Location.Z - Actor.CollisionHeight - Floor.Z;
             if( Pawn.bIsOnSurface && DistanceAboveFloor > Pawn.MaxStepDownHeight )
@@ -1105,17 +1103,15 @@ void actorTick (INDEX iActor)
                 // by moving him back to his original location and reversing his velocity,
                 // to some limited degree (since the pawn might be *forced* off the edge).
                 Pawn.Location = PreviousLocation;
-                FVector VelocityReversal = Pawn.Velocity;
-                VelocityReversal.Normalize();
-                VelocityReversal *= -3.0 * Pawn.NormalSpeed;
+                FVector VelocityReversal = Pawn.Velocity.Normal() * -3.0 * Pawn.GroundSpeed;
                 Pawn.Velocity += VelocityReversal;
                 MoveVector = Pawn.Velocity;
                 GLevel->MoveActor(iActor,&MoveVector);
-                iCollisionNode = Model.ZCollision(&Pawn.Location,&Floor,&iActorHit);
+                iCollisionNode = Model.ZCollision(Pawn.Location,Floor,iActorHit,0);
             }
         }
 
-        if ( iCollisionNode != MAXWORD )
+        if ( iCollisionNode != INDEX_NONE )
         {
             const FLOAT dZ = Pawn.Location.Z - Actor.CollisionHeight - Floor.Z;
             const BOOL WasOnSurface = Pawn.bIsOnSurface;
@@ -1124,7 +1120,7 @@ void actorTick (INDEX iActor)
             {
                 FVector Adjustment = GMath.ZeroVector;
                 Adjustment.Z = -dZ;
-                Model.SphereMove (&Pawn.Location,&Adjustment,Actor.CollisionRadius,1);
+                Model.SphereMove (Pawn.Location,Adjustment,Actor.CollisionRadius,1,0);
             }
             if( !WasOnSurface && Pawn.bIsOnSurface )
             {
@@ -1368,7 +1364,7 @@ static FVector ChooseLocation
         static DWORD TotalCycleCount = 0; // Total cycles spent handling message
         static int   ExecutionCount  = 0; // Number of times this code was executed
         static DWORD MaxCycleCount   = 0; // Max cycles spent any one time
-        const DWORD StartTime = TimeCpuCycles();
+        const DWORD StartTime = CPUTIME();
     #endif
     IModel & Model = GLevel->ModelInfo;
     FVector Choice;
@@ -1392,7 +1388,7 @@ static FVector ChooseLocation
     }
     #if AllowPerformanceMeasurements
     {
-        const DWORD EndTime = TimeCpuCycles();
+        const DWORD EndTime = CPUTIME();
         const DWORD CycleCount = EndTime-StartTime;
         TotalCycleCount += CycleCount;
         ExecutionCount++;
@@ -1432,10 +1428,8 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
         //--------------------------------------------------------------------
         //                    Initialization
         //--------------------------------------------------------------------
-        case ACTOR_Spawn:
         case ACTOR_BeginPlay:
         {
-            ARoot::Process(Level,Message,Params); //tbc!
             // Here is where all the generalized pawn initialization belongs:
             Pawn.bStatusChanged = TRUE;
             Pawn.bIsQuiescent = TRUE;
@@ -1444,25 +1438,24 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
             Pawn.bTargetWasLost = FALSE;
             Pawn.AITask         = EAI_TaskNone;
             Pawn.AIPreviousTask = EAI_TaskNone;
-            Pawn.AIMove = EAI_MoveNone;
-            Pawn.AIPreviousMove = EAI_MoveNone;
+            Pawn.AIMove = EAIM_MoveNone;
+            Pawn.AIPreviousMove = EAIM_MoveNone;
             Pawn.Stamina = 1.0;
             Pawn.LastNonFallZ = Pawn.Location.Z;
             Pawn.iRecentWeapons[0] = INDEX_NONE;
             Pawn.iRecentWeapons[1] = INDEX_NONE;
-            Pawn.TargetPitch = Pawn.DrawRot.Pitch;
-            Pawn.TargetYaw = Pawn.DrawRot.Yaw;
-            Pawn.TargetRoll = Pawn.DrawRot.Roll;
+            Pawn.TargetRot = Pawn.DrawRot;
             Pawn.iPendingTeleporter = INDEX_NONE;
+            Pawn.iInstigator = iMe;
             if( Actor.IsPlayer() )
             {
                 bCannotTurn = FALSE;
                 bCannotMove = FALSE;
             }
-            checkVital( sizeof(AI) <= sizeof(Actor.AIInfo), "AIInfo is too big!" );
+            checkVital( sizeof(AI) <= sizeof(Actor.Private.AIInfo), "AIInfo is too big!" );
             Actor.CancelAnimations();
             Actor.Send_Animate( PAnimate::StillAnimation );
-            return ProcessDone;
+            return ProcessParent;
             break;
         }
         //--------------------------------------------------------------------
@@ -1475,7 +1468,7 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
                 static DWORD TotalCycleCount = 0; // Total cycles spent handling message
                 static int   ExecutionCount  = 0; // Number of times this code was executed
                 static DWORD MaxCycleCount   = 0; // Max cycles spent any one time
-                const DWORD StartTime = TimeCpuCycles();
+                const DWORD StartTime = CPUTIME();
             #endif
             if
             ( 
@@ -1486,7 +1479,7 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
             {
                 return ProcessDone;
             }
-            if( GCheat->IsWizard && !Actor.IsPlayer() && Pawn.LifeState==LS_Alive && GInput.Switches[FInput::S_Home].IsOn && (GServer.Ticks&0x3)==0 )
+            if( GCheat->IsWizard && !Actor.IsPlayer() && Pawn.LifeState==LS_Alive && GApp->Input->Switches[FPlatformInput::S_Home].IsOn && (GServer.Ticks&0x3)==0 )
             {
                 Actor.DumpAI();
             }
@@ -1533,9 +1526,9 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
                     int Hue = 1 + int(Default.LightHue) + Pawn.ExplosiveCharge * 2;
                     int Brightness = 1+int(Default.LightBrightness) + Pawn.ExplosiveCharge * 1;
                     int Radius = 1 + int(Default.LightRadius) + Pawn.ExplosiveCharge * 10;
-                    Pawn.LightHue = OurMin( 255, Hue );
-                    Pawn.LightBrightness = OurMin( 255, Brightness );
-                    Pawn.LightRadius = OurMin( 255, Radius );
+                    Pawn.LightHue = Min( 255, Hue );
+                    Pawn.LightBrightness = Min( 255, Brightness );
+                    Pawn.LightRadius = Min( 255, Radius );
                     if( Pawn.ExplosiveCharge > 0 )
                     {
                         Pawn.LightType = LT_Pulse;
@@ -1651,7 +1644,7 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
 
             #if AllowPerformanceMeasurements
             {
-                const DWORD EndTime = TimeCpuCycles();
+                const DWORD EndTime = CPUTIME();
                 const DWORD CycleCount = EndTime-StartTime;
                 TotalCycleCount += CycleCount;
                 ExecutionCount++;
@@ -1684,23 +1677,24 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
 
             //todo: This input handling should be in the engine, and the collected
             // movement info should be put into the message parameters.
-            if( !GServer.IsPaused )
+            if( !GServer.IsPaused && Camera->Current )
             {
                 FVector Move;
                 FFloatRotation Rotation;
-                GCameraManager->GetStoredMove( User, &Move, &Rotation ); // Called just so that dmTick is called.
+                GCameraManager->GetStoredMove( Camera, &Move, &Rotation ); // Called just so that dmTick is called.
                 //todo: Too much detail here - FAction should hide this stuff from us.
-                GInput.GatherInput();
-                GAction.UpdateMovementActions(GInput);
-                GAction.UpdateFixedActions();
-                GAction.TransformActions();
-                GGame.PlayerYaw( Pawn, GAction.Movements[PlayerAxis_Yaw].Analog, GAction.Movements[PlayerAxis_Yaw].Differential );
-                GGame.PlayerPitch( Pawn, GAction.Movements[PlayerAxis_Pitch].Analog, GAction.Movements[PlayerAxis_Pitch].Differential );
+                GApp->Input->GatherInput();
+                FAction & Actions = *Camera->Console->GetActions();
+                Actions.UpdateMovementActions(GInput);
+                Actions.UpdateFixedActions();
+                Actions.TransformActions();
+                GGame.PlayerYaw( Pawn, Actions.Movements[PlayerAxis_Yaw].Analog, Actions.Movements[PlayerAxis_Yaw].Differential );
+                GGame.PlayerPitch( Pawn, Actions.Movements[PlayerAxis_Pitch].Analog, Actions.Movements[PlayerAxis_Pitch].Differential );
                 // Clear those movements which have been added to the player's motion:
-                GAction.Movements[PlayerAxis_Yaw].Empty();
-                GAction.Movements[PlayerAxis_Pitch].Empty();
+                Actions.Movements[PlayerAxis_Yaw].Empty();
+                Actions.Movements[PlayerAxis_Pitch].Empty();
                 DrawRot.Yaw   = ViewRot.Yaw     ;
-                DrawRot.Pitch = ViewRot.Pitch   ;
+                DrawRot.Pitch = 0               ;
             }
             if (bBehindView)
             {
@@ -1752,12 +1746,12 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
                     );
                     Actor.Send_Animate( PAnimate::MoveAnimation );
                     Actor.SendWhenTaskIsDone( ACTOR_HarmTarget ); // Do some harm later.
-                    Pawn.AIMove = EAI_MoveRunAway;
+                    Pawn.AIMove = EAIM_MoveRunAway;
                     Pawn.ExplorationTimer = 40; //tbi? Hard-coded value?
                 }
                 else if
                 ( 
-                        (Pawn.AIPreviousTask==EAI_TaskAttack  || Pawn.AIPreviousMove == EAI_MoveApproach )
+                        (Pawn.AIPreviousTask==EAI_TaskAttack  || Pawn.AIPreviousMove == EAIM_MoveApproach )
                     &&  Pawn.BackOffPeriod != 0 
                     && 
                         (
@@ -1769,7 +1763,7 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
                     // Pawn wants to back off a little.
                     Debug( "Back off." );
                     const int Period = DSeconds( Random( int(Pawn.BackOffPeriod)-Pawn.BackOffRandomization, int(Pawn.BackOffPeriod)+Pawn.BackOffRandomization ) );
-                    if( Pawn.NormalSpeed == 0 )
+                    if( Pawn.GroundSpeed == 0 )
                     {
                         // Pawn doesn't move, so just have him idle...
                         Actor.DoWait( Period );
@@ -1786,13 +1780,13 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
                         Actor.Send_Animate( PAnimate::MoveAnimation );
                     }
                     Actor.SendWhenTaskIsDone( ACTOR_HarmTarget ); // Do some harm later.
-                    Pawn.AIMove = EAI_MoveBackOff;
+                    Pawn.AIMove = EAIM_MoveBackOff;
                 }
                 else
                 {
                     Debug( "Maybe move towards target" );
                     // Move towards the target.
-                    const int Period = Pawn.NormalSpeed == 0 ? 0 : DSeconds( Random( int(Pawn.ApproachPeriod)-Pawn.ApproachRandomization, int(Pawn.ApproachPeriod)+Pawn.ApproachRandomization ) );
+                    const int Period = Pawn.GroundSpeed == 0 ? 0 : DSeconds( Random( int(Pawn.ApproachPeriod)-Pawn.ApproachRandomization, int(Pawn.ApproachPeriod)+Pawn.ApproachRandomization ) );
                     if( Period != 0 )
                     {
                         Actor.Near
@@ -1803,7 +1797,7 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
                         Pawn.ExplorationTimer = 40; //tbi? Hard-coded value?
                         Actor.Send_Animate( PAnimate::MoveAnimation );
                         Actor.SendWhenTaskIsDone( ACTOR_HarmTarget ); // Do some harm later.
-                        Pawn.AIMove = EAI_MoveApproach;
+                        Pawn.AIMove = EAIM_MoveApproach;
                     }
                     else
                     {
@@ -1923,7 +1917,7 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
                     Actor.TurnTowards( FActor::Actor(iHarmer).Location, Degrees(180) );
                 }
             }
-            return ProcessDone;
+            return ProcessParent;
         }
         //--------------------------------------------------------------------
         //                Should actor accept pickup?
@@ -1942,11 +1936,11 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
             {
                 PickItUp = FALSE; // Pawn is not under user control.
             }
-            else if( PickUp.Class->IsKindOf(GClasses.PowerUp) )
+            else if( PickUp.Class->IsKindOf("PowerUp"))
             {
                 PickItUp = Actor.CanUsePowerUp(PickUpActor.PowerUp(),FALSE);
             }
-            else if( PickUp.Class->IsKindOf(GClasses.Ammo) )
+            else if( PickUp.Class->IsKindOf("Ammo") )
             {
                 PickItUp = Actor.CanUseAmmo(PickUpActor.Ammo(),FALSE);
             }
@@ -1968,7 +1962,7 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
             PActor        *InvInfo = (PActor*)Params;
             INDEX        iNewInv  = InvInfo->iActor;
             AInventory    &NewInv  = FActor::Inventory(iNewInv);
-            if (NewInv.Class->IsKindOf(GClasses.Weapon))
+            if (NewInv.Class->IsKindOf("Weapon"))
             {
                 AWeapon & NewWeapon = FActor::Weapon(iNewInv);
                 FActor * CurrentWeapon = FActor::Handle(iWeapon);
@@ -2025,7 +2019,7 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
             PText *Msg = (PText *)Params;
             if (Actor.IsPlayer())
             {
-                User->Console->Log((ELogType)Msg->MsgType, Msg->Message);
+                Camera->Console->Log((ELogType)Msg->MsgType, Msg->Message);
             }
             return ProcessDone;
         }
@@ -2155,17 +2149,17 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
             Pawn.bStatusChanged = TRUE;
             Actor.Send_TextMsg( Inventory.PickupMessage );
             BOOL DestroyIt = FALSE;
-            if( Inventory.Class->IsKindOf(GClasses.PowerUp) )
+            if( Inventory.Class->IsKindOf("PowerUp") )
             {
                 Actor.CanUsePowerUp(InventoryActor.PowerUp(),TRUE);
                 DestroyIt = TRUE;
             }
-            else if( Inventory.Class->IsKindOf(GClasses.Ammo) )
+            else if( Inventory.Class->IsKindOf("Ammo") )
             {
                 Actor.CanUseAmmo(InventoryActor.Ammo(),TRUE);
                 DestroyIt = TRUE;
             }
-            else if( Inventory.Class->IsKindOf(GClasses.Weapon) && Actor.InventoryItem(InventoryActor.Class) != 0 )
+            else if( Inventory.Class->IsKindOf("Weapon") && Actor.InventoryItem(InventoryActor.Class) != 0 )
             {
                 // The pawn already has the weapon, so just grab the ammo.
                 const AWeapon & Weapon = InventoryActor.Weapon();
@@ -2175,7 +2169,7 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
             if( DestroyIt )
             {
                 //tbd: done by inventory handling...FActor::Actor(Inventory).MakeSound(Inventory.PickupSound);
-                if (Inventory.Class->IsKindOf(GClasses.Ammo) && iWeapon==INDEX_NONE )
+                if (Inventory.Class->IsKindOf("Ammo") && iWeapon==INDEX_NONE )
                 {
                     Actor.Send_ChooseWeapon();
                 }
@@ -2197,11 +2191,11 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
             // priority and enough ammo to be useful. iComparable tells us the *nearest*
             // comparable weapon (the one with the closest priority).
             INDEX   iComparable        = INDEX_NONE ; // Index of nearest comparable weapon, INDEX_NONE if not found.
-            int     ComparablePriority ; // Priority of iComparable, or undefined if iComparable==INDEX_NONE.
+            int     ComparablePriority = 0; // Priority of iComparable, or undefined if iComparable==INDEX_NONE.
             // We also keep track of the "best" weapon - the one with the highest priority
             // and enough ammo to be useful.
             INDEX   iBest              = INDEX_NONE ; // Index of best weapon, INDEX_NONE if not found.
-            int     BestPriority       ; // Priority of iBest, or undefined if iBest==INDEX_NONE.
+            int     BestPriority = 0  ; // Priority of iBest, or undefined if iBest==INDEX_NONE.
 
             AWeapon * CurrentWeapon = iWeapon==INDEX_NONE ? 0 : &FActor::Weapon(iWeapon);
 
@@ -2256,9 +2250,21 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
                 Debug( "A %s just touched a %s", TouchingActor.Class->Name, Actor.Class->Name );
                 if( Actor.IsPlayer() )
                 {
-                    if( TouchingActor.Class->IsKindOf(GClasses.Pawn) )
+                    if( TouchingActor.Class->IsKindOf("Pawn") )
                     {
                         APawn & Toucher = TouchingActor.Pawn();
+                    }
+                    if( !TouchingActor.bWasTouchedByPlayer ) // First time this actor is touched by a player?
+                    {
+                        if( TouchingActor.bIsSecretGoal )
+                        {
+                            Pawn.SecretsFound++;
+                        }
+                        if( TouchingActor.bIsItemGoal )
+                        {
+                            Pawn.ItemsFound++;
+                        }
+                        TouchingActor.bWasTouchedByPlayer = TRUE;    
                     }
                 }
             }
@@ -2274,7 +2280,7 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
             if( Info.SensedActor != INDEX_NONE )
             {
                 FActor & SensedActor = FActor::Actor(Info.SensedActor);
-                if( SensedActor.Class->IsKindOf( GClasses.Pawn ) && SensedActor.Pawn().User !=  0 )
+                if( SensedActor.IsPlayer() )
                 {
                     Debug( "%s: I sense you.", Class->Name );
 		    Pawn.bIsQuiescent = FALSE;
@@ -2375,6 +2381,19 @@ int APawn::Process(ILevel *Level, FName Message, void *Params)
             // We don't do anything with this since we are always polling for
             // the completion of animations.
             return ProcessDone;
+            break;
+        }
+        //--------------------------------------------------------------------
+        //                    Actor entered a new zone
+        //--------------------------------------------------------------------
+        case ACTOR_ZoneChange:
+        {
+            AZoneDescriptor * Zone = Level->GetZoneDescriptor(Level->GetActorZone(iMe));
+            if( Zone != 0 )
+            {        
+                Pawn.bIsSwimming = Zone->bWaterZone;
+            }
+            return ProcessParent;
             break;
         }
     }

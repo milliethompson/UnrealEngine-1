@@ -1,10 +1,10 @@
-// InpActDi.h : header file
-//
 /*
 ==============================================================================
+UnWnActD.h: Actions dialog
+Used by: Properties dialog
 
 Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
-Compiled with Visual C++ 4.0, Calling method=__fastcall
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
     This is the MFC-generated class for handling the Unreal input
@@ -24,9 +24,8 @@ class CDialogInputActions : public CDialog
 {
 // Construction
 public:
-	CDialogInputActions(CWnd* pParent = NULL);   // standard constructor
+	CDialogInputActions(UCamera * Camera, CWnd* pParent = NULL);   // standard constructor
     BOOL OnInitDialog();
-
 
     BOOL Accept(); 
         // If input is valid, save the changes and return TRUE. Otherwise,
@@ -117,6 +116,10 @@ protected:
 	afx_msg void OnContextMenu(CWnd* pWnd, CPoint point);
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
+
+private:
+    UCamera * Camera; // Camera associated with actions.
+    FAction * Actions;
 
     void ArrangeSelectedActions(int TopPosition = 0, int Selection = 0);
         // Clears out any current display of actions and inputs and

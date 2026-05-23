@@ -32,7 +32,7 @@
 // Returns 1 if snapped to a vertex.
 // Returns -1 if brush location is invalid, i.e. partially off map. Not implemented.
 //
-int FEditor::constraintApply(IModel *LevelModelInfo, IModel *BrushInfo,
+int FGlobalEditor::constraintApply(IModel *LevelModelInfo, IModel *BrushInfo,
 	FVector *Location, FRotation *Rotation,FConstraints *Constraints)
 	{
 	FVector  SourcePoint;
@@ -48,7 +48,7 @@ int FEditor::constraintApply(IModel *LevelModelInfo, IModel *BrushInfo,
 	if ((LevelModelInfo != NULL) && (BrushInfo != NULL) && (Constraints->SnapVertex))
 		{
 		SourcePoint = *Location + BrushInfo->PostPivot;
-		if (LevelModelInfo->FindNearestVertex (&SourcePoint,&DestPoint,Constraints->SnapDist,&Temp) >= 0.0)
+		if (LevelModelInfo->FindNearestVertex (SourcePoint,DestPoint,Constraints->SnapDist,Temp) >= 0.0)
 			{
 			*Location = DestPoint - BrushInfo->PostPivot;
 			Snapped   = 1;
@@ -59,7 +59,7 @@ int FEditor::constraintApply(IModel *LevelModelInfo, IModel *BrushInfo,
 		*Location = Location->GridSnap(Constraints->Grid);
 		};
 	return Snapped;
-	UNGUARD("FEditor::constraintApply");
+	UNGUARD("FGlobalEditor::constraintApply");
 	};
 
 void constrainSimplePoint(FVector *Location,FConstraints *Constraints)
@@ -72,7 +72,7 @@ void constrainSimplePoint(FVector *Location,FConstraints *Constraints)
 //
 // Finish snapping a brush
 //
-void FEditor::constraintFinishSnap(ILevel *LevelInfo,UModel *Brush)
+void FGlobalEditor::constraintFinishSnap(ILevel *LevelInfo,UModel *Brush)
 	{
 	GUARD;
 	IModel BrushInfo;
@@ -84,13 +84,13 @@ void FEditor::constraintFinishSnap(ILevel *LevelInfo,UModel *Brush)
 		Brush->Unlock(&BrushInfo);
 		Brush->ModelFlags &= ~MF_ShouldSnap;
 		};
-	UNGUARD("FEditor::constraintFinishSnap");
+	UNGUARD("FGlobalEditor::constraintFinishSnap");
 	};
 
 //
 // Finish snapping all brushes in a level
 //
-void FEditor::constraintFinishAllSnaps(ULevel *Level)
+void FGlobalEditor::constraintFinishAllSnaps(ULevel *Level)
 	{
 	GUARD;
 	//
@@ -120,10 +120,10 @@ void FEditor::constraintFinishAllSnaps(ULevel *Level)
 			};
 		};
 	Level->Unlock(&LevelInfo);
-	UNGUARD("FEditor::constraintFinishAllSnaps");
+	UNGUARD("FGlobalEditor::constraintFinishAllSnaps");
 	};
 
-void FEditor::constraintInit(FConstraints *Const)
+void FGlobalEditor::constraintInit(FConstraints *Const)
 	{
 	GUARD;
 	mymemset (Const,0,sizeof (FConstraints));
@@ -137,7 +137,7 @@ void FEditor::constraintInit(FConstraints *Const)
 	Const->GridEnabled			= 0;
 	Const->RotGridEnabled		= 0;
 	Const->SnapVertex			= 1;
-	UNGUARD("FEditor::constraintInit");
+	UNGUARD("FGlobalEditor::constraintInit");
 	};
 
 /*------------------------------------------------------------------------------

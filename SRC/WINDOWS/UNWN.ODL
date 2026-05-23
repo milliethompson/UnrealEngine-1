@@ -24,26 +24,53 @@ library Unreal
 
 	[ uuid(D0EB88E6-2016-11CF-98C0-0000C06958A7) ]
 	dispinterface IUnrealEdServer
-		{
+	{
 		properties:
 			//{{AFX_ODL_PROP(CUnrealEdServer)
 			//}}AFX_ODL_PROP
 		methods:
 			//{{AFX_ODL_METHOD(CUnrealEdServer)
-			[id(1), helpstring("Execute a world editor command.")] void Exec(BSTR Cmd);
+			[id(1), helpstring("Execute an UnrealEdServer command.")] void Exec(BSTR Cmd);
 			[id(2), helpstring("Execute a slow command.")] void SlowExec(BSTR Cmd);
-			[id(3), helpstring("Get a world editor property.")] BSTR GetProp(BSTR Topic, BSTR Item);
-			[id(4), helpstring("Set a world editor property.")] void SetProp(BSTR Topic, BSTR Item, BSTR NewValue);
+			[id(3), helpstring("Get an UnrealEdServer property.")] BSTR GetProp(BSTR Topic, BSTR Item);
+			[id(4), helpstring("Set an UnrealEdServer property.")] void SetProp(BSTR Topic, BSTR Item, BSTR NewValue);
 			[id(5), helpstring("Enable all windows.")] void Enable();
 			[id(6), helpstring("Disable all windows. Must call before opening a modal dialog box")] void Disable();
-			[id(7), helpstring("Initialize Unreal")] void Init(long hWndMain, long hWndEdCallback);
+			[id(7), helpstring("Initialize UnrealEdServer.")] void Init(long hWndMain, long hWndEdCallback);
 			//}}AFX_ODL_METHOD
-		};
+	};
 	[ uuid(F936C3A7-1FF8-11CF-98C0-0000C06958A7) ]
 	coclass UnrealEdServer
-		{
+	{
 		[default] dispinterface IUnrealEdServer;
-		};
+	};
+
+	///////////////////
+	// IUnrealServer //
+	///////////////////
+	
+	[ uuid(65033ED8-3939-11D0-B0AE-00C04FD8ED0D) ]
+	dispinterface IUnrealServer
+	{
+		properties:
+			//{{AFX_ODL_PROP(CUnrealServer)
+			//}}AFX_ODL_PROP
+			
+		methods:
+			//{{AFX_ODL_METHOD(CUnrealServer)
+			[id(1), helpstring("Execute an UnrealServer command.")] void Exec(BSTR Cmd);
+			[id(2), helpstring("Get an UnrealServer property.")] BSTR GetProp(BSTR Topic, BSTR Item);
+			[id(3), helpstring("Initialize UnrealServer.")] void Init(long hWndMain, long hWndCallback);
+			[id(4), helpstring("Set an UnrealServer property.")] void SetProp(BSTR Topic, BSTR Item, BSTR NewValue);
+			//}}AFX_ODL_METHOD
+
+	};
+	[ uuid(65033ED9-3939-11D0-B0AE-00C04FD8ED0D) ]
+	coclass UnrealServer
+	{
+		[default] dispinterface IUnrealServer;
+	};
+
 	//{{AFX_APPEND_ODL}}
 	};
 

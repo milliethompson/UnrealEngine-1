@@ -6,13 +6,13 @@ Begin VB.Form frmMain
    ClientLeft      =   2595
    ClientTop       =   3480
    ClientWidth     =   11865
-   Height          =   8805
+   Height          =   8715
    Icon            =   "Main.frx":0000
    Left            =   2535
    LinkTopic       =   "Form1"
    ScaleHeight     =   8115
    ScaleWidth      =   11865
-   Top             =   2850
+   Top             =   2940
    Visible         =   0   'False
    Width           =   11985
    WindowState     =   2  'Maximized
@@ -454,14 +454,14 @@ Begin VB.Form frmMain
    Begin VB.Menu File 
       Caption         =   "&File"
       Begin VB.Menu New 
-         Caption         =   "&New Map"
+         Caption         =   "&New level"
       End
       Begin VB.Menu Open 
-         Caption         =   "&Open Map"
+         Caption         =   "&Open level"
          Shortcut        =   ^O
       End
       Begin VB.Menu Save 
-         Caption         =   "&Save Map"
+         Caption         =   "&Save level"
          Shortcut        =   ^V
       End
       Begin VB.Menu SaveAs 
@@ -472,10 +472,10 @@ Begin VB.Form frmMain
          Caption         =   "-"
       End
       Begin VB.Menu ImportLevel 
-         Caption         =   "&Import map"
+         Caption         =   "&Import Level"
       End
       Begin VB.Menu ExportLevel 
-         Caption         =   "&Export map"
+         Caption         =   "&Export level"
       End
       Begin VB.Menu ZSTOS 
          Caption         =   "-"
@@ -630,6 +630,7 @@ Begin VB.Form frmMain
          End
          Begin VB.Menu ParSolHeightMap 
             Caption         =   "Height Map"
+            Visible         =   0   'False
          End
       End
       Begin VB.Menu ZGYM 
@@ -727,7 +728,7 @@ Begin VB.Form frmMain
          Caption         =   "&Level"
       End
       Begin VB.Menu ViewLevelLinks 
-         Caption         =   "&View Links..."
+         Caption         =   "&View Links"
       End
       Begin VB.Menu Preferences 
          Caption         =   "&Preferences"
@@ -1457,7 +1458,16 @@ Private Sub Form_Load()
     Dim Temp As String
     Dim Highlight As Boolean
     '
-    Call InitApp ' Init App object properties
+    ' Inhibit registry reading if desired.
+    '
+    If InStr(UCase(Command$), "RESET") Then
+        MsgBox "Your UnrealEd settings have been reset."
+        NoReadRegistry = True
+    End If
+    '
+    ' Init App object properties.
+    '
+    Call InitApp
     '
     ' Create global UnrealEdApp object.
     '
@@ -1636,10 +1646,12 @@ Private Sub Form_Load()
     '
     Call Ed.RegisterBrowserTopic(frmTexBrowser, "Textures")
     Call Ed.RegisterBrowserTopic(frmClassBrowser, "Classes")
-    'Call Ed.RegisterBrowserTopic(frmBrushBrowser, "Brushes")
     Call Ed.RegisterBrowserTopic(frmSoundFXBrowser, "SoundFX")
-    'Call Ed.RegisterBrowserTopic(frmAmbientBrowser, "Ambient")
     Call Ed.SetBrowserTopic(Ed.InitialBrowserTopic)
+    '
+    ' Browsers that no longer exist:
+    'Call Ed.RegisterBrowserTopic(frmBrushBrowser, "Brushes")
+    'Call Ed.RegisterBrowserTopic(frmAmbientBrowser, "Ambient")
     '
     If CalcText.Visible Then
         CalcText.AddItem "Reset"
@@ -1649,6 +1661,10 @@ Private Sub Form_Load()
     End If
     '
     PreferencesChange
+    '
+    ' Enable registry reading.
+    '
+    NoReadRegistry = False
     '
 End Sub
 
@@ -1663,61 +1679,25 @@ Private Sub Form_Resize()
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
-   Dim N As Integer
-   '
-   ' Unload all forms
-   '
-   Unload frmActorProperties ' Actor properties lister
-   Unload frmClassBrowser   ' Actor Class browser
-   Unload frmSoundFXBrowser ' Sound browser
-   Unload frmScriptEd       ' Actor script editor
-   Unload frmBrush          ' Brush tools
-   Unload frmSurfaceProps   ' Surface properties
-   Unload frmResBrowse      ' World resource browser
-   Unload frmTexProp        ' Texture properties
-   Unload frmLevel          ' Level window
-   Unload frmPopups         ' Rt. click menus
-   Unload frmPopups2        ' More rt. clicks
-   Unload frmGrid           ' Grid settings
-   Unload frmRotGrid        ' Rotational grid settings
-   Unload frmMapToolbar     ' Map-mode controls
-   Unload frmDialogs        ' Common dialogs
-   Unload frmRebuilder      ' Rebuilder
-   Unload frmPreferences    ' Preferences
-   Unload frmTexImport      ' Texture import dialog
-   Unload frmAddSpecial     ' Add special brush
-   Unload frmBrushImp       ' Import brush
-   Unload frmMeshViewer     ' Mesh viewer
-   Unload frmNewClass       ' New Actor Class
-   Unload frmResults        ' Text results
-   Unload frmEditVector     ' Actor properties vector editing
-   Unload frmEditRotation   ' Actor properties rotation editing
-   Unload frmScriptFind     ' Script text finder
-   Unload frmSoundImportDlg ' Sound import thing
-   Unload frmTwoDee         ' 2D tools
-   Unload frmExtrude        ' 2D Extrude
-   Unload frmRevolve        ' 2D Revolve
-   Unload frmBevel          ' 2D Bevel
-   Unload frmExPoint        ' 2D Extrude to point
-   '
-   Unload frmParSolRect
-   Unload frmParSolCone
-   Unload frmParSolHeightMap
-   Unload frmParSolLinearStair
-   Unload frmParSolSphere
-   Unload frmParSolSpiralStair
-   Unload frmParSolCurvedStair
-   Unload frmParSolTube
-   Unload frmPsSheet
-   '
-   UnloadMiscForms
-   Ed.UnloadBrowser
-   '
-   ' Save profile now that all forms have
-   ' called their EndOnTop's.
-   '
-   Ed.SaveProfile
-   '
+    Dim N As Integer
+    
+    ' Unload browser.
+    Ed.UnloadBrowser
+   
+   
+    ' Unload all forms
+    Dim i As Long
+    For i = Forms.Count - 1 To 0 Step -1
+        Unload Forms(i)
+    Next
+   
+    ' Save profile now that all forms have
+    ' called their EndOnTop's.
+    Ed.SaveProfile
+   
+   ' End the program, in case any stray objects
+   ' are still hanging around in memory.
+   End
 End Sub
 
 Private Sub MapEditMode_Click()
@@ -1755,7 +1735,15 @@ End Sub
 
 Private Sub New_Click()
     Ed.Server.Disable
-    frmNewMap.Show 1 ' Model new-level dialog
+    If MsgBox("Are you sure you want to create a new map?", _
+        vbOKCancel) = vbOK Then
+       
+        ' New map.
+        Ed.MapFname = ""
+        frmMain.Caption = Ed.EditorAppName
+        Ed.Server.Exec "MAP NEW"
+        PostLoad
+    End If
     Ed.Server.Enable
 End Sub
 
@@ -1774,8 +1762,6 @@ Private Sub Open_Click()
     '
     Call UpdateDialog(frmDialogs.MapOpen)
     If (frmDialogs.MapOpen.filename <> "") Then
-        '
-        Ed.CloseLevelWindows
         '
         ' Load the map, inhibiting redraw since we're
         ' about to resize everything anyway.
@@ -1817,7 +1803,7 @@ Private Sub ParSolLinearStair_Click()
 End Sub
 
 Private Sub ParSolRect_Click()
-    frmParSolRect.Show
+    frmParSolCube.Show
 End Sub
 
 Private Sub ParSolSphereDome_Click()
@@ -1843,7 +1829,8 @@ Private Sub Preferences_Click()
 End Sub
 
 Private Sub Project_Click()
-    frmLevel.Show
+    frmActorProperties.GetLevelProperties
+    'frmLevel.Show
 End Sub
 
 Private Sub Rebuild_Click()
@@ -2061,14 +2048,27 @@ Private Sub TextureCombo_Click()
 End Sub
 
 Private Sub Timer_Timer()
+    Dim Name As String
     Ed.AutoSaveCountup = Ed.AutoSaveCountup + 1
     If (Ed.AutoSaveCountup > Ed.AutoSaveTime) And _
         (Ed.AutoSaveTime <> 0) Then
         '
         Ed.AutoSaveCountup = 0
         Ed.BeginSlowTask ("Saving map")
-        Ed.Server.SlowExec "MAP SAVE FILE=" & Quotes(Ed.BaseDir + Ed.MapDir + "\AutoSave.unr")
+        '
+        If Ed.AutoUnique <> 0 Then
+            Name = "Auto" & Trim(Str(Ed.AutoCounter))
+        Else
+            Name = "Autosave"
+        End If
+        '
+        Ed.Server.SlowExec "MAP SAVE FILE=" & Quotes(Ed.BaseDir + Ed.MapDir + "\" + Name + ".unr")
         Ed.EndSlowTask
+        '
+        If Ed.AutoUnique <> 0 Then
+            Ed.AutoCounter = (Ed.AutoCounter + 1) Mod 20
+            Ed.SaveProfile
+        End If
     End If
 End Sub
 
@@ -2084,7 +2084,7 @@ Private Sub UndoButton_Click()
     Ed.Tools.Click "TRANSACTION UNDO"
 End Sub
 
-Private Sub ViewLevelLinks_Click()
+Public Sub ViewLevelLinks_Click()
     Call frmResults.UpdateStatus("Level links:")
     Ed.Server.Exec "LEVEL LINKS"
     frmResults.UpdateResults
@@ -2262,7 +2262,7 @@ Private Sub InitToolbar()
     ToolIcons(11).Tag = "BRUSH FROM DEINTERSECTION"
     ToolIcons(14).Tag = "BRUSH ADD SPECIAL"
     ToolIcons(17).Tag = "BRUSH ADDMOVER"
-    ToolIcons(20).Tag = "RECTANGLE"
+    ToolIcons(20).Tag = "CUBE"
     ToolIcons(23).Tag = "SPHERE"
     ToolIcons(26).Tag = "CYLINDER"
     ToolIcons(29).Tag = "CONE"
@@ -2673,9 +2673,9 @@ Private Sub Callback_KeyPress(KeyAscii As Integer)
             frmSurfaceProps.GetSelectedPolys
         End If
     Case EDC_SELACTORCHANGE:
-        If GActorPropsAction = 1 Then
+        If GActorPropsAction = AP_Selected Then
             frmActorProperties.GetSelectedActors
-        ElseIf GActorPropsAction = 2 Then
+        ElseIf GActorPropsAction = AP_Class Then
             frmActorProperties.NoteClassChange
         End If
     Case EDC_SELBRUSHCHANGE:

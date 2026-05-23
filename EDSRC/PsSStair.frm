@@ -2,39 +2,39 @@ VERSION 4.00
 Begin VB.Form frmParSolSpiralStair 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Build a Spiral Stair"
-   ClientHeight    =   7476
-   ClientLeft      =   7872
-   ClientTop       =   1212
-   ClientWidth     =   3012
+   ClientHeight    =   7470
+   ClientLeft      =   6180
+   ClientTop       =   1170
+   ClientWidth     =   3015
    ClipControls    =   0   'False
    ControlBox      =   0   'False
    BeginProperty Font 
       name            =   "MS Sans Serif"
       charset         =   0
       weight          =   700
-      size            =   7.8
+      size            =   8.25
       underline       =   0   'False
       italic          =   0   'False
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H00C0C0C0&
-   Height          =   7800
+   Height          =   7830
    HelpContextID   =   155
-   Left            =   7824
+   Left            =   6120
    LinkTopic       =   "Form4"
    MaxButton       =   0   'False
    MinButton       =   0   'False
-   ScaleHeight     =   7476
-   ScaleWidth      =   3012
+   ScaleHeight     =   7470
+   ScaleWidth      =   3015
    ShowInTaskbar   =   0   'False
-   Top             =   936
-   Width           =   3108
+   Top             =   870
+   Width           =   3135
    Begin VB.PictureBox Picture1 
       Height          =   7692
       Left            =   0
-      ScaleHeight     =   7644
-      ScaleWidth      =   2964
-      TabIndex        =   0
+      ScaleHeight     =   7635
+      ScaleWidth      =   2955
+      TabIndex        =   19
       Top             =   0
       Width           =   3012
       Begin VB.CheckBox chkAlignSide 
@@ -43,14 +43,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   240
-         TabIndex        =   36
+         TabIndex        =   18
          Top             =   3240
          Value           =   1  'Checked
          Width           =   1332
@@ -63,14 +63,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   375
          Left            =   1080
-         TabIndex        =   35
+         TabIndex        =   9
          Top             =   6960
          Width           =   855
       End
@@ -81,14 +81,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   375
          Left            =   120
-         TabIndex        =   34
+         TabIndex        =   8
          Top             =   6960
          Width           =   855
       End
@@ -98,14 +98,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   375
          Left            =   2040
-         TabIndex        =   33
+         TabIndex        =   10
          Top             =   6960
          Width           =   855
       End
@@ -115,14 +115,15 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   48
-         TabIndex        =   20
+         TabIndex        =   24
+         TabStop         =   0   'False
          Top             =   5460
          Width           =   495
       End
@@ -132,7 +133,7 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
@@ -140,7 +141,7 @@ Begin VB.Form frmParSolSpiralStair
          ForeColor       =   &H00000000&
          Height          =   285
          Left            =   1560
-         TabIndex        =   19
+         TabIndex        =   7
          Text            =   "Spiral"
          Top             =   5880
          Width           =   1455
@@ -151,7 +152,7 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
@@ -159,7 +160,7 @@ Begin VB.Form frmParSolSpiralStair
          ForeColor       =   &H00000000&
          Height          =   285
          Left            =   1560
-         TabIndex        =   18
+         TabIndex        =   4
          Text            =   "32"
          Top             =   4680
          Width           =   1455
@@ -170,7 +171,7 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
@@ -178,7 +179,7 @@ Begin VB.Form frmParSolSpiralStair
          ForeColor       =   &H00000000&
          Height          =   285
          Left            =   1560
-         TabIndex        =   17
+         TabIndex        =   3
          Text            =   "16"
          Top             =   4440
          Width           =   1455
@@ -189,7 +190,7 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
@@ -197,7 +198,7 @@ Begin VB.Form frmParSolSpiralStair
          ForeColor       =   &H00000000&
          Height          =   285
          Left            =   1560
-         TabIndex        =   16
+         TabIndex        =   2
          Text            =   "256"
          Top             =   4080
          Width           =   1455
@@ -208,7 +209,7 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
@@ -216,7 +217,7 @@ Begin VB.Form frmParSolSpiralStair
          ForeColor       =   &H00000000&
          Height          =   285
          Left            =   1560
-         TabIndex        =   15
+         TabIndex        =   1
          Text            =   "256-16"
          Top             =   3840
          Width           =   1455
@@ -227,7 +228,7 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
@@ -235,7 +236,7 @@ Begin VB.Form frmParSolSpiralStair
          ForeColor       =   &H00000000&
          Height          =   285
          Left            =   1560
-         TabIndex        =   14
+         TabIndex        =   0
          Text            =   "64"
          Top             =   3600
          Width           =   1455
@@ -246,7 +247,7 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
@@ -254,7 +255,7 @@ Begin VB.Form frmParSolSpiralStair
          ForeColor       =   &H00000000&
          Height          =   285
          Left            =   1560
-         TabIndex        =   13
+         TabIndex        =   6
          Text            =   "8"
          Top             =   5280
          Width           =   1455
@@ -265,7 +266,7 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
@@ -273,7 +274,7 @@ Begin VB.Form frmParSolSpiralStair
          ForeColor       =   &H00000000&
          Height          =   285
          Left            =   1560
-         TabIndex        =   12
+         TabIndex        =   5
          Text            =   "8"
          Top             =   5040
          Width           =   1455
@@ -284,14 +285,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   855
          Left            =   1815
-         TabIndex        =   9
+         TabIndex        =   23
          Top             =   390
          Width           =   1095
          Begin VB.CheckBox chkIntFill 
@@ -300,14 +301,14 @@ Begin VB.Form frmParSolSpiralStair
                name            =   "MS Sans Serif"
                charset         =   0
                weight          =   400
-               size            =   7.8
+               size            =   8.25
                underline       =   0   'False
                italic          =   0   'False
                strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   11
+            TabIndex        =   12
             Top             =   240
             Width           =   855
          End
@@ -317,14 +318,14 @@ Begin VB.Form frmParSolSpiralStair
                name            =   "MS Sans Serif"
                charset         =   0
                weight          =   400
-               size            =   7.8
+               size            =   8.25
                underline       =   0   'False
                italic          =   0   'False
                strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   10
+            TabIndex        =   13
             Top             =   480
             Width           =   855
          End
@@ -335,14 +336,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   855
          Left            =   1815
-         TabIndex        =   6
+         TabIndex        =   22
          Top             =   2310
          Width           =   1095
          Begin VB.OptionButton optCeilingStepped 
@@ -351,14 +352,14 @@ Begin VB.Form frmParSolSpiralStair
                name            =   "MS Sans Serif"
                charset         =   0
                weight          =   400
-               size            =   7.8
+               size            =   8.25
                underline       =   0   'False
                italic          =   0   'False
                strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   8
+            TabIndex        =   16
             Top             =   240
             Value           =   -1  'True
             Width           =   855
@@ -369,14 +370,14 @@ Begin VB.Form frmParSolSpiralStair
                name            =   "MS Sans Serif"
                charset         =   0
                weight          =   400
-               size            =   7.8
+               size            =   8.25
                underline       =   0   'False
                italic          =   0   'False
                strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   7
+            TabIndex        =   17
             Top             =   480
             Width           =   855
          End
@@ -387,14 +388,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   855
          Left            =   1815
-         TabIndex        =   3
+         TabIndex        =   21
          Top             =   1350
          Width           =   1095
          Begin VB.OptionButton optSurfaceStepped 
@@ -403,14 +404,14 @@ Begin VB.Form frmParSolSpiralStair
                name            =   "MS Sans Serif"
                charset         =   0
                weight          =   400
-               size            =   7.8
+               size            =   8.25
                underline       =   0   'False
                italic          =   0   'False
                strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   5
+            TabIndex        =   14
             Top             =   240
             Value           =   -1  'True
             Width           =   855
@@ -421,14 +422,14 @@ Begin VB.Form frmParSolSpiralStair
                name            =   "MS Sans Serif"
                charset         =   0
                weight          =   400
-               size            =   7.8
+               size            =   8.25
                underline       =   0   'False
                italic          =   0   'False
                strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   4
+            TabIndex        =   15
             Top             =   480
             Width           =   855
          End
@@ -439,24 +440,24 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   372
          Left            =   1935
-         TabIndex        =   2
+         TabIndex        =   11
          Top             =   30
          Value           =   1  'Checked
          Width           =   1212
       End
       Begin Threed.SSPanel SSPanel1 
-         Height          =   3132
-         Left            =   12
-         TabIndex        =   1
-         Top             =   36
-         Width           =   1692
+         Height          =   3135
+         Left            =   15
+         TabIndex        =   20
+         Top             =   30
+         Width           =   1695
          _Version        =   65536
          _ExtentX        =   2990
          _ExtentY        =   5530
@@ -465,17 +466,16 @@ Begin VB.Form frmParSolSpiralStair
          BevelInner      =   1
          Begin VB.Image Image4 
             Appearance      =   0  'Flat
-            Height          =   384
+            Height          =   480
             Left            =   360
             Picture         =   "PsSStair.frx":0000
             Top             =   840
-            Width           =   384
+            Width           =   480
          End
          Begin VB.Image Image3 
             Appearance      =   0  'Flat
             Height          =   384
             Left            =   840
-            Picture         =   "PsSStair.frx":0442
             Top             =   960
             Width           =   384
          End
@@ -483,7 +483,6 @@ Begin VB.Form frmParSolSpiralStair
             Appearance      =   0  'Flat
             Height          =   384
             Left            =   960
-            Picture         =   "PsSStair.frx":0884
             Top             =   360
             Width           =   384
          End
@@ -491,7 +490,6 @@ Begin VB.Form frmParSolSpiralStair
             Appearance      =   0  'Flat
             Height          =   384
             Left            =   360
-            Picture         =   "PsSStair.frx":0CC6
             Top             =   240
             Width           =   384
          End
@@ -889,7 +887,6 @@ Begin VB.Form frmParSolSpiralStair
             Appearance      =   0  'Flat
             Height          =   384
             Left            =   372
-            Picture         =   "PsSStair.frx":1108
             Top             =   948
             Visible         =   0   'False
             Width           =   384
@@ -898,7 +895,6 @@ Begin VB.Form frmParSolSpiralStair
             Appearance      =   0  'Flat
             Height          =   384
             Left            =   960
-            Picture         =   "PsSStair.frx":154A
             Top             =   840
             Visible         =   0   'False
             Width           =   384
@@ -907,7 +903,6 @@ Begin VB.Form frmParSolSpiralStair
             Appearance      =   0  'Flat
             Height          =   384
             Left            =   840
-            Picture         =   "PsSStair.frx":198C
             Top             =   240
             Visible         =   0   'False
             Width           =   384
@@ -916,7 +911,6 @@ Begin VB.Form frmParSolSpiralStair
             Appearance      =   0  'Flat
             Height          =   384
             Left            =   240
-            Picture         =   "PsSStair.frx":1DCE
             Top             =   360
             Visible         =   0   'False
             Width           =   384
@@ -950,14 +944,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   1560
-         TabIndex        =   32
+         TabIndex        =   36
          Top             =   5592
          Width           =   1212
       End
@@ -968,14 +962,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   480
-         TabIndex        =   31
+         TabIndex        =   35
          Top             =   5592
          Width           =   972
       End
@@ -986,7 +980,7 @@ Begin VB.Form frmParSolSpiralStair
          ForeColor       =   &H80000008&
          Height          =   252
          Left            =   2160
-         TabIndex        =   30
+         TabIndex        =   34
          Top             =   6600
          Visible         =   0   'False
          Width           =   612
@@ -999,14 +993,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   480
-         TabIndex        =   29
+         TabIndex        =   33
          Top             =   5880
          Width           =   972
       End
@@ -1017,14 +1011,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   240
-         TabIndex        =   28
+         TabIndex        =   32
          Top             =   4680
          Width           =   1212
       End
@@ -1035,14 +1029,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   612
          Left            =   120
-         TabIndex        =   27
+         TabIndex        =   31
          Top             =   6240
          Width           =   2652
       End
@@ -1053,14 +1047,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   600
-         TabIndex        =   26
+         TabIndex        =   30
          Top             =   4440
          Width           =   852
       End
@@ -1071,14 +1065,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   120
-         TabIndex        =   25
+         TabIndex        =   29
          Top             =   4080
          Width           =   1332
       End
@@ -1089,14 +1083,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   120
-         TabIndex        =   24
+         TabIndex        =   28
          Top             =   3840
          Width           =   1332
       End
@@ -1107,14 +1101,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   120
-         TabIndex        =   23
+         TabIndex        =   27
          Top             =   3600
          Width           =   1332
       End
@@ -1125,14 +1119,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   480
-         TabIndex        =   22
+         TabIndex        =   26
          Top             =   5280
          Width           =   972
       End
@@ -1143,14 +1137,14 @@ Begin VB.Form frmParSolSpiralStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   252
          Left            =   0
-         TabIndex        =   21
+         TabIndex        =   25
          Top             =   5040
          Width           =   1452
       End
@@ -3852,4 +3846,39 @@ End Sub
 
 Private Sub Trigger_Change()
     Build_Click
+End Sub
+
+'
+' Focus change highlighting routines.
+'
+Private Sub txtInnerSRad_GotFocus()
+    SelectAll txtInnerSRad
+End Sub
+
+Private Sub txtOuterSRad_GotFocus()
+    SelectAll txtOuterSRad
+End Sub
+
+Private Sub txtOuterWallRadius_GotFocus()
+    SelectAll txtOuterWallRadius
+End Sub
+
+Private Sub txtStepHeight_GotFocus()
+    SelectAll txtStepHeight
+End Sub
+
+Private Sub txtStepThickness_GotFocus()
+    SelectAll txtStepThickness
+End Sub
+
+Private Sub txtCycleNum_GotFocus()
+    SelectAll txtCycleNum
+End Sub
+
+Private Sub txtNumSteps_GotFocus()
+    SelectAll txtNumSteps
+End Sub
+
+Private Sub txtGroup_GotFocus()
+    SelectAll txtGroup
 End Sub

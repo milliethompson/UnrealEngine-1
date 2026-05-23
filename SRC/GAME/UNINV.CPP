@@ -112,7 +112,7 @@ int AInventory::Process(ILevel *Level, FName Message, void *Params)
                     IModel & Model = GLevel->ModelInfo;
                     INDEX iActorHit;
                     FVector Floor;
-                    if ( Model.ZCollision(&Location,&Floor,&iActorHit) != MAXWORD )
+                    if ( Model.ZCollision(Location,Floor,iActorHit,0) != INDEX_NONE )
                     {
                         const FLOAT dZ = Location.Z - Actor.CollisionHeight - Floor.Z;
                         const BOOL IsOnSurface = dZ<=2; //tbi: 2
@@ -147,8 +147,8 @@ int AInventory::Process(ILevel *Level, FName Message, void *Params)
             {
                 PTouch & TouchInfo = *(PTouch *)Params;
                 FActor & TouchingActor = FActor::Actor(TouchInfo.iActor);
-
-                if( TouchingActor.Class->IsKindOf(GClasses.Pawn) )
+                //todo: Delete: ARoot::Process(Level,Message,Params);
+                if( TouchingActor.Class->IsKindOf("Pawn") )
                 {
                     APawn & Toucher = TouchingActor.Pawn();
                     PPickupQuery PickupInfo;
@@ -158,7 +158,7 @@ int AInventory::Process(ILevel *Level, FName Message, void *Params)
                     {
                         if (Level->SendMessage(iInvActor,ACTOR_PreemptPickupQuery,&PickupInfo)==1)
                         {
-                            return ProcessDone;
+                            return ProcessParent;
                         }
                         iInvActor = FActor::Actor(iInvActor).iInventory;
                     }
@@ -204,13 +204,21 @@ int AInventory::Process(ILevel *Level, FName Message, void *Params)
                         }
                     }
                 }
-                else if( TouchingActor.IsA( GClasses.Projectile ) && bTakesDamage )
+                return ProcessParent;
+            }
+            //----------------------------------------------------------------
+            //                 Pickup item was hit
+            //----------------------------------------------------------------
+            case ACTOR_Hit:
+            {
+                const PHit & HitInfo = PHit::Convert(Params);
+                if( bTakesDamage )
                 {
                     //todo: Duplicate respawning logic above.
-                    FActor * Effect = Actor.Spawn( EffectWhenDestroyed, this->Location, 0, GMath.ZeroVector );
                     Level->DestroyActor(iMe);
+                    Actor.Instigate( EffectWhenDestroyed );
                 }
-                return ProcessDone;
+                return ProcessParent;
             }
             //----------------------------------------------------------------
             //                 Timer expired
@@ -242,6 +250,7 @@ int AInventory::Process(ILevel *Level, FName Message, void *Params)
 
                 if( Parent.iWeapon == iMe )
                 { 
+                    SynchronizeInventoryItem( *this, ParentPawn );
                     const FLOAT ParentSpeed = ParentPawn.Velocity.Size2D(); //todo: Efficiency
                     if( InvState == INV_Active && ParentSpeed >= 0.2 && GPreferences.WeaponsSway )
                     {
@@ -259,8 +268,8 @@ int AInventory::Process(ILevel *Level, FName Message, void *Params)
                             MaxRollFactor           = Values[1];
                             AccelerationRatio       = Values[2];
                         }
-                        WORD MaxYaw = ParentSpeed/ParentPawn.NormalSpeed * MaxYawFactor;
-                        WORD MaxRoll = ParentSpeed/ParentPawn.NormalSpeed * MaxRollFactor;
+                        WORD MaxYaw = 2.0*ParentSpeed/ParentPawn.GroundSpeed * MaxYawFactor;
+                        WORD MaxRoll = 2.0*ParentSpeed/ParentPawn.GroundSpeed * MaxRollFactor;
                         YawSpeed = YawSpeed >= 0 ? +MaxYaw/8 : -MaxYaw/AccelerationRatio;
                         RollSpeed = RollSpeed >= 0 ? +MaxRoll/8 : -MaxRoll/AccelerationRatio;
                         DrawYaw += YawSpeed;
@@ -292,113 +301,6 @@ int AInventory::Process(ILevel *Level, FName Message, void *Params)
                         DrawYaw  = 0;
                     }
                 }
-                    #if 0 //tbd: obsolete 
-                    ViewRot.Yaw     = Parent.ViewRot.Yaw;
-                    ViewRot.Pitch   = (SWORD)Parent.ViewRot.Pitch - ( (SWORD)Parent.ViewRot.Pitch > 0 ? 0 : ((SWORD)Parent.ViewRot.Pitch >> 2) );
-                    //todo: Add this back after Intel version: ViewRot.Pitch   = (SWORD)Parent.ViewRot.Pitch - ((SWORD)Parent.ViewRot.Pitch >> 2);
-                    ViewRot.Roll    = 0.0;
-                    ViewRot.Pitch   += DrawPitch;
-
-                    FCoords Coords = GMath.CameraViewCoords;
-                    Coords.DeTransformByRotation(ParentPawn.ViewRot);
-
-                    Location       = ParentPawn.Location;
-                    Location.Z    += ParentPawn.EyeHeight + ParentPawn.Bob * 0.10;
-                    Location      += Coords.YAxis * DrawDown;
-                    Location      += Coords.ZAxis * DrawForward;
-
-                    switch (InvState)
-                    {
-                        case INV_None:
-                        {
-                            break;
-                        }
-                        case INV_Active:
-                        {
-                            const FLOAT ParentSpeed = ParentPawn.Velocity.Size2D();
-                            static int MaxYawFactor = 150;
-                            static int MaxRollFactor = 300;
-                            static int AccelerationRatio = 16;
-                            if( GCheat->Adjustment==FCheat::AdjustWeaponMotion )
-                            {
-                                FLOAT Values[3];
-                                Values[0] = MaxYawFactor;
-                                Values[1] = MaxRollFactor;
-                                Values[2] = AccelerationRatio;
-                                GCheat->DoAdjustments(Parent.iMe, Values );
-                                MaxYawFactor            = Values[0];
-                                MaxRollFactor           = Values[1];
-                                AccelerationRatio       = Values[2];
-                            }
-                            if( ParentSpeed >= 0.2 && GPreferences.WeaponsSway )
-                            {
-                                WORD MaxYaw = ParentSpeed/ParentPawn.NormalSpeed * MaxYawFactor;
-                                WORD MaxRoll = ParentSpeed/ParentPawn.NormalSpeed * MaxRollFactor;
-                                YawSpeed = YawSpeed >= 0 ? +MaxYaw/8 : -MaxYaw/AccelerationRatio;
-                                RollSpeed = RollSpeed >= 0 ? +MaxRoll/8 : -MaxRoll/AccelerationRatio;
-                                DrawYaw += YawSpeed;
-                                DrawRoll += RollSpeed;
-                                if( DrawYaw > MaxYaw )
-                                {
-                                    DrawYaw = MaxYaw;
-                                    if( YawSpeed > 0 ) { YawSpeed = -YawSpeed; }
-                                }
-                                else if( DrawYaw < -MaxYaw )
-                                {
-                                    DrawYaw = -MaxYaw;
-                                    if( YawSpeed < 0 ) { YawSpeed = -YawSpeed; }
-                                }
-                                ViewRot.Yaw += DrawYaw;
-                                if( DrawRoll > MaxRoll )
-                                {
-                                    DrawRoll = MaxRoll;
-                                    if( RollSpeed > 0 ) { RollSpeed = -RollSpeed; }
-                                }
-                                else if( DrawRoll < -MaxRoll )
-                                {
-                                    DrawRoll = -MaxRoll;
-                                    if( RollSpeed < 0 ) { RollSpeed = -RollSpeed; }
-                                }
-                                ViewRot.Roll += DrawRoll;
-                            }
-                            else
-                            {
-                                DrawRoll = 0;
-                                DrawYaw  = 0;
-                            }
-                            break;
-                        }
-                        case INV_DeActivating:
-                        case INV_Activating:
-                        {
-                            // Activating: Pull the weapon up and away from the body.
-                            // Deactivating: Pull the weapon down and towards the body.
-                            // Do this by pretending to start from a location
-                            // a little below the parent location, and move towards or
-                            // away from the weapon's Location.
-                            FVector StartedAt = ParentPawn.Location;
-                            StartedAt.Z -= 30;
-                            FVector Direction = Location - StartedAt;
-                            Direction *= float(TimerCountdown)/WeaponActivationTime;
-                            if( InvState == INV_DeActivating )
-                            {
-                                Location = StartedAt + Direction;
-                                //ViewRot.Yaw   += Era * 4000 / WeaponActivationTime;
-                                //ViewRot.Pitch -= Era * 500 / WeaponActivationTime;
-                            }
-                            else
-                            {
-                                Location -= Direction;
-                                ViewRot.Yaw   += TimerCountdown * 6000 / WeaponActivationTime;
-                                //ViewRot.Pitch -= TimerCountdown * 500 / WeaponActivationTime;
-                            }
-                            break;
-                        }
-                        case INV_Using1: // Primary attack
-                        case INV_Using2: // Secondary attack
-                                break;
-                    }
-                    #endif
                 return ProcessParent;
                 break;
             }
@@ -424,7 +326,7 @@ int AInventory::Process(ILevel *Level, FName Message, void *Params)
                     // Prevent the owner from picking up an item he already has,
                     // unless there is ammo that can be used by the parent.
                     PickItUp = FALSE;
-                    if( Actor.IsA(GClasses.Weapon) && Actor.HasParent() )
+                    if( Actor.IsKindOf("Weapon") && Actor.HasParent() )
                     {
                         AWeapon & Weapon = Actor.Weapon();
                         FActor & Parent = Actor.Parent();
@@ -482,7 +384,7 @@ int AInventory::Process(ILevel *Level, FName Message, void *Params)
                 {
                     // Request to switch to another item.
                     AInventory & NextActive = FActor::Inventory(iNextActive);
-                    if (NextActive.Class->IsKindOf(GClasses.Inventory))
+                    if (NextActive.Class->IsKindOf("Inventory"))
                     {
                         if (OwningSet==NextActive.OwningSet)
                         {
@@ -564,6 +466,7 @@ int AInventory::Process(ILevel *Level, FName Message, void *Params)
     UNGUARD("AInventory::Process");
 }
 
+#if 0 //todo: Delete
 //----------------------------------------------------------------------------
 //                 Health processing
 //----------------------------------------------------------------------------
@@ -593,6 +496,7 @@ int AArmor::Process(ILevel *Level, FName Message, void *Params)
     return ProcessParent;
     UNGUARD( "AArmor::Process" );
 }
+#endif
 
 //----------------------------------------------------------------------------
 //                 Pickup processing
@@ -614,6 +518,7 @@ int APowerUp::Process(ILevel *Level, FName Message, void *Params)
     UNGUARD( "APowerUp::Process" );
 }
 
+#if 0 //todo: Delete
 //----------------------------------------------------------------------------
 //                 Clip processing
 //----------------------------------------------------------------------------
@@ -644,6 +549,7 @@ int AStingerAmmo::Process(ILevel *Level, FName Message, void *Params)
     return ProcessParent;
     UNGUARD( "AStingerAmmo::Process" );
 }
+#endif
 
 //----------------------------------------------------------------------------
 //                 The End

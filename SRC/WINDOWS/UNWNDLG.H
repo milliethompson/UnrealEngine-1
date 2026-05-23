@@ -7,55 +7,48 @@
 =============================================================================*/
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnDlg dialog
+// CUnrealWnDlg dialog.
 /////////////////////////////////////////////////////////////////////////////
 
 class CUnrealWnDlg : public CDialog
-	{
-	//
-	// Construction:
-	//
-	public:
-	CUnrealWnDlg(CWnd* pParent = NULL);	// standard constructor
-	~CUnrealWnDlg(void); // destructor
-	//
-	// Custom:
-	//
-	void Exit(void);
+{
+public:
+	// Construction.
+	CUnrealWnDlg(CWnd* pParent = NULL);
+	~CUnrealWnDlg();
+
+	// Custom.
+	void Exit();
 	void Log(const CString &Text);
-	void ShowMe(void);
+	void ShowMe();
 	CEdit *FocusEditControl;
 	CRect Rect;
-	//
-	// Dialog Data:
-	//
+
+	// Dialog Data.
 	//{{AFX_DATA(CUnrealWnDlg)
 	enum { IDD = IDD_UNWN_DIALOG };
 	CEdit	m_CmdLine;
 	CEdit	m_CmdLog;
 	//}}AFX_DATA
-	//
-	// Virtual function overrides:
-	//
-	virtual void OnCancel(void);
-	virtual void OnOK(void);
-	//
-	// ClassWizard-generated virtual function overrides:
-	//
+
+	// Virtual function overrides.
+	virtual void OnCancel();
+	virtual void OnOK();
+
+	// ClassWizard-generated virtual function overrides.
 	//{{AFX_VIRTUAL(CUnrealWnDlg)
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 	//}}AFX_VIRTUAL
-	//
-	// Implementation
-	//
-	protected:
+
+	// Implementation.
+protected:
 	HICON m_hIcon;
-	//
-	// Handmade message map functions
+
+	// Handmade message map functions.
 	afx_msg LONG OnUnrealTimer(UINT,LONG);
 	//
-	// Generated message map functions
+	// Generated message map functions.
 	//{{AFX_MSG(CUnrealWnDlg)
 	afx_msg void OnSysCommand(UINT,LONG);
 	virtual BOOL OnInitDialog();
@@ -66,7 +59,9 @@ class CUnrealWnDlg : public CDialog
 	afx_msg void OnSetfocusCmdLog();
 	afx_msg void OnShowWindow(BOOL bShow, UINT nStatus);
 	//}}AFX_MSG
-	//
 	DECLARE_MESSAGE_MAP()
-	};
+};
 
+/////////////////////////////////////////////////////////////////////////////
+// The End.
+/////////////////////////////////////////////////////////////////////////////

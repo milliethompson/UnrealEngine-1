@@ -12,16 +12,16 @@
 #define _INC_UNPARAMS
 
 /*-----------------------------------------------------------------------------
-	Parameter parsing functions (UnParams.cpp)
+	Parameter parsing functions (UnParams.cpp).
 -----------------------------------------------------------------------------*/
 
 //
-// Bogus FStreamParser class, simply contains all stream parsing routines
+// Bogus FStreamParser class, simply contains all stream parsing routines.
 //
 class UNREAL_API FStreamParser
-	{
+{
 	friend UNREAL_API int GetBYTE 		(const char *Stream, const char *Match,	BYTE *Value);
-	friend UNREAL_API int GetSBYTE 		(const char *Stream, const char *Match,	SBYTE *Value);
+	friend UNREAL_API int GetCHAR 		(const char *Stream, const char *Match,	CHAR *Value);
 	friend UNREAL_API int GetWORD 		(const char *Stream, const char *Match,	WORD *Value);
 	friend UNREAL_API int GetINDEX		(const char *Stream, const char *Match,	INDEX *Value);
 	friend UNREAL_API int GetSWORD 		(const char *Stream, const char *Match,	SWORD *Value);
@@ -45,17 +45,16 @@ class UNREAL_API FStreamParser
 	friend UNREAL_API int GetBEGIN 		(const char **Stream, const char *Match);
 	friend UNREAL_API int GetEND		(const char **Stream, const char *Match);
 	friend UNREAL_API void GetNEXT		(const char **Stream);
-	friend UNREAL_API int GrabSTRING	(const char *&Str,char *Result, int MaxLen);
-	friend UNREAL_API int PeekCMD 		(const char *Stream, const char *Match);
+	friend UNREAL_API int  GrabSTRING	(const char *&Str,char *Result, int MaxLen);
+	friend UNREAL_API int  PeekCMD 		(const char *Stream, const char *Match);
 	friend UNREAL_API void SkipLINE		(const char **Stream);
 	friend UNREAL_API char *SetFVECTOR	(char *Dest,const FVector   *Value);
 	friend UNREAL_API char *SetFIXFVECTOR(char *Dest,const FVector   *Value);
 	friend UNREAL_API char *SetROTATION	(char *Dest,const FRotation *Rotation);
 	friend UNREAL_API char *SetFSCALE	(char *Dest,const FScale	*Scale);
-	};
+};
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/
 #endif // _INC_UNPARAMS
-

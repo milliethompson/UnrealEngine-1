@@ -7,6 +7,15 @@ Compiled with Visual C++ 4.0.
 Description:
     Refer to the associated header file.
 
+WARNING:
+   This package was designed to coordinate all access to subsystem
+   configurations (using the .ini file) by knowing about each subsystem.
+   This approach is obsolete and is on its way out. So
+   unconfig.h and unconfig.cpp will soon be gone. Instead, each
+   subsystem (FInput, FAction, and so on) manages its own configuration
+   using the platform-specific functions for setting/retrieving profile
+   values.
+
 Revision history:
     * 06/14/96: Created by Mark
 ==============================================================================*/
@@ -29,7 +38,7 @@ FConfiguration GConfiguration;
 static const BOOL Debugging = FALSE; // TRUE to enable debugging, FALSE otherwise.
 
 static const int MaxSectionLength = 32000; // Maximum length of text in a profile section.
-static inline void __cdecl Debug(const char * Message, ...)
+static inline void CDECL Debug(const char * Message, ...)
 {
     if( Debugging )
     {
@@ -47,24 +56,18 @@ static inline void __cdecl Debug(const char * Message, ...)
 //----------------------------------------------------------------------------
 //                Initialization
 //----------------------------------------------------------------------------
-void FConfiguration::Initialize()
+void FConfiguration::Initialize() //tbd! this function!
 {
     GUARD;
-    //tbi: These belong elsewhere.
-    GInput.Initialize();
-    GAction.Initialize();
     InterpretValuesFromFile(FConfiguration::NoSection);
     UNGUARD( "FConfiguration::Initialize" );
 }
 
 //----------------------------------------------------------------------------
-//                Finalize
+//                Exit
 //----------------------------------------------------------------------------
-void FConfiguration::Finalize()
+void FConfiguration::Exit()
 {
-    //tbi: These belong elsewhere.
-    GInput.Finalize();
-    GAction.Finalize();
 }
 
 //----------------------------------------------------------------------------
@@ -73,8 +76,6 @@ void FConfiguration::Finalize()
 static const char * SectionNames[FConfiguration::SectionCount] =
 {
     0               // NoSection
-,   "Input"         // InputSection
-,   "Action"        // ActionSection
 ,   "Preferences"   // PreferencesSection
 ,   "Audio"         // AudioSection
 };
@@ -96,9 +97,21 @@ FKeyValues::TStringList FConfiguration::GetSection
 ,   const char *    FileName        // 0 means use the default file name
 )
 {
+    return GetSection( SectionName(Section) );
+}
+
+//----------------------------------------------------------------------------
+//       Get all the values for a section from an initialization file.
+//----------------------------------------------------------------------------
+FKeyValues::TStringList FConfiguration::GetSection
+(
+    const char *    Section         // Get from this section.
+,   const char *    FileName        // 0 means use the default file name
+)
+{
     FKeyValues::TStringList List;
     List.Strings = FParse::MakeString(MaxSectionLength);
-    GApp->GetProfileSection( SectionName(Section), List.Strings, MaxSectionLength, FileName );
+    GApp->GetProfileSection( Section, List.Strings, MaxSectionLength, FileName );
     return List;
 }
 
@@ -112,13 +125,26 @@ char * FConfiguration::Get
     ,   const char *    FileName        // 0 means use the default file name
 )
 {
+    return GetValue( SectionName(Section), Key, FileName );
+}
+
+//----------------------------------------------------------------------------
+//       Get a particular value from an initialization file
+//----------------------------------------------------------------------------
+char * FConfiguration::GetValue
+(
+    const char *    Section         // Get from this section.
+,   const char *    Key             // Get the value for this key.
+,   const char *    FileName        // 0 means use the default file name
+)
+{
     char * Value = 0;
     char Text[FKeyValues::MaxValueLength+1]; // +1 for trailing null.
     if
     ( 
         GApp->GetProfileValue
         (
-            SectionName(Section)
+            Section
         ,   Key
         ,   0
         ,   Text
@@ -253,16 +279,6 @@ void FConfiguration::InterpretValue
         {
             break;
         }
-        case InputSection:
-        {
-            IsOkay = GInput.SetValue(Key,Value);
-            break;
-        }
-        case ActionSection:
-        {
-            IsOkay = GAction.SetValue(Key,Value);
-            break;
-        }
         case PreferencesSection:
         {
             IsOkay = GPreferences.SetValue(Key,Value);
@@ -311,7 +327,6 @@ void FConfiguration::InterpretValuesFromFile
             const TSection Section = TSection(Section_);
             InterpretValuesFromFile(Section, FileName);
         }
-        WriteValuesToFile(NoSection,"\\unreal\\system\\Debug.Ini"); //tbd!
     }
     else
     {
@@ -381,8 +396,6 @@ void FConfiguration::WriteValuesToFile
         FKeyValues::TStringList Pairs;
         switch(Section)
         {
-            case InputSection       : { Pairs = GInput.Pairs()      ; break; }
-            case ActionSection      : { Pairs = GAction.Pairs()     ; break; }
             case PreferencesSection : { Pairs = GPreferences.Pairs(); break; }
             case AudioSection       : { Pairs = AudioPairs()        ; break; }
             default: checkVital(FALSE,"Logic");

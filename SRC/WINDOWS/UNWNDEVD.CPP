@@ -1,10 +1,9 @@
-// InpDevDi.cpp : implementation file
-//
 /*
 ==============================================================================
+UnWnDevD.cpp: Input devices dialog class
 
 Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
-Compiled with Visual C++ 4.0, Calling method=__fastcall
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
     This is the CDialog-based class for handling the Unreal input devices dialog.
@@ -43,9 +42,9 @@ BOOL CDialogInputDevices::OnInitDialog()
 {
     CDialog::OnInitDialog();
     {
-        UseMouse        = GInput.UsingDevice( FInput::MouseDevice     );
-        UseJoystick1    = GInput.UsingDevice( FInput::Joystick1Device );
-        UseJoystick2    = GInput.UsingDevice( FInput::Joystick2Device );
+        UseMouse        = GApp->Input->UsingDevice( FPlatformInput::MouseDevice     );
+        UseJoystick1    = GApp->Input->UsingDevice( FPlatformInput::Joystick1Device );
+        UseJoystick2    = GApp->Input->UsingDevice( FPlatformInput::Joystick2Device );
         UpdateData(FALSE);
     }
     return FALSE; // FALSE tells Windows not to set the input focus. 
@@ -79,9 +78,9 @@ BOOL CDialogInputDevices::Accept()
 {
     BOOL Accepted = TRUE; // We always accept the input (it cannot be wrong).
     UpdateData(TRUE);
-    GInput.UseDevice( FInput::MouseDevice     , UseMouse         );
-    GInput.UseDevice( FInput::Joystick1Device , UseJoystick1     );
-    GInput.UseDevice( FInput::Joystick2Device , UseJoystick2     );
+    GApp->Input->UseDevice( FPlatformInput::MouseDevice     , UseMouse         );
+    GApp->Input->UseDevice( FPlatformInput::Joystick1Device , UseJoystick1     );
+    GApp->Input->UseDevice( FPlatformInput::Joystick2Device , UseJoystick2     );
     return Accepted;
 }
 

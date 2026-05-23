@@ -19,7 +19,7 @@
 //
 // Move all selected actors *except* cameras.  No transaction tracking.
 //
-void FEditor::edactMoveSelected (ILevel *Level, FVector *Delta, FFloatRotation *Rotation)
+void FGlobalEditor::edactMoveSelected (ILevel *Level, FVector *Delta, FFloatRotation *Rotation)
 	{
 	GUARD;
 	AActor *Actor = &Level->Actors->Element(0);
@@ -27,7 +27,9 @@ void FEditor::edactMoveSelected (ILevel *Level, FVector *Delta, FFloatRotation *
 		{
 		if (Actor->bSelected)
 			{
-			Actor->bTempDynamicLight = 1;
+			if( *Delta != GMath.ZeroVector ) Actor->bTempDynamicLight = 1;
+			else Actor->bTempLightChanged = 1;
+			//
 			Actor->Location.MoveBounded(*Delta);
 			Actor->DrawRot.Add(Rotation->Pitch,Rotation->Yaw,Rotation->Roll);
 			//
@@ -52,7 +54,7 @@ void FEditor::edactMoveSelected (ILevel *Level, FVector *Delta, FFloatRotation *
 //
 // Delete all selected actors.  Transaction-tracked.
 //
-void FEditor::edactDeleteSelected (ILevel *Level)
+void FGlobalEditor::edactDeleteSelected (ILevel *Level)
 	{
 	GUARD;
 	AActor *Actor = &Level->Actors->Element(0);
@@ -71,7 +73,7 @@ void FEditor::edactDeleteSelected (ILevel *Level)
 // Duplicate all selected actors and select just the duplicated set.
 // Transaction-tracked.
 //
-void FEditor::edactDuplicateSelected (ILevel *Level)
+void FGlobalEditor::edactDuplicateSelected (ILevel *Level)
 	{
 	GUARD;
 	AActor		*Actor,*NewActor;
@@ -136,13 +138,13 @@ void FEditor::edactDuplicateSelected (ILevel *Level)
 //
 // Select all actors except cameras. Transaction-tracked.
 //
-void FEditor::edactSelectAll (ILevel *Level)
+void FGlobalEditor::edactSelectAll (ILevel *Level)
 	{
 	GUARD;
 	AActor *Actor = &Level->Actors->Element(0);
 	for (INDEX i=0; i<Level->Actors->Max; i++)
 		{
-		if ((Actor->Class != GClasses.Camera) && !Actor->bSelected) // Don't select cameras
+		if (!Actor->IsKindOf("Camera") && !Actor->bSelected && !Actor->bHiddenEd)
 			{
 			GTrans->NoteActor (Level->Actors,i);
 			Actor->bSelected=1;
@@ -155,13 +157,13 @@ void FEditor::edactSelectAll (ILevel *Level)
 //
 // Select all actors in a particular class. Transaction-tracked.
 //
-void FEditor::edactSelectOfClass (ILevel *Level,UClass *Class)
+void FGlobalEditor::edactSelectOfClass (ILevel *Level,UClass *Class)
 	{
 	GUARD;
 	AActor *Actor = &Level->Actors->Element(0);
 	for (INDEX i=0; i<Level->Actors->Max; i++)
 		{
-		if ((Actor->Class==Class) && (Actor->Class!=GClasses.Camera) && !Actor->bSelected)
+		if (Actor->Class==Class && !Actor->IsKindOf("Camera") && !Actor->bSelected)
 			{
 			GTrans->NoteActor (Level->Actors,i);
 			Actor->bSelected=1;
@@ -174,7 +176,7 @@ void FEditor::edactSelectOfClass (ILevel *Level,UClass *Class)
 //
 // Select no actors. Transaction-tracked.
 //
-void FEditor::edactSelectNone (ILevel *Level)
+void FGlobalEditor::edactSelectNone (ILevel *Level)
 	{
 	AActor		*Actor;
 	//
@@ -193,42 +195,9 @@ void FEditor::edactSelectNone (ILevel *Level)
 	};
 
 //
-// Reset all selected actors to their default properties.
-// Transaction-tracked.
-//
-void FEditor::edactResetSelected (ILevel *Level)
-	{
-	GUARD;
-	AActor			*Actor;
-	FVector			Location;
-	FRotation		DrawRot,ViewRot;
-	//
-	Actor = &Level->Actors->Element(0);
-	for (INDEX i=0; i<Level->Actors->Max; i++)
-		{
-		if (Actor->Class && (Actor->Class != GClasses.Camera) && Actor->bSelected) // Don't select cameras
-			{
-			GTrans->NoteActor (Level->Actors,i);
-			//
-			Location = Actor->Location;
-			DrawRot  = Actor->DrawRot;
-			ViewRot  = Actor->ViewRot;
-			//
-			*Actor = Actor->Class->DefaultActor;
-			//
-			Actor->Location = Location;
-			Actor->DrawRot  = DrawRot;
-			Actor->ViewRot  = ViewRot;
-			};
-		Actor++;
-		};
-	UNGUARD("edactResetSelected");
-	};
-
-//
 // Delete all actors that are descendents of a class.
 //
-void FEditor::edactDeleteDependentsOf (ILevel *Level,UClass *Class)
+void FGlobalEditor::edactDeleteDependentsOf (ILevel *Level,UClass *Class)
 	{
 	AActor *Actor;
 	UClass *TestClass;

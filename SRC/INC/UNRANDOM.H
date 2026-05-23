@@ -26,7 +26,7 @@ struct FRandom
     static float Value(float First, float Last); // Returns a value in First..Last (inclusive)
     static BOOL Percent(int Percentage); // Returns TRUE Percentage% of the time.
     static BOOL Boolean(); // Return TRUE 50% of the time.
-    static void Initialize();
+    static void Initialize(unsigned Seed); // If Seed==0, a seed is selected.
 };
 
 // Randomly select from 2 choices:

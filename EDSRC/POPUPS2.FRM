@@ -2,17 +2,17 @@ VERSION 4.00
 Begin VB.Form frmPopups2 
    Caption         =   "frmMorePopups"
    ClientHeight    =   3975
-   ClientLeft      =   4785
-   ClientTop       =   2835
+   ClientLeft      =   5460
+   ClientTop       =   3390
    ClientWidth     =   6690
-   Height          =   4620
+   Height          =   4575
    Icon            =   "Popups2.frx":0000
-   Left            =   4725
+   Left            =   5400
    LinkTopic       =   "Form1"
    ScaleHeight     =   3975
    ScaleWidth      =   6690
    ShowInTaskbar   =   0   'False
-   Top             =   2250
+   Top             =   2850
    Width           =   6810
    Begin VB.Menu ClassBrowser 
       Caption         =   "ClassBrowser"

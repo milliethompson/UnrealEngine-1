@@ -2,17 +2,17 @@ VERSION 4.00
 Begin VB.Form frmBrushImp 
    Caption         =   "Import a brush"
    ClientHeight    =   3690
-   ClientLeft      =   2775
-   ClientTop       =   3150
+   ClientLeft      =   4395
+   ClientTop       =   2940
    ClientWidth     =   4425
    Height          =   4050
    Icon            =   "BrushImp.frx":0000
-   Left            =   2715
+   Left            =   4335
    LinkTopic       =   "Form1"
    ScaleHeight     =   3690
    ScaleWidth      =   4425
    ShowInTaskbar   =   0   'False
-   Top             =   2850
+   Top             =   2640
    Width           =   4545
    Begin VB.CommandButton Cancel 
       Cancel          =   -1  'True

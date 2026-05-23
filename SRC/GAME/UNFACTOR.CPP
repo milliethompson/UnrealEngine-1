@@ -1,4 +1,5 @@
-/*==============================================================================
+/*
+==============================================================================
 UnFActor.cpp: <Description>
 
 Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
@@ -9,7 +10,8 @@ Description:
 
 Revision history:
     * 07/04/96: Created by Mark
-==============================================================================*/
+==============================================================================
+*/
 
 #include "UnFActor.h"
 #include "UnRandom.h"
@@ -79,15 +81,6 @@ static inline int Degrees(int Degrees)
 //----------------------------------------------------------------------------
 //             Convenience functions.
 //----------------------------------------------------------------------------
-static inline FLOAT Max( FLOAT Value1, FLOAT Value2 )
-{
-    return Value1 >= Value2 ? Value1 : Value2;
-}
-
-static inline FLOAT Min( FLOAT Value1, FLOAT Value2 )
-{
-    return Value1 <= Value2 ? Value1 : Value2;
-}
 
 #define arrayCount_(Array) ( sizeof(Array) / sizeof((Array)[0]) )
 
@@ -160,7 +153,7 @@ void FActor::DumpAI() const
     Text += sprintf( Text, "%s AITask:", Actor.Class->Name );
     // Task kind:
     {
-        char * KindText;
+        char * KindText = 0;
         switch(AITask)
         {
             case EAI_TaskNone       : KindText = "None"     ; break;
@@ -225,7 +218,7 @@ void FActor::DumpAI() const
 void FActor::InitializeAI()
 {
     EmptyAI(TRUE);
-    if( IsA(GClasses.Pawn) )
+    if( IsKindOf("Pawn") )
     {
         APawn & Pawn = this->Pawn();
         Pawn.bTargetWasHere  = FALSE;
@@ -254,6 +247,28 @@ void FActor::SetActorCollision(BOOL CollideActors)
 }
 
 //----------------------------------------------------------------------------
+//                 Find the index of the first ancestor player
+//----------------------------------------------------------------------------
+INDEX FActor::AncestorIndex(UClass * Class) const
+{
+    INDEX iAncestor       = INDEX_NONE; // Index of parent, grandparent, great grandparent, and so on.
+    INDEX iMatchingAncestor = INDEX_NONE; // Index of first ancestor found to be of the given class.
+    while( iAncestor != INDEX_NONE && iMatchingAncestor == INDEX_NONE )
+    {
+        const FActor & Ancestor = FActor::Actor(iAncestor);
+        if( Ancestor.IsKindOf(Class) )
+        {
+            iMatchingAncestor = iAncestor;
+        }
+        else
+        {
+            iAncestor = Ancestor.iParent;
+        }
+    }
+    return iMatchingAncestor;
+}
+
+//----------------------------------------------------------------------------
 //                 Can the pawn see a location?
 //----------------------------------------------------------------------------
 BOOL FActor::CanSee(const FVector & Location) const
@@ -262,7 +277,7 @@ BOOL FActor::CanSee(const FVector & Location) const
     const FVector & TargetLocation = Location;
     const APawn & SensorPawn = this->Pawn();
     IModel & Model = GLevel->ModelInfo;
-    if( Model.LineClass( &SensorPawn.Location, &TargetLocation ) == 1 ) // Unobstructed line?
+    if( Model.LineClass( SensorPawn.Location, TargetLocation, 0 ) == 1 ) // Unobstructed line?
     {
         FVector SightVector = TargetLocation - SensorPawn.Location;
         if( SightVector.SizeSquared() <= SensorPawn.SightRadius*SensorPawn.SightRadius)
@@ -291,7 +306,7 @@ BOOL FActor::CanSee(const FVector & Location) const
 BOOL FActor::CanFire(BOOL Primary) const
 {
     BOOL CanFire = FALSE;
-    if( this->IsA( GClasses.Weapon) && this->HasParent() )
+    if( this->IsKindOf("Weapon") && this->HasParent() )
     {
         const AWeapon & Weapon = this->Weapon();
         const APawn & Parent = this->Parent().Pawn();
@@ -328,7 +343,7 @@ int FActor::Fire
     FActor & Actor = *this;
     const int Usage = PrimaryUse ? 0 : 1;
     int DischargeCount = 0;
-    if( this->IsA( GClasses.Weapon) && this->HasParent() )
+    if( this->IsKindOf("Weapon") && this->HasParent() )
     {
         AWeapon & Weapon = this->Weapon();
         APawn & Parent = this->Parent().Pawn();
@@ -412,7 +427,7 @@ int FActor::Fire
                 }
                 else
                 {
-                    GGame.SpawnForwardProjectile( Weapon.iMe, ProjectileClass, Weapon.ProjStartDist, YawDeviation, PitchDeviation );
+                    GGame.SpawnForwardProjectile( Weapon.iMe, ProjectileClass, 0/*Weapon.ProjStartDist*/, YawDeviation, PitchDeviation );
                 }
             }
             Weapon.bNeedsReloading = AmmoHeld < Weapon.AmmoUsed[0]*int(Weapon.Discharges[0]);
@@ -428,7 +443,7 @@ int FActor::Fire
 //----------------------------------------------------------------------------
 void FActor::AddExplosiveCharge(FLOAT Charge)
 {
-    if( this->IsA(GClasses.Pawn) )
+    if( this->IsKindOf("Pawn") )
     {
         APawn & Pawn = this->Pawn();
         Pawn.ExplosiveCharge += Charge;
@@ -453,6 +468,7 @@ const
     {
         Info.iSourceActor = iMe;
     }
+    Info.iInstigator = iInstigator;
     Info.Damage[DamageType] = Damage;
     Info.Momentum = Momentum;
     FActor::Send_Hit(Target.iMe,Info);
@@ -472,6 +488,7 @@ void FActor::CauseRayDamage
     PHit HitInfo;
     HitInfo.Empty();
     HitInfo.iSourceActor = Source.iMe;
+    HitInfo.iInstigator = iInstigator;
     HitInfo.Damage[DMT_Basic] = Damage;
     HitInfo.Momentum = 0; // 0 since the ::RayHit routine below will handle momentum.
 
@@ -512,7 +529,7 @@ BOOL FActor::CanHear(const FVector & Location, FLOAT Noise) const
 {
     BOOL CanHear = FALSE;
     IModel & Model = GLevel->ModelInfo;
-    if( Model.LineClass( &this->Location, &Location ) == 1 ) // Unobstructed path?
+    if( Model.LineClass( this->Location, Location, 0 ) == 1 ) // Unobstructed path?
     {
         const FLOAT Distance = (this->Location-Location).Size();
         CanHear = this->CanHear(Distance,Noise);
@@ -569,9 +586,7 @@ BOOL FActor::CanSense( const APawn & Pawn ) const
 void FActor::StopTurning()
 {
     APawn & Pawn = this->Pawn();
-    Pawn.YawSpeed    = 0 ;
-    Pawn.PitchSpeed  = 0 ;
-    Pawn.RollSpeed   = 0 ;
+    Pawn.RotSpeed = GMath.ZeroRotation;
 }
 
 //----------------------------------------------------------------------------
@@ -659,23 +674,11 @@ void FActor::TakeDamage( PHit & Info )
             HealthDamage += Info.Damage[WhichDamage];
         }
 
-        // Impart some momentum to actor:
-        if( Info.Momentum != 0 && Info.iSourceActor != INDEX_NONE )
-        {
-            if( Actor.bMomentum && Actor.Mass != 0 )
-            {
-                FActor & Source = FActor::Actor(Info.iSourceActor);
-                FVector dVelocity = Actor.Location - Source.Location;
-                dVelocity.Normalize();
-                dVelocity *= Info.Momentum / Actor.Mass;
-                Actor.Velocity += dVelocity;
-            }
-        }
         // Cheat: Lethal hit
         if( Info.iSourceActor != INDEX_NONE )
         {
             FActor & Source = FActor::Actor(Info.iSourceActor);
-            if( Source.IsA(GClasses.Pawn) )
+            if( Source.IsKindOf("Pawn") )
             {
                 APawn & SourcePawn = Source.Pawn();
                 if( GCheat->LethalHit || GCheat->LethalHits )
@@ -703,7 +706,7 @@ void FActor::TakeDamage( PHit & Info )
         if( NewHealth < 1.0 && Pawn.Health >= 1.0 )
         {
             Pawn.LifeState = LS_Dead;
-            Pawn.iKiller = Info.iSourceActor;
+            Pawn.iKiller = Info.iInstigator;
             Pawn.Health = 0;
             FActor::Send_Die(iMe);
         }
@@ -731,7 +734,7 @@ BOOL FActor::MightSense( const APawn & Pawn ) const
     const APawn & Target = Pawn;
     const FLOAT MaxRadius = Sensor.SightRadius;
     return 
-        Model.LineClass( &Sensor.Location, &Target.Location ) == 1 // Unobstructed line?
+        Model.LineClass( Sensor.Location, Target.Location, 0 ) == 1 // Unobstructed line?
     &&  (Target.Location - Sensor.Location).SizeSquared() <= MaxRadius*MaxRadius
     ;
 }
@@ -767,12 +770,10 @@ const
         Location += RightVector * Right;
         Location.Z += Up;
 
-        INDEX iEffect = GLevel->SpawnActor(Class,NAME_NONE,&Location);
-        Effect = Handle(iEffect);
+        Effect = Instigate(Class,&Location);
 	    if( Effect != 0 )
         {
             APyrotechnics & Pyrotechnic = Effect->Pyrotechnic();
-            Pyrotechnic.Velocity        = GMath.ZeroVector   ;
             Pyrotechnic.Texture         = Pyrotechnic.Textures[0] ;
         }
     }    
@@ -793,7 +794,7 @@ BOOL FActor::CanSee(const APawn & Pawn) const
 void FActor::MakeSound(USound * Sound) const
 {
     //todo: Improve this pawn-specific stuff..
-    if( IsA(GClasses.Pawn) )
+    if( IsKindOf("Pawn") )
     {
         APawn & Pawn = (APawn &)this->Pawn(); //todo: Yech - gross cast. Fix this.
         if( Pawn.SoundTimer == 0 || Pawn.LifeState != LS_Alive )
@@ -818,7 +819,7 @@ void FActor::MakeSound(USound * Sound, const FVector & Location) const
         //todo: The following check for pawns is robust but
         // it seems a waste to do it here.
         INDEX Index = 
-            this->IsA(GClasses.Pawn) && this->Pawn().LifeState != LS_Alive
+            this->IsKindOf("Pawn") && this->Pawn().LifeState != LS_Alive
         ?   -1          // Audio routines expect -1 for a dying monster to avoid cutting off his scream.
         :   this->iMe;
         ;
@@ -849,7 +850,7 @@ void FActor::MakeNoise(FLOAT Noise, const FVector & Location)
     	for( int Which = 0; Which < Actors.DynamicActors->Count(); Which++ )
         {
             AActor * const CheckActor = (*Actors.DynamicActors)[Which];
-            if( CheckActor != 0 && CheckActor->Class->IsKindOf(GClasses.Pawn) )
+            if( CheckActor != 0 && CheckActor->Class->IsKindOf("Pawn") )
             {
                 FActor & Actor = FActor::Actor( *CheckActor );
                 APawn & Pawn = Actor.Pawn();
@@ -897,7 +898,6 @@ const
     }
 }
 
-
 //----------------------------------------------------------------------------
 //              Create a new actor based on the given info.
 //----------------------------------------------------------------------------
@@ -905,26 +905,92 @@ FActor * FActor::Spawn
 (
     UClass        * Class       // Class of actor to create. 0 if none.
 ,   const FVector & Location    // Location of new actor.
-,   int             LifeSpan    // Life span of new actor, or 0 to use default class lifespan.
 ,   const FVector & Velocity    // Velocity of new actor.
 )
 {
-    FActor * Actor = 0;
+    FActor * NewActor = 0;
     if( Class != 0 )
     {
         INDEX iActor = GLevel->SpawnActor(Class,NAME_NONE,&Location);
         if (iActor != INDEX_NONE)
         {
-            Actor = &FActor::Actor(iActor);
-            Actor->Velocity = Velocity;
-            if( LifeSpan != 0 )
-            {
-                Actor->LifeSpan = LifeSpan;
-            }
+            NewActor = &FActor::Actor(iActor);
+            NewActor->Velocity = Velocity;
         }
     }
-    return Actor;
+    return NewActor;
 }
+
+//----------------------------------------------------------------------------
+//         Create a new actor and propagate instigator information
+//----------------------------------------------------------------------------
+FActor * FActor::Instigate
+(
+    UClass        * Class        // Class of actor to create. 0 if none.
+,   const FVector * Location     // Location of new actor, or 0 to use this->Location.
+,   const FVector * Velocity     // Velocity of new actor, or 0 for zero.
+)
+const
+{
+    FActor * NewActor = Spawn
+    ( 
+        Class
+    ,   Location != 0 ? *Location : this->Location
+    ,   Velocity != 0 ? *Velocity : GMath.ZeroVector
+    );
+    if( NewActor != 0 )
+    {
+        NewActor->iInstigator = this->iInstigator;
+    }
+    return NewActor;
+}
+
+
+//----------------------------------------------------------------------------
+//              Create a new actor at the location of *this.
+//----------------------------------------------------------------------------
+FActor * FActor::SpawnChild
+(
+    UClass        * Class       // Class of actor to create. 0 if none.
+)
+{
+    FActor * NewActor = 0;
+    if( Class != 0 )
+    {
+        INDEX iActor = GLevel->SpawnActor(Class,NAME_NONE,&Location);
+        if (iActor != INDEX_NONE)
+        {
+            NewActor = &FActor::Actor(iActor);
+            NewActor->Send_SetParent( this->iMe );
+        }
+    }
+    return NewActor;
+}
+
+//----------------------------------------------------------------------------
+//              Create a new actor at the location of *this.
+//----------------------------------------------------------------------------
+FActor * FActor::SpawnChild
+(
+    UClass        * Class       // Class of actor to create. 0 if none.
+,   const FVector & Location    // Location of new actor.
+,   const FVector & Velocity    // Velocity of new actor.
+)
+{
+    FActor * NewActor = 0;
+    if( Class != 0 )
+    {
+        INDEX iActor = GLevel->SpawnActor(Class,NAME_NONE,&Location);
+        if (iActor != INDEX_NONE)
+        {
+            NewActor = &FActor::Actor(iActor);
+            NewActor->Send_SetParent( this->iMe );
+            NewActor->Velocity = Velocity;
+        }
+    }
+    return NewActor;
+}
+
 
 //----------------------------------------------------------------------------
 //     Determine the first inventory item of the given class.
@@ -994,7 +1060,7 @@ BOOL FActor::CanUseAmmo
         CanUse = TRUE;
         if( Apply )
         {
-            PawnAmmo = OurMin( int(PawnAmmo)+AmmoCount, int(PawnAmmoLimit) );
+            PawnAmmo = Min( int(PawnAmmo)+AmmoCount, int(PawnAmmoLimit) );
             Pawn.bStatusChanged = TRUE;
         }
     }
@@ -1131,8 +1197,8 @@ BOOL FActor::CanUsePowerUp
 //----------------------------------------------------------------------------
 void FActor::StopTimer()
 {
-    TimerCountdown  = 0   ;
-    TimerMessage    = 0   ;
+    TimerCountdown  = 0;
+    TimerMessage    = NAME_NONE;
 }
 
 //----------------------------------------------------------------------------
@@ -1169,7 +1235,7 @@ void FActor::UseFrame
 void FActor::CancelAnimations()
 {
     AActorAI & AI = this->AI();
-    ARoot & Root = this->Root();
+    AActor & Root = *this;
     while( !AI.Animations.IsEmpty() )
     {
         AI.Animations.MoveNextTo(Root);
@@ -1232,7 +1298,7 @@ static void PrepareForNewAnimation(FActor & Actor)
         // The animation list is full. 
         // Let's copy the first animation (the oldest) into the actor's current
         // animation. This will create lost frames and jerky animation.
-        AI.Animations.MoveNextTo(Actor.Root());
+        AI.Animations.MoveNextTo(Actor);
     }
 }
 
@@ -1282,10 +1348,9 @@ FActor * FActor::NearbyFacedPawn(const FRotation & View) const
         {
             const INDEX CheckIndex = Touchers[Which];
             FActor & Check = FActor::Actor(CheckIndex);
-            if( CheckIndex != this->iMe && Check.IsA(GClasses.Pawn) )
+            if( CheckIndex != this->iMe && Check.IsKindOf("Pawn") )
             {
-                FVector Direction = Check.Location - this->Location;
-                Direction.Normalize();
+                FVector Direction = (Check.Location - this->Location).Normal();
                 const FLOAT Dot = ViewVector | Direction;
                 if( (BestChoice == INDEX_NONE && Dot >= .5 ) || Dot > BestDot )
                 {
@@ -1366,7 +1431,7 @@ void FActor::AnimationTick()
                 if( !AI.Animations.IsEmpty() )
                 {
                     Actor.bAnimate = TRUE;
-                    AI.Animations.MoveNextTo(Actor.Root());
+                    AI.Animations.MoveNextTo(Actor);
                 }
             }
         }
@@ -1643,11 +1708,11 @@ void FActor::TurnTowards( const FVector & TargetLocation, int MaxChange )
 //---------------------------------------------------------------------------
 void FActor::TriggerEvent()
 {
-    if( EventName != NAME_NONE )
+    if( Event != NAME_NONE )
     {
         PTouch Info;
         Info.iActor = iMe;
-        GLevel->SendMessageEx(ACTOR_Trigger,&Info,INDEX_NONE,EventName,NULL);
+        GLevel->SendMessageEx(ACTOR_Trigger,&Info,INDEX_NONE,Event,NULL);
     }
 }
 
@@ -1670,7 +1735,7 @@ void FActor::TeleportTo( INDEX iTeleporter )
         {
             // Find the matching teleporter (or other target):
             INDEX iTarget = TargetLocation[0] != 0 ? INDEX_NONE : iTeleporter;
-            for( int WhichActor = 0; iTarget==INDEX_NONE && WhichActor < GLevel->Actors->Max; ++WhichActor )
+            for( int WhichActor = 0; iTarget==INDEX_NONE && WhichActor < GLevel->Actors->Num; ++WhichActor )
             {
                 AActor & Actor = GLevel->Actors->Element(WhichActor);
                 if( stricmp( Actor.Name.Name(), TargetLocation ) == 0 ) 
@@ -2222,6 +2287,41 @@ int FActor::Send_TextMsg(INDEX iActor, const char * Message, BYTE MessageType)
     UNGUARD("FActor::TextMsg");
 }
 
+//---------------------------------------------------------------------------
+//               Send ACTOR_SetParent to an actor.
+//---------------------------------------------------------------------------
+int FActor::Send_SetParent(INDEX iActor, INDEX iNewParent)
+{
+    GUARD;
+    PActor Info;
+    Info.iActor = iNewParent;
+    return GLevel->SendMessage(iActor,ACTOR_SetParent,&Info);
+    UNGUARD("FActor::SetParent");
+}
+
+//---------------------------------------------------------------------------
+//               Send ACTOR_GainedChild to an actor.
+//---------------------------------------------------------------------------
+int FActor::Send_GainedChild(INDEX iActor, INDEX iChild)
+{
+    GUARD;
+    PActor Info;
+    Info.iActor = iChild;
+    return GLevel->SendMessage(iActor,ACTOR_GainedChild,&Info);
+    UNGUARD("FActor::GainedChild");
+}
+
+//---------------------------------------------------------------------------
+//               Send ACTOR_LostChild to an actor.
+//---------------------------------------------------------------------------
+int FActor::Send_LostChild(INDEX iActor, INDEX iChild)
+{
+    GUARD;
+    PActor Info;
+    Info.iActor = iChild;
+    return GLevel->SendMessage(iActor,ACTOR_LostChild,&Info);
+    UNGUARD("FActor::LostChild");
+}
 
 //---------------------------------------------------------------------------
 //               Send ACTOR_SensedSomething to an actor.

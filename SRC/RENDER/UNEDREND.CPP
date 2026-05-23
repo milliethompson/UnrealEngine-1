@@ -16,7 +16,7 @@
 #define ORTHO_LOW_DETAIL 40000.0
 
 /*-----------------------------------------------------------------------------
-	Line drawing routines
+	Line drawing routines.
 -----------------------------------------------------------------------------*/
 
 //
@@ -63,7 +63,7 @@ void FGlobalRender::DrawLine(ICamera *Camera, BYTE Color, int Dotted,
 		}
 	else
 		{
-		DWORD TrueColor = GGfx.TrueColors[NewColor].D;
+		DWORD TrueColor = GGfx.DefaultColors[NewColor].TrueColor();
 		#define DRAWPIXEL(Dest)  *(DWORD *)(Dest)=TrueColor
 		#define SHIFT 2
 		#define LABEL1(X) X##C4
@@ -77,13 +77,24 @@ void FGlobalRender::DrawLine(ICamera *Camera, BYTE Color, int Dotted,
 //
 // Draw a depth-shaded line
 //
-void FGlobalRender::DrawDepthLine(ICamera *Camera, BYTE Color, int Dotted,
-	FLOAT X1, FLOAT Y1, FLOAT RZ1, FLOAT X2, FLOAT Y2, FLOAT RZ2)
-	{
+void FGlobalRender::DrawDepthLine
+(
+	ICamera		*Camera, 
+	BYTE		Color, 
+	INT			Dotted,
+	FLOAT		X1, 
+	FLOAT		Y1, 
+	FLOAT		RZ1, 
+	FLOAT		X2, 
+	FLOAT		Y2, 
+	FLOAT		RZ2
+)
+{
 	INT NewColor = Color-16;
-	if (Camera->ColorBytes==1)
-		{
-		#define DRAWPIXEL(Dest)    *(Dest)=NewColor + (UNFIX(FixG1 += FixDG)<<3);
+	FCacheItem *Item;
+	if( Camera->ColorBytes == 1 )
+	{
+		#define DRAWPIXEL(Dest) *(Dest)=NewColor + (Unfix(FixG1 += FixDG)<<3);
 		#define ASMPIXEL \
 			__asm{mov ebx,eax}\
 			__asm{mov edx,[FixDG]}\
@@ -102,10 +113,11 @@ void FGlobalRender::DrawDepthLine(ICamera *Camera, BYTE Color, int Dotted,
 		#undef  DEPTHSHADE
 		#undef  DRAWPIXEL
 		#undef  ASMPIXEL
-		}
-	else if ((Camera->ColorBytes==2) && (Camera->Caps && CC_RGB565))
-		{
-		#define DRAWPIXEL(Dest)    *(WORD *)(Dest)=GGfx.DefaultColors[NewColor+(UNFIX(FixG1 += FixDG)<<3)].HiColor565();
+	}
+	else if( Camera->ColorBytes == 2 )
+	{
+		WORD *HiColor = GGfx.DefaultPalette->GetColorDepthPalette(Item,Camera->Texture).PtrWORD;
+		#define DRAWPIXEL(Dest) *(WORD *)(Dest)=HiColor[NewColor+(Unfix(FixG1 += FixDG)<<3)];
 		#define DEPTHSHADE
 		#define SHIFT 1
 		#define LABEL1(X) X##D2_565
@@ -114,22 +126,12 @@ void FGlobalRender::DrawDepthLine(ICamera *Camera, BYTE Color, int Dotted,
 		#undef  SHIFT
 		#undef  DEPTHSHADE
 		#undef  DRAWPIXEL
-		}
-	else if (Camera->ColorBytes==2)
-		{
-		#define DRAWPIXEL(Dest)    *(WORD *)(Dest)=GGfx.DefaultColors[NewColor+(UNFIX(FixG1 += FixDG)<<3)].HiColor555();
-		#define DEPTHSHADE
-		#define SHIFT 1
-		#define LABEL1(X) X##D2_555
-		#include "UnLine1.cpp"
-		#undef  LABEL1
-		#undef  SHIFT
-		#undef  DEPTHSHADE
-		#undef  DRAWPIXEL
-		}
+		Item->Unlock();
+	}
 	else
-		{
-		#define DRAWPIXEL(Dest)    *(DWORD *)(Dest)=*(DWORD *)&GGfx.TrueColors[NewColor+(UNFIX(FixG1 += FixDG)<<3)];
+	{
+		DWORD *TrueColor = GGfx.DefaultPalette->GetColorDepthPalette(Item,Camera->Texture).PtrDWORD;
+		#define DRAWPIXEL(Dest)    *(DWORD *)(Dest)=TrueColor[NewColor+(Unfix(FixG1 += FixDG)<<3)];
 		#define DEPTHSHADE
 		#define SHIFT 2
 		#define LABEL1(X) X##D4
@@ -138,11 +140,12 @@ void FGlobalRender::DrawDepthLine(ICamera *Camera, BYTE Color, int Dotted,
 		#undef  LABEL1
 		#undef  DEPTHSHADE
 		#undef  DRAWPIXEL
-		};
-	};
+		Item->Unlock();
+	}
+}
 
 /*-----------------------------------------------------------------------------
-	Low-level graphics drawing primitives
+	Low-level graphics drawing primitives.
 -----------------------------------------------------------------------------*/
 
 //
@@ -150,13 +153,13 @@ void FGlobalRender::DrawDepthLine(ICamera *Camera, BYTE Color, int Dotted,
 //
 void FGlobalRender::DrawRect(ICamera *Camera, BYTE Color, int X1, int Y1, int X2, int Y2)
 	{
-	GUARD;
+	guard(FGlobalRender::DrawRect);
 	//
 	if ((X2<0)||(Y2<0)) return;
 	//
 	const int SXR      = Camera->SXR;
 	const int SYR      = Camera->SYR;
-	const int SXStride = Camera->SXStride;
+	const int SXStride = Camera->Stride;
 	//
 	if ((X1>=SXR) || (Y1>=SYR)) return;
 	//
@@ -177,7 +180,7 @@ void FGlobalRender::DrawRect(ICamera *Camera, BYTE Color, int X1, int Y1, int X2
 		{
 		Dest1 = &Camera->Screen[X1 + Y1*SXStride];
 		//
-		#ifdef ASM
+#if ASM
 		__asm
 			{
 			mov edi,[Dest1]		// Destination address
@@ -228,7 +231,7 @@ void FGlobalRender::DrawRect(ICamera *Camera, BYTE Color, int X1, int Y1, int X2
 		}
 	else
 		{
-		DWORD TrueColor = GGfx.TrueColors [Color].D;
+		DWORD TrueColor = GGfx.DefaultColors[Color].TrueColor();
 		Dest1 = &Camera->Screen[(X1 + Y1 * SXStride) << 2];
 		for (Y=0; Y<YL; Y++)
 			{
@@ -241,7 +244,7 @@ void FGlobalRender::DrawRect(ICamera *Camera, BYTE Color, int X1, int Y1, int X2
 			Dest1 += SXStride << 2;
 			};
 		};
-	UNGUARD("FGlobalRender::DrawRect");
+	unguard;
 	};
 
 //
@@ -267,7 +270,7 @@ void FGlobalRender::DrawCircle(ICamera *Camera, FVector &Location, int Radius, i
 	};
 
 /*-----------------------------------------------------------------------------
-	Misc
+	Misc.
 -----------------------------------------------------------------------------*/
 
 //
@@ -277,7 +280,7 @@ void FGlobalRender::DrawCircle(ICamera *Camera, FVector &Location, int Radius, i
 int FGlobalRender::OrthoClip(ICamera *Camera,const FVector *P1, const FVector *P2,
 	FLOAT *ScreenX1, FLOAT *ScreenY1, FLOAT *ScreenX2, FLOAT *ScreenY2)
 	{
-	GUARD;
+	guard(FGlobalRender::OrthoClip);
 	const FVector *Origin = &Camera->Coords.Origin;
 	FLOAT   X1,X2,Y1,Y2,Temp;
 	int     Status=1;
@@ -300,12 +303,13 @@ int FGlobalRender::OrthoClip(ICamera *Camera,const FVector *P1, const FVector *P
 			break;
 		default:
 			appError ("OrthoClip: Bad RendMap");
+			return 0;
 		};
 	//
 	// See if points for a line that's parallel to our line of sight (i.e. line appears
 	// as a dot):
 	//
-	if ((OurAbs(X2-X1)+OurAbs(Y1-Y2))<0.5) Status=2; // Is point
+	if ((Abs(X2-X1)+Abs(Y1-Y2))<0.5) Status=2; // Is point
 	//
 	// Zoom:
 	//
@@ -325,13 +329,13 @@ int FGlobalRender::OrthoClip(ICamera *Camera,const FVector *P1, const FVector *P
 	if (X1>Camera->SXR)  return 0;
 	if (X1<0)
 		{
-		if (OurAbs(X2-X1)<0.001) return 0;
+		if (Abs(X2-X1)<0.001) return 0;
 		Y1 += (0-X1)*(Y2-Y1)/(X2-X1);
 		X1  = 0;
 		};
 	if (X2>=Camera->SXR)
 		{
-		if (OurAbs(X2-X1)<0.001) return 0;
+		if (Abs(X2-X1)<0.001) return 0;
 		Y2 += ((Camera->FSXR-1.0)-X2)*(Y2-Y1)/(X2-X1);
 		X2  = Camera->FSXR-1.0;
 		};
@@ -347,13 +351,13 @@ int FGlobalRender::OrthoClip(ICamera *Camera,const FVector *P1, const FVector *P
 	if (Y1>Camera->SYR)  return 0;
 	if (Y1<0)
 		{
-		if (OurAbs(Y2-Y1)<0.001) return 0;
+		if (Abs(Y2-Y1)<0.001) return 0;
 		X1 += (0-Y1)*(X2-X1)/(Y2-Y1);
 		Y1  = 0;
 		};
 	if (Y2>=Camera->SYR)
 		{
-		if (OurAbs(Y2-Y1)<0.001) return 0;
+		if (Abs(Y2-Y1)<0.001) return 0;
 		X2 += ((Camera->FSYR1-1.0)-Y2)*(X2-X1)/(Y2-Y1);
 		Y2  = (Camera->FSYR1-1.0);
 		};
@@ -366,7 +370,7 @@ int FGlobalRender::OrthoClip(ICamera *Camera,const FVector *P1, const FVector *P
 	*ScreenY2=Y2;
 	//
 	return Status;
-	UNGUARD("FGlobalRender::OrthoClip");
+	unguard;
 	};
 
 //
@@ -377,9 +381,9 @@ int FGlobalRender::OrthoClip(ICamera *Camera,const FVector *P1, const FVector *P
 // Scale = scale of one world unit (at this point) relative to screen pixels,
 // for example 0.5 means one world unit is 0.5 pixels.
 //
-int FGlobalRender::Project (ICamera *Camera, FVector *V, FLOAT *ScreenX, FLOAT *ScreenY, FLOAT *Scale)
+int FGlobalRender::Project(ICamera *Camera, FVector *V, FLOAT *ScreenX, FLOAT *ScreenY, FLOAT *Scale)
 	{
-	GUARD;
+	guard(FGlobalRender::Project);
 	//
 	const FVector *Origin = &Camera->Coords.Origin;
 	FVector	Temp;
@@ -414,7 +418,7 @@ int FGlobalRender::Project (ICamera *Camera, FVector *V, FLOAT *ScreenX, FLOAT *
 		{
 		Temp.TransformVector(Camera->Coords);
 		//
-		Z  = Temp.Z; if (OurAbs (Z)<0.01) Z+=0.02;
+		Z  = Temp.Z; if (Abs (Z)<0.01) Z+=0.02;
 		RZ	= Camera->ProjZ / Z;
 		//
 		*ScreenX = Temp.X * RZ + Camera->FSXR2;
@@ -422,11 +426,11 @@ int FGlobalRender::Project (ICamera *Camera, FVector *V, FLOAT *ScreenX, FLOAT *
 		if (Scale != NULL) *Scale = RZ;
 		return (Z>1.0);
 		};
-	UNGUARD("FGlobalRender::Project");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
-   Screen to world functions (inverse projection)
+   Screen to world functions (inverse projection).
 -----------------------------------------------------------------------------*/
 
 //
@@ -435,9 +439,9 @@ int FGlobalRender::Project (ICamera *Camera, FVector *V, FLOAT *ScreenX, FLOAT *
 // unless UseEdScan=1 and the user just clicked on a wall (a Bsp polygon).
 // Sets V to location and returns 1, or returns 0 if couldn't perform conversion.
 //
-int FGlobalRender::Deproject (ICamera *Camera,int ScreenX,int ScreenY,FVector *V,int UseEdScan,FLOAT Radius)
+int FGlobalRender::Deproject(ICamera *Camera,int ScreenX,int ScreenY,FVector *V,int UseEdScan,FLOAT Radius)
 	{
-	GUARD;
+	guard(FGlobalRender::Deproject);
 	//
 	FVector	*Origin = &Camera->Coords.Origin;
 	FLOAT	SX		= (FLOAT)ScreenX - Camera->FSXR2;
@@ -502,16 +506,16 @@ int FGlobalRender::Deproject (ICamera *Camera,int ScreenX,int ScreenY,FVector *V
 				};
 			return 0; // 3D not supported yet
 		};
-	UNGUARD("FGlobalRender::Deproject");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
-   High-level graphics primitives
+   High-level graphics primitives.
 -----------------------------------------------------------------------------*/
 
-void FGlobalRender::DrawOrthoLine (ICamera *Camera, const FVector *P1, const FVector *P2,int Color,int Dotted)
+void FGlobalRender::DrawOrthoLine(ICamera *Camera, const FVector *P1, const FVector *P2,int Color,int Dotted)
 	{
-	GUARD;
+	guard(FGlobalRender::DrawOrthoLine);
 	//
 	FLOAT   X1,Y1,X2,Y2;
 	int		Status;
@@ -526,13 +530,13 @@ void FGlobalRender::DrawOrthoLine (ICamera *Camera, const FVector *P1, const FVe
 		{
 		if (Camera->OrthoZoom < ORTHO_LOW_DETAIL) DrawRect(Camera,Color,X1-1,Y1-1,X1+1,Y1+1);
 		};
-	UNGUARD("FGlobalRender::DrawOrthoLine");
+	unguard;
 	};
 
-void FGlobalRender::Draw3DLine (ICamera *Camera, const FVector *OrigP, const FVector *OrigQ, int MustTransform, 
+void FGlobalRender::Draw3DLine(ICamera *Camera, const FVector *OrigP, const FVector *OrigQ, int MustTransform, 
 	int Color,int DepthShade,int Dotted)
 	{
-	GUARD;
+	guard(FGlobalRender::Draw3DLine);
 	//
 	FLOAT   SX	= Camera->FSXR;
 	FLOAT	SY  = Camera->FSYR;
@@ -709,11 +713,11 @@ void FGlobalRender::Draw3DLine (ICamera *Camera, const FVector *OrigP, const FVe
 	if 		(DepthShade==0) DrawLine	  (Camera,Color,Dotted,X1,Y1,X2,Y2);
 	else if (DepthShade==1)	DrawDepthLine (Camera,Color,Dotted,X1,Y1,RZ1,X2,Y2,RZ2);
 	//
-	UNGUARD("FGlobalRender::Draw3DLine");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
-	Edpoly drawers
+	Edpoly drawers.
 -----------------------------------------------------------------------------*/
 
 //
@@ -721,7 +725,7 @@ void FGlobalRender::Draw3DLine (ICamera *Camera, const FVector *OrigP, const FVe
 //
 void FGlobalRender::DrawFPoly(ICamera *Camera, FPoly *EdPoly, int WireColor, int FillColor,int Dotted)
 	{
-	GUARD;
+	guard(FGlobalRender::DrawFPoly);
 	//
 	const FVector	*Origin = &Camera->Coords.Origin;
 	FVector			*Verts	= &EdPoly->Vertex[0];
@@ -779,17 +783,17 @@ void FGlobalRender::DrawFPoly(ICamera *Camera, FPoly *EdPoly, int WireColor, int
 			V2 = V1++;
 			};
 		};
-	UNGUARD("FGlobalRender::DrawFPoly");
+	unguard;
 	};
 
 //
 // Draw a brush (with rotation/translation):
 //
-void FGlobalRender::DrawBrushPolys (ICamera *Camera, UModel *Brush, 
+void FGlobalRender::DrawBrushPolys(ICamera *Camera, UModel *Brush, 
 	int WireColor, int Dotted, FConstraints *Constraints, int DrawPivot,
 	int DrawVertices, int DrawSelected, int DoScan)
 	{
-	GUARD;
+	guard(FGlobalRender::DrawBrushPolys);
 	//
 	// See if we can reject the brush:
 	//
@@ -797,7 +801,7 @@ void FGlobalRender::DrawBrushPolys (ICamera *Camera, UModel *Brush,
 		{
 		if (!BoundVisible (Camera,&Brush->Bound[1],NULL,NULL,NULL)) return;
 		};
-	AActor		*Actor = Camera->Actor;
+	APawn		*Actor = Camera->Actor;
 	FCoords     Coords;		// Locally-rotated coordinates for brush
 	FVector     Location;	// New (constrained) location
 	FRotation	Rotation;	// New (constrained) rotation
@@ -952,12 +956,12 @@ void FGlobalRender::DrawBrushPolys (ICamera *Camera, UModel *Brush,
 	GMem.Release	(TransformedEdPolys);
 	Brush->Unlock	(&BrushInfo);
 	//
-	UNGUARD("FGlobalRender::DrawBrushFPolys");
+	unguard;
 	};
 
-void FGlobalRender::DrawLevelBrushes (ICamera *Camera)
+void FGlobalRender::DrawLevelBrushes(ICamera *Camera)
 	{
-	GUARD;
+	guard(FGlobalRender::DrawLevelBrushes);
 	//
 	ULevel			*Level		= Camera->Level.Level;
 	UModel			*Brush;
@@ -1004,12 +1008,12 @@ void FGlobalRender::DrawLevelBrushes (ICamera *Camera)
 		//
 		DrawBrushPolys(Camera,Brush,WireColor,0,Constraints,ShowVerts,ShowVerts,Selected,1);
 		};
-	UNGUARD("FGlobalRender::DrawLevelBrushes");
+	unguard;
 	};
 
-void FGlobalRender::DrawActiveBrush (ICamera *Camera)
+void FGlobalRender::DrawActiveBrush(ICamera *Camera)
 	{
-	GUARD;
+	guard(FGlobalRender::DrawActiveBrush);
 	//
 	int	Selected = Camera->Level.Brush->ModelFlags & MF_Selected;
 	DrawBrushPolys
@@ -1017,15 +1021,15 @@ void FGlobalRender::DrawActiveBrush (ICamera *Camera)
 		Camera,Camera->Level.Brush,BrushWireColor,1,
 		GEditor ? &GEditor->Constraints : NULL,1,GEditor ? GEditor->ShowVertices : 0,Selected, 1
 		);
-	UNGUARD("FGlobalRender::DrawActiveBrush");
+	unguard;
 	};
 
 //
 // Draw the brush's bounding box and pivots:
 //
-void FGlobalRender::DrawBoundingVolume(ICamera *Camera,FBoundingVolume *Bound)
+void FGlobalRender::DrawBoundingRect(ICamera *Camera,FBoundingRect *Bound)
 	{
-	GUARD;
+	guard(FGlobalRender::DrawBoundingRect);
 	//
 	FVector B[2],P,Q;
 	FLOAT SX,SY;
@@ -1061,21 +1065,21 @@ void FGlobalRender::DrawBoundingVolume(ICamera *Camera,FBoundingVolume *Bound)
 			if (GEditor && GEditor->Scan.Active) GEditor->Scan.PostScan(EDSCAN_BrushVertex,0,0,0,&P);
 			};
 		};
-	UNGUARD("FGlobalRender::DrawBoundingVolume");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
-	Misc gfx
+	Misc gfx.
 -----------------------------------------------------------------------------*/
 
 //
 // Draw a piece of an orthogonal grid (arbitrary axes):
 //
-void FGlobalRender::DrawGridSection (ICamera *Camera, int CameraLocX,
+void FGlobalRender::DrawGridSection(ICamera *Camera, int CameraLocX,
 	int CameraSXR, int CameraGridY, FVector *A, FVector *B,
 	FLOAT *AX, FLOAT *BX,int AlphaCase)
 	{
-	GUARD;
+	guard(FGlobalRender::DrawGridSection);
 	//
 	if (!CameraGridY) return;
 	if (!Camera->Camera->IsOrtho()) appError("Ortho camera error");
@@ -1083,21 +1087,21 @@ void FGlobalRender::DrawGridSection (ICamera *Camera, int CameraLocX,
 	FLOAT	Start = (int)((CameraLocX - (CameraSXR>>1)*Camera->Zoom)/CameraGridY) - 1.0;
 	FLOAT	End   = (int)((CameraLocX + (CameraSXR>>1)*Camera->Zoom)/CameraGridY) + 1.0;
 	int     Dist  = (int)(Camera->SXR * Camera->Zoom / CameraGridY);
-	int		i,Color,IncBits,Max,iStart,iEnd;
+	int		i,Color,IncBits,GMax,iStart,iEnd;
 	FLOAT	Alpha,Ofs;
 	//
 	IncBits = 0;
-	Max     = Camera->SXR >> 2;
+	GMax    = Camera->SXR >> 2;
 	//
-	if ((Dist+Dist) >= Max)
+	if ((Dist+Dist) >= GMax)
 		{
-		while ((Dist>>IncBits) >= Max) IncBits++;
-		Alpha = (FLOAT)Dist / (FLOAT)((1<<IncBits) * Max);
+		while ((Dist>>IncBits) >= GMax) IncBits++;
+		Alpha = (FLOAT)Dist / (FLOAT)((1<<IncBits) * GMax);
 		}
 	else Alpha = 0.0;
 	//
-	iStart  = OurMax((int)Start,-32768/CameraGridY) >> IncBits;
-	iEnd    = OurMin((int)End,  +32768/CameraGridY) >> IncBits;
+	iStart  = Max((int)Start,-32768/CameraGridY) >> IncBits;
+	iEnd    = Min((int)End,  +32768/CameraGridY) >> IncBits;
 	//
 	for (i=iStart; i<iEnd; i++)
 		{
@@ -1114,15 +1118,15 @@ void FGlobalRender::DrawGridSection (ICamera *Camera, int CameraLocX,
 			DrawOrthoLine(Camera,A,B,Color+16,1);
 			};
 		};
-	UNGUARD("FGlobalRender::DrawGridSection");
+	unguard;
 	};
 
 //
 // Draw worldbox and groundplane lines, if desired.
 //
-void FGlobalRender::DrawWireBackground (ICamera *Camera)
+void FGlobalRender::DrawWireBackground(ICamera *Camera)
 	{
-	GUARD;
+	guard(FGlobalRender::DrawWireBackground);
 	//
 	if (!GEditor) return;
 	//
@@ -1245,5 +1249,9 @@ void FGlobalRender::DrawWireBackground (ICamera *Camera)
 			Draw3DLine(Camera,&A,&B,1,(i==j)?GroundPlaneHighlight:GroundPlaneColor,1,0);
 			};
 		};
-	UNGUARD("FGlobalRender::DrawWireBackground");
+	unguard;
 	};
+
+/*-----------------------------------------------------------------------------
+	The End.
+-----------------------------------------------------------------------------*/

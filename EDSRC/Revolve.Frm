@@ -22,6 +22,7 @@ Begin VB.Form frmRevolve
    Left            =   1470
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
+   MinButton       =   0   'False
    ScaleHeight     =   1875
    ScaleWidth      =   4620
    ShowInTaskbar   =   0   'False

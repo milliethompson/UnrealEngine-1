@@ -22,41 +22,32 @@ Begin VB.Form frmAddSpecial
       Height          =   315
       Left            =   1200
       Style           =   2  'Dropdown List
-      TabIndex        =   17
+      TabIndex        =   16
       Tag             =   "Predefined settings"
       Top             =   120
       Width           =   1935
    End
    Begin VB.Frame Frame5 
       Caption         =   "Effects"
-      Height          =   1395
+      Height          =   1335
       Left            =   120
       TabIndex        =   13
-      Top             =   1380
+      Top             =   1440
       Width           =   1455
       Begin VB.CheckBox Invisible 
          Caption         =   "Invisible"
          Height          =   255
          Left            =   120
-         TabIndex        =   19
-         Top             =   1020
+         TabIndex        =   18
+         Top             =   840
          Width           =   1215
       End
       Begin VB.CheckBox ZonePortal 
          Caption         =   "Zone Portal"
          Height          =   255
          Left            =   120
-         TabIndex        =   18
-         Top             =   780
-         Width           =   1215
-      End
-      Begin VB.CheckBox Ghost 
-         Caption         =   "Ghost"
-         Height          =   255
-         Left            =   120
-         TabIndex        =   15
-         Tag             =   "Textures are semi-transparent"
-         Top             =   540
+         TabIndex        =   17
+         Top             =   600
          Width           =   1215
       End
       Begin VB.CheckBox Transparent 
@@ -65,7 +56,7 @@ Begin VB.Form frmAddSpecial
          Left            =   120
          TabIndex        =   14
          Tag             =   "Textures are transparent"
-         Top             =   300
+         Top             =   360
          Width           =   1215
       End
    End
@@ -162,7 +153,7 @@ Begin VB.Form frmAddSpecial
    End
    Begin VB.Frame Frame1 
       Caption         =   "Masking"
-      Height          =   855
+      Height          =   915
       Left            =   120
       TabIndex        =   0
       Top             =   480
@@ -173,7 +164,7 @@ Begin VB.Form frmAddSpecial
          Left            =   120
          TabIndex        =   4
          Tag             =   "Textures are drawn with holes"
-         Top             =   480
+         Top             =   540
          Width           =   1215
       End
       Begin VB.OptionButton Regular 
@@ -182,7 +173,7 @@ Begin VB.Form frmAddSpecial
          Left            =   120
          TabIndex        =   3
          Tag             =   "Textures have no holes"
-         Top             =   240
+         Top             =   300
          Value           =   -1  'True
          Width           =   1215
       End
@@ -192,7 +183,7 @@ Begin VB.Form frmAddSpecial
       Caption         =   "Predefined:"
       Height          =   255
       Left            =   120
-      TabIndex        =   16
+      TabIndex        =   15
       Top             =   120
       Width           =   975
    End
@@ -212,8 +203,6 @@ Private Sub Add_Click()
     '
     If Transparent.Value Then
         Flags = Flags + PF_TRANSPARENT
-    ElseIf Ghost.Value Then
-        Flags = Flags + PF_GHOST
     End If
     '
     If Invisible.Value Then
@@ -246,16 +235,14 @@ End Sub
 Private Sub Form_Load()
     Call Ed.SetOnTop(Me, "AddSpecial", TOP_NORMAL)
     '
-    Settings.AddItem "Regular Brush"
+    Settings.AddItem "Invisible collision hull"
     Settings.AddItem "Zone Portal"
     Settings.AddItem "Semisolid Pillar"
     Settings.AddItem "Transparent Window"
-    Settings.AddItem "Ghost Window"
     Settings.AddItem "Masked Decoration"
     Settings.AddItem "Masked Wall"
-    Settings.AddItem "Subtractive Door"
     Settings.AddItem "Water"
-    Settings.AddItem "Invisible collision hull"
+    Settings.AddItem "Regular Brush"
     '
     Settings.Text = "Regular Brush"
 End Sub
@@ -275,7 +262,6 @@ Private Sub Settings_Click()
         ZonePortal.Value = 0
         Transparent.Value = 0
         Invisible.Value = 0
-        Ghost.Value = 0
         Solid.Value = True
         OneSided.Value = True
     Case "Zone Portal":
@@ -283,7 +269,6 @@ Private Sub Settings_Click()
         ZonePortal.Value = 1
         Transparent.Value = 0
         Invisible.Value = 0
-        Ghost.Value = 0
         NonSolid.Value = True
         TwoSided.Value = True
     Case "Semisolid Pillar":
@@ -291,7 +276,6 @@ Private Sub Settings_Click()
         ZonePortal.Value = 0
         Transparent.Value = 0
         Invisible.Value = 0
-        Ghost.Value = 0
         SemiSolid.Value = True
         OneSided.Value = True
     Case "Transparent Window":
@@ -299,15 +283,6 @@ Private Sub Settings_Click()
         ZonePortal.Value = 0
         Transparent.Value = 1
         Invisible.Value = 0
-        Ghost.Value = 0
-        NonSolid.Value = True
-        OneSided.Value = True
-    Case "Ghost Window":
-        Regular.Value = True
-        ZonePortal.Value = 0
-        Transparent.Value = 0
-        Invisible.Value = 0
-        Ghost.Value = 1
         NonSolid.Value = True
         OneSided.Value = True
     Case "Masked Decoration":
@@ -315,7 +290,6 @@ Private Sub Settings_Click()
         ZonePortal.Value = 0
         Transparent.Value = 0
         Invisible.Value = 0
-        Ghost.Value = 0
         NonSolid.Value = True
         OneSided.Value = True
     Case "Masked Wall":
@@ -323,31 +297,20 @@ Private Sub Settings_Click()
         ZonePortal.Value = 0
         Transparent.Value = 0
         Invisible.Value = 0
-        Ghost.Value = 0
         SemiSolid.Value = True
-        OneSided.Value = True
-    Case "Subtractive Door":
-        Regular.Value = True
-        ZonePortal.Value = 0
-        Transparent.Value = 0
-        Invisible.Value = 0
-        Ghost.Value = 0
-        Solid.Value = True
         OneSided.Value = True
     Case "Water":
         Regular.Value = True
         ZonePortal.Value = 0
         Transparent.Value = 1
         Invisible.Value = 0
-        Ghost.Value = 0
         NonSolid.Value = True
         TwoSided.Value = True
     Case "Invisible collision hull":
         Regular.Value = True
         ZonePortal.Value = 0
         Transparent.Value = 0
-        Invisible.Value = True
-        Ghost.Value = 0
+        Invisible.Value = 1
         SemiSolid.Value = True
         TwoSided.Value = False
     End Select

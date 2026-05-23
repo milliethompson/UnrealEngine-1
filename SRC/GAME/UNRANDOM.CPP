@@ -16,18 +16,21 @@ Revision history:
 #include "UnRandom.h"
 #include <stdlib.h>
 #include <sys\types.h>
-#include <sys\timeb.h>
+#include <sys\timeb.h>   // To give us some time functions to select a random number.
 
 //----------------------------------------------------------------------------
 //               Initialize the random number generator.
 //----------------------------------------------------------------------------
-void FRandom::Initialize()
+void FRandom::Initialize(unsigned Seed)
 {
     // Seed the random-number generator with a value that will give us
     // different random number sequences.
-    struct _timeb TimeInfo;
-    _ftime( &TimeInfo );
-    const unsigned Seed = 1000*(unsigned)TimeInfo.time + (unsigned)TimeInfo.millitm;
+    if( Seed == 0 )
+    {
+        struct _timeb TimeInfo;
+        _ftime( &TimeInfo );
+        Seed = 1000*(unsigned)TimeInfo.time + (unsigned)TimeInfo.millitm;
+    }
     srand( Seed );
 }
 

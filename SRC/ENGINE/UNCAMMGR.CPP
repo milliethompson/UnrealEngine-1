@@ -11,92 +11,89 @@
 #include "Unreal.h"
 
 /*-----------------------------------------------------------------------------
-	FCameraManager generic implementation
+	FCameraManager generic implementation.
 -----------------------------------------------------------------------------*/
 
 //
 // Redraw all cameras looking at the level.
 //
 void FCameraManager::RedrawLevel(ULevel *Level)
+{
+	guard(FCameraManager::RedrawLevel);
+
+	for( int i=0; i<CameraArray->Num; i++ )
 	{
-	GUARD;
-	for (int i=0; i<CameraArray->Num; i++)
-		{
 		UCamera *Camera = CameraArray->Element(i);
-	    if ((Camera->Level == Level) &&
+	    if( (Camera->Level == Level) &&
 	     	(!Camera->OnHold) &&
-			Camera->SXR && Camera->SYR)
-			{
+			Camera->SXR && Camera->SYR )
+		{
 			Camera->Draw(0);
-			};
-		};
-	UNGUARD("FCameraManager::RedrawLevel");
-	};
+		}
+	}
+	unguard;
+}
 
 //
 // Close all cameras that are child windows of a specified window.
 //
 void FCameraManager::CloseWindowChildren(DWORD ParentWindow)
-	{
-	GUARD;
+{
+	guard(FCameraManager::CloseWindowChildren);
+
 	char TempName[NAME_SIZE];
-	//
-	for (int i=CameraArray->Num-1; i>=0; i--)
-	   	{
+	for( int i=CameraArray->Num-1; i>=0; i-- )
+	{
 		UCamera *Camera = CameraArray->Element(i);
 		strcpy (TempName,Camera->Name); strupr(TempName);
-		//
-		if ((ParentWindow==0) ||
+
+		if( (ParentWindow==0) ||
 			(Camera->ParentWindow==ParentWindow) ||
-			((ParentWindow==MAXDWORD)&&!strstr(TempName,"STANDARD"))
+			((ParentWindow==MAXDWORD)&&!strstr(TempName,"STANDARD") )
 			)
-			{
+		{
 			Camera->Kill();
-			};
-		};
-	UNGUARD("FCameraManager::CloseWindowChildren");
-	};
+		}
+	}
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Globals to reconcile actors and cameras after loading or creating a new level
+	Globals to reconcile actors and cameras after loading or 
+	creating a new level.
 -----------------------------------------------------------------------------*/
 
 //
 // Update all actor Camera references in the world based on the Cameras
 // controlling them.
 //
-void FCameraManager::UpdateActorUsers(void)
+void FCameraManager::UpdateActorUsers()
+{
+	guard(FCameraManager::UpdateActorUsers);
+	int i;
+
+	// Dissociate all Cameras and cameras from all actors.
+	for (i=0; i<GServer.Levels->Num; i++)
 	{
-	GUARD;
-	//
-	// Dissociate all Cameras and cameras from all actors:
-	//
-	for (int i=0; i<GServer.Levels->Num; i++)
-		{
 		GServer.Levels->Element(i)->DissociateActors();
-		};
-	//
-	// Hook all cameras up to their corresponding actors:
-	//
+	}
+
+	// Hook all cameras up to their corresponding actors.
 	for (i=0; i<GCameraManager->CameraArray->Num; i++)
-		{
+	{
 		UCamera *Camera = GCameraManager->CameraArray->Element(i);
-		AActor  *Actor  = &Camera->GetActor();
-		if (Actor->Class == NULL)
-			{
-			debugf (LOG_Ed,"cameraUpdateActorCameras: Bad actor association");
+		APawn	*Actor  = (APawn *)&Camera->Level->ActorList->Element(Camera->iActor);
+		
+		if( !Actor->Class || !Actor->IsKindOf("Pawn"))
+		{
+			debugf (LOG_Ed,"Bad actor association");
 			Camera->Kill();
-			}
+		}
 		else Actor->Camera = Camera;
-		};
-	//
-	// Hook all logged-in Cameras up to their corresponding actors:
-	//
-	/* Not yet implemented */
-	//
-	UNGUARD("FCameraManager::UpdateActorUsers");
-	};
+	}
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/

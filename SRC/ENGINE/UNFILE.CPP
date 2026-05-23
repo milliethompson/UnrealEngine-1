@@ -12,12 +12,12 @@
 #include "UnFile.h"
 
 #ifdef __MSVC__
-#include <direct.h>
+	#include <direct.h>
 #endif
 
 /*-----------------------------------------------------------------------------
    fsize: Size of a file.  Returns -1 if doesn't exist.
-   This is a good function to tell you whether a file exists.
+   This is a good function to tell whether a file exists.
 -----------------------------------------------------------------------------*/
 
 long fsize (const char *fname)
@@ -87,12 +87,6 @@ int fsetdir(const char *dir)
 	if (i>0) if (newdir[i]=='\\') newdir[i]='\0';
 	if (*newdir) {
 		if (newdir[1]==':') {
-			#ifdef __WATCOMC__
-			_dos_setdrive (newdir[0]-'A',&total_drives);
-			#endif
-			#ifdef __BORLANDC__
-			setdisk (newdir[0]-'A');
-			#endif
 			newdir+=2;
 			};
 		}
@@ -309,12 +303,13 @@ const char *spc(int num)
 //
 void UNREAL_API mymemset(void *Dest,char c,int Count)
 	{
-	#ifdef ASM
+	static FLOAT F;
+#if ASM
 	__asm
 		{
 		mov al,[c]
 		mov edi,[Dest]
-		mov ah,al
+		mov ah,[c]
 		mov esi,[Count]
 		mov ebx,eax
 		cmp esi,0
@@ -325,7 +320,7 @@ void UNREAL_API mymemset(void *Dest,char c,int Count)
 		;
 		PreLoop1:
 		test edi,15
-		jz Loop4Enter
+		jz  Loop4Enter
 		mov [edi],al
 		inc edi
 		sub esi,1
@@ -334,36 +329,26 @@ void UNREAL_API mymemset(void *Dest,char c,int Count)
 		;
 		Loop4Enter:
 		sub esi,15
-		jnc Loop16
-		jmp PostLoop1Enter
+		jc  PostLoop1Enter
 		;
-		/*
-		mov ecx,[FGlobalPlatform.MMX]
-		cmp ecx,0
-		jnz DoMMX
-		*/
+		mov DWORD PTR [F],eax
+		mov DWORD PTR [F+4],eax
+		fld [F]
+		;
 		ALIGN 16
 		Loop16:
-		mov [edi   ],eax
-		mov [edi+4 ],eax
-		mov [edi+8 ],eax
-		mov [edi+12],eax
+		fst  QWORD PTR [edi]
+		fst  QWORD PTR [edi+8]
+		; mov [edi   ],eax
+		; mov [edi+4 ],eax
+		; mov [edi+8 ],eax
+		; mov [edi+12],eax
 		add edi,16
 		sub esi,16
 		jnc Loop16
-		jmp PostLoop1Enter
 		;
-		ALIGN 16
-		;DoMMX:
-		;...
-		Loop16MMX:
-		mov [edi   ],eax
-		mov [edi+4 ],eax
-		mov [edi+8 ],eax
-		mov [edi+12],eax
-		add edi,16
-		sub esi,16
-		jnc Loop16MMX
+		fst [F]
+		jmp PostLoop1Enter
 		;
 		PostLoop1Enter:
 		add esi,16
@@ -393,6 +378,7 @@ UNREAL_API int mymemeq(void *P1, void *P2, int n)
 	{
 	BYTE *B1 = (BYTE *)P1;
 	BYTE *B2 = (BYTE *)P2;
+#ifdef ASM
 	while (n&15)
 		{
 		if (*B1 != *B2) return 0;
@@ -439,6 +425,13 @@ UNREAL_API int mymemeq(void *P1, void *P2, int n)
 		NotEq:
 		};
 	return Result;
+#else
+	while (n-- > 0)
+		{
+		if (*B1++ != *B2++) return 0;
+		};
+	return 1;
+#endif
 	};
 
 /*-----------------------------------------------------------------------------

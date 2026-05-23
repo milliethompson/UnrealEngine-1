@@ -2,7 +2,7 @@ VERSION 4.00
 Begin VB.Form frmTexImport 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Import Texture"
-   ClientHeight    =   3465
+   ClientHeight    =   3135
    ClientLeft      =   2565
    ClientTop       =   2910
    ClientWidth     =   4920
@@ -16,14 +16,14 @@ Begin VB.Form frmTexImport
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   3825
+   Height          =   3495
    HelpContextID   =   125
    Icon            =   "TexImprt.frx":0000
    Left            =   2505
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
-   ScaleHeight     =   3465
+   ScaleHeight     =   3135
    ScaleWidth      =   4920
    ShowInTaskbar   =   0   'False
    Top             =   2610
@@ -41,8 +41,8 @@ Begin VB.Form frmTexImport
       EndProperty
       Height          =   375
       Left            =   1260
-      TabIndex        =   15
-      Top             =   3060
+      TabIndex        =   2
+      Top             =   2700
       Width           =   1215
    End
    Begin VB.Frame Frame2 
@@ -56,9 +56,9 @@ Begin VB.Form frmTexImport
          italic          =   -1  'True
          strikethrough   =   0   'False
       EndProperty
-      Height          =   1335
+      Height          =   975
       Left            =   60
-      TabIndex        =   10
+      TabIndex        =   13
       Top             =   1620
       Width           =   4755
       Begin VB.CheckBox DoMips 
@@ -74,7 +74,7 @@ Begin VB.Form frmTexImport
          EndProperty
          Height          =   195
          Left            =   240
-         TabIndex        =   14
+         TabIndex        =   6
          Top             =   600
          Value           =   1  'Checked
          Width           =   1875
@@ -92,43 +92,9 @@ Begin VB.Form frmTexImport
          EndProperty
          Height          =   195
          Left            =   240
-         TabIndex        =   13
+         TabIndex        =   5
          Top             =   360
          Width           =   1875
-      End
-      Begin VB.TextBox DispersionC 
-         BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
-         EndProperty
-         Height          =   285
-         Left            =   2940
-         TabIndex        =   11
-         Text            =   "0.50"
-         Top             =   900
-         Width           =   915
-      End
-      Begin VB.Label Label5 
-         Caption         =   "Diffusion in 256-color mode:"
-         BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
-         EndProperty
-         Height          =   315
-         Left            =   540
-         TabIndex        =   12
-         Top             =   900
-         Width           =   2175
       End
    End
    Begin VB.Frame Frame1 
@@ -144,7 +110,7 @@ Begin VB.Form frmTexImport
       EndProperty
       Height          =   1455
       Left            =   60
-      TabIndex        =   3
+      TabIndex        =   8
       Top             =   120
       Width           =   4755
       Begin VB.TextBox TexName 
@@ -161,7 +127,7 @@ Begin VB.Form frmTexImport
          Height          =   285
          Left            =   2040
          MaxLength       =   15
-         TabIndex        =   5
+         TabIndex        =   7
          Text            =   "TexName"
          Top             =   660
          Width           =   2415
@@ -180,8 +146,8 @@ Begin VB.Form frmTexImport
          Height          =   285
          Left            =   2040
          MaxLength       =   15
-         TabIndex        =   4
-         Text            =   "FamilyName"
+         TabIndex        =   0
+         Text            =   "TexFamily"
          Top             =   1020
          Width           =   2415
       End
@@ -199,7 +165,7 @@ Begin VB.Form frmTexImport
          EndProperty
          Height          =   255
          Left            =   120
-         TabIndex        =   9
+         TabIndex        =   12
          Top             =   300
          Width           =   735
       End
@@ -216,7 +182,7 @@ Begin VB.Form frmTexImport
          EndProperty
          Height          =   255
          Left            =   960
-         TabIndex        =   8
+         TabIndex        =   11
          Top             =   300
          Width           =   3495
       End
@@ -234,7 +200,7 @@ Begin VB.Form frmTexImport
          EndProperty
          Height          =   255
          Left            =   600
-         TabIndex        =   7
+         TabIndex        =   10
          Top             =   660
          Width           =   1335
       End
@@ -252,7 +218,7 @@ Begin VB.Form frmTexImport
          EndProperty
          Height          =   255
          Left            =   480
-         TabIndex        =   6
+         TabIndex        =   9
          Top             =   1020
          Width           =   1455
       End
@@ -271,8 +237,8 @@ Begin VB.Form frmTexImport
       EndProperty
       Height          =   375
       Left            =   2580
-      TabIndex        =   2
-      Top             =   3060
+      TabIndex        =   3
+      Top             =   2700
       Width           =   1095
    End
    Begin VB.CommandButton OK 
@@ -290,8 +256,8 @@ Begin VB.Form frmTexImport
       EndProperty
       Height          =   375
       Left            =   60
-      TabIndex        =   0
-      Top             =   3060
+      TabIndex        =   1
+      Top             =   2700
       Width           =   1095
    End
    Begin VB.CommandButton Cancel 
@@ -309,8 +275,8 @@ Begin VB.Form frmTexImport
       EndProperty
       Height          =   375
       Left            =   3720
-      TabIndex        =   1
-      Top             =   3060
+      TabIndex        =   4
+      Top             =   2700
       Width           =   1095
    End
 End
@@ -336,11 +302,18 @@ Public Sub DoNext()
     End If
     '
     frmTexImport.TexName = GetFileNameOnly(Fname)
+    If frmTexImport.TexName = AllString Then
+        frmTexImport.TexName = "Untitled"
+    End If
     '
     If AutoOk = 1 Then Ok_Click
 End Sub
 
 Private Sub Form_Activate()
+    TexFamily.SelStart = 0
+    TexFamily.SelLength = Len(TexFamily.Text)
+    TexFamily.SetFocus
+    '
     DoNext
 End Sub
 
@@ -368,7 +341,6 @@ Private Sub Ok_Click()
             " NAME=" & Quotes(TexName) & _
             " FAMILY=" & Quotes(TexFamily) & _
             " MIPS=" & OnOff(Int(DoMips.Value)) & _
-            " PALDIFFUSION=" & Trim(DispersionC.Text) & _
             " FLAGS=" & Trim(Str(IIf(DoMasked.Value, PF_MASKED, 0)))
         DoNext
     End If
@@ -379,3 +351,4 @@ Private Sub OkAll_Click()
     AutoOk = 1
     Ok_Click
 End Sub
+

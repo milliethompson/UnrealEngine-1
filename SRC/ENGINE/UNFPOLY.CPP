@@ -23,7 +23,7 @@
 //
 // Initialize everything in an  editor polygon structure to defaults
 //
-void FPoly::Init (void)
+void FPoly::Init()
 	{
 	GUARD;
 	Base.X       	= MAXSWORD; // No origin
@@ -46,7 +46,7 @@ void FPoly::Init (void)
 // Reverse an FPoly by revesing the normal and reversing the order of its
 // vertices.
 //
-void FPoly::Flip (void)
+void FPoly::Reverse()
 	{
 	GUARD;
 	FVector Temp;
@@ -68,7 +68,7 @@ void FPoly::Flip (void)
 // Fix up an editor poly by deleting vertices that are identical.  Sets
 // vertex count to zero if it collapses.  Returns number of vertices, 0 or >=3.
 //
-int FPoly::Fix (void)
+int FPoly::Fix()
 	{
 	GUARD;
 	int i,j,prev;
@@ -90,7 +90,7 @@ int FPoly::Fix (void)
 	UNGUARD("FPoly::Fix");
 	};
 
-FLOAT FPoly::Area(void)
+FLOAT FPoly::Area()
 	{
 	GUARD;
 	FVector Side1,Side2;
@@ -121,8 +121,9 @@ int FPoly::SplitWithPlane (
 	{
 	GUARD;
 	FVector 	Intersection;
-	FLOAT   	Dist,MaxDist=0,MinDist=0,PrevDist,Thresh;
-	enum 	  	{V_FRONT,V_BACK,V_EITHER} Status,PrevStatus;
+	FLOAT   	Dist=0.0,MaxDist=0,MinDist=0;
+	FLOAT		PrevDist,Thresh;
+	enum 	  	{V_FRONT,V_BACK,V_EITHER} Status,PrevStatus=V_EITHER;
 	int     	i,j;
 	//
 	if (VeryPrecise)	Thresh = THRESH_SPLIT_POLY_PRECISELY;	
@@ -340,8 +341,14 @@ int FPoly::SplitWithPlaneFast(
 		PrevStatus = Status;
 		W          = V++;
 		};
-	FrontPoly->NumVertices = N1;
-	BackPoly ->NumVertices = N2;
+	FrontPoly->NumVertices	= N1;
+	FrontPoly->Base			= Base;
+	FrontPoly->Normal		= Normal;
+	//
+	BackPoly->NumVertices	= N2;
+	BackPoly->Base			= Base;
+	BackPoly->Normal		= Normal;
+	//
 	return SP_Split;
 	//
 	UNGUARD("FPoly::SplitWithPlaneFast");
@@ -379,7 +386,7 @@ void FPoly::SplitInHalf (FPoly *OtherHalf)
 // are often created during T-joint elimination).  Returns nonzero result (plus sets
 // normal vector to zero) if a problem occurs.
 //
-int FPoly::CalcNormal (void)
+int FPoly::CalcNormal()
 	{
 	GUARD;
 	FVector 	Side1,Side2;
@@ -466,7 +473,7 @@ void FPoly::Transform (FModelCoords &Coords, FVector *PreSubtract,FVector *PostA
 // Remove colinear vertices and check convexity.  Returns 1 if convex, 0 if
 // nonconvex or collapsed.
 //
-int FPoly::RemoveColinears(void)
+int FPoly::RemoveColinears()
 	{
 	FVector  SidePlaneNormal[MAX_FPOLY_VERTICES];
 	FVector  Side;
@@ -534,7 +541,6 @@ int FPoly::RemoveColinears(void)
 int FPoly::Finalize (int NoError)
 	{
 	GUARD;
-	FVector Temp;
 	//
 	// Check for problems:
 	//
@@ -568,18 +574,8 @@ int FPoly::Finalize (int NoError)
 	//
 	if (TextureU.IsZero() && TextureV.IsZero())
 		{
-		Temp = Vertex[0] - Vertex[1];
-		TextureU = Temp ^ Normal;
-		TextureU.Normalize(); // Ignore normalization errors
-		//
-		TextureV = TextureU ^ Normal;
-		TextureV.Normalize(); // Ignore normalization errors
-		//
-		// Default scaling:
-		// V = upside down (for correct mapping onto default rectangle)
-		//
-		TextureU *= +65536.0;
-		TextureV *= -65536.0;
+		TextureU = ((Vertex[0] - Vertex[1]) ^ Normal).Normal() * +65536.0;
+		TextureV = (TextureU                ^ Normal).Normal() * -65536.0;
 		};
 	return 0;
 	UNGUARD("FPoly::Finalize");
@@ -657,11 +653,8 @@ char *UPolys::Export(char *Buffer,const char *FileType,int Indent)
 			{
 			Buffer += sprintf (Buffer,"%s      Pan      U=%i V=%i\r\n",spc(Indent),Poly->PanU,Poly->PanV);
 			};
-		if ((Poly->TextureU.X != MAXWORD) && (Poly->TextureV.X != MAXWORD))
-			{
-			Buffer += sprintf (Buffer,"%s      TextureU %s\r\n",spc(Indent),SetFIXFVECTOR(TempStr,&Poly->TextureU));
-			Buffer += sprintf (Buffer,"%s      TextureV %s\r\n",spc(Indent),SetFIXFVECTOR(TempStr,&Poly->TextureV));
-			};
+		Buffer += sprintf (Buffer,"%s      TextureU %s\r\n",spc(Indent),SetFIXFVECTOR(TempStr,&Poly->TextureU));
+		Buffer += sprintf (Buffer,"%s      TextureV %s\r\n",spc(Indent),SetFIXFVECTOR(TempStr,&Poly->TextureV));
 		for (j=0; j<Poly->NumVertices; j++)
 			{
 			Buffer += sprintf (Buffer,"%s      Vertex   %s\r\n",spc(Indent),SetFVECTOR(TempStr,&Poly->Vertex[j]));
@@ -685,6 +678,15 @@ void UPolys::QueryDataReferences(FResourceCallback &Callback)
 		Callback.Name		(this,				&Element(i).ItemName, 0);
 		};
 	UNGUARD("UPolys::QueryDataReferences");
+	};
+void UPolys::Flip()
+	{
+	GUARD;
+	//
+	UDatabase::Flip();
+	//todo:
+	//
+	UNGUARD("UPolys::Flip");
 	};
 AUTOREGISTER_RESOURCE(RES_Polys,UPolys,0xB2D90855,0xCCD211cf,0x91360000,0xC028B992);
 
@@ -750,7 +752,7 @@ int UPolys::ParseFPolys(const char **Stream,int More, int CmdLine)
 				else if	((DXFTag==8) && strstr (Str,"FACE"))
 					{
 					n=atoi(Str+4)-1;
-					Num = OurMax(Num,n+1);
+					Num = ::Max(Num,n+1);
 					if (!(Num&63)) GApp->StatusUpdate ("Importing DXF",Num,Max);
 					}
 				else if	(DXFTag==10)
@@ -794,7 +796,7 @@ int UPolys::ParseFPolys(const char **Stream,int More, int CmdLine)
 					if (!(Num&127)) GApp->StatusUpdate ("Importing DXF",Num,Max);
 					if (Poly->Finalize(1)==0)
 						{
-						Poly->Flip();
+						Poly->Reverse();
 						Num++;
 						};
 					}
@@ -811,7 +813,7 @@ int UPolys::ParseFPolys(const char **Stream,int More, int CmdLine)
 			Poly = &FPolys[Num];
 			if (Poly->NumVertices!=0) if (Poly->Finalize(1)==0)
 				{
-				Poly->Flip();
+				Poly->Reverse();
 				Num++;
 				};
 			//for (n=0; n<Num; n++) debugf(LOG_Info,"%i",FPolys[n].NumVertices);
@@ -978,7 +980,7 @@ int	UPolys::CountFPolys(const char *Stream)
 		else if (GetBEGIN(&Ptr,"POLYGON"))  n++;
 		else if (strstr(Ptr,"Face "))		n++;
 		else if (strstr(Ptr,"3DFACE"))		n++;
-		else if (strncmp(Ptr,"FACE",4)==0)	n = OurMax(n,1+atoi(Ptr+4));
+		else if (strncmp(Ptr,"FACE",4)==0)	n = ::Max(n,1+atoi(Ptr+4));
 		};
 	return n;
 	UNGUARD("UPolys::CountFPolys");

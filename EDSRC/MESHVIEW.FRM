@@ -275,7 +275,7 @@ End Sub
 Sub UpdateMeshList()
     Dim S As String
     MeshMapCombo.Clear
-    Ed.Server.Exec "RESOURCE QUERY TYPE=MESHMAP"
+    Ed.Server.Exec "RES QUERY TYPE=MESHMAP"
     Do
         S = Trim(Ed.Server.GetProp("Res", "QueryRes"))
         If S = "" Then Exit Do

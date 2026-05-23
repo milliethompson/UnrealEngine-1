@@ -1,5 +1,5 @@
 /*=============================================================================
-	ProjMan.txt: Unreal Project Management notes
+	ProjMan.txt: Project Management notes
 	By: Tim Sweeney, Epic MegaGames, Inc.
 =============================================================================*/
 
@@ -8,7 +8,7 @@
 ******************************
 
 1. When you originate a piece of code, include a heading at the top of every file looking 
-   something like this:
+   like this:
 
 	/*=============================================================================
 		UnClass.cpp: Actor class functions
@@ -23,52 +23,50 @@
 2.	Whenever you revise an existing piece of code that you got some somebody else, 
 	put your name, date, and summary of changes in the "Revision history".
 
-3.	Naming conventions for Unreal internals:
+3.	Naming conventions for internals:
 
-	* FClassName:    A simple, non-resource class, for example: FVector, FMemoryCache.
-	* UClassName:    A resource class derived from UResource, for example: UCamera, UTextBuffer.
-	* CClassName:    An MFC-derived class, for example: CUnrealEdServer.
-	* IClassName:    An convenience structure for a locked resource (ICamera, ILevel, IModel, IMeshMap)
-	* PClassName:	 A class used in the "void *Params" parameter along with in actor messages
-	* IObjectName:   A COM/OLE object used by Unreal, for example: IUnrealNetwork, IUnrealGatekeeper.
-	* GVariableName: A global variable, for example: GMem, GBlit.
+	FClassName			A simple, non-resource class, for example: FVector, FMemoryCache.
+	FGlobalClassName	A class for which only one instance can exist, usually a global subsystem.
+	UClassName			A resource class derived from UResource, for example: UCamera, UTextBuffer.
+	CClassName			An MFC-derived class, for example: CUnrealEdServer.
+	IClassName			An convenience structure for a locked resource (ICamera, ILevel, IModel, IMeshMap)
+	PClassName			A class used in the "void *Params" parameter along with in actor messages
+	AClassName			An AActorBase-derived actor class.
+	IObjectName			A COM/OLE object used by Unreal, for example: IUnrealNetwork, IUnrealGatekeeper.
+	GVariableName		A global variable, for example: GMem, GBlit.
+	TTemplateName		A C++ template.
 
 	The reason is because VC++'s class browser sorts alphabetically and this
 	causes classes to be grouped reasonably well.  It also keeps names consistent so that
 	you can see what a particular class is all about given just its name.
 
-4.	Wrap all of your functions in a GUARD block so that the function calling history can
+4.	Wrap all of your functions in a guard block so that the function calling history can
 	be displayed in case Unreal crashes in a particular routine, or in case appError is
 	called:
 
-	void MyClass::MyRoutine (int x)
-		{
-		GUARD; // A macro that encapsulates the function in a try/catch block
-		int y;
-		for (y=0; y<x; y++) {DoSomthing();};
-		UNGUARD ("MyClass::MyRoutine");
-		};
+	void MyClass::MyRoutine( int x )
+	{
+		guard(MyClass::MyRoutine); // A macro that encapsulates the function in a try/catch block.
+		DoSomthingHere();
+		unguard;
+	}
 
     The one exception to this is when you're writing a small performance critical function.
 
-	The GUARD/UNGUARD macros expand to something like this:
+	The guard macros expand to something like this:
 
-	void MyClass::MyRoutine (int x)
-		{
+	void MyClass::MyRoutine( int x )
+	{
+		static const char __FUNC_NAME__ = "MyClass::MyRoutine";
 		try
-			{
-			int y;
-			for (y=0; y<x; y++) {DoSomthing();};
-			}
+		{
+			DoSomethingHere();
+		}
 		catch(...)
-			{
-			GApp->Log(LOG_Critical,"MyClass::MyRoutine"); // Output call history to log
-			if(GApp->GuardTrap) strcat(GApp->ErrorHist," <- "); // Build error message string
-			strcat(GApp->ErrorHist,s); // Build error message string
-			GApp->GuardTrap=1; // Note that we have crashed
-			*(char*)NULL=0; // Trigger caller's exception handler
-			};
-		};
+		{
+			// Write out the call stack information and trigger the next catch handler.
+		}
+	}
 
 5.	Name classes and class functions in mixed upper and lower case, like FMyClass::MyFunction,
     no underscores, lowercase-only, caps-only, etc.  For non-class functions, you can either
@@ -77,8 +75,8 @@
 
 6.  Use the following functions for informational and debugging output:
 
-	debug (LOG_INFO,"Some message");
-	debugf(LOG_INFO,"Some printf-like message, A=%i, B=%s",SomeInt,SomeString);
+	debug (LOG_Info,"Some message");
+	debugf(LOG_Info,"Some printf-like message, A=%i, B=%s",SomeInt,SomeString);
 
 	They output text to the Unreal console and also write to System\Unreal.log.
 
@@ -93,27 +91,27 @@
 
 8.	For portability concerns, if your code is not platform-dependent, stick with
 	ANSI C/C++ conventions.  Also avoid structured exception handling with the
-	one exception of using the GUARD/UNGUARD macros.
+	one exception of using the guard/unguard macros.
 
 	These porting concerns don't apply to code specific to a particular platform, such
 	as the Windows networking code or any MFC-derived code.  These can use the full
-	C++ capabilities of the system.
+	C++ capabilities of the target system.
 
 9.  Whenever you use inline assembly language (or separate MASM code), include
     a conditionally-compilable C version of the routine as well, and verify that
 	it works when compiled with and without ASM:
 
 	void SomeFunction (int x)
-		{
-		#ifdef ASM // Fast assembly-language version
+	{
+	#ifdef ASM // Fast assembly-language version.
 		__asm
-			{
-			// Assembly code goes here
-			};
-		#else // Slow C version for portability
-			// C code goes here
-		#endif
-		};
+		{
+			// Assembly code goes here.
+		}
+	#else // Slow C version for portability.
+		// C code goes here.
+	#endif
+	}
 
 10.	Document all of your class functions as black boxes in your class header files,
     i.e. describe the functions inputs, outputs, and possible error conditions.
@@ -123,7 +121,8 @@
 11.	The best kind of C/C++ code is code which is well-structured and obvious enough
 	that it doesn't need much commenting, like this:
 
-		for (i=0; i<NumCameras; i++) RedrawCamera(CameraList[i]);
+		for( i=0; i<NumCameras; i++ )
+			RedrawCamera( CameraList[i] );
 	
 	Use comments within your code to describe non-obvious tricks you're doing,
 	especially in areas where other people may need to understand or modify the code.
@@ -145,12 +144,20 @@
 15. Define enumerations like this:
 
 	enum EFruit
-		{
-		FRUIT_None		= 0,	// Tag zero should generally be 'none'
-		FRUIT_Apple		= 1,	// Apples are nice
-		FRUIT_Orange	= 2,	// Oranges are tangy
-		FRUIT_MAX		= 3,	// One beyond the maximum enumeration
-		};
+	{
+		FRUIT_None		= 0,	// Tag zero should generally be 'none'.
+		FRUIT_Apple		= 1,	// Apples are nice.
+		FRUIT_Orange	= 2,	// Oranges are tangy.
+		FRUIT_MAX		= 3,	// One beyond the maximum enumeration.
+	};
+
+16. Unless performance needs dictate otherwise, write all of your subsystems
+	as black boxes, with a pure virtual base class (FMyClassBase) in a
+	header file which defines all of the public functions, and a concrete class 
+	defined either in your C++ code or in a separate header, which contains all of
+	your private functions and nitty gritty implementation details.  This makes it
+	much easier for others to use your subsystem without understanding how it
+	works internally.
 
 ********************
 ** Using comments **
@@ -168,30 +175,72 @@
 // maximum number of cameras was exceeded.  Call with AllowEdit to enable editing
 // within the camera window.
 //
-void OpenCamera (char *CameraName, int AllowEdit)
-	{
-	// ...
-	};
+UCamera *OpenCamera (char *CameraName, int AllowEdit)
+{
+	// Do something...
+	return Camera;
+}
 
 *********************
 ** Recommendations **
 *********************
 
-1. Indent code like this.  No, this isn't backwards, the rest of the world
-   is backwards.
+1. Indent code using the Microsoft C++ programming standards, like:
 
 	void *FMemoryCache::Get(DWORD ID)
-		{
+	{
 		GUARD;
-		for (int i=0; i<HackEntities; i++)
-			{
-			if (EntityList[i].ID==ID) return HackEntityList[i].Data;
-			};
-		return NULL;
-		UNGUARD("FMemoryCache::Get");
-		};
 
-2. Name regular variables with a pure name (i.e. PlayerDescription) rather than
+		// Try to find a matching entity.
+		for (int i=0; i<HackEntities; i++)
+		{
+			if (EntityList[i].ID==ID)
+				return HackEntityList[i].Data;
+		}
+
+		// Couldn't find a matching entity.
+		return NULL;
+
+		UNGUARD("FMemoryCache::Get");
+	}
+
+2. One statement per line.
+
+3. Comments should be complete sentences terminated with a period.
+
+4. Name regular variables with a pure name (i.e. PlayerDescription) rather than
    something crazy like lpszPlayerDescription, playerDescription, or player_description.
+
+******************
+** Comment tags **
+******************
+
+Use the following comments to tag code which needs work or is somehow dangerous:
+
+	//todo: [Name] Use this tag to denote stuff that you need to do.
+	//obsolete: Use this to denote obsolete code which is no longer in use.
+	//warning: Use this to document dangerous but necessary coding practices, such as:
+		*	A C++ structure which is mirrored elsewhere, for example in an assembly
+			language .inc file.
+		*	Code with complex and non-obvious interactions (such as Unreal's camera
+			closing code, whose path of execution goes all over the places due to
+			Windows messaging quirks).
+
+************************
+** Programming Spirit **
+************************
+
+1.	Be a minimalist.  The simpler and more concise your code, the less opportunity for
+	errors.  The easier it is to read and understand, the easier it will be to debug.
+
+2.	Make your code multi-programmer friendly.  We expect this project to evolve over
+	a long period of time and be greatly extended, so make sure that others will be
+	able to approach your code later on.
+
+3.	Catch your bugs very early on in development by using asserts and by testing everything.
+
+4.	Keep all of your code as modular as possible, and as separated from the rest of
+	the codebase as possible.  This makes it much easier to make sweeping changes to
+	one part of the codebase without causing havoc on the rest.
 
 -Tim

@@ -3,8 +3,8 @@ Begin VB.Form frmGrid
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Grid Settings"
    ClientHeight    =   1995
-   ClientLeft      =   1305
-   ClientTop       =   3690
+   ClientLeft      =   4470
+   ClientTop       =   4215
    ClientWidth     =   6855
    ControlBox      =   0   'False
    BeginProperty Font 
@@ -17,16 +17,16 @@ Begin VB.Form frmGrid
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   2355
+   Height          =   2400
    HelpContextID   =   111
    Icon            =   "Grid.frx":0000
-   Left            =   1245
+   Left            =   4410
    LinkTopic       =   "Form8"
    MaxButton       =   0   'False
    ScaleHeight     =   1995
    ScaleWidth      =   6855
    ShowInTaskbar   =   0   'False
-   Top             =   3390
+   Top             =   3870
    Width           =   6975
    Begin VB.CommandButton Command3 
       Appearance      =   0  'Flat

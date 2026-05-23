@@ -8,6 +8,7 @@
 		* Created by Tim Sweeney
 =============================================================================*/
 
+#pragma warning (disable : 4201) /* nonstandard extension used : nameless struct/union */
 #include <windows.h>
 #include "Net.h"
 

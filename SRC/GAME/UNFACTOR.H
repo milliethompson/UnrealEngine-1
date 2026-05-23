@@ -58,11 +58,13 @@ public:
     //   virtual functions
     //   member variables
 
-    // Make an FActor from an AActor or ARoot:
+    // Make an FActor from an AActor:
     static FActor & Actor(AActor & Actor) { return (FActor &)Actor; }
     static const FActor & Actor(const AActor & Actor) { return (FActor &)Actor; }
-    static FActor & Actor(ARoot & Actor) { return (FActor &)Actor; }
-    static const FActor & Actor(const ARoot & Actor) { return (FActor &)Actor; }
+
+    // Make an FActor from an AActorHelper:
+    static FActor & Actor(AActorBase & Actor) { return (FActor &)Actor; }
+    static const FActor & Actor(const AActorBase & Actor) { return (FActor &)Actor; }
 
     // Make an FActor from an index:
     static FActor & Actor( INDEX iActor ) { return Actor(GLevel->Actors->Element(iActor)); }
@@ -76,44 +78,43 @@ public:
     // These functions let you avoid writing explicit type casts. 
     // In addition, these functions could be made safe (raising an error
     // if the actor is not of the expected class.)
-    APawn           & Pawn          () { return (APawn          &)*this; }
-    ARoot           & Root          () { return (ARoot          &)*this; }
-    AProjectile     & Projectile    () { return (AProjectile    &)*this; }
-    ALight          & Light         () { return (ALight         &)*this; }
-    AInventory      & Inventory     () { return (AInventory     &)*this; }
-    AWeapon         & Weapon        () { return (AWeapon        &)*this; }
-    APowerUp        & PowerUp       () { return (APowerUp       &)*this; }
-    AAmmo           & Ammo          () { return (AAmmo          &)*this; }
-    APyrotechnics   & Pyrotechnic   () { return (APyrotechnics  &)*this; }
-    ADecorations    & Decoration    () { return (ADecorations   &)*this; }
-    AKeypoint       & Keypoint      () { return (AKeypoint      &)*this; }
-    APlayerStart    & PlayerStart   () { return (APlayerStart   &)*this; }
-    ATeleporter     & Teleporter    () { return (ATeleporter    &)*this; }
-    AZoneDescriptor & ZoneDescriptor() { return (AZoneDescriptor&)*this; }
-    ABlockMonsters  & BlockMonsters () { return (ABlockMonsters &)*this; }
-    AMover          & Mover         () { return (AMover         &)*this; }
-    ATrigger        & Trigger       () { return (ATrigger       &)*this; }
+    AAmmo            & Ammo           () { return (AAmmo            &)*this; }
+    ABlockMonsters   & BlockMonsters  () { return (ABlockMonsters   &)*this; }
+    ADecoration      & Decoration     () { return (ADecoration      &)*this; }
+    AExplosion       & Explosion      () { return (AExplosion       &)*this; }
+    AInventory       & Inventory      () { return (AInventory       &)*this; }
+    AKeypoint        & Keypoint       () { return (AKeypoint        &)*this; }
+    ALevelDescriptor & LevelDescriptor() { return (ALevelDescriptor &)*this; }
+    ALight           & Light          () { return (ALight           &)*this; }
+    AMover           & Mover          () { return (AMover           &)*this; }
+    APawn            & Pawn           () { return (APawn            &)*this; }
+    APlayerStart     & PlayerStart    () { return (APlayerStart     &)*this; }
+    APowerUp         & PowerUp        () { return (APowerUp         &)*this; }
+    AProjectile      & Projectile     () { return (AProjectile      &)*this; }
+    APyrotechnics    & Pyrotechnic    () { return (APyrotechnics    &)*this; }
+    ATeleporter      & Teleporter     () { return (ATeleporter      &)*this; }
+    ATrigger         & Trigger        () { return (ATrigger         &)*this; }
+    AWeapon          & Weapon         () { return (AWeapon          &)*this; }
+    AZoneDescriptor  & ZoneDescriptor () { return (AZoneDescriptor  &)*this; }
 
-    const APawn           & Pawn          () const { return (APawn          &)*this; }
-    const ARoot           & Root          () const { return (ARoot          &)*this; }
-    const AProjectile     & Projectile    () const { return (AProjectile    &)*this; }
-    const ALight          & Light         () const { return (ALight         &)*this; }
-    const AInventory      & Inventory     () const { return (AInventory     &)*this; }
-    const AWeapon         & Weapon        () const { return (AWeapon        &)*this; }
-    const APowerUp        & PowerUp       () const { return (APowerUp       &)*this; }
-    const AAmmo           & Ammo          () const { return (AAmmo          &)*this; }
-    const APyrotechnics   & Pyrotechnic   () const { return (APyrotechnics  &)*this; }
-    const ADecorations    & Decoration    () const { return (ADecorations   &)*this; }
-    const AKeypoint       & Keypoint      () const { return (AKeypoint      &)*this; }
-    const APlayerStart    & PlayerStart   () const { return (APlayerStart   &)*this; }
-    const ATeleporter     & Teleporter    () const { return (ATeleporter    &)*this; }
-    const AZoneDescriptor & ZoneDescriptor() const { return (AZoneDescriptor&)*this; }
-    const ABlockMonsters  & BlockMonsters () const { return (ABlockMonsters &)*this; }
-    const AMover          & Mover         () const { return (AMover         &)*this; }
-    const ATrigger        & Trigger       () const { return (ATrigger       &)*this; }
-
-    // Is the specifed actor a kind of actor specified by Class?
-    BOOL IsA(UClass * Class) const { return this->Class->IsKindOf(Class); }
+    const AAmmo            & Ammo           () const { return (AAmmo            &)*this; }
+    const ABlockMonsters   & BlockMonsters  () const { return (ABlockMonsters   &)*this; }
+    const ADecoration      & Decoration     () const { return (ADecoration      &)*this; }
+    const AExplosion       & Explosion      () const { return (AExplosion       &)*this; }
+    const AInventory       & Inventory      () const { return (AInventory       &)*this; }
+    const AKeypoint        & Keypoint       () const { return (AKeypoint        &)*this; }
+    const AProjectile      & Projectile     () const { return (AProjectile      &)*this; }
+    const ALevelDescriptor & LevelDescriptor() const { return (ALevelDescriptor &)*this; }
+    const ALight           & Light          () const { return (ALight           &)*this; }
+    const AMover           & Mover          () const { return (AMover           &)*this; }
+    const APawn            & Pawn           () const { return (APawn            &)*this; }
+    const APowerUp         & PowerUp        () const { return (APowerUp         &)*this; }
+    const APlayerStart     & PlayerStart    () const { return (APlayerStart     &)*this; }
+    const APyrotechnics    & Pyrotechnic    () const { return (APyrotechnics    &)*this; }
+    const ATeleporter      & Teleporter     () const { return (ATeleporter      &)*this; }
+    const ATrigger         & Trigger        () const { return (ATrigger         &)*this; }
+    const AZoneDescriptor  & ZoneDescriptor () const { return (AZoneDescriptor  &)*this; }
+    const AWeapon          & Weapon         () const { return (AWeapon          &)*this; }
 
     void MakeSound(USound * Sound) const;
     void MakeSound(USound * Sound, const FVector & Location) const;
@@ -128,14 +129,43 @@ public:
     ,   int         Count  
     ) const;
 
-    // Create a new actor based on the given info. Returns pointer to new actor, or 0 if none created.
+    // Create a new actor based on the given information. 
+    // Returns pointer to new actor, or 0 if none created.
     static FActor * Spawn 
     (
         UClass        * Class           // Class of actor to create. 0 if none.
     ,   const FVector & Location        // Location of new actor.
-    ,   int             LifeSpan = 0    // Life span of new actor, or 0 to use default class lifespan.
     ,   const FVector & Velocity = GMath.ZeroVector // Velocity of new actor.
     );
+
+    // Create a new actor based on the given information. 
+    // Returns pointer to new actor, or 0 if none created.
+    // In addition, sets the iInstigator member of the new actor to
+    // the iInstigator member of *this.
+    FActor * Instigate
+    (
+        UClass        * Class           // Class of actor to create. 0 if none.
+    ,   const FVector * Location = 0    // Location of new actor, or 0 to use this->Location.
+    ,   const FVector * Velocity = 0    // Velocity of new actor, or 0 for zero.
+    )
+    const;
+
+    // Create a new child actor at the location of *this. 
+    // Returns pointer to new actor, or 0 if none created.
+    FActor * SpawnChild
+    (
+        UClass        * Class           // Class of actor to create. 0 if none.
+    );
+
+    // Create a new child actor of *this using the given parameters.
+    // Returns pointer to new actor, or 0 if none created.
+    FActor * SpawnChild
+    (
+        UClass        * Class           // Class of actor to create. 0 if none.
+    ,   const FVector & Location        // Location of new actor.
+    ,   const FVector & Velocity = GMath.ZeroVector // Velocity of new actor.
+    );
+
 
     // Determine the first inventory item of the given class.
     // If found, return the item. Otherwise, return 0.
@@ -246,8 +276,12 @@ public:
     FActor & Parent() const { return Actor(iParent); }
     BOOL HasTarget() const { return iTarget != INDEX_NONE; }
     BOOL HasParent() const { return iParent != INDEX_NONE; }
+    INDEX AncestorIndex(UClass * Class) const; // Return the first ancestor of the given class.
+        // More specifically, look back through the iParent chain of *this to find the
+        // first actor which is of the specified Class.
 
-    BOOL IsPlayer() const { return Camera!=0; }
+    BOOL IsPawn() const { return IsKindOf("Pawn"); }
+    BOOL IsPlayer() const { return IsPawn() && this->Pawn().Camera != 0; }
 
     BOOL CanSeeAsFarAs(const FVector & Location) const; // Does *this (must be a pawn) have vision good enough to see as far as Location, ignoring obstacles?
 //tbd?    BOOL CanHearAsFarAs(const FVector & Location) const; // Does *this (must be a pawn) have hearing good enough to hear as far as Location, ignoring obstacles?
@@ -284,6 +318,21 @@ public:
     ,   EDamageType DamageType  = DMT_Basic // Kind of damage
     )
     const;
+
+    void GainMomentum // Change the actor's velocity by adding the specified momentum.
+    (
+        FLOAT             Momentum  // Scalar magnitude of momentum.
+    ,   const FVector   & Direction // Direction of momentum (length, if not 0, is irrelevant)
+    )
+    {
+        if( Momentum != 0 && bMomentum && Mass != 0 )
+        {
+            FVector dVelocity = Direction;
+            dVelocity.Normalize();
+            dVelocity *= Momentum / Mass;
+            Velocity += dVelocity;
+        }
+    }
 
     void CauseRayDamage // Have *this cause basic damage to the first actor hit by a ray.
     (
@@ -335,23 +384,24 @@ public:
     // These functions let you avoid writing explicit type casts. 
     // In addition, these functions could be made safe (raising an error
     // if the actor is not of the expected class.)
-    static APawn           & Pawn          ( INDEX iActor ) { return (APawn          &)Actor(iActor).Pawn          (); }
-    static ARoot           & Root          ( INDEX iActor ) { return (ARoot          &)Actor(iActor).Root          (); }
-    static AProjectile     & Projectile    ( INDEX iActor ) { return (AProjectile    &)Actor(iActor).Projectile    (); }
-    static ALight          & Light         ( INDEX iActor ) { return (ALight         &)Actor(iActor).Light         (); }
-    static AInventory      & Inventory     ( INDEX iActor ) { return (AInventory     &)Actor(iActor).Inventory     (); }
-    static AWeapon         & Weapon        ( INDEX iActor ) { return (AWeapon        &)Actor(iActor).Weapon        (); }
-    static APowerUp        & PowerUp       ( INDEX iActor ) { return (APowerUp       &)Actor(iActor).PowerUp       (); }
-    static AAmmo           & Ammo          ( INDEX iActor ) { return (AAmmo          &)Actor(iActor).Ammo          (); }
-    static APyrotechnics   & Pyrotechnic   ( INDEX iActor ) { return (APyrotechnics  &)Actor(iActor).Pyrotechnic   (); }
-    static ADecorations    & Decoration    ( INDEX iActor ) { return (ADecorations   &)Actor(iActor).Decoration    (); }
-    static AKeypoint       & Keypoint      ( INDEX iActor ) { return (AKeypoint      &)Actor(iActor).Keypoint      (); }
-    static APlayerStart    & PlayerStart   ( INDEX iActor ) { return (APlayerStart   &)Actor(iActor).PlayerStart   (); }
-    static ATeleporter     & Teleporter    ( INDEX iActor ) { return (ATeleporter    &)Actor(iActor).Teleporter    (); }
-    static AZoneDescriptor & ZoneDescriptor( INDEX iActor ) { return (AZoneDescriptor&)Actor(iActor).ZoneDescriptor(); }
-    static ABlockMonsters  & BlockMonsters ( INDEX iActor ) { return (ABlockMonsters &)Actor(iActor).BlockMonsters (); }
-    static AMover          & Mover         ( INDEX iActor ) { return (AMover         &)Actor(iActor).Mover         (); }
-    static ATrigger        & Trigger       ( INDEX iActor ) { return (ATrigger       &)Actor(iActor).Trigger       (); }
+    static AAmmo             & Ammo            ( INDEX iActor ) { return (AAmmo            &)Actor(iActor).Ammo            (); }
+    static ABlockMonsters    & BlockMonsters   ( INDEX iActor ) { return (ABlockMonsters   &)Actor(iActor).BlockMonsters   (); }
+    static ADecoration       & Decoration      ( INDEX iActor ) { return (ADecoration      &)Actor(iActor).Decoration      (); }
+    static AExplosion        & Explosion       ( INDEX iActor ) { return (AExplosion       &)Actor(iActor).Explosion       (); }
+    static AInventory        & Inventory       ( INDEX iActor ) { return (AInventory       &)Actor(iActor).Inventory       (); }
+    static AKeypoint         & Keypoint        ( INDEX iActor ) { return (AKeypoint        &)Actor(iActor).Keypoint        (); }
+    static ALevelDescriptor  & LevelDescriptor ( INDEX iActor ) { return (ALevelDescriptor &)Actor(iActor).LevelDescriptor (); }
+    static ALight            & Light           ( INDEX iActor ) { return (ALight           &)Actor(iActor).Light           (); }
+    static AMover            & Mover           ( INDEX iActor ) { return (AMover           &)Actor(iActor).Mover           (); }
+    static APawn             & Pawn            ( INDEX iActor ) { return (APawn            &)Actor(iActor).Pawn            (); }
+    static APlayerStart      & PlayerStart     ( INDEX iActor ) { return (APlayerStart     &)Actor(iActor).PlayerStart     (); }
+    static APowerUp          & PowerUp         ( INDEX iActor ) { return (APowerUp         &)Actor(iActor).PowerUp         (); }
+    static APyrotechnics     & Pyrotechnic     ( INDEX iActor ) { return (APyrotechnics    &)Actor(iActor).Pyrotechnic     (); }
+    static AProjectile       & Projectile      ( INDEX iActor ) { return (AProjectile      &)Actor(iActor).Projectile      (); }
+    static ATeleporter       & Teleporter      ( INDEX iActor ) { return (ATeleporter      &)Actor(iActor).Teleporter      (); }
+    static ATrigger          & Trigger         ( INDEX iActor ) { return (ATrigger         &)Actor(iActor).Trigger         (); }
+    static AWeapon           & Weapon          ( INDEX iActor ) { return (AWeapon          &)Actor(iActor).Weapon          (); }
+    static AZoneDescriptor   & ZoneDescriptor  ( INDEX iActor ) { return (AZoneDescriptor  &)Actor(iActor).ZoneDescriptor  (); }
 
     //------------------------------------------------------------------------
     //      Actor messaging functions. 
@@ -377,11 +427,13 @@ public:
     static int Send_DoSomething    (INDEX iActor);
     static int Send_EndAnimation   (INDEX iActor);
     static int Send_FrameTrigger   (INDEX iActor, int Sequence, int Frame, int Trigger );
+    static int Send_GainedChild    (INDEX iActor, INDEX iChild);
     static int Send_GoToLevel      (INDEX iActor, const char *LevelName );
     static int Send_HarmTarget     (INDEX iActor);
     static int Send_HitWall        (INDEX iActor);
     static int Send_Hit            (INDEX iActor, PHit & Info);
     static int Send_KillCredit     (INDEX iActor);
+    static int Send_LostChild      (INDEX iActor, INDEX iChild);
     static int Send_PickupNotify   (INDEX iActor, INDEX iPickup        );
     static int Send_PostTeleport   (INDEX iActor, INDEX iTeleporter);
     static int Send_PreTeleport    (INDEX iActor, INDEX iTeleporter);
@@ -390,6 +442,7 @@ public:
     static int Send_RestartLevel   (INDEX iActor);
     static int Send_Search         (INDEX iActor);
     static int Send_SensedSomething(INDEX iActor, PSense & Info );
+    static int Send_SetParent      (INDEX iActor, INDEX iNewParent );
     static int Send_SwitchInventory(INDEX iActor, INDEX iNextInventory );
     static int Send_TargetIsNear   (INDEX iActor);
     static int Send_TargetMovedAway(INDEX iActor);
@@ -415,11 +468,13 @@ public:
     int Send_DoSomething    ()                      { return Send_DoSomething    (iMe); }
     int Send_EndAnimation   ()                      { return Send_EndAnimation   (iMe); }
     int Send_FrameTrigger   ( int Sequence, int Frame, int Trigger ) { return Send_FrameTrigger(iMe,Sequence,Frame,Trigger); }
+    int Send_GainedChild    (INDEX iChild)          { return Send_GainedChild    (iMe,iChild); }
     int Send_GoToLevel      (const char *LevelName) { return Send_GoToLevel(iMe, LevelName); }
     int Send_HarmTarget     ()                      { return Send_HarmTarget     (iMe); }
     int Send_HitWall        ()                      { return Send_HitWall        (iMe); }
     int Send_Hit            (PHit & Info)           { return Send_Hit            (iMe,Info); }
     int Send_KillCredit     ()                      { return Send_KillCredit     (iMe); }
+    int Send_LostChild      (INDEX iChild)          { return Send_LostChild      (iMe,iChild); }
     int Send_PickupNotify   (INDEX iPickup)         { return Send_PickupNotify   (iMe,iPickup); }
     int Send_PostTeleport   (INDEX iTeleporter)     { return Send_PostTeleport   (iMe,iTeleporter); }
     int Send_PreTeleport    (INDEX iTeleporter)     { return Send_PreTeleport    (iMe,iTeleporter); }
@@ -428,6 +483,7 @@ public:
     int Send_RestartLevel   ()                      { return Send_RestartLevel   (iMe); }
     int Send_Search         ()                      { return Send_Search         (iMe); }
     int Send_SensedSomething(PSense & Info)         { return Send_SensedSomething(iMe,Info); }
+    int Send_SetParent      (INDEX iNewParent)      { return Send_SetParent      (iMe,iNewParent); }
     int Send_SwitchInventory(INDEX iNextInventory)  { return Send_SwitchInventory(iMe,iNextInventory); }
     int Send_TargetIsNear   ()                      { return Send_TargetIsNear   (iMe); }
     int Send_TargetMovedAway()                      { return Send_TargetMovedAway(iMe); }
@@ -443,8 +499,8 @@ public:
     //------------------------------------------------------------------------
     //                  AI-related functions.
     //------------------------------------------------------------------------
-    AActorAI & AI() { return *(AActorAI*)&AIInfo; }
-    const AActorAI & AI() const { return *(AActorAI*)&AIInfo; }
+    AActorAI & AI() { return *(AActorAI*)&Private.AIInfo; }
+    const AActorAI & AI() const { return *(AActorAI*)&Private.AIInfo; }
     void ClearTask(BOOL CancelAnimations = FALSE);
     void SetTask(EAI_Task Task, int Ticks); // Finish any existing animations, and add a new task.
     //              Functions to set the actor's immediate task.
@@ -479,11 +535,6 @@ public:
     void InitializeAI();
 
 };
-
-static inline       AActor & actor(      ARoot & Actor) { return *(AActor*)&Actor; }
-static inline const AActor & actor(const ARoot & Actor) { return *(AActor*)&Actor; }
-
-static BOOL actorIs(const ARoot & Actor, UClass * Class) { return Actor.Class->IsKindOf(Class); }
 
 
 // Return values for actor ::Process functions:

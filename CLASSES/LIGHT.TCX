@@ -1,32 +1,231 @@
 '
-' UnrealEd class and child classes for class: Light 
+' Actor classes exported from UnrealEd
 '
-
 DeclareClass Name=Light
+DeclareClass Name=Satellite
+DeclareClass Name=TorchFlame
 
 Begin Class Name=Light
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 '
-' This is a built-in Unreal class and it shouldn't be modified
+' The light actor class.
+' This is a built-in Unreal class and it shouldn't be modified.
 '
-Class Light Expands Root Intrinsic
+Class Light Expands Actor Intrinsic
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
       Class=Light
+      Location=(+00000.000000,+00000.000000,+00000.000000)
+      Velocity=(+00000.000000,+00000.000000,+00000.000000)
+      DrawRot=(0,0,0)
+      ViewRot=(0,0,0)
+      Parent=None
+      Weapon=None
       Texture=s_light
+      MeshMap=None
+      Brush=None
+      AmbientSound=None
+      DrawScale=+00001.000000
+      AnimSeq=0
+      AnimRate=+00000.000000
+      AnimBase=+00000.000000
+      AnimCount=0
+      AnimFirst=0
+      AnimLast=0
+      AnimMessage=0
       CollisionRadius=+00024.000000
       CollisionHeight=+00024.000000
+      DrawType=1
+      BlitType=1
+      ParticleType=0
+      ParticleCount=0
+      ParticleRate=0
+      SoundRadius=32
       LightType=1
+      LightEffect=0
       LightBrightness=64
+      LightHue=0
       LightSaturation=255
       LightRadius=64
       LightPeriod=32
-      bStaticActor=True
+      LightPhase=0
+      LightCone=0
+	  VolumeBrightness=128
+	  VolumeRadius=16
+      InherentBrightness=0
+      bAnimate=False
+      bMeshWet=False
+      bMeshShadowCast=False
+      bMeshEnviroMap=False
+      bSpriteRotates=False
+      bUnused0=False
+      bActorShadows=False
+      bShinyReflect=False
+      bSpecialLight=False
+      bStatic=True
       bHidden=True
+      bHiddenEd=False
+      bDirectional=False
+      bCollideActors=False
+      bCollideWorld=False
+      bBlocksActors=False
+      bBehindView=False
+      bSelected=False
+      bTempDynamicLight=False
+      bDrawOnHorizon=False
       bTemplateClass=False
-	  DefaultEdCategory=Lighting
+      bTempLightChanged=False
+      bUnlit=False
+      bNoSmooth=False
+      bUnused4=False
+      bUnused5=False
+      bUnused6=False
+      bUnused7=False
+      bUnused8=False
+      User=None
+      Name=None
+      EventName=None
+      Target=None
+      Inventory=None
+      Floor=None
+      Mass=+00100.000000
+      bInactive=False
+      bPegged=False
+      bGravity=False
+      bMomentum=False
+      bProjTarget=False
+      bCanPossess=False
+      bDifficulty1=True
+      bDifficulty2=True
+      bDifficulty3=True
+      bDifficulty4=True
+      bNetCooperative=True
+      bNetDeathMatch=True
+      bNetPersistent=True
+      bNetNoMonsters=True
+      bTempEditor=False
+      bJustDeleted=False
+      bCanBeTeleported=False
+      bUnused12=False
+      bUnused13=False
+      bUnused14=False
+      bUnused15=False
+      Me=None
+      Zone=0
+      ChanceOfExistence=0
+      LifeSpan=0
+      Age=0
+      Era=0
+      TriggerSequences(0)=0
+      TriggerSequences(1)=0
+      TriggerSequences(2)=0
+      TriggerSequences(3)=0
+      TriggerSequences(4)=0
+      TriggerSequences(5)=0
+      TriggerSequences(6)=0
+      TriggerSequences(7)=0
+      TriggerSequences(8)=0
+      TriggerSequences(9)=0
+      TriggerFrames(0)=0
+      TriggerFrames(1)=0
+      TriggerFrames(2)=0
+      TriggerFrames(3)=0
+      TriggerFrames(4)=0
+      TriggerFrames(5)=0
+      TriggerFrames(6)=0
+      TriggerFrames(7)=0
+      TriggerFrames(8)=0
+      TriggerFrames(9)=0
+      TriggerValues(0)=0
+      TriggerValues(1)=0
+      TriggerValues(2)=0
+      TriggerValues(3)=0
+      TriggerValues(4)=0
+      TriggerValues(5)=0
+      TriggerValues(6)=0
+      TriggerValues(7)=0
+      TriggerValues(8)=0
+      TriggerValues(9)=0
+      WhichTriggers=0
+      TextureList=0
+      TextureCount=0
+      ScriptCountdown=0
+      TimerCountdown=0
+      TimerMessage=0
+      WaterSinkRate=+00000.500000
+      AITask=0
+      PendingTeleporter=None
+      TeleportDelay=0
+      DefaultEdCategory=Lighting
    End DefaultProperties
 End Class
 
+Begin Class Name=Satellite
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+'
+' A special kind of light which appears in the backdrops
+' and rises/falls according to the level's day/night cycle.
+'
+Class Satellite Expands Light Intrinsic
+
+Dim Period as Editable Real ' Amount that level's day cycle is scaled by, normally 1.0
+Dim Phase  as Editable Real ' Phase offset from start of level time, 0.0 to 1.0
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Sattelite
+	  LightType=1
+	  LightEffect=15
+	  Period=1.0
+	  Phase=0.0
+	  bStatic=0
+	  bDirectional=1
+	  bOnHorizon=1
+   End DefaultProperties
+End Class
+
+Begin Class Name=TorchFlame
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Class TorchFlame Expands Light Intrinsic
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=TorchFlame
+      bStatic=False
+      bHidden=False
+      MeshMap=Flame
+      DrawType=2
+      DrawScale=1.0
+      AnimRate=1.0
+      AnimCount=0
+      AnimSeq=1
+      bAnimate=True
+      LightType=1
+	  LightEffect=2
+      LightBrightness=40
+      LightRadius=32
+   End DefaultProperties
+End Class
+
+Begin Class Name=Spotlight
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+'
+' A directional spotlight.
+'
+Class Spotlight Expands Light Intrinsic
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Spotlight
+	  LightType=1
+	  LightEffect=12
+	  LightCone=128
+	  bDirectional=1
+	  bStaticActor=0
+   End DefaultProperties
+End Class

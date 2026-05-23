@@ -2,13 +2,13 @@
 
 [General Info]
 Version=1
-LastClass=CUnrealWnDlg
-LastTemplate=CDialog
+LastClass=CUnrealEdServer
+LastTemplate=generic CWnd
 NewFileInclude1=#include "stdafx.h"
 NewFileInclude2=#include "unwn.h"
 LastPage=0
 
-ClassCount=4
+ClassCount=5
 Class1=CUnrealWnApp
 Class2=CUnrealWnDlg
 Class3=CUnrealEdServer
@@ -19,7 +19,7 @@ Resource2=IDR_LOG
 Resource3=IDR_CONACCEL
 Resource4=IDD_PASSWORD
 Resource5=IDD_PROPERTIES_PREFERENCES
-Resource6=IDD_LOG
+Resource6=IDR_EDITORCAM
 Class4=CPasswordDlg
 Resource7=IDD_SLOWTASK
 Resource8=IDD_ACTION_SELECTION
@@ -33,7 +33,8 @@ Resource15=IDD_INPUT_ACTIONS
 Resource16=IDD_AUDIO
 Resource17=IDD_ACTION_TUTORIAL
 Resource18=IDR_PLAYERCAM
-Resource19=IDR_EDITORCAM
+Class5=CUnrealServer
+Resource19=IDD_LOG
 
 [CLS:CUnrealWnApp]
 Type=0
@@ -227,14 +228,14 @@ Control2=65535,static,1342177280
 Control3=IDC_MUSIC_VOLUME,msctls_trackbar32,1342373912
 Control4=65535,static,1342177280
 Control5=IDC_SOUND_VOLUME,msctls_trackbar32,1342373912
-Control6=65535,static,1342308352
-Control7=IDC_SAMPLE_RATE_LIST,combobox,1344340227
-Control8=IDC_USE_DIRECT_SOUND,button,1342373891
+Control6=IDC_USE_DIRECT_SOUND,button,1342373891
+Control7=65535,static,1342177280
+Control8=65535,static,1342177280
 Control9=65535,static,1342177280
 Control10=65535,static,1342177280
-Control11=65535,static,1342177280
-Control12=65535,static,1342177280
-Control13=65535,static,1342308352
+Control11=65535,static,1342308352
+Control12=IDC_ENABLE_FILTER,button,1342373891
+Control13=65535,button,1342177287
 
 [DLG:IDD_ACTION_TUTORIAL]
 Type=1
@@ -313,4 +314,12 @@ Command18=ID_HELP_TOPICS
 Command19=ID_HELP_ORDER
 Command20=ID_HELP_EPICSWEBSITE
 CommandCount=20
+
+[CLS:CUnrealServer]
+Type=0
+HeaderFile=UnSrv.h
+ImplementationFile=UnSrv.cpp
+BaseClass=CWnd
+Filter=W
+VirtualFilter=WC
 

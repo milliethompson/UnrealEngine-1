@@ -3,8 +3,8 @@ Begin VB.Form frmParSolLinearStair
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Build a Linear Staircase"
    ClientHeight    =   5295
-   ClientLeft      =   6690
-   ClientTop       =   1110
+   ClientLeft      =   6720
+   ClientTop       =   1635
    ClientWidth     =   2490
    ControlBox      =   0   'False
    BeginProperty Font 
@@ -20,15 +20,16 @@ Begin VB.Form frmParSolLinearStair
    Height          =   5655
    HelpContextID   =   152
    Icon            =   "PsLStair.frx":0000
-   Left            =   6630
+   Left            =   6660
    LinkTopic       =   "Form3"
    MaxButton       =   0   'False
    ScaleHeight     =   5295
    ScaleWidth      =   2490
    ShowInTaskbar   =   0   'False
-   Top             =   810
+   Top             =   1335
    Width           =   2610
    Begin VB.TextBox FirstStep 
+      BackColor       =   &H00FFFFFF&
       BeginProperty Font 
          name            =   "MS Sans Serif"
          charset         =   0
@@ -40,7 +41,7 @@ Begin VB.Form frmParSolLinearStair
       EndProperty
       Height          =   288
       Left            =   1320
-      TabIndex        =   3
+      TabIndex        =   0
       Text            =   "0"
       Top             =   2160
       Width           =   1092
@@ -370,7 +371,7 @@ Begin VB.Form frmParSolLinearStair
       EndProperty
       Height          =   375
       Left            =   960
-      TabIndex        =   1
+      TabIndex        =   7
       Top             =   4800
       Width           =   615
    End
@@ -388,7 +389,7 @@ Begin VB.Form frmParSolLinearStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1320
-      TabIndex        =   4
+      TabIndex        =   1
       Text            =   "32"
       Top             =   2520
       Width           =   1095
@@ -407,7 +408,7 @@ Begin VB.Form frmParSolLinearStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1320
-      TabIndex        =   7
+      TabIndex        =   4
       Text            =   "8"
       Top             =   3600
       Width           =   1095
@@ -426,7 +427,7 @@ Begin VB.Form frmParSolLinearStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1320
-      TabIndex        =   6
+      TabIndex        =   3
       Text            =   "256"
       Top             =   3240
       Width           =   1095
@@ -445,7 +446,7 @@ Begin VB.Form frmParSolLinearStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1320
-      TabIndex        =   5
+      TabIndex        =   2
       Text            =   "16"
       Top             =   2880
       Width           =   1095
@@ -464,7 +465,7 @@ Begin VB.Form frmParSolLinearStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1320
-      TabIndex        =   8
+      TabIndex        =   5
       Text            =   "Group"
       Top             =   3960
       Width           =   1095
@@ -482,7 +483,7 @@ Begin VB.Form frmParSolLinearStair
       EndProperty
       Height          =   375
       Left            =   1680
-      TabIndex        =   2
+      TabIndex        =   8
       Top             =   4800
       Width           =   735
    End
@@ -500,7 +501,7 @@ Begin VB.Form frmParSolLinearStair
       EndProperty
       Height          =   375
       Left            =   120
-      TabIndex        =   0
+      TabIndex        =   6
       Top             =   4800
       Width           =   735
    End
@@ -720,7 +721,7 @@ Private Sub Build_Click()
         Exit Sub
     End If
     If SSteps = 1 Then
-        MsgBox ("A 1-step Staircase is a Rectangle. Use the Rectangle Brush.")
+        MsgBox ("A 1-step Staircase is a cube. Use the cube brush.")
         Exit Sub
     End If
     If SSteps > 45 Then
@@ -881,5 +882,32 @@ End Sub
 
 Private Sub Trigger_Change()
     Build_Click
+End Sub
+
+'
+' Focus change highlighting routines.
+'
+Private Sub FirstStep_GotFocus()
+    SelectAll FirstStep
+End Sub
+
+Private Sub StepLength_GotFocus()
+    SelectAll StepLength
+End Sub
+
+Private Sub StepHeight_GotFocus()
+    SelectAll StepHeight
+End Sub
+
+Private Sub StepWidth_GotFocus()
+    SelectAll StepWidth
+End Sub
+
+Private Sub NumSteps_GotFocus()
+    SelectAll NumSteps
+End Sub
+
+Private Sub Group_GotFocus()
+    SelectAll Group
 End Sub
 

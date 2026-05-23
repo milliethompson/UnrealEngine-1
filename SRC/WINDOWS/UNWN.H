@@ -18,64 +18,63 @@
 extern class CUnrealWnApp App;
 
 /////////////////////////////////////////////////////////////////////////////
-// CTimer
+// CTimer.
 /////////////////////////////////////////////////////////////////////////////
 
 class CUnrealTimer
-	{
-	public:
-	//
+{
+public:
+
+	// Variables.
 	MMRESULT	TimerHandle;
 	MMRESULT	TimerPeriod;
 	DWORD		TimerRate;
 	DWORD		TimerTicks;
 	DWORD		TimerBug;
 	DWORD		TimerAlive;
-	//
-	// Functions:
-	//
-	CTimer(void);
-	void Enable(void);
-	void Disable(void);
+
+	// Functions.
+	CTimer();
+	void Enable();
+	void Disable();
 	void Init(DWORD TimerRate);
-	void Exit(void);
-	};
+	void Exit();
+};
 
 /////////////////////////////////////////////////////////////////////////////
 // CUnrealWnApp:
-// See UnWn.cpp for the implementation of this class
+// See UnWn.cpp for the implementation of this class.
 /////////////////////////////////////////////////////////////////////////////
 
 class CUnrealWnApp : public CWinApp
-	{
-	public:
+{
+public:
+	// Constructor.
 	CUnrealWnApp();
-	//
-	// Custom:
-	//
+
+	// Custom.
 	DWORD AlwaysOnTop;
 	CUnrealWnDlg *Dialog;
 	HWND hWndMain;
-	HWND hWndEdCallback;
-	void UpdateUI(void);
+	HWND hWndCallback;
+	void UpdateUI();
 	void RegisterFileTypes(char *BaseDir);
 	char CmdLine[256];
 	char Error[1024];
 	char BaseDir[256];
 	int InOle,OleCrashed,UsageCount,InError,PlatformCrashed;
-	//
+
 	FGlobalPlatform Platform;
 	CUnrealTimer Timer;
-	//
+
 	void RouteMessage(void *Msg);
-	void MessagePump(void);
-	void InitializeUnreal(void);
-	void UnrealLockApp(void);
-	void UnrealUnlockApp(void);
-	void FinalizeErrorText(void);
-	//
+	void MessagePump();
+	void InitializeUnreal();
+	void UnrealLockApp();
+	void UnrealUnlockApp();
+	void FinalizeErrorText();
+
 	// Overrides
-	//
 	//{{AFX_VIRTUAL(CUnrealWnApp)
 	public:
 	virtual BOOL InitInstance();
@@ -103,9 +102,50 @@ class CUnrealWnApp : public CWinApp
 	afx_msg void OnNetGame();
 	afx_msg void OnPropertiesProperties();
 	//}}AFX_MSG
-	//
 	DECLARE_MESSAGE_MAP()
 protected:
-	};
+};
+
+/////////////////////////////////////////////////////////////////////////////
+// Ole helpers
+/////////////////////////////////////////////////////////////////////////////
+
+static int inline CheckUnrealState(char *Descr)
+{
+	if( App.PlatformCrashed )
+	{
+		char Error[16384];
+		strcpy(Error,"Unrecoverable: ");
+		strcat(Error,App.Platform.ErrorHist);
+
+		if (App.Platform.Debugging) DebugBreak();
+		else AfxThrowOleDispatchException(1,Error);
+		return 0;
+	}
+	else if( !App.Platform.ServerAlive )
+	{
+		App.Platform.Logf(LOG_Critical,"Ole '%s' after server shutdown",Descr);
+		return 0;
+	}
+	else return 1;
+}
+
+static void inline HandleOleError(char *Module)
+{
+	App.InOle=0;
+	App.OleCrashed=1;
+
+	App.Platform.ShutdownAfterError();
+
+	strcat(App.Platform.ErrorHist," <- Ole call to ");
+	strcat(App.Platform.ErrorHist,Module);
+	App.FinalizeErrorText();
+
+	App.Platform.Logf("Exiting due to Ole error");
+	App.Platform.CloseLog();
+
+	if (App.Platform.Debugging) DebugBreak();
+	else AfxThrowOleDispatchException(1,App.Platform.ErrorHist);
+}
 
 /////////////////////////////////////////////////////////////////////////////

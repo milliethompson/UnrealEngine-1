@@ -40,7 +40,7 @@ class NInternetDriver : public NDriver
 	// NDriver interface:
 	//
 	int Init(char *ParamBuffer,char *ErrorMessage);
-	void Exit(void);
+	void Exit();
 	int Exec(const char *Cmd,FOutputDevice *Out);
 	int CanHandleURL(char *ServerURL);
 	NSocket *ServerAcceptConnection(int ServerID);
@@ -50,8 +50,8 @@ class NInternetDriver : public NDriver
 	//
 	// FTask implementation:
 	//
-	void TaskTick(void);
-	virtual void TaskExit(void);
+	void TaskTick();
+	virtual void TaskExit();
 	virtual char *TaskStatus(char *Name,char *Desc);
 	//
 	// Custom variables:
@@ -69,7 +69,7 @@ class NInternetDriver : public NDriver
 	// Custom functions:
 	//
 	NInternetDriver() {Initialized=0;};
-	void AssertInitialized(void) {if (!Initialized) appError("Internet not initialized");};
+	void AssertInitialized() {if (!Initialized) appError("Internet not initialized");};
 	//
 	// Dialog functions:
 	//
@@ -95,8 +95,8 @@ class FTaskTelnet : public FTask, public FOutputDevice
 	//
 	// FTask interface:
 	//
-	void TaskTick(void);
-	void TaskExit(void);
+	void TaskTick();
+	void TaskExit();
 	char *TaskStatus(char *Name,char *Desc);
 	//
 	// FOutputDevice interface:
@@ -106,7 +106,7 @@ class FTaskTelnet : public FTask, public FOutputDevice
 	// Custom interface:
 	//
 	int Guest;
-	char UserName[NAME_SIZE];
+	char UserName[NET_NAME_SIZE];
 	SOCKET Socket;
 	SOCKADDR_IN SockAddr;
 	enum {MAX_INPUT_LEN=255};
@@ -120,7 +120,7 @@ class FTaskTelnet : public FTask, public FOutputDevice
 //
 // Return a string describing the most recent Windows Sockets error.
 //
-char *wsaError(void);
+char *wsaError();
 
 /*------------------------------------------------------------------------------
 	The End

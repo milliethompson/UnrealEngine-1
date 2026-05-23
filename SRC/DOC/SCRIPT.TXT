@@ -423,10 +423,9 @@ State Alive, Auto Editable
 			PlayVariedSound(SnortSound)
 			PlayAnim (LookLeft,0)
 		ElseIf Random(10)=0 then 
-			{
 			PlayVariedSound(SnortSound)
 			PlayAnim (LookRight,0)
-			}
+		EndIf
 		Goto Idle
 		When SeeTarget(Source as Actor)
 			Target         = Source

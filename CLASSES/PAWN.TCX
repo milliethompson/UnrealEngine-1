@@ -1,10 +1,10 @@
 '
-' UnrealEd class and child classes for class: Pawn
+' UnrealEd Pawn class and child classes.
 '
 
 DeclareClass Name=Camera
 DeclareClass Name=Pawn
-DeclareClass Name=Woman
+DeclareClass Name=Human
 DeclareClass Name=Dragon
 DeclareClass Name=Skaarj
 DeclareClass Name=BigMan
@@ -12,7 +12,6 @@ DeclareClass Name=ArchAngel
 DeclareClass Name=Gasbag
 DeclareClass Name=Manta
 DeclareClass Name=Tentacle
-
 DeclareClass Name=WallHit
 DeclareClass Name=PawnHit
 DeclareClass Name=Explode3
@@ -25,48 +24,103 @@ Begin Class Name=Pawn
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 '
-' This is a built-in Unreal class and it shouldn't be modified
+' The base class of all actors that can be controlled by players or AI.
+' This is a built-in Unreal class and it shouldn't be modified.
 '
-' The base class of all actors that can be controlled by players.
-' Pawns can be posessed by either players or AI.
-'
-Class Pawn Expands Root Intrinsic
+Class Pawn Expands Actor Intrinsic
 
+' Player info.
+Dim Camera			As NoSave Camera    ' Camera, if under local player control.
+Dim Player			As NoSave Player    ' Player, if controlled by a player.
+Dim PlayerName		As String(32)       ' Player name, or blank if none.
+Dim TeamName		As String(32)       ' Team, or blank if none.
+
+' Movement.
+Dim RotSpeed        As Rotation			' Change in rotation per tick.
+Dim TargetRot       As Rotation			' Destination rotation.
+Dim BaseEyeHeight	As Editable Real    ' Base eye height above collision center.
+Dim EyeHeight		As Real             ' Current eye height, adjusted for bobbing.
+Dim Bob				As Real             ' How much to bob the view.
+
+' Camera status.
+Dim OrthoZoom		As Real             ' Orthogonal/map view zoom factor.
+Dim FovAngle		As Real             ' X field of view angle in degrees, usually 90.
+Dim ShowFlags		As Integer			' Camera flags.
+Dim RendMap			As Integer			' Map rendering type.
+Dim Misc1			As Integer			' Miscellaneous.
+Dim Misc2			As Integer			' Miscellaneous camera info.
+
+' Input buttons (32), for pawns under player control.
+Dim bNone			As Boolean
+Dim bJump			As Boolean
+Dim bFire			As Boolean
+Dim bAltFire		As Boolean
+Dim bZoom			As Boolean
+Dim bRun			As Boolean
+Dim bLookAround		As Boolean
+Dim bDuck			As Boolean
+Dim bNextWeapon		As Boolean
+Dim bPrevWeapon		As Boolean
+Dim bWeapon1		As Boolean
+Dim bWeapon2		As Boolean
+Dim bWeapon3		As Boolean
+Dim bWeapon4		As Boolean
+Dim bWeapon5		As Boolean
+Dim bWeapon6		As Boolean
+Dim bWeapon7		As Boolean
+Dim bWeapon8		As Boolean
+Dim bWeapon9		As Boolean
+Dim bSlide			As Boolean
+Dim bConsole		As Boolean
+Dim bHalfConsole	As Boolean
+Dim bExtra9			As Boolean
+Dim bExtra8			As Boolean
+Dim bExtra7			As Boolean
+Dim bExtra6			As Boolean
+Dim bExtra5			As Boolean
+Dim bExtra4			As Boolean
+Dim bExtra3			As Boolean
+Dim bExtra2			As Boolean
+Dim bExtra1			As Boolean
+Dim bExtra0			As Boolean
+
+' Axis-based input movements (16), for pawns under player control.
+Dim aNone			As Real
+Dim aForward		As Real
+Dim aTurn			As Real
+Dim aSlide			As Real
+Dim aUp				As Real
+Dim aLookUp			As Real
+Dim aLookSide		As Real
+Dim aBaseX			As Real
+Dim aBaseY			As Real
+Dim aExtra6			As Real
+Dim aExtra5			As Real
+Dim aExtra4			As Real
+Dim aExtra3			As Real
+Dim aExtra2			As Real
+Dim aExtra1			As Real
+Dim aExtra0			As Real
+
+'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+' Enums
 EnumDef ELifeState = LS_None, LS_Alive, LS_Dying, LS_Dead
 
-EnumDef EAI_Move =             _ ' The move strategy is 
-    EAI_MoveNone               _ ' ... nothing specific.
-,   EAI_MoveApproach           _ ' ... to approach a target.
-,   EAI_MoveBackOff            _ ' ... to strategically retreat.
-,   EAI_MoveRunAway              ' ... to run away.
-
-' Misc
-Dim YawSpeed as Editable Integer
-Dim PitchSpeed as Editable Integer
-Dim RollSpeed as Editable Integer
-Dim FixFrame as Editable Integer
-Dim BaseEyeHeight as Editable Real
-Dim EyeHeight as Real
-Dim Bob as Real
-Dim TeamName as Editable Name
-Dim TargetYaw        As Integer
-Dim TargetPitch      As Integer
-Dim TargetRoll       As Integer
+EnumDef EAI_Move =              _ ' The move strategy is 
+    EAIM_MoveNone               _ ' ... nothing specific.
+,   EAIM_MoveApproach           _ ' ... to approach a target.
+,   EAIM_MoveBackOff            _ ' ... to strategically retreat.
+,   EAIM_MoveRunAway              ' ... to run away.
 
 ' Player game statistics. 
 '   Those which are always accurate are marked [A] (for accurate).
 '   Those which are periodically calculated are marked [P] (for periodic).
 '   These statistics are tracked for the current level.
-Dim KillCount       As Byte     ' [A] The number of enemies killed by this actor.
 Dim DeathCount      As Byte     ' [A] The number of times this pawn has died.
-Dim SecretCount     As Byte     ' [A] Number of secrets found.
-Dim ShotCount       As Integer  ' [A] Number of shots fired.
-Dim HitCount        As Integer  ' [A] Number of times enemies have been hit.
-Dim DamagedCount    As Integer  ' [A] Total damage taken by actor.
-Dim DamageCount     As Integer  ' [A] Total damage inflicted by actor.
-Dim HealthCount     As Integer  ' [P] Total health of actor.
-Dim LowHealthCount  As Integer  ' [P] Total low-health values of actor.
-Dim HighHealthCount As Integer  ' [P] Total high-health values of actor.
+
+Dim ItemsFound   as Integer   ' Number of item goals achieved
+Dim KillCount    as Integer   ' Number of kill goals achieved
+Dim SecretsFound as Integer   ' Number of secret goals achieved
 
 ' Monster AI response configuration:
 '   These properties affect the AI of monsters.
@@ -80,13 +134,6 @@ Dim BackOffThreshold       As Editable Byte    ' Dekaunits. Monster must be at l
 Dim TargetCloseness        As Editable Byte    ' Monster's preferred distance from target, in dekaunits.
 Dim TargetZCloseness       As Editable Byte    ' Monster's preferred height above or below target, in dekaunits.
 Dim ApproachDirectness     As Editable Byte    ' Directness of approaching target (0=direct, 255=indirect).
-Dim bHasAI                 As Editable Boolean ' Does the pawn have intelligence?
-Dim bSensesTargets         As Editable Boolean ' TRUE iff the pawn senses potential targets
-Dim bRespondsToNoise       As Editable Boolean ' TRUE iff the pawn responds to nearby noise (not necessarily those of a target).
-Dim bRespondsToSights      As Editable Boolean ' TRUE iff the pawn responds to nearby sights (not necessarily those of a target).
-Dim bHarmsMonsters         As Editable Boolean ' TRUE iff the pawn harms other monsters (but only when provoked).
-Dim bNeverStill            As Editable Boolean ' TRUE iff the pawn never becomes quiescent.
-Dim bIsXenophobic          As Editable Boolean ' TRUE iff the pawn harms monsters different from itself. Meaningful only if bHarmsMonsters.
 Dim LurkingDistance        As Editable Byte    ' If non-zero, waits until target is this close before attacking. In dekaunits.
 Dim AuralAcuity            As Editable Real    ' Measures how well the pawn can hear things. 1.0 means a noise of 1 can be heard 100 units away. 0 means superb hearing.
 Dim RunAwayHealthThreshold As Editable Byte    ' Health threshold below which pawn runs away. 0 for none.
@@ -104,7 +151,7 @@ Dim QuestingSounds(2)    As Editable Sound
 Dim StillSounds(2)       As Editable Sound
 Dim VictorySounds(2)     As Editable Sound
 Dim AttackSounds(4)      As Editable Sound ' Sounds used for pawn-specific attacks
-Dim SoundTimer           As          Byte  ' Countdown from last sound made by pawn.
+Dim SoundTimer           As Byte  ' Countdown from last sound made by pawn.
 
 Dim AttackEffects(2)     As Editable Class ' Pyrotechnic effects to use when shooting
 Dim ExplosionEffect      As Editable Class ' Pyrotechnic effect when something explodes in the pawn.
@@ -113,6 +160,10 @@ Dim NaturalArmor(4) As Editable Real ' Indexed by EDamageType. Values are: 0.0..
 Dim HealRate        As Editable Real ' Amount pawn heals each tick.
 Dim Armor(4)        As Editable Real ' Indexed by EDamageType
 
+Dim AirDamping           As Editable Real   ' When flying, velocity is multipled by this each tick.
+Dim JumpDamping          As Editable Real   ' When in the air, but not flying, velocity is multipled by this each tick.
+Dim WaterDamping         As Editable Real   ' When swimming, velocity is multipled by this each tick.
+Dim GroundDamping        As Editable Real   ' When on the ground, velocity is multipled by this each tick.
 Dim SightRadius          As Editable Real   ' Maximum seeing distance.
 Dim PeripheralVision     As Editable Real   ' Cosine of limits of peripheral vision.
 Dim HearingAccuracy      As Editable Byte   ' Ability to locate the direction of a noise, 0=none, 255=superb
@@ -120,8 +171,9 @@ Dim Visibility           As Byte            ' How visible is the pawn? 0=invisib
 Dim Noise                As Real            ' The amount of noise being made by the pawn.
 
 Dim LungeSpeed     As Editable Real ' Lunge speed. Decreases stamina.
-Dim RunSpeed       As Editable Real ' Running speed. Does not decreases stamina.
-Dim NormalSpeed    As Editable Real ' The usual speed. Does not decrease stamina.
+Dim GroundSpeed    As Editable Real ' The maximum ground speed.
+Dim WaterSpeed     As Editable Real ' The maximum swimming speed.
+Dim AirSpeed       As Editable Real ' The maximum flying speed.
 Dim MaxStrength    As Editable Real ' The usual strengh of the pawn.
 Dim Strength       As Editable Real ' The current strength of the pawn. 0=weak, 1.0=really strong.
 Dim Stamina        As Real   ' Stamina: 0=none (can't run), 1.0=normal max.
@@ -140,11 +192,6 @@ Dim TargetLostTime     As Integer   ' Time the target was lost
 Dim TargetLastLocation As Vector    ' Last known location of target.
 Dim TargetLastVelocity As Vector    ' Last known velocity of target.
 
-' Information about animations, attacks, and so on:
-Dim bHasDistantMovingAttack  As Editable Boolean ' Does the monster have a distant, moving attack?
-Dim bHasDistantStillAttack   As Editable Boolean ' Does the monster have a distant, still attack?
-Dim bHasCloseUpAttack        As Editable Boolean ' Does the monster have a close-up attack?
-
 Dim LastNonFallZ             As Real          ' Z-coordinate of last time on surface or otherwise not falling.
 
 ' Status of usually temporary effects: 
@@ -157,30 +204,9 @@ Dim ExplosiveCharge        As Real    ' Amount of explosive charge imbedded in p
 Dim DelayedDamage          As Real    ' Amount of delayed basic damage
 Dim DamageDelay            As Byte    ' Ticks left before DelayedDamage takes effect.
 
-' todo: Make the effects into a BYTE flag (simplifies checking)
-Dim bHasInvisibility   As Editable Boolean ' TRUE iff the pawn has the power of invisibility.
-Dim bHasSilence        As Editable Boolean ' TRUE iff the pawn has the power of silence.
-Dim bHasInvincibility  As Editable Boolean ' TRUE iff a target suffers no damage
-Dim bHasSuperStrength  As Editable Boolean ' TRUE iff the pawn has the power of strength.
-Dim bHasSuperStamina   As Editable Boolean ' TRUE iff the pawn has the power of stamina.
-Dim bIsQuiescent       As          Boolean ' TRUE iff the pawn is quiescent
-Dim bTargetIsNear      As          Boolean ' TRUE iff the current iTarget is close enough for a melee attack
-Dim bTargetWasHere     As          Boolean ' When bTargetWasLost, are we near the place the target was lost?
-Dim bTargetWasNear     As          Boolean ' When we have a target, or when bTargetWasLost, was the target recently within melee range?
-Dim bTargetWasLost     As          Boolean ' TRUE iff a target was lost. 
-Dim bLimitRotation     As Editable Boolean ' TRUE iff pitch and roll rotations are limited (can't turn upside down).
-Dim bLookingAlongStair As          Boolean ' TRUE iff the view has been adjusted to look along stairs.
-Dim bIsOnSurface       As          Boolean ' TRUE iff the pawn is standing on a surface.
-Dim bCheated           As          Boolean ' TRUE iff the pawn has cheated.
-Dim bStatusChanged     As          Boolean ' TRUE after change in the pawn's health, ammo, weapons, armour, and so on.
-Dim bIsAlarmed         As          Boolean ' TRUE iff the pawn is alarmed by something.
-
-' Player controls:
-Dim bCannotTurn        As Editable Boolean ' The pawn is not allowed to turn.
-Dim bCannotMove        As Editable Boolean ' The pawn is not allowed to move (forward/backward/left/right/up/down).
-
 Dim MaxStepUpHeight    As Editable Byte    ' Maximum size of upward step.
 Dim MaxStepDownHeight  As Editable Byte    ' Maximum size of downward step.
+Dim LookTimer          As                     Byte    ' Timer used to smooth out automatic look behaviour.
 
 ' Max. amount of ammo pawn can carry:
 Dim AmmoCapacity(10)  As Editable Integer ' Indexed by EAmmoType
@@ -188,12 +214,39 @@ Dim AmmoCapacity(10)  As Editable Integer ' Indexed by EAmmoType
 'Inventory information:
 Dim RecentWeapons(2) As Actor ' (1) is the most recently used or current weapon, (2) the second most recently used.
 
-' Rendering effects for players
-Dim HurtEffectCount as Byte
-Dim PickupEffectCount as Byte
-Dim HealthEffectCount as Byte
-Dim TeleportEffectCount as Byte
-Dim bRenderUnderwater as Integer
+' Boolean values, collected together for space efficiency...
+Dim bCanPossess		        as Editable  Boolean
+Dim bHasAI                  As Editable Boolean ' Does the pawn have intelligence?
+Dim bSensesTargets          As Editable Boolean ' TRUE iff the pawn senses potential targets
+Dim bRespondsToNoise        As Editable Boolean ' TRUE iff the pawn responds to nearby noise (not necessarily those of a target).
+Dim bRespondsToSights       As Editable Boolean ' TRUE iff the pawn responds to nearby sights (not necessarily those of a target).
+Dim bHarmsMonsters          As Editable Boolean ' TRUE iff the pawn harms other monsters (but only when provoked).
+Dim bNeverStill             As Editable Boolean ' TRUE iff the pawn never becomes quiescent.
+Dim bIsXenophobic           As Editable Boolean ' TRUE iff the pawn harms monsters different from itself. Meaningful only if bHarmsMonsters.
+Dim bHasDistantMovingAttack As Editable Boolean ' Does the monster have a distant, moving attack?
+Dim bHasDistantStillAttack  As Editable Boolean ' Does the monster have a distant, still attack?
+Dim bHasCloseUpAttack       As Editable Boolean ' Does the monster have a close-up attack?
+Dim bHasInvisibility        As Editable Boolean ' TRUE iff the pawn has the power of invisibility.
+Dim bHasSilence             As Editable Boolean ' TRUE iff the pawn has the power of silence.
+Dim bHasInvincibility       As Editable Boolean ' TRUE iff a target suffers no damage
+Dim bHasSuperStrength       As Editable Boolean ' TRUE iff the pawn has the power of strength.
+Dim bHasSuperStamina        As Editable Boolean ' TRUE iff the pawn has the power of stamina.
+Dim bIsQuiescent            As          Boolean ' TRUE iff the pawn is quiescent
+Dim bTargetIsNear           As          Boolean ' TRUE iff the current iTarget is close enough for a melee attack
+Dim bTargetWasHere          As          Boolean ' When bTargetWasLost, are we near the place the target was lost?
+Dim bTargetWasNear          As          Boolean ' When we have a target, or when bTargetWasLost, was the target recently within melee range?
+Dim bTargetWasLost          As          Boolean ' TRUE iff a target was lost. 
+Dim bLimitRotation          As Editable Boolean ' TRUE iff pitch and roll rotations are limited (can't turn upside down).
+Dim bLookingAlongStair      As          Boolean ' TRUE iff the view has been adjusted to look along stairs.
+Dim bIsOnSurface            As          Boolean ' TRUE iff the pawn is standing on a surface.
+Dim bCheated                As          Boolean ' TRUE iff the pawn has cheated.
+Dim bStatusChanged          As          Boolean ' TRUE after change in the pawn's health, ammo, weapons, armour, and so on.
+Dim bIsAlarmed              As          Boolean ' TRUE iff the pawn is alarmed by something.
+Dim bIsSwimming             As          Boolean ' TRUE when the pawn is swimming.
+Dim bCannotTurn             As Editable Boolean ' The pawn is not allowed to turn.
+Dim bCannotMove             As Editable Boolean ' The pawn is not allowed to move (forward/backward/left/right/up/down).
+'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -203,6 +256,7 @@ Dim bRenderUnderwater as Integer
       bHasAI=True
       bCollideWorld=True
       bBlocksActors=True
+      bBlocksPlayers=True
       bTemplateClass=False
       bGravity=True
       bMomentum=True
@@ -221,10 +275,15 @@ Dim bRenderUnderwater as Integer
       bHasInvincibility=False
       bHasSuperStrength=False
       bHasSuperStamina=False
+      bIsKillGoal=True
       AmmoCapacity(0)=250
       AmmoCapacity(1)=100
       AmmoCapacity(2)=500
       AmmoCapacity(3)=900
+      AirDamping=+00000.99000
+      JumpDamping=+00000.99000
+      WaterDamping=+00000.96000
+      GroundDamping=+00000.90000
       ApproachPeriod=30
       ApproachRandomization=10
       AttackPeriod=20
@@ -233,8 +292,6 @@ Dim bRenderUnderwater as Integer
       BackOffRandomization=10
       BackOffThreshold=15
       RunAwayHealthThreshold=6
-      RunSpeed=+00010.000000
-      NormalSpeed=+00005.000000
       bLookingAlongStair=False
       bCheated=False
       AuralAcuity=1.0
@@ -246,6 +303,7 @@ Dim bRenderUnderwater as Integer
       AttackSounds(1)=None
       AttackSounds(2)=None
       AttackSounds(3)=None
+      bIsSwimming=False
       bCannotTurn=False
       bCannotMove=False
       MaxStepUpHeight=25
@@ -268,6 +326,8 @@ Class Camera Expands Pawn Intrinsic
       Class=Camera
       Texture=s_camera
       CollisionHeight=+00055.000000
+	  Location=(-500.0,-300.0,300.0)
+	  ViewRot=(0,8192,0)
       LightBrightness=100
       LightRadius=16
       bDirectional=True
@@ -275,32 +335,36 @@ Class Camera Expands Pawn Intrinsic
    End DefaultProperties
 End Class
 
-Begin Class Name=Woman
+Begin Class Name=Human
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 '
 ' This is a built-in Unreal class and it shouldn't be modified
 '
-Class Woman Expands Pawn Intrinsic
+Class Human Expands Pawn Intrinsic
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Class=Woman
+      Class=Human
       MeshMap=Woman
       CollisionRadius=+00022.000000
-      CollisionHeight=+00055.000000
+      CollisionHeight=+00054.000000
+      BaseEyeHeight=+00012.00000
+	  DrawScale=1.33
       DrawType=2
       Mass=+00100.000000
-      LightType=1
+      LightType=0
       LightBrightness=20
       LightHue=40
       LightSaturation=192
       LightRadius=12
       LightPeriod=16
       LungeSpeed=+00020.000000
-      RunSpeed=+00010.000000
-      NormalSpeed=+00005.000000
+      GroundSpeed=+00010.000000
+      WaterSpeed=+00006.000000
+      AirSpeed=+00010.000000
       HealRate=0.000
+      WaterSinkRate=+00000.050000
       MinorInjurySounds(0)=fgrunt2
       MinorInjurySounds(1)=fyell1
       MinorInjurySounds(2)=None
@@ -372,14 +436,14 @@ EnumDef ESkaarjAnimations = _
     ,   SkaarjA_T5          _
     ,   SkaarjA_T6          _
     ,   SkaarjA_TakeHit     
-Dim Hack1 As ESkaarjAnimationTriggers ' Hack so EnumDef doesn't disappear in root.h
-Dim Hack2 As ESkaarjAnimations        ' Hack so EnumDef doesn't disappear in root.h
+Dim Hack1 As ESkaarjAnimationTriggers ' Hack so EnumDef doesn't disappear in Root.h
+Dim Hack2 As ESkaarjAnimations        ' Hack so EnumDef doesn't disappear in Root.h
 
 ' Sounds:
-Dim LungeSound    As Editable Sound   ' Sound made when Skaarj lunges
-Dim SpinSound     As Editable Sound   ' Sound made when Skaarj does spin
-Dim ClawSound     As Editable Sound   ' Sound made when Skaarj claws
-Dim ShootSound    As Editable Sound   ' Sound made when Skaarj shoots
+Dim LungeSound    As Editable(Effects) Sound   ' Sound made when Skaarj lunges
+Dim SpinSound     As Editable(Effects) Sound   ' Sound made when Skaarj does spin
+Dim ClawSound     As Editable(Effects) Sound   ' Sound made when Skaarj claws
+Dim ShootSound    As Editable(Effects) Sound   ' Sound made when Skaarj shoots
 
 ' Attack damage:
 Dim LungeDamage   As Editable Byte    ' Basic damage done by lunge
@@ -395,7 +459,7 @@ Dim ShootDamage   As Editable Byte    ' Basic damage caused by shooting
       CollisionHeight=+00068.000000
       DrawType=2
       Mass=+00200.000000
-      NormalSpeed=+00004.000000
+      GroundSpeed=+00004.000000
       LungeDamage=25
       SpinDamage=20
       ClawDamage=20
@@ -457,12 +521,12 @@ EnumDef EBigManAnimations =  _
     ,    BigManA_T5         _
     ,    BigManA_TakeHit    _
     ,    BigManA_DieBackward
-Dim Hack1 As EBigManAnimationTriggers ' Hack so EnumDef doesn't disappear in root.h
-Dim Hack2 As EBigManAnimations        ' Hack so EnumDef doesn't disappear in root.h
+Dim Hack1 As EBigManAnimationTriggers ' Hack so EnumDef doesn't disappear in Root.h
+Dim Hack2 As EBigManAnimations        ' Hack so EnumDef doesn't disappear in Root.h
 
 ' Sounds:
-Dim ShootSound    As Editable Sound   ' Sound made when monster shoots
-Dim WhipSound     As Editable Sound   ' Sound made during pistol-whip
+Dim ShootSound    As Editable(Sound) Sound   ' Sound made when monster shoots
+Dim WhipSound     As Editable(Sound) Sound   ' Sound made during pistol-whip
 
 ' Attack damage:
 Dim ShootDamage   As Editable Byte    ' Basic damage done by each shot.
@@ -476,7 +540,7 @@ Dim WhipDamage    As Editable Byte    ' Basic damage done by pistol-whip.
       CollisionHeight=+00064.000000
       DrawType=2
       Mass=+00300.000000
-      NormalSpeed=+00003.700000
+      GroundSpeed=+00003.700000
       WhipDamage=20
       ShootDamage=5
       TriggerSequences(0)=2
@@ -540,7 +604,7 @@ Class ArchAngel Expands BigMan Intrinsic
       Class=ArchAngel
       MeshMap=BigMan
       Mass=+00400.000000
-      NormalSpeed=+00004.300000
+      GroundSpeed=+00004.300000
       CollisionRadius=+00046.000000
       CollisionHeight=+00074.000000
       DrawScale=+00001.150000
@@ -574,13 +638,13 @@ EnumDef EGasBagAnimations =  _
     ,   GasBagA_T3               _
     ,   GasBagA_T4               _
     ,   GasBagA_TakeHit
-Dim Hack1 As EGasBagAnimationTriggers ' Hack so EnumDef doesn't disappear in root.h
-Dim Hack2 As EGasBagAnimations        ' Hack so EnumDef doesn't disappear in root.h
+Dim Hack1 As EGasBagAnimationTriggers ' Hack so EnumDef doesn't disappear in Root.h
+Dim Hack2 As EGasBagAnimations        ' Hack so EnumDef doesn't disappear in Root.h
 
 ' Sounds:
-Dim BelchSound    As Editable Sound   ' Sound made when monster belches
-Dim PunchSound    As Editable Sound   ' Sound made during each punch
-Dim PoundSound    As Editable Sound   ' Sound made during pound 
+Dim BelchSound    As Editable(Sound) Sound   ' Sound made when monster belches
+Dim PunchSound    As Editable(Sound) Sound   ' Sound made during each punch
+Dim PoundSound    As Editable(Sound) Sound   ' Sound made during pound 
 
 ' Attack damage:
 Dim BelchDamage   As Editable Byte    ' Basic damage done by belch
@@ -596,7 +660,7 @@ Dim PoundDamage   As Editable Byte    ' Basic damage done by pound.
       DrawType=2
       Mass=+00070.000000
       bGravity=False
-      NormalSpeed=+00003.000000
+      GroundSpeed=+00003.000000
       BelchDamage=10
       PunchDamage=20
       PoundDamage=25
@@ -635,12 +699,12 @@ EnumDef EMantaAnimations =  _
     ,    MantaA_Die        _
     ,    MantaA_Land       _
     ,    MantaA_Launch 
-Dim Hack1 As EMantaAnimationTriggers ' Hack so EnumDef doesn't disappear in root.h
-Dim Hack2 As EMantaAnimations        ' Hack so EnumDef doesn't disappear in root.h
+Dim Hack1 As EMantaAnimationTriggers ' Hack so EnumDef doesn't disappear in Root.h
+Dim Hack2 As EMantaAnimations        ' Hack so EnumDef doesn't disappear in Root.h
 
 ' Sounds:
-Dim StingSound    As Editable Sound   ' Sound made when monster stings
-Dim WhipSound     As Editable Sound   ' Sound made during whip
+Dim StingSound    As Editable(Sound) Sound   ' Sound made when monster stings
+Dim WhipSound     As Editable(Sound) Sound   ' Sound made during whip
 
 ' Attack damage:
 Dim StingDamage   As Editable Byte    ' Basic damage done by Sting.
@@ -654,7 +718,7 @@ Dim WhipDamage    As Editable Byte    ' Basic damage done by whip.
       CollisionHeight=+00030.000000
       DrawType=2
       Mass=+00080.000000
-      NormalSpeed=+00009.500000
+      GroundSpeed=+00009.500000
       bGravity=False
       bHasDistantMovingAttack=False
       bHasDistantStillAttack=False
@@ -703,12 +767,12 @@ EnumDef ETentacleAnimations =  _
     ,    TentacleA_Shoot      _
     ,    TentacleA_Mebax      _
     ,    TentacleA_Death
-Dim Hack1 As ETentacleAnimationTriggers ' Hack so EnumDef doesn't disappear in root.h
-Dim Hack2 As ETentacleAnimations        ' Hack so EnumDef doesn't disappear in root.h
+Dim Hack1 As ETentacleAnimationTriggers ' Hack so EnumDef doesn't disappear in Root.h
+Dim Hack2 As ETentacleAnimations        ' Hack so EnumDef doesn't disappear in Root.h
 
 ' Sounds:
-Dim ShootSound    As Editable Sound   ' Sound made when monster shoots
-Dim MebaxSound    As Editable Sound   ' Sound made during mebax
+Dim ShootSound    As Editable(Sound) Sound   ' Sound made when monster shoots
+Dim MebaxSound    As Editable(Sound) Sound   ' Sound made during mebax
 
 ' Attack damage:
 Dim Projectile    As Editable Class   ' The projectile used
@@ -724,7 +788,7 @@ Dim WhipDamage    As Editable Byte    ' Damage done by whipping action.
       Mass=+00000.000000
       bMomentum=False
       bGravity=False
-      NormalSpeed=+00000.000000
+      GroundSpeed=+00000.000000
       PeripheralVision=-00001.000000
       bHasDistantMovingAttack=False
       bHasDistantStillAttack=True

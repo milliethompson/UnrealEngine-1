@@ -24,7 +24,7 @@ BYTE GFlags2 [MAXWORD+1];
 // Duplicate the specified brush's edpolys and return a new brush.
 // Returns NULL if the brush is empty.
 //
-UModel *FEditor::csgDuplicateBrush(ULevel *Level,UModel *Brush, DWORD PolyFlags, BYTE ModelFlags)
+UModel *FGlobalEditor::csgDuplicateBrush(ULevel *Level,UModel *Brush, DWORD PolyFlags, BYTE ModelFlags)
 	{
 	if (Brush->Polys->Num==0) return NULL;
 	//
@@ -72,7 +72,7 @@ UModel *FEditor::csgDuplicateBrush(ULevel *Level,UModel *Brush, DWORD PolyFlags,
 // Add a brush to the list of CSG brushes in the level, using a CSG operation, and return 
 // a newly-created copy of it.
 //
-UModel *FEditor::csgAddOperation (UModel *Brush,ULevel *Level, DWORD PolyFlags, ECsgOper CsgOper, BYTE ModelFlags)
+UModel *FGlobalEditor::csgAddOperation (UModel *Brush,ULevel *Level, DWORD PolyFlags, ECsgOper CsgOper, BYTE ModelFlags)
 	{
 	GUARD;
 	UArray	*BrushArray	= Level->BrushArray;
@@ -96,7 +96,7 @@ UModel *FEditor::csgAddOperation (UModel *Brush,ULevel *Level, DWORD PolyFlags, 
 	Misc
 -----------------------------------------------------------------------------*/
 
-char *FEditor::csgGetName (ECsgOper CSG)
+char *FGlobalEditor::csgGetName (ECsgOper CSG)
 	{
 	GUARD;
 	switch (CSG)
@@ -114,7 +114,7 @@ char *FEditor::csgGetName (ECsgOper CSG)
 	UNGUARD("csgGetName");
 	};
 
-void FEditor::csgInvalidateBsp (ULevel *Level)
+void FGlobalEditor::csgInvalidateBsp (ULevel *Level)
 	{
 	GUARD;
 	Level->Model->ModelFlags |= MF_InvalidBsp;
@@ -131,7 +131,7 @@ void FEditor::csgInvalidateBsp (ULevel *Level)
 // Note: Needs to be expanded to defragment Bsp polygons as needed (by rebuilding
 // the Bsp), so that it doesn't slow down to a crawl on complex levels.
 //
-void FEditor::csgRebuild (ULevel *Level)
+void FGlobalEditor::csgRebuild (ULevel *Level)
 	{
 	GUARD;
 	UModel		     	*Model = Level->Model;
@@ -141,6 +141,7 @@ void FEditor::csgRebuild (ULevel *Level)
 	char				TempStr [80];
 	//
 	GApp->BeginSlowTask ("Rebuilding geometry",1,0);
+	FastRebuild=1;
 	//
 	constraintFinishAllSnaps(Level);
 	Model->ModelFlags &= ~MF_InvalidBsp;	// Revalidate the Bsp
@@ -170,7 +171,7 @@ void FEditor::csgRebuild (ULevel *Level)
 			//
 			debug 				(LOG_Bsp,"Map: Rebuilding Bsp");
 			bspBuildFPolys		(Level->Model,1);
-			bspMergeCoplanars	(Level->Model,0);
+			bspMergeCoplanars	(Level->Model,0,0);
 			bspBuild			(Level->Model,BSP_Lame,25,0);
 			debugf				(LOG_Bsp,"Map: Reduced nodes by %i%%, polys by %i%%",(100*(NodeCount-Model->BspNodes->Num))/NodeCount,(100*(PolyCount-Model->BspSurfs->Num))/PolyCount);
 			//
@@ -186,6 +187,7 @@ void FEditor::csgRebuild (ULevel *Level)
 	bspBuildBounds(&ModelInfo);
 	Model->Unlock(&ModelInfo);
 	//
+	FastRebuild = 0;
 	GApp->EndSlowTask ();
 	UNGUARD("csgRebuild");
 	};
@@ -198,7 +200,7 @@ void FEditor::csgRebuild (ULevel *Level)
 // Sets and clears all Bsp node flags.  Affects all nodes, even ones that don't
 // really exist.
 //
-void FEditor::polySetAndClearNodeFlags (IModel *ModelInfo, DWORD SetBits, DWORD ClearBits)
+void FGlobalEditor::polySetAndClearNodeFlags (IModel *ModelInfo, DWORD SetBits, DWORD ClearBits)
 	{
 	FBspNode 	*Node = &ModelInfo->BspNodes [0];
 	BYTE		NewFlags;
@@ -221,7 +223,7 @@ void FEditor::polySetAndClearNodeFlags (IModel *ModelInfo, DWORD SetBits, DWORD 
 // Sets and clears all Bsp node flags.  Affects all nodes, even ones that don't
 // really exist.
 //
-void FEditor::polySetAndClearPolyFlags (IModel *ModelInfo, DWORD SetBits, DWORD ClearBits,int SelectedOnly, int UpdateMaster)
+void FGlobalEditor::polySetAndClearPolyFlags (IModel *ModelInfo, DWORD SetBits, DWORD ClearBits,int SelectedOnly, int UpdateMaster)
 	{
 	FBspSurf 	*Poly = &ModelInfo->BspSurfs [0];
 	DWORD		NewFlags;
@@ -254,7 +256,7 @@ typedef void (*POLY_CALLBACK)(IModel *ModelInfo, INDEX iSurf);
 //
 // Find the Brush EdPoly corresponding to a given Bsp poly:
 //
-FPoly *FEditor::polyFindMaster (IModel *ModelInfo, INDEX iSurf)
+FPoly *FGlobalEditor::polyFindMaster (IModel *ModelInfo, INDEX iSurf)
 	{
 	FPoly						*BrushFPolys;
 	FBspSurf 					*Poly;
@@ -275,7 +277,7 @@ FPoly *FEditor::polyFindMaster (IModel *ModelInfo, INDEX iSurf)
 //
 // Doesn't do any transaction tracking.  Assumes you've called transSelectedBspSurfs.
 //
-void FEditor::polyUpdateMaster (IModel *ModelInfo,INDEX iSurf,int UpdateTexCoords,int UpdateBase)
+void FGlobalEditor::polyUpdateMaster (IModel *ModelInfo,INDEX iSurf,int UpdateTexCoords,int UpdateBase)
 	{
 	FBspSurf		*Poly;
 	FPoly			*MasterEdPoly,*BrushEdPolys;
@@ -332,7 +334,7 @@ void FEditor::polyUpdateMaster (IModel *ModelInfo,INDEX iSurf,int UpdateTexCoord
 //
 // Find all Bsp polys with flags such that SetBits are clear or ClearBits are set.
 //
-void FEditor::polyFindByFlags (IModel *ModelInfo, DWORD SetBits, DWORD ClearBits, POLY_CALLBACK Callback)
+void FGlobalEditor::polyFindByFlags (IModel *ModelInfo, DWORD SetBits, DWORD ClearBits, POLY_CALLBACK Callback)
 	{
 	FBspSurf 	*Poly = &ModelInfo->BspSurfs [0];
 	//
@@ -352,7 +354,7 @@ void FEditor::polyFindByFlags (IModel *ModelInfo, DWORD SetBits, DWORD ClearBits
 // Find all Bsp polys corresponding to a particular editor brush resource and polygon index.
 // Call with BrushPoly set to INDEX_NONE to find all Bsp polys corresponding to the brush.
 //
-void FEditor::polyFindByBrush (IModel *ModelInfo, UModel *Brush, INDEX iBrushPoly, POLY_CALLBACK Callback)
+void FGlobalEditor::polyFindByBrush (IModel *ModelInfo, UModel *Brush, INDEX iBrushPoly, POLY_CALLBACK Callback)
 	{
 	FBspSurf 	*Poly = &ModelInfo->BspSurfs [0];
 	//
@@ -375,7 +377,7 @@ void FEditor::polyFindByBrush (IModel *ModelInfo, UModel *Brush, INDEX iBrushPol
 // Find all Bsp polys corresponding to a particular editor brush resource and polygon index.
 // Call with BrushPoly set to INDEX_NONE to find all Bsp polys corresponding to the brush.
 //
-void FEditor::polyFindByBrushGroupItem (
+void FGlobalEditor::polyFindByBrushGroupItem (
 	IModel *ModelInfo,
 	UModel *Brush, INDEX iBrushPoly,
 	FName GroupName, FName ItemName,
@@ -404,7 +406,7 @@ void FEditor::polyFindByBrushGroupItem (
    All transactional polygon selection functions
 -----------------------------------------------------------------------------*/
 
-void FEditor::polyResetSelection (IModel *ModelInfo)
+void FGlobalEditor::polyResetSelection (IModel *ModelInfo)
 	{
 	FBspSurf	*Poly;
 	//
@@ -418,21 +420,21 @@ void FEditor::polyResetSelection (IModel *ModelInfo)
 	UNGUARD("polyResetSelection");
 	};
 
-void FEditor::polySelectAll (IModel *ModelInfo)
+void FGlobalEditor::polySelectAll (IModel *ModelInfo)
 	{
 	GUARD;
 	polySetAndClearPolyFlags 	(ModelInfo,PF_Selected,0,0,0);
 	UNGUARD("polySelectAll");
 	};
 
-void FEditor::polySelectNone (IModel *ModelInfo)
+void FGlobalEditor::polySelectNone (IModel *ModelInfo)
 	{
 	GUARD;
 	polySetAndClearPolyFlags 	(ModelInfo, 0, PF_Selected,0,0);
 	UNGUARD("polySelectNone");
 	};
 
-void FEditor::polySelectMatchingGroups (IModel *ModelInfo)
+void FGlobalEditor::polySelectMatchingGroups (IModel *ModelInfo)
 	{
 	FBspSurf	*Poly;
 	INDEX		i;
@@ -459,7 +461,7 @@ void FEditor::polySelectMatchingGroups (IModel *ModelInfo)
 	UNGUARD("polySelectMatchingGroups");
 	};
 
-void FEditor::polySetItemNames (IModel *ModelInfo,FName ItemName)
+void FGlobalEditor::polySetItemNames (IModel *ModelInfo,FName ItemName)
 	{
 	FPoly		*EdPoly;
 	//
@@ -475,7 +477,7 @@ void FEditor::polySetItemNames (IModel *ModelInfo,FName ItemName)
 	UNGUARD("polySetItemNames");
 	};
 
-void FEditor::polySelectMatchingItems (IModel *ModelInfo)
+void FGlobalEditor::polySelectMatchingItems (IModel *ModelInfo)
 	{
 	FBspSurf *Poly;
 	//
@@ -575,16 +577,16 @@ int TagAdjacentsType (IModel *ModelInfo, EAdjacentsType AdjacentType)
 				}
 			else if (AdjacentType == ADJACENT_FLOORS)
 				{
-				if (OurAbs(Normal->Z) <= 0.85) Found = 0;
+				if (Abs(Normal->Z) <= 0.85) Found = 0;
 				}
 			else if (AdjacentType == ADJACENT_WALLS)
 				{
-				if (OurAbs(Normal->Z) >= 0.10) Found = 0;
+				if (Abs(Normal->Z) >= 0.10) Found = 0;
 				}
 			else if (AdjacentType == ADJACENT_SLANTS)
 				{
-				if (OurAbs(Normal->Z) > 0.85) Found = 0;
-				if (OurAbs(Normal->Z) < 0.10) Found = 0;
+				if (Abs(Normal->Z) > 0.85) Found = 0;
+				if (Abs(Normal->Z) < 0.10) Found = 0;
 				};
 			if (Found > 0)
 				{
@@ -633,14 +635,14 @@ void TagCoplanars (IModel *ModelInfo)
 	UNGUARD("TagCoplanars");
 	};
 
-void FEditor::polySelectAdjacents (IModel *ModelInfo)
+void FGlobalEditor::polySelectAdjacents (IModel *ModelInfo)
 	{
 	GUARD;
 	do {} while (TagAdjacentsType (ModelInfo,ADJACENT_ALL) > 0);
 	UNGUARD("polySelectAdjancents");
 	};
 
-void FEditor::polySelectCoplanars (IModel *ModelInfo)
+void FGlobalEditor::polySelectCoplanars (IModel *ModelInfo)
 	{
 	GUARD;
 	TagCoplanars(ModelInfo);
@@ -648,7 +650,7 @@ void FEditor::polySelectCoplanars (IModel *ModelInfo)
 	UNGUARD("polySelectCoplanars");
 	};
 
-void FEditor::polySelectMatchingBrush (IModel *ModelInfo)
+void FGlobalEditor::polySelectMatchingBrush (IModel *ModelInfo)
 	{
 	FBspSurf	*Poly;
 	INDEX		i;
@@ -681,7 +683,7 @@ void FEditor::polySelectMatchingBrush (IModel *ModelInfo)
 	UNGUARD("polySelectMatchingBrush");
 	};
 
-void FEditor::polySelectMatchingTexture (IModel *ModelInfo)
+void FGlobalEditor::polySelectMatchingTexture (IModel *ModelInfo)
 	{
 	FBspSurf	*Poly;
 	INDEX		i,Blank=0;
@@ -710,28 +712,28 @@ void FEditor::polySelectMatchingTexture (IModel *ModelInfo)
 	UNGUARD("polySelectMatchingTexture");
 	};
 
-void FEditor::polySelectAdjacentWalls (IModel *ModelInfo)
+void FGlobalEditor::polySelectAdjacentWalls (IModel *ModelInfo)
 	{
 	GUARD;
 	do {} while (TagAdjacentsType  (ModelInfo,ADJACENT_WALLS) > 0);
 	UNGUARD("polySelectAdjacentWalls");
 	};
 
-void FEditor::polySelectAdjacentFloors (IModel *ModelInfo)
+void FGlobalEditor::polySelectAdjacentFloors (IModel *ModelInfo)
 	{
 	GUARD;
 	do {} while (TagAdjacentsType (ModelInfo,ADJACENT_FLOORS) > 0);
 	UNGUARD("polySelectAdjacentFloors");
 	};
 
-void FEditor::polySelectAdjacentSlants (IModel *ModelInfo)
+void FGlobalEditor::polySelectAdjacentSlants (IModel *ModelInfo)
 	{
 	GUARD;
 	do {} while (TagAdjacentsType  (ModelInfo,ADJACENT_SLANTS) > 0);
 	UNGUARD("polySelectEAdjacentsTypelants");
 	};
 
-void FEditor::polySelectReverse (IModel *ModelInfo)
+void FGlobalEditor::polySelectReverse (IModel *ModelInfo)
 	{
 	FBspSurf	*Poly;
 	//
@@ -747,7 +749,7 @@ void FEditor::polySelectReverse (IModel *ModelInfo)
 	UNGUARD("polySelectReverse");
 	};
 
-void FEditor::polyMemorizeSet (IModel *ModelInfo)
+void FGlobalEditor::polyMemorizeSet (IModel *ModelInfo)
 	{
 	FBspSurf *Poly;
 	//
@@ -776,7 +778,7 @@ void FEditor::polyMemorizeSet (IModel *ModelInfo)
 	UNGUARD("polyMemorizeSet");
 	};
 
-void FEditor::polyRememberSet (IModel *ModelInfo)
+void FGlobalEditor::polyRememberSet (IModel *ModelInfo)
 	{
 	FBspSurf *Poly;
 	//
@@ -805,7 +807,7 @@ void FEditor::polyRememberSet (IModel *ModelInfo)
 	UNGUARD("polyRememberSet");
 	};
 
-void FEditor::polyXorSet (IModel *ModelInfo)
+void FGlobalEditor::polyXorSet (IModel *ModelInfo)
 	{
 	FBspSurf	*Poly;
 	int			Flag1,Flag2;
@@ -838,7 +840,7 @@ void FEditor::polyXorSet (IModel *ModelInfo)
 	UNGUARD("polyXorSet");
 	};
 
-void FEditor::polyUnionSet (IModel *ModelInfo)
+void FGlobalEditor::polyUnionSet (IModel *ModelInfo)
 	{
 	FBspSurf	*Poly;
 	//
@@ -859,7 +861,7 @@ void FEditor::polyUnionSet (IModel *ModelInfo)
 	UNGUARD("polyUnionSet");
 	};
 
-void FEditor::polyIntersectSet (IModel *ModelInfo)
+void FGlobalEditor::polyIntersectSet (IModel *ModelInfo)
 	{
 	FBspSurf		*Poly;
 	//
@@ -924,7 +926,7 @@ void MapSelect (ULevel *Level,BRUSH_SEL_FUNC Func,int Tag)
 // Select all
 //
 int  BrushSelectAllFunc (UModel *Brush,int Tag) {return 1;};
-void FEditor::mapSelectAll (ULevel *Level)
+void FGlobalEditor::mapSelectAll (ULevel *Level)
 	{
 	GUARD;
 	MapSelect (Level,BrushSelectAllFunc,0);
@@ -935,7 +937,7 @@ void FEditor::mapSelectAll (ULevel *Level)
 // Select none
 //
 int BrushSelectNoneFunc (UModel *Brush,int Tag) {return 0;};
-void FEditor::mapSelectNone (ULevel *Level)
+void FGlobalEditor::mapSelectNone (ULevel *Level)
 	{
 	GUARD;
 	MapSelect (Level,BrushSelectNoneFunc,0);
@@ -946,7 +948,7 @@ void FEditor::mapSelectNone (ULevel *Level)
 // Select by CSG operation
 //
 int  BrushSelectOperationFunc (UModel *Brush,int Tag) {return (Brush->CsgOper == Tag) && !(Brush->PolyFlags & (PF_NotSolid | PF_Semisolid));};
-void FEditor::mapSelectOperation (ULevel *Level,ECsgOper CsgOper)
+void FGlobalEditor::mapSelectOperation (ULevel *Level,ECsgOper CsgOper)
 	{
 	GUARD;
 	MapSelect (Level,BrushSelectOperationFunc,CsgOper);
@@ -954,7 +956,7 @@ void FEditor::mapSelectOperation (ULevel *Level,ECsgOper CsgOper)
 	};
 
 int  BrushSelectFlagsFunc (UModel *Brush,int Tag) {return (Brush->PolyFlags & Tag);};
-void FEditor::mapSelectFlags (ULevel *Level,DWORD Flags)
+void FGlobalEditor::mapSelectFlags (ULevel *Level,DWORD Flags)
 	{
 	GUARD;					   
 	MapSelect (Level,BrushSelectFlagsFunc,(int)Flags);
@@ -1011,7 +1013,7 @@ void MapSelectSeq (ULevel *Level,int Delta)
 //
 // Select brushes previous to selected brushes
 //
-void FEditor::mapSelectPrevious (ULevel *Level)
+void FGlobalEditor::mapSelectPrevious (ULevel *Level)
 	{
 	GUARD;
 	MapSelectSeq (Level,1);
@@ -1021,7 +1023,7 @@ void FEditor::mapSelectPrevious (ULevel *Level)
 //
 // Select brushes after selected brushes
 //
-void FEditor::mapSelectNext (ULevel *Level)
+void FGlobalEditor::mapSelectNext (ULevel *Level)
 	{
 	GUARD;
 	MapSelectSeq (Level,-1);
@@ -1031,7 +1033,7 @@ void FEditor::mapSelectNext (ULevel *Level)
 //
 // Select first or last
 //
-void FEditor::mapSelectFirst (ULevel *Level)
+void FGlobalEditor::mapSelectFirst (ULevel *Level)
 	{
 	GUARD;
 	ILevel 		LevelInfo;
@@ -1050,7 +1052,7 @@ void FEditor::mapSelectFirst (ULevel *Level)
 	UNGUARD("mapSelectFirst");
 	};
 
-void FEditor::mapSelectLast (ULevel *Level)
+void FGlobalEditor::mapSelectLast (ULevel *Level)
 	{
 	GUARD;
 	ILevel 		LevelInfo;
@@ -1100,7 +1102,7 @@ void CopyBrushEdPolys (UModel *DestBrush,UModel *SourceBrush,int Realloc)
 //
 // Put the first selected brush into the current brush.
 //
-void FEditor::mapBrushGet (ULevel *Level)
+void FGlobalEditor::mapBrushGet (ULevel *Level)
 	{
 	GUARD;
 	ILevel 	LevelInfo;
@@ -1132,7 +1134,7 @@ void FEditor::mapBrushGet (ULevel *Level)
 //
 // Replace all selected brushes with the current brush.
 //
-void FEditor::mapBrushPut (ULevel *Level)
+void FGlobalEditor::mapBrushPut (ULevel *Level)
 	{
 	GUARD;
 	ILevel 		LevelInfo;
@@ -1159,7 +1161,7 @@ void FEditor::mapBrushPut (ULevel *Level)
 //
 // Delete all selected brushes in a level
 //
-void FEditor::mapDelete (ULevel *Level)
+void FGlobalEditor::mapDelete (ULevel *Level)
 	{
 	GUARD;
 	ILevel 		LevelInfo;
@@ -1189,7 +1191,7 @@ void FEditor::mapDelete (ULevel *Level)
 //
 // Duplicate all selected brushes on a level
 //
-void FEditor::mapDuplicate (ULevel *Level)
+void FGlobalEditor::mapDuplicate (ULevel *Level)
 	{
 	GUARD;
 	FVector  		Delta = {32.0,32.0,32.0};
@@ -1267,7 +1269,7 @@ void SendTo (ULevel *Level,int SendToFirstXOR)
 //
 // Send all selected brushes in a level to the front of the hierarchy
 //
-void FEditor::mapSendToFirst (ULevel *Level)
+void FGlobalEditor::mapSendToFirst (ULevel *Level)
 	{
 	GUARD;
 	SendTo(Level,0);
@@ -1277,14 +1279,14 @@ void FEditor::mapSendToFirst (ULevel *Level)
 //
 // Send all selected brushes in a level to the back of the hierarchy
 //
-void FEditor::mapSendToLast (ULevel *Level)
+void FGlobalEditor::mapSendToLast (ULevel *Level)
 	{
 	GUARD;
 	SendTo(Level,MF_Selected);
 	UNGUARD("mapSendToLast");
 	};
 
-void FEditor::mapSetBrush (ULevel *Level,EMapSetBrushFlags PropertiesMask,WORD BrushColor,FName GroupName,
+void FGlobalEditor::mapSetBrush (ULevel *Level,EMapSetBrushFlags PropertiesMask,WORD BrushColor,FName GroupName,
 	DWORD SetPolyFlags,DWORD ClearPolyFlags)
 	{
 	GUARD;
@@ -1338,7 +1340,7 @@ void FEditor::mapSetBrush (ULevel *Level,EMapSetBrushFlags PropertiesMask,WORD B
 //
 // Pan textures on selected polys.  Doesn't do transaction tracking.
 //
-void FEditor::polyTexPan (IModel *ModelInfo,int PanU,int PanV,int Absolute)
+void FGlobalEditor::polyTexPan (IModel *ModelInfo,int PanU,int PanV,int Absolute)
 	{
 	FBspSurf	*Poly;
 	//
@@ -1368,7 +1370,7 @@ void FEditor::polyTexPan (IModel *ModelInfo,int PanU,int PanV,int Absolute)
 //
 // Scale textures on selected polys. Doesn't do transaction tracking.
 //
-void FEditor::polyTexScale (IModel *ModelInfo,FLOAT UU,FLOAT UV, FLOAT VU, FLOAT VV,int Absolute)
+void FGlobalEditor::polyTexScale (IModel *ModelInfo,FLOAT UU,FLOAT UV, FLOAT VU, FLOAT VV,int Absolute)
 	{
 	FVector		OriginalU,OriginalV;
 	FVector		NewU,NewV;
@@ -1414,7 +1416,7 @@ void FEditor::polyTexScale (IModel *ModelInfo,FLOAT UU,FLOAT UV, FLOAT VU, FLOAT
 //
 // Align textures on selected polys.  Doesn't do any transaction tracking.
 //
-void FEditor::polyTexAlign (IModel *ModelInfo,ETexAlign TexAlignType,DWORD Texels)
+void FGlobalEditor::polyTexAlign (IModel *ModelInfo,ETexAlign TexAlignType,DWORD Texels)
 	{
 	FBspSurf		*Poly;
 	FPoly			EdPoly;
@@ -1455,7 +1457,7 @@ void FEditor::polyTexAlign (IModel *ModelInfo,ETexAlign TexAlignType,DWORD Texel
 					break;
 				case TEXALIGN_Floor:
 					//
-					if (OurAbs(Normal.Z) > 0.05)
+					if (Abs(Normal.Z) > 0.05)
 						{
 						//
 						// Shouldn't change base point, just base U,V
@@ -1491,7 +1493,7 @@ void FEditor::polyTexAlign (IModel *ModelInfo,ETexAlign TexAlignType,DWORD Texel
 					// U = (Nx,Ny,0)/sqrt(Nx^2+Ny^2)
 					// V = (U dot N) normalized and stretched so Vz=1
 					//
-					if (OurAbs(Normal.Z)<0.95)
+					if (Abs(Normal.Z)<0.95)
 						{
 						U.X = +Normal.Y;
 						U.Y = -Normal.X;
@@ -1520,7 +1522,7 @@ void FEditor::polyTexAlign (IModel *ModelInfo,ETexAlign TexAlignType,DWORD Texel
 					U    = ModelInfo->FVectors [Poly->vTextureU];
 					V    = ModelInfo->FVectors [Poly->vTextureV];
 					//
-					if ((OurAbs(Normal.Z)<0.95) && (OurAbs(V.Z)>0.05))
+					if ((Abs(Normal.Z)<0.95) && (Abs(V.Z)>0.05))
 						{
 						k     = -Base.Z/V.Z;
 						V    *= k;
@@ -1584,7 +1586,7 @@ void MapTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, ch
 	else if (stricmp(Item,"Add"         )==0) itoa (NumAdd,Data,10);
 	else if (stricmp(Item,"Subtract"    )==0) itoa (NumSubtract,Data,10);
 	else if (stricmp(Item,"Special"     )==0) itoa (NumSpecial,Data,10);
-	else if (stricmp(Item,"AvgPolys"    )==0) itoa (NumPolys/OurMax(1,NumBrushes-1),Data,10);
+	else if (stricmp(Item,"AvgPolys"    )==0) itoa (NumPolys/Max(1,NumBrushes-1),Data,10);
 	else if (stricmp(Item,"TotalPolys"  )==0) itoa (NumPolys,Data,10);
 	else if (stricmp(Item,"Points"		)==0) itoa (ModelInfo.NumPoints,Data,10);
 	else if (stricmp(Item,"Vectors"		)==0) itoa (ModelInfo.NumVectors,Data,10);
@@ -1592,7 +1594,7 @@ void MapTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, ch
 	else if (stricmp(Item,"Zones"		)==0) itoa (ModelInfo.NumZones-1,Data,10);
 	else if (stricmp(Item,"Bounds"		)==0) itoa (ModelInfo.NumBounds,Data,10);
 	else if (stricmp(Item,"Planes"		)==0) itoa (ModelInfo.NumUniquePlanes,Data,10);
-	else if (!stricmp(Item,"DuplicateBrush"))
+	else if (!stricmp(Item,"DuplicateBrush")==0)
 		{
 		//
 		// Make a unique copy of the current brush and return its name:
@@ -1612,8 +1614,6 @@ void MapTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, ch
 			};
 		debugf("Duplicate %s at %s",NewBrush?NewBrush->Name:"",PlaceAt?PlaceAt->Name:"");
 		}
-	else strcpy(Data,"-1"); // Unknown
-	//
 	Brush->Unlock(&ModelInfo);
 	//
 	UNGUARD("MapTopicHandler::Get");
@@ -1638,7 +1638,7 @@ void PolysTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, 
 	//
 	Level->Model->Lock(&ModelInfo,LOCK_Read);
 	//
-	INDEX n  = 0;
+	int n=0, StaticLights=0, DynamicLights=0, Meshels=0, MeshU=0, MeshV=0;
 	OffFlags = (DWORD)~0;
 	OnFlags  = (DWORD)~0;
 	for (INDEX i=0; i<ModelInfo.NumBspSurfs; i++)
@@ -1649,12 +1649,26 @@ void PolysTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, 
 			{
 			OnFlags  &=  Poly->PolyFlags;
 			OffFlags &= ~Poly->PolyFlags;
+			//
 			n++;
+			//
+			if(Poly->iLightMesh!=INDEX_NONE)
+				{
+				FLightMeshIndex &Index = ((FLightMeshIndex*)Level->Model->LightMesh->GetData())[Poly->iLightMesh];
+				//
+				StaticLights	+= Index.NumStaticLights;
+				DynamicLights	+= Index.NumDynamicLights;
+				Meshels			+= Index.MeshUSize * Index.MeshVSize;
+				};
 			};
 		};
 	if (!stricmp(Item,"NumSelected"))				sprintf(Data,"%i",n);
+	else if (!stricmp(Item,"StaticLights"))			sprintf(Data,"%i",StaticLights);
+	else if (!stricmp(Item,"DynamicLights"))		sprintf(Data,"%i",DynamicLights);
+	else if (!stricmp(Item,"Meshels"))				sprintf(Data,"%i",Meshels);
 	else if (!stricmp(Item,"SelectedSetFlags"))		sprintf(Data,"%u",OnFlags  & ~PF_NoEdit);
 	else if (!stricmp(Item,"SelectedClearFlags"))	sprintf(Data,"%u",OffFlags & ~PF_NoEdit);
+	else if (!stricmp(Item,"MeshSize") && n==1)		sprintf(Data,"%ix%i",MeshU,MeshV);
 	Level->Model->Unlock(&ModelInfo);
 	//
 	UNGUARD("PolysTopicHandler::Get");

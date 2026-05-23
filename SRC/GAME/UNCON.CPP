@@ -24,19 +24,16 @@
 	Globals
 ------------------------------------------------------------------------------*/
 
+static FAction GAction  ;
+
 //
 // These defines give the size of the displayable status bar graphics, because
 // the status bar textures are forced to power-of-two sizes.
 //
 #define STATUSBAR_U  640.0
-//obsolete: #define STATUSBAR_V  58.0
 #define STATUSBAR_V  64.0
-//obsolete:#define EXTRABAR_U   640.0
-//obsolete:#define EXTRABAR_V   32.0 /*18.0*/
 
 // Specification of locations of parts of the status bars:
-//obsolete:	static const FLOAT HealthImageX = 362.0; // Relative to left of status bar.
-//obsolete:	static const FLOAT HealthImageY =   0.0; // Relative to top of status bar.
 static const FLOAT ArmorValueX  =  90.0; // Relative to left of status bar.
 static const FLOAT HealthValueX = 281.0; // Relative to left of status bar.
 static const FLOAT AmmoValueX   = 472.0; // Relative to left of status bar.
@@ -118,7 +115,7 @@ void FCameraConsole::Init(UCamera *ThisCamera)
 	LastTickTime	= 0;
 	StatusRefreshPages = 2;
 	//
-	BorderSize		= 1; //obsolete:2
+	BorderSize		= 1; 
 	Redraw			= 0;
 	LogoUp			= 0;
 	Scrollback		= 0;
@@ -131,11 +128,9 @@ void FCameraConsole::Init(UCamera *ThisCamera)
 	StatusSmallBar	= new("StatusBarS",		FIND_Existing)UTexture;
 	StatusWeaponLight		= new("StatusLight",		FIND_Existing)UTexture;
 	StatusSmallWeaponLight	= new("StatusLightS",		FIND_Existing)UTexture;
-//obsolete:	ExtraBar		= new("ExtraBar",		FIND_Existing)UTexture;;
 	ConBackground	= new("ConBackground",	FIND_Existing)UTexture;
 	Border			= new("Border",			FIND_Existing)UTexture;
 	ArmorImages[DMT_Basic] = new("Armor1"       , FIND_Existing)UTexture;
-//obsolete:	    HealthImage            = new("Health"       , FIND_Existing)UTexture;
     StatusDigits[0]        = new("Status0"      , FIND_Existing)UTexture;
     StatusDigits[1]        = new("Status1"      , FIND_Existing)UTexture;
     StatusDigits[2]        = new("Status2"      , FIND_Existing)UTexture;
@@ -163,7 +158,17 @@ void FCameraConsole::Init(UCamera *ThisCamera)
 	SpawnConsoleMessage();
 	Logf("Console ready for %s",Camera->Level->ActorList->Element(Camera->iActor).Name.Name());
 	Logf(" ");
-	//
+
+    // Action and input handling:
+    // Note:
+    //   For now, we use the same global objects for all cameras. If we want to
+    //   extend input/action handling to be camera-dependent, we would change
+    //   this to create new objects for each camera.
+    Actions     = &GAction  ;
+    Actions->Initialize()   ;
+    Input       = &GInput   ;
+    Input->Initialize(GApp->Input);
+
 	UNGUARD("FCameraConsole::Init");
 	};
 
@@ -171,9 +176,19 @@ void FCameraConsole::Init(UCamera *ThisCamera)
 // Shut down a particular camera's console. Should be called before
 // closing a camera.
 //
-void FCameraConsole::Exit(void)
+void FCameraConsole::Exit()
 	{
 	GUARD;
+    if( Actions != 0 ) 
+    { 
+        // Actions->Exit(); // We can't do this currently because Actions is shared among cameras.
+        Actions = 0; 
+    }
+    if( Input != 0 ) 
+    { 
+        // Input->Exit(); // We can't do this currently because Input is shared among cameras.
+        Input = 0; 
+    }
 	UNGUARD("FCameraConsole::Exit");
 	};
 
@@ -181,14 +196,14 @@ void FCameraConsole::Exit(void)
 	Utility functions
 ------------------------------------------------------------------------------*/
 
-void FCameraConsole::NoteResize(void)
+void FCameraConsole::NoteResize()
 	{
 	GUARD;
 	Redraw++;
 	UNGUARD("FCameraConsole::NoteResize");
 	};
 
-void FCameraConsole::ClearInput(void)
+void FCameraConsole::ClearInput()
 	{
 	GUARD;
 	//
@@ -213,38 +228,38 @@ int FCameraConsole::Exec(const char *Cmd,FOutputDevice *Out)
 		Out->Logf("   CONSOLE - Owned by %s",Camera->Level->ActorList->Element(Camera->iActor).Name.Name());
 		return Str[0]!=0;
 		}
-	else if (GetCMD(&Str,"HIDE"))
+	else if (GetCMD(&Str,"CONSOLE"))
 		{
-		Out->Log("Console hidden");
-		ConsoleDest = 0.0;
-		return 1;
-		}
-	else if (GetCMD(&Str,"SHOW"))
-		{
-		Out->Log("Console shown");
-		ConsoleDest = CON_SHOW;
-		return 1;
-		}
-	else if (GetCMD(&Str,"FULL"))
-		{
-		Out->Log("Full console view");
-		ConsoleDest = 1.0;
-		return 1;
+		if (GetCMD(&Str,"HIDE"))
+			{
+			Out->Log("Console hidden");
+			ConsoleDest = 0.0;
+			return 1;
+			}
+		else if (GetCMD(&Str,"SHOW"))
+			{
+			Out->Log("Console shown");
+			ConsoleDest = CON_SHOW;
+			return 1;
+			}
+		else if (GetCMD(&Str,"FULL"))
+			{
+			Out->Log("Full console view");
+			ConsoleDest = 1.0;
+			return 1;
+			}
+		else return 0;
 		}
 	else if (GetCMD(&Str,"FPS"))
 		{
-		GRend->QuickStats ^= 1; Out->Logf("Stats are %s",GRend->QuickStats?"on":"off"); return 1;
+		GRend->QuickStats ^= 1; 
+		Out->Logf("FPS display is %s",GRend->QuickStats?"on":"off"); 
+		return 1;
 		}
-	else if (GetCMD(&Str,"QUICKSTATS"))
-		{
-            GRend->QuickStats ^= 1;
-            StatusRefreshPages = 2;
-    		return 1;
-        }
 	else if (PeekCMD(Str,"PN") || PeekCMD(Str,"PP"))
 		{
 		ICamera CameraInfo;
-		AActor *Actor = &Camera->GetActor();
+		APawn *Actor = &Camera->GetActor();
 		//
 		int d=+1;
 		if		(GetCMD(&Str,"PP")) d=-1;
@@ -252,7 +267,7 @@ int FCameraConsole::Exec(const char *Cmd,FOutputDevice *Out)
 		//
 		UClass *DestClass;
 		//
-		if (Actor->CameraStatus.ShowFlags & SHOW_StandardView)
+		if (Actor->ShowFlags & SHOW_StandardView)
 			{
 			Out->Log("Must open a free camera to possess");
 			return 1;
@@ -267,7 +282,7 @@ int FCameraConsole::Exec(const char *Cmd,FOutputDevice *Out)
 		int n = CameraInfo.iActor;
 		int Failed = 1;
 		//
-		while (1)
+		for(;;)
 			{
 			n += d;
 			if      (n >= CameraInfo.Level.Actors->Max)	n=0;
@@ -276,7 +291,9 @@ int FCameraConsole::Exec(const char *Cmd,FOutputDevice *Out)
 			if (n == CameraInfo.iActor) break;
 			//
 			AActor *TestActor = &CameraInfo.Level.Actors->Element(n);
-			if (TestActor->Class && (!TestActor->Camera) && TestActor->bCanPossess && !TestActor->bHiddenEd)
+			if (TestActor->IsKindOf("Pawn") && 
+				!TestActor->GetPlayer() &&
+				((APawn*)TestActor)->bCanPossess && !TestActor->bHiddenEd)
 				{
 				if ((TestActor->Class == DestClass) || (DestClass == NULL))
 					{
@@ -285,7 +302,7 @@ int FCameraConsole::Exec(const char *Cmd,FOutputDevice *Out)
 					//
 					CameraInfo.Camera->iActor = n;
 					CameraInfo.iActor = n;
-					CameraInfo.Actor = TestActor;
+					CameraInfo.Actor = (APawn*)TestActor;
 					//
 					Failed=0;
 					break;
@@ -304,84 +321,79 @@ int FCameraConsole::Exec(const char *Cmd,FOutputDevice *Out)
 		else
 			{
 			char Who[256];
-			strcpy (Who,"Possessed a ");
-			strcat (Who,Actor->Class->Name);
-			if (!Actor->Name.IsNone())
-				{
-				strcat     (Who," ");
-				strcat     (Who,Actor->Name.Name());
-				};
+			strcpy( Who,"Possessed a " );
+			strcat( Who,Camera->GetActor().Class->Name );
 			Out->Log(Who);
 			};
 		return 1;
 		}
-	else if (GetCMD(&Str,"DUMPCACHE"))
-		{
-        char Status[100];
-        GCache.Status(Status);
-        Out->Log(Status);
-        GCache.Dump();
-        GCache.AssertValid();
-        return 1;
-        }
 	else if (GetCMD(&Str,"CHECK"))
 		{
         // Add any checks here...
-        debugf( LOG_Info, "Checking cache..." );
-        GCache.AssertValid();
         debugf( LOG_Info, "Checking actor lists..." );
         Camera->Level->ActorList->CheckLists();
         return 1;
         }
 	else if (GetCMD(&Str,"ACTORSIZES"))
 		{
-            Out->Logf( "sizeof(AI)=%i", sizeof(AActorAI) );
-            Out->Logf( "sizeof(ARoot)=%i", sizeof(ARoot) );
-            Out->Logf( "sizeof(APawn)=%i+Root", sizeof(APawn)-sizeof(ARoot) );
-            Out->Logf( "sizeof(ASkaarj)=%i+Root", sizeof(ASkaarj)-sizeof(ARoot) );
-            Out->Logf( "sizeof(ABigMan)=%i+Root", sizeof(ABigMan)-sizeof(ARoot) );
-            Out->Logf( "sizeof(AInventory)=%i+Root", sizeof(AInventory)-sizeof(ARoot) );
-    		return 1;
+        Out->Logf( "sizeof(AI)=%i", sizeof(AActorAI) );
+        Out->Logf( "sizeof(AActor)=%i", sizeof(AActor) );
+        Out->Logf( "sizeof(APawn)=%i+Root", sizeof(APawn)-sizeof(AActor) );
+        Out->Logf( "sizeof(ASkaarj)=%i+Root", sizeof(ASkaarj)-sizeof(AActor) );
+        Out->Logf( "sizeof(ABigMan)=%i+Root", sizeof(ABigMan)-sizeof(AActor) );
+        Out->Logf( "sizeof(AInventory)=%i+Root", sizeof(AInventory)-sizeof(AActor) );
+    	return 1;
         }
-	else if (GetCMD(&Str,"ACTORINFO"))
+	else if (GetCMD(&Str,"ACTORINFO")) // Summarize essential actor info?
 		{
-            for( int WhichActor = 0; WhichActor < Camera->Level->ActorList->Num; ++WhichActor )
+        for( int WhichActor = 0; WhichActor < Camera->Level->ActorList->Num; ++WhichActor )
+            {
+            AActor & Actor = Camera->Level->ActorList->Element(WhichActor);
+            if( Actor.Class != 0 )
                 {
-                    AActor & Actor = Camera->Level->ActorList->Element(WhichActor);
-                    if( Actor.Class != 0 )
-                        {
-                            char Info[100];
-                            char * Text = Info;
-                            const char * Name = Actor.Name.Name();
-                            Text += sprintf( Text, "[%2i] %s %s", WhichActor, (Name!=0?Name:""), Actor.Class->Name );
-                            Text += sprintf( Text, " %s", Actor.bStaticActor ? "s" : "!s" );
-                            Text += sprintf( Text, ",%s", Actor.bCollideActors ? "c" : "!c" );
-                            Text += sprintf( Text, " L:[%5.0f %5.0f %5.0f]", Actor.Location.X, Actor.Location.Y, Actor.Location.Z );
-                            Text += sprintf( Text, " V:[%5.0f %5.0f %5.0f]", Actor.Velocity.X, Actor.Velocity.Y, Actor.Velocity.Z );
-                            debug( LOG_Info, Info );
-                        }
+                char Info[100];
+                char * Text = Info;
+                const char * Name = Actor.Name.Name();
+                Text += sprintf( Text, "[%2i] %s %s", WhichActor, (Name!=0?Name:""), Actor.Class->Name );
+                Text += sprintf( Text, " %s", Actor.bStatic ? "s" : "!s" );
+                Text += sprintf( Text, ",%s", Actor.bCollideActors ? "c" : "!c" );
+                Text += sprintf( Text, ",%s", Actor.bWasTouchedByPlayer ? "t" : "!t" );
+                Text += sprintf( Text, " L:[%5.0f %5.0f %5.0f]", Actor.Location.X, Actor.Location.Y, Actor.Location.Z );
+                Text += sprintf( Text, " V:[%5.0f %5.0f %5.0f]", Actor.Velocity.X, Actor.Velocity.Y, Actor.Velocity.Z );
+                debug( LOG_Info, Info );
                 }
-    		return 1;
+            }
+    	return 1;
+        }
+	else if (GetCMD(&Str,"LEVELSTATS")) // Show level stats?
+		{
+        APawn & Pawn = (APawn&)this->Camera->GetActor(); // Camera actor is always a pawn.
+        const ALevelDescriptor & Descriptor = (const ALevelDescriptor &)
+            Camera->Level->ActorList->Element(0)
+            ;
+        Out->Logf
+        ( 
+            "Kills: %i/%i  Items: %i/%i Secrets: %i/%i"
+        ,   int(Pawn.KillCount), int(Descriptor.KillGoals)
+        ,   int(Pawn.ItemsFound), int(Descriptor.ItemGoals)
+        ,   int(Pawn.SecretsFound), int(Descriptor.SecretGoals)
+        );
+        return 1;
         }
     else if
     ( 
         // Check individual characters so complete strings won't appear in the executable code.
         // This makes it harder for hackers to figure out cheats by scanning for strings.
-        // Allow password "CHEETAH" and some abbreviations thereof...
+        // Allow password "CHEAT" and some abbreviations thereof...
             toupper(Str[0])=='C' 
         &&  toupper(Str[1])=='H' 
         &&  toupper(Str[2])=='E' 
-        &&  toupper(Str[3])=='E'
-        &&  
-            (
-                strnicmp( &Str[4], "T "   ,2) == 0
-            ||  strnicmp( &Str[4], "TA "  ,3) == 0
-            ||  strnicmp( &Str[4], "TAH " ,4) == 0
-            )
+        &&  toupper(Str[3])=='A'
+        &&  toupper(Str[4])=='T'
     )
         {
         while( !isspace(*Str) ) { Str++; }
-        AActor & Actor = Camera->GetActor();
+        AActor & Actor = (AActor&)Camera->GetActor();
         GCheat->DoCheatCommands( Str, &Actor, Camera->Level, Out );
         return 1;
         }
@@ -405,7 +417,7 @@ void FCameraConsole::Log(ELogType ThisType, const char *Text)
 	GUARD;
 	//
 	TopLine		= (TopLine+1) % MAX_LINES;
-	NumLines	= OurMin(NumLines+1,(int)(MAX_LINES-1));
+	NumLines	= Min(NumLines+1,(int)(MAX_LINES-1));
 	//
 	strncpy (MsgText[TopLine],Text,TEXTMSG_LENGTH);
 	MsgText[TopLine][TEXTMSG_LENGTH-1] = 0;
@@ -433,72 +445,62 @@ void FCameraConsole::PreRender(ICamera *Camera)
 	GUARD;
 
     // Process any console-related actions:
-    const BOOL FullConsole = GAction.Do(FAction::ConsoleFull);
-    const BOOL HalfConsole = GAction.Do(FAction::ConsoleHalf);
-    if( FullConsole || HalfConsole )
+    if( Camera->Camera->Current )
     {
-        if( ConsoleDest==0 )
+        const BOOL FullConsole = GAction.Do(FAction::ConsoleFull);
+        const BOOL HalfConsole = GAction.Do(FAction::ConsoleHalf);
+        if( FullConsole || HalfConsole )
         {
-            ConsoleDest = FullConsole ? 1.0 : CON_SHOW;
-            if (KeyState!=CK_Type) ClearInput();
-            KeyState = CK_Type;
-        }
-        else
-        {
-            ClearInput();
-            ConsoleDest = 0;
-            KeyState = CK_None;
-        }
-    }
-    if( GAction.Do(FAction::ConsoleType) )
-        {
-            ClearInput();
-            KeyState = CK_Type;
-        }
-    else if( GAction.Do(FAction::Chat) )
-        {
-            ClearInput();
-            strcpy (TypedStr,"Say ");
-            KeyState = CK_Type;
-        }
-    if( GAction.Do(FAction::ScreenEnlarge) )
-        {
-            if (--BorderSize<0) BorderSize=0;
-        }
-    else if( GAction.Do(FAction::ScreenShrink) )
-        {
-            if (++BorderSize>=MAX_BORDER) BorderSize=MAX_BORDER-1;
-        }
-    if( GAction.Do(FAction::ScreenShot) )
-        {
-			static int ScreenNum=0;
-        	char Fname[256];
-			do	{
-				sprintf (Fname,"Unreal%02i.PCX",ScreenNum++);
-				} while ((fsize(Fname)>=0) && (ScreenNum<100));
-			if (ScreenNum<100)
-				{
-					debugf(LOG_Info,"Saving snapshot %s",Fname);
-					Camera->Texture->ExportToFile(Fname);
-				};
-        }
-    if( GAction.Do(FAction::Pause) )
-        {
-            GServer.IsPaused = !GServer.IsPaused;
-            if( GServer.IsPaused )
+            if( ConsoleDest==0 )
             {
-                // Game was just paused...
-                GAudio.Pause();
-                Log( LOG_Play, "Paused" );
-                //todo? Should we save any existing message and display it when unpaused?
+                ConsoleDest = FullConsole ? 1.0 : CON_SHOW;
+                if (KeyState!=CK_Type) ClearInput();
+                KeyState = CK_Type;
             }
             else
             {
-                // Game was just unpaused...
-                GAudio.UnPause();
-                MsgType = LOG_None; // Clear the "paused" message
+                ClearInput();
+                ConsoleDest = 0;
+                KeyState = CK_None;
             }
         }
+        if( GAction.Do(FAction::ConsoleType) )
+            {
+                ClearInput();
+                KeyState = CK_Type;
+            }
+        else if( GAction.Do(FAction::Chat) )
+            {
+                ClearInput();
+                strcpy (TypedStr,"Say ");
+                KeyState = CK_Type;
+            }
+        if( GAction.Do(FAction::ScreenEnlarge) )
+            {
+                if (--BorderSize<0) BorderSize=0;
+            }
+        else if( GAction.Do(FAction::ScreenShrink) )
+            {
+                if (++BorderSize>=MAX_BORDER) BorderSize=MAX_BORDER-1;
+            }
+        if( GAction.Do(FAction::Pause) )
+            {
+                GServer.IsPaused = !GServer.IsPaused;
+                if( GServer.IsPaused )
+                {
+                    // Game was just paused...
+                    GAudio.Pause();
+                    Log( LOG_Play, "Paused" );
+                    //todo? Should we save any existing message and display it when unpaused?
+                }
+                else
+                {
+                    // Game was just unpaused...
+                    GAudio.UnPause();
+                    MsgType = LOG_None; // Clear the "paused" message
+                }
+            }
+    }
 
 	//
 	// Update the camera console:
@@ -520,10 +522,8 @@ void FCameraConsole::PreRender(ICamera *Camera)
 	BorderLines		= 0;
 	BorderPixels	= 0;
 	StatusBarLines	= 0;
-//obsolete:	ExtraBarLines	= 0;
 	ConsoleLines	= 0;
 	//
-//obsolete: Status bar is now supported in all colordepths
 	//if (Camera->ColorBytes!=1)
 	//	{
 	//	BorderSize=0;
@@ -536,34 +536,29 @@ void FCameraConsole::PreRender(ICamera *Camera)
 		{
 		if (BorderSize>=1) // Status bar
 			{
-			StatusBarLines = OurMin((FLOAT)(Camera->FSXR * STATUSBAR_V/STATUSBAR_U),(FLOAT)SYR);
+			StatusBarLines = Min((FLOAT)(Camera->FSXR * STATUSBAR_V/STATUSBAR_U),(FLOAT)SYR);
 			SYR -= StatusBarLines;
 			};
-//obsolete:		if (BorderSize>=2) // Extra status bar
-//obsolete:			{
-//obsolete:			ExtraBarLines = OurMin((FLOAT)(Camera->FSXR * EXTRABAR_V/EXTRABAR_U),(FLOAT)SYR);
-//obsolete:			SYR -= ExtraBarLines;
-//obsolete:			};
 		if (ConsolePos > 0.0) // Show console
 			{
-			ConsoleLines = OurMin(ConsolePos * (FLOAT)SYR,(FLOAT)SYR);
+			ConsoleLines = Min(ConsolePos * (FLOAT)SYR,(FLOAT)SYR);
 			SYR -= ConsoleLines;
 			};
 		if (BorderSize>=2) // Encroach on screen area
 			{
 			FLOAT Fraction = (FLOAT)(BorderSize-1) / (FLOAT)(MAX_BORDER-1);
 			//
-			BorderLines = (int)OurMin((FLOAT)SYR * 0.25f * Fraction,(FLOAT)SYR);
-			BorderLines = OurMax(0,BorderLines - ConsoleLines);
+			BorderLines = (int)Min((FLOAT)SYR * 0.25f * Fraction,(FLOAT)SYR);
+			BorderLines = Max(0,BorderLines - ConsoleLines);
 			SYR -= 2 * BorderLines;
 			//
-			BorderPixels = (int)OurMin((FLOAT)SXR * 0.25f * Fraction,(FLOAT)SXR) & ~3;
+			BorderPixels = (int)Min((FLOAT)SXR * 0.25f * Fraction,(FLOAT)SXR) & ~3;
 			SXR -= 2 * BorderPixels;
 			};
 		Camera->Screen = &Camera->Screen
 			[
 			Camera->ColorBytes * 
-			(BorderPixels + (ConsoleLines + BorderLines) * Camera->SXStride)
+			(BorderPixels + (ConsoleLines + BorderLines) * Camera->Stride)
 			];
 		Camera->PrecomputeRenderInfo(SXR,SYR);
 		};
@@ -674,7 +669,7 @@ void FCameraConsole::PostRender(ICamera *Camera,int XLeft)
 	int Changed		= !mymemeq(this,Old,sizeof(*this)) || PawnStatusChanged;
 	int DrawStatus  = Changed || (StatusRefreshPages>0);
 	int YStart		= BorderLines;
-	int YEnd		= Camera->SYR-BorderLines-StatusBarLines;//obsolete:-ExtraBarLines;
+	int YEnd		= Camera->SYR-BorderLines-StatusBarLines;
 	int DrawBorder	= DrawStatus || (MsgType != LOG_None) || (KeyState==CK_Type);
 	//
 	if (DrawStatus)
@@ -710,18 +705,6 @@ void FCameraConsole::PostRender(ICamera *Camera,int XLeft)
 				);
 
 	            // Show the health value:
-//obsolete:	                // Show the health (image and value):
-//obsolete:	                {
-//obsolete:				    GRend->DrawScaledSprite // Draw the health
-//obsolete:					    (
-//obsolete:					        Camera
-//obsolete:	                    ,   HealthImage
-//obsolete:	                    ,   StatusBarX + HealthImageX * XScale
-//obsolete:	                    ,   StatusBarY + HealthImageY * YScale
-//obsolete:	                    ,   FLOAT(HealthImage->USize) * XScale
-//obsolete:	                    ,   FLOAT(HealthImage->VSize) * YScale
-//obsolete:	                    ,   BT_None,NULL,0,0
-//obsolete:					    );
                 ShowValue
                     ( 
                         Pawn.Health
@@ -733,7 +716,6 @@ void FCameraConsole::PostRender(ICamera *Camera,int XLeft)
                     ,   UseSmallBar
                     ,   UseSmallBar ? StatusSmallDigits : StatusDigits
                     );
-//obsolete:                }
 
                 // Show the armor (image and value):
                 {
@@ -846,29 +828,17 @@ void FCameraConsole::PostRender(ICamera *Camera,int XLeft)
 	//
 	// Draw logo:
 	//
-	if (LogoUp)
+	if( LogoUp )
 		{
 		LogoUp=1;
 		int USize,VSize, MipLevel=0;
-		BYTE *Data = GGfx.Logo->GetData(&MipLevel,Camera->ColorBytes,&USize,&VSize);
+		ITexture TextureInfo;
+		BYTE *Data = GGfx.Logo->GetData(TextureInfo,&MipLevel,Camera->ColorBytes,&USize,&VSize);
 		FLOAT XSize = Camera->FSXR * 0.7;
 		FLOAT YSize = XSize * ((FLOAT)VSize/(FLOAT)USize);
 		GRend->DrawScaledSprite(Camera,GGfx.Logo,0.5*(Camera->FSXR - XSize),0,XSize,YSize,BT_None,NULL,0,0);
+		GGfx.Logo->Unlock(TextureInfo);
 		};
-	#ifdef SPLASH_CONFIDENTIAL
-		if ((GServer.Ticks < 35*8) && (levelGetState (Camera->Level.Level)==LEVEL_UP_PLAY))
-			{
-			gfxBurnRect (Camera->Texture,20,Camera->SXR-20,70,Camera->SYR-12,0);
-			//
-			GGfx.Printf (Camera->Texture,12,80,1,  GGfx.HugeFontID,P_BROWN,"   " GAME_NAME " " GAME_VERSION);
-			GGfx.Printf (Camera->Texture,50,110,-1,GGfx.MedFontID,NormalFontColor,SPLASH_1);
-			GGfx.Printf (Camera->Texture,50,120,-1,GGfx.MedFontID,NormalFontColor,SPLASH_2);
-			GGfx.Printf (Camera->Texture,50,150,-1,GGfx.MedFontID,NormalFontColor,SPLASH_3);
-			GGfx.Printf (Camera->Texture,50,160,-1,GGfx.MedFontID,NormalFontColor,SPLASH_4);
-			GGfx.Printf (Camera->Texture,50,170,-1,GGfx.MedFontID,NormalFontColor,SPLASH_5);
-			};
-	#endif
-	//
 	if (ConsoleLines)
 		{
 		//
@@ -932,7 +902,7 @@ void FCameraConsole::PostRender(ICamera *Camera,int XLeft)
 				);
 			GGfx.WrappedPrintf
 				(
-				Camera->Texture,2,Camera->SYR - ConsoleLines - StatusBarLines /*obsolete:- ExtraBarLines*/ - YL - 1,
+				Camera->Texture,2,Camera->SYR - ConsoleLines - StatusBarLines - YL - 1,
 				-1,0,
 				GGfx.MedFont,NormalFontColor,
 				Camera->SXR-4,0,S
@@ -955,10 +925,11 @@ void FCameraConsole::PostRender(ICamera *Camera,int XLeft)
 //
 // Console keypress handler.  Returns 1 if processed, 0 if not.
 //
-int FCameraConsole::Key (int Key)
+int FCameraConsole::Key( int Key )
 	{
 	GUARD;
-	AActor *Actor = &Camera->GetActor();
+	APawn *Actor = &Camera->GetActor();
+    const BOOL Changed = GApp->Input->Press( GApp->Input->WindowsKeySwitches[Key] );
 	//
 	// Keys recognized regardless of state:
 	//
@@ -993,7 +964,13 @@ int FCameraConsole::Key (int Key)
 					if (ConsoleDest!=0.0) ConsoleDest=0.0;
 					break;
 				case K_ENTER: // Toggle fullscreen mode
-					if (GApp->KeyDown[K_ALT]) GCameraManager->MakeFullscreen(Camera);
+					if (GApp->KeyDown[K_ALT])
+						{
+						if(!(Camera->GetActor().ShowFlags & SHOW_ChildWindow))
+							{
+							GCameraManager->MakeFullscreen(Camera);
+							};
+						};
 					break;
 				case K_F11+256: // Brightness level
 					char Temp[80];
@@ -1129,8 +1106,8 @@ void FCameraConsole::Tick (ICamera *Camera,int TicksPassed)
 		{
 		FLOAT Delta = 0.05;
 		//
-		if (ConsolePos<ConsoleDest) ConsolePos = OurMin(ConsolePos+Delta,ConsoleDest);
-		else						ConsolePos = OurMax(ConsolePos-Delta,ConsoleDest);
+		if (ConsolePos<ConsoleDest) ConsolePos = Min(ConsolePos+Delta,ConsoleDest);
+		else						ConsolePos = Max(ConsolePos-Delta,ConsoleDest);
 		};
 	//
 	// Update status message:
@@ -1149,12 +1126,71 @@ void FCameraConsole::Tick (ICamera *Camera,int TicksPassed)
 // This is used to block the actions of certain player inputs,
 // such as the space bar.
 //
-int FCameraConsole::IsTyping (void)
+int FCameraConsole::IsTyping()
 	{
 	GUARD;
 	return KeyState!=CK_None;
 	UNGUARD("FCameraConsole::IsTyping");
 	};
+
+//----------------------------------------------------------------------------
+//              Get the actions associated with the camera
+//----------------------------------------------------------------------------
+//todo: Can we eliminate this function?
+class FAction * FCameraConsole::GetActions()
+{
+    return Actions;
+}
+
+//----------------------------------------------------------------------------
+//              Get the input associated with the camera
+//----------------------------------------------------------------------------
+//todo: Can we eliminate this function?
+class FInput * FCameraConsole::GetInput()
+{
+    return Input;
+}
+
+//----------------------------------------------------------------------------
+//              Gather polled input and update the status of all actions
+//----------------------------------------------------------------------------
+void FCameraConsole::UpdateActionStatus()
+{
+    GAction.UpdateStatus( *Input, IsTyping() );
+}
+
+//----------------------------------------------------------------------------
+//              Build a player action packet 
+//----------------------------------------------------------------------------
+void FCameraConsole::SetActionStatus( PPlayerTick & PlayerActions )
+{
+    //todo: We don't need the Camera parameter, since we have a member Camera.
+    FVector         Move        ;
+    FFloatRotation  Rotation    ;
+    GCameraManager->GetStoredMove(Camera,&Move,&Rotation); // Called only to get dmTick (direct mouse support) called
+    memmove( &PlayerActions.Movements, Actions->Movements, sizeof(PlayerActions.Movements) );
+    memmove( &PlayerActions.Actions, Actions->Status, sizeof(Actions->Status) );
+    Actions->EmptyMovements(); // Reset all movements since they might be accumulated later
+}
+
+//----------------------------------------------------------------------------
+//             A switch was pressed
+//----------------------------------------------------------------------------
+void FCameraConsole::PressSwitch( int Switch_ )
+{
+    const FInput::TSwitch Switch = FInput::TSwitch(Switch_);
+    //todo: Code
+    Actions->TriggerActions(*Input,Switch,Camera);
+}
+
+//----------------------------------------------------------------------------
+//             A switch was released
+//----------------------------------------------------------------------------
+void FCameraConsole::ReleaseSwitch( int Switch_ )
+{
+    const FInput::TSwitch Switch = FInput::TSwitch(Switch_);
+    //todo: Code
+}
 
 /*------------------------------------------------------------------------------
 	The End

@@ -61,7 +61,7 @@ void VARARGS FOutputDevice::Logf(const char *Fmt,...)
 //
 // Output device startup message.
 //
-void FOutputDevice::SpawnConsoleMessage(void)
+void FOutputDevice::SpawnConsoleMessage()
 	{
 	GUARD;
 	//

@@ -37,11 +37,11 @@ int ATrigger::Process(ILevel *Level, FName Message, void *Params)
 			return 1;
 		case ACTOR_Touch:
 			{
-			if (EventName!=NAME_NONE)
+			if (Event!=NAME_NONE)
 				{
-				Level->SendMessageEx(ACTOR_Trigger,Params,INDEX_NONE,EventName,NULL);
+				Level->SendMessageEx(ACTOR_Trigger,Params,INDEX_NONE,Event,NULL);
 				};
-			if (bShowMessage)
+			if (this->Message[0])
 				{
 				PText Msg;
 				Msg.MsgType = LOG_Play;
@@ -49,15 +49,15 @@ int ATrigger::Process(ILevel *Level, FName Message, void *Params)
 				Level->SendMessage(*(INDEX *)Params,ACTOR_TextMsg,&Msg);
 				};
 			if (bTriggerOnceOnly) Actor.SetActorCollision(FALSE);
-			return 1;
+			return 0;
 			};
 		case ACTOR_UnTouch:
 			{
-			if (EventName!=NAME_NONE)
+			if (Event!=NAME_NONE)
 				{
 				PTouch TouchParams;
 				TouchParams.iActor = iMe;
-				Level->SendMessageEx(ACTOR_UnTrigger,&TouchParams,INDEX_NONE,EventName,NULL);
+				Level->SendMessageEx(ACTOR_UnTrigger,&TouchParams,INDEX_NONE,Event,NULL);
 				};
 			return 1;
 			};
@@ -96,9 +96,9 @@ int ACounter::Process(ILevel *Level, FName Message, void *Params)
 				else
 					{
 					sprintf(Msg.Message,CompleteMessage);
-					if (EventName!=NAME_NONE)
+					if (Event!=NAME_NONE)
 						{
-						Level->SendMessageEx(ACTOR_Trigger,Params,INDEX_NONE,EventName,NULL);
+						Level->SendMessageEx(ACTOR_Trigger,Params,INDEX_NONE,Event,NULL);
 						};
 					};
 				if (bShowMessage) Level->SendMessage(*(INDEX *)Params,ACTOR_TextMsg,&Msg);

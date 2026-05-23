@@ -17,15 +17,15 @@
 //
 // Status of filtered polygons:
 //
-enum EPolyNodeFilter {
-   F_ROOT,                 // Leaf is the root, since the Bsp was previously empty
-   F_OUTSIDE,              // Leaf is an exterior leaf (visible to viewers)
-   F_INSIDE,               // Leaf is an interior leaf (non-visible, hidden behind backface)
-   F_COPLANAR_OUTSIDE,     // Poly is coplanar and in the exterior (visible to viewers)
-   F_COPLANAR_INSIDE,      // Poly is coplanar and inside (invisible to viewers)
-   F_COSPATIAL_FACING_IN,  // Poly is coplanar, cospatial, and facing in
-   F_COSPATIAL_FACING_OUT, // Poly is coplanar, cospatial, and facing out
-   };
+enum EPolyNodeFilter
+{
+   F_OUTSIDE,              // Leaf is an exterior leaf (visible to viewers).
+   F_INSIDE,               // Leaf is an interior leaf (non-visible, hidden behind backface).
+   F_COPLANAR_OUTSIDE,     // Poly is coplanar and in the exterior (visible to viewers).
+   F_COPLANAR_INSIDE,      // Poly is coplanar and inside (invisible to viewers).
+   F_COSPATIAL_FACING_IN,  // Poly is coplanar, cospatial, and facing in.
+   F_COSPATIAL_FACING_OUT, // Poly is coplanar, cospatial, and facing out.
+};
 
 //
 // Generic filter function called by BspFilterEdPolys.  A and B are pointers
@@ -35,15 +35,6 @@ typedef void (*BSP_FILTER_FUNC) (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
    EPolyNodeFilter Leaf, ENodePlace ENodePlace);
 
 //
-// Position of something that falls into a Bsp leaf:
-//
-enum ELoc
-   {
-   LOC_OUTSIDE,
-   LOC_INSIDE,
-   };
-
-//
 // Information used by FilterEdPoly
 //
 class FCoplanarInfo
@@ -51,8 +42,8 @@ class FCoplanarInfo
    public:
    INDEX          iOriginalNode; // INDEX_NONE = no coplanars are tracked
    INDEX          iBackNode;
-   ELoc           BackNodeLoc;
-   ELoc           FrontLeafLoc;
+   int	          BackNodeOutside;
+   int	          FrontLeafOutside;
    int            ProcessingBack;
    };
 
@@ -61,32 +52,7 @@ class FCoplanarInfo
 // function for all chunks that fall into leaves.
 //
 void FilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
-   INDEX iNode, FPoly *EdPoly, FCoplanarInfo CoplanarInfo, ELoc Loc);
-
-//
-// A node and vertex number corresponding to a point, used in generating
-// Bsp side links.
-//
-class FPointVert 
-	{
-	public:
-	INDEX	iNode;
-	INDEX	nVertex;
-	int		iNext;
-	};
-
-//
-// A list of point/vertex links, used in generating Bsp side links.
-//
-class FPointVertList
-	{
-	public:
-	int				Num;		// Number of entries in pool
-	int				Max;		// Number of point-vertex links in table
-	IModel		*ModelInfo;	// Model
-	FPointVert		*Index;		// Node-Vert index for all points (only *Next is valid)
-	FPointVert		*Pool;		// Pool of node-verts used by linked lists for each point
-	};
+   INDEX iNode, FPoly *EdPoly, FCoplanarInfo CoplanarInfo, int Outside);
 
 //
 // Bsp statistics used by link topic function.
@@ -171,18 +137,13 @@ FLOAT bspNodeDot (IModel *ModelInfo, INDEX iNode1, INDEX iNode2)
 
 //
 // Add a new point to the model (preventing duplicates) and return its
-// index.  Would benefit greatly from X & Y sorted point indices.
+// index.
 //
-INDEX __inline AddThing (FVector *FVectors, INT *Num, INT Max, FVector *V, FLOAT Thresh,int Check)
+INDEX AddThing (FVector *FVectors, INT *Num, INT Max, FVector *V, FLOAT Thresh,int Check)
 	{
 	FLOAT    Temp;
 	FVector  *TableVect;
 	INDEX    n = *Num;
-	//
-	// If X=MAXSWORD, this point or vector is nonexistant, and its index is set to
-	// MAXWORD, meaning "This index is nonexistant".
-	//
-	if (V->X==MAXSWORD) return INDEX_NONE;
 	//
 	if (Check) // See if this is very close to an existing point/vector:
 		{
@@ -227,7 +188,7 @@ INDEX __inline AddThing (FVector *FVectors, INT *Num, INT Max, FVector *V, FLOAT
 //
 // Add a new vector to the model, merging near-duplicates,  and return its index.
 //
-INDEX FEditor::bspAddVector (IModel *ModelInfo, FVector *V, int Normal)
+INDEX FGlobalEditor::bspAddVector (IModel *ModelInfo, FVector *V, int Normal)
 	{
 	GUARD;
 	FLOAT Thresh;
@@ -242,7 +203,7 @@ INDEX FEditor::bspAddVector (IModel *ModelInfo, FVector *V, int Normal)
 //
 // Add a new point to the model, merging near-duplicates,  and return its index.
 //
-INDEX FEditor::bspAddPoint (IModel *ModelInfo, FVector *V, int Exact)
+INDEX FGlobalEditor::bspAddPoint (IModel *ModelInfo, FVector *V, int Exact)
 	{
 	GUARD;
 	//
@@ -250,20 +211,27 @@ INDEX FEditor::bspAddPoint (IModel *ModelInfo, FVector *V, int Exact)
 	if (Exact) Thresh = THRESH_POINTS_ARE_SAME;
 	else       Thresh = THRESH_POINTS_ARE_NEAR;
 	//
+	// Try to find a match quickly from the Bsp. This finds all potential matches
+	// except for any dissociated from nodes/surfaces during a rebuild.
+	//
 	FVector Temp;
 	INDEX pVertex;
-	FLOAT NearestDist = ModelInfo->FindNearestVertex (V,&Temp,Thresh,&pVertex);
+	FLOAT NearestDist = ModelInfo->FindNearestVertex(*V,Temp,Thresh,pVertex);
 	if ((NearestDist >= 0.0) && (NearestDist <= Thresh)) return pVertex;
 	//
-	return AddThing (ModelInfo->FPoints,&ModelInfo->NumPoints,ModelInfo->MaxPoints,V,Thresh,0);
+	// No match found; add it slowly to find duplicates:
 	//
+	return AddThing
+		(
+		ModelInfo->FPoints,&ModelInfo->NumPoints,ModelInfo->MaxPoints,V,Thresh,
+		!FastRebuild
+		);
 	UNGUARD("bspAddPoint");
 	};
 
 /*-----------------------------------------------------------------------------
 	Adding polygons to the Bsp
 ----------------------------------------------------------------------------*/
-
 
 //
 // Add an editor polygon to the Bsp, and also stick a reference to it
@@ -273,7 +241,7 @@ INDEX FEditor::bspAddPoint (IModel *ModelInfo, FVector *V, int Exact)
 // Returns: Index to newly-created node of Bsp.  If several nodes were created because
 // of split polys, returns the parent (highest one up in the Bsp).
 //
-INDEX FEditor::bspAddNode (IModel *ModelInfo, INDEX iParent, ENodePlace ENodePlace,
+INDEX FGlobalEditor::bspAddNode (IModel *ModelInfo, INDEX iParent, ENodePlace ENodePlace,
 	DWORD NodeFlags, FPoly *EdPoly)
 	{
 	GUARD;
@@ -320,7 +288,12 @@ INDEX FEditor::bspAddNode (IModel *ModelInfo, INDEX iParent, ENodePlace ENodePla
 		Surf->iBrushPoly	= EdPoly->iBrushPoly;
 		}
 	else if (EdPoly->iLink==INDEX_NONE) appError ("BspAddNode: iLink==INDEX_NONE");
-	if (Surf->PolyFlags & PF_NotSolid) NodeFlags |= NF_NotCsg;
+	//
+	// Set NodeFlags:
+	//
+	if (Surf->PolyFlags & PF_NotSolid)  NodeFlags |= NF_NotCsg;
+	if (Surf->PolyFlags & PF_Invisible) NodeFlags |= NF_NotLightBlocking;
+	if (Surf->PolyFlags & PF_Masked)    NodeFlags |= NF_ShootThrough;
 	//
 	if (EdPoly->NumVertices > FBspNode::MAX_NODE_VERTICES)
 		{
@@ -371,9 +344,13 @@ INDEX FEditor::bspAddNode (IModel *ModelInfo, INDEX iParent, ENodePlace ENodePla
 		Node->iDynamic[1] 	= INDEX_NONE;
 		Node->NodeFlags   	= NodeFlags;
 		Node->iBound		= INDEX_NONE;
-		Node->iZone			= MAXBYTE;
-		Node->iUniquePlane	= INDEX_NONE;
+		Node->iZone[0]		= 0;
+		Node->iZone[1]		= 0;
 		Node->ZoneMask		= 0;
+		//
+		// Set node plane:
+		//
+		Node->Plane.MakePlane(EdPoly->Base,EdPoly->Normal);
 		//
 		// Set up vertex pool for node:
 		//
@@ -453,9 +430,9 @@ INDEX FindBestSplit (IModel *ModelInfo, int NumPolys,INDEX *PolyList,EBspOptimiz
 	if (NumPolys<=0) appError ("FindBestSplit: NumPolys<=0");
 	if (NumPolys==1) return 0; // No need to test if only one poly
 	//
-	if		(Opt==BSP_Optimal)   Inc = 1;					 // Test all nodes
-	else if (Opt==BSP_Good)		Inc = OurMax(1,NumPolys/20); // Test 20 nodes
-	else /* BSP_Lame */			Inc = OurMax(1,NumPolys/4);  // Test 4 nodes
+	if		(Opt==BSP_Optimal)  Inc = 1;					// Test all nodes
+	else if (Opt==BSP_Good)		Inc = Max(1,NumPolys/20);	// Test 20 nodes
+	else /* BSP_Lame */			Inc = Max(1,NumPolys/4);	// Test 4 nodes
 	//
 	// See if there are any non-semisolid polygons here:
 	//
@@ -486,11 +463,10 @@ INDEX FindBestSplit (IModel *ModelInfo, int NumPolys,INDEX *PolyList,EBspOptimiz
 			} while ((Index<(i+Inc)) && (Index<NumPolys) && (Poly->PolyFlags & PF_AddLast) && (!AllSemiSolids));
 		if ((Index>=(i+Inc))||(Index>=NumPolys)) continue;
 		//
-		if ((Poly->PolyFlags & PF_AddLast) && (!AllSemiSolids)) appError ("FOkwefwef");
-		//
 		for (j=0; j<NumPolys; j+=Inc) if (j!=Index)
 			{
-			switch (ModelInfo->FPolys[PolyList[j]].SplitWithPlane (Poly->Base,Poly->Normal,NULL,NULL,0))
+			FPoly *OtherPoly = &ModelInfo->FPolys[PolyList[j]];
+			switch (OtherPoly->SplitWithPlane (Poly->Base,Poly->Normal,NULL,NULL,0))
 				{
 				case SP_Coplanar:
 					Coplanar++;
@@ -502,30 +478,29 @@ INDEX FindBestSplit (IModel *ModelInfo, int NumPolys,INDEX *PolyList,EBspOptimiz
 					Back++;
 					break;
 				case SP_Split:
-					//
-					// Highly disfavor splitting polys that are zone portals.
-					//
+					// Disfavor splitting polys that are zone portals.
 					if (!(Poly->PolyFlags & PF_Portal)) Splits++;
 					else Splits += 16;
 					break;
 				};
 			};
+		// Highly reward splitters that cleanly partition zones.
+		// Disfavor splitters that split zones in half.
+		FLOAT Bonus=0;
+		/*
+		int AllFront=0,AllBack=0;
+		for( int i=0; i<UBspNodes::MAX_ZONES; i++)
+			{
+			AllFront += (SideZones[i]==SIDE_Front);
+			AllBack  += (SideZones[i]==SIDE_Back );
+			};
+		if((AllFront>0)&&(AllBack>0)) Bonus = 100.0 * 1000.0 * (AllFront+AllBack);
+		*/
 		//
-		// Balance coefficient (0 best, 1 worst) =
-		//    If NumPolys=NumSplits: 1
-		//    Else:                  OurAbs(Front-Back)/(NumPolys-NumSplits)
-		//
-		// Split coefficient =       Splits/NumPolys
-		//
-		// Score is from 0 to 100, lower is better.  Change this to alter
-		// the Bsp optimization technique.
-		//
-		// Notes:
-		//
-		// * May want to favor splits whose front and back bounding boxes have the
-		//   smallest amount of overlap.
-		//
-		Score = (FLOAT)(Balance * OurAbs(Front-Back) + (100-Balance) * Splits) / (0.001 + Poly->Area());
+		Score = 
+			(FLOAT)(Balance * Abs(Front-Back) +	(100-Balance)*Splits - Bonus) / 
+			(0.001 + Poly->Area()
+			);
 		if ((Score < BestScore) || (Best==-1))
 			{
 			Best      = Index;
@@ -646,7 +621,7 @@ void SplitPolyList (IModel *ModelInfo, INDEX iParent, ENodePlace ENodePlace,
 // Opt     = Bsp optimization, Bsp_LAME (fast), Bsp_GOOD (medium), Bsp_OPTIMAL (slow)
 // Balance = 0-100, 0=only worry about minimizing splits, 100=only balance tree.
 //
-void FEditor::bspBuild (UModel *Model, EBspOptimization Opt, int Balance, int RebuildSimplePolys)
+void FGlobalEditor::bspBuild (UModel *Model, EBspOptimization Opt, int Balance, int RebuildSimplePolys)
 	{
 	GUARD;
 	IModel		ModelInfo;
@@ -718,7 +693,7 @@ void FEditor::bspBuild (UModel *Model, EBspOptimization Opt, int Balance, int Re
 // first identical EdPoly in the list, or its index if it's the first.
 // Not transactional.
 //
-void FEditor::bspValidateBrush (UModel *Brush,int ForceValidate,int DoStatusUpdate)
+void FGlobalEditor::bspValidateBrush (UModel *Brush,int ForceValidate,int DoStatusUpdate)
 	{
 	GUARD;
 	IModel			ModelInfo;
@@ -731,7 +706,10 @@ void FEditor::bspValidateBrush (UModel *Brush,int ForceValidate,int DoStatusUpda
 		{
 		ModelInfo.ModelFlags |= MF_Linked;
 		//
-		for (i=0; i<ModelInfo.NumFPolys; i++) ModelInfo.FPolys[i].iLink = i;
+		for (i=0; i<ModelInfo.NumFPolys; i++)
+			{
+			ModelInfo.FPolys[i].iLink = i;
+			};
 		for (i=0; i<ModelInfo.NumFPolys; i++)
 			{
 			if (DoStatusUpdate && !(i&7))
@@ -912,7 +890,7 @@ void MergeCoplanars (IModel *ModelInfo,INDEX *PolyList, int PolyCount)
 //
 // Build EdPoly list from a model's Bsp. Not transactional.
 //
-void FEditor::bspBuildFPolys (UModel *Model,int iSurfLinks)
+void FGlobalEditor::bspBuildFPolys (UModel *Model,int iSurfLinks)
 	{
 	GUARD;
 	IModel  ModelInfo;
@@ -932,7 +910,7 @@ void FEditor::bspBuildFPolys (UModel *Model,int iSurfLinks)
 // Merge all coplanar EdPolys in a model.  Not transactional.
 // Preserves (though reorders) iLinks.
 //
-void FEditor::bspMergeCoplanars (UModel *Model,int RemapLinks)
+void FGlobalEditor::bspMergeCoplanars (UModel *Model,int RemapLinks,int MergeDisparateTextures)
 	{
 	GUARD;
 	IModel		ModelInfo;
@@ -969,10 +947,17 @@ void FEditor::bspMergeCoplanars (UModel *Model,int RemapLinks)
 					{
 					OtherPoly->PolyFlags |= PF_EdProcessed;
 					Dist = FPointPlaneDist (OtherPoly->Base,EdPoly->Base,EdPoly->Normal);
-					if ((Dist>-0.001) && (Dist<0.001) && 
-						((OtherPoly->Normal | EdPoly->Normal)>0.9999) &&
-						FPointsAreNear(OtherPoly->TextureU,EdPoly->TextureU,THRESH_VECTORS_ARE_NEAR) &&
-						FPointsAreNear(OtherPoly->TextureV,EdPoly->TextureV,THRESH_VECTORS_ARE_NEAR)
+					if	(
+							(Dist>-0.001)
+						&&	(Dist<0.001)
+						&&	((OtherPoly->Normal | EdPoly->Normal)>0.9999)
+						&&	(
+								MergeDisparateTextures ||
+								(
+									FPointsAreNear(OtherPoly->TextureU,EdPoly->TextureU,THRESH_VECTORS_ARE_NEAR)
+								&&	FPointsAreNear(OtherPoly->TextureV,EdPoly->TextureV,THRESH_VECTORS_ARE_NEAR)
+								)
+							)
 						)
 						{
 						PolyList[PolyCount++] = j;
@@ -1148,7 +1133,7 @@ void CleanupPolys (IModel *ModelInfo)
 // Clean up all nodes after a CSG operation.  Resets temporary bit flags and unlinks
 // empty leaves.  Removes zero-vertex nodes which have nonzero-vertex coplanars.
 //
-void FEditor::bspCleanup (IModel *ModelInfo)
+void FGlobalEditor::bspCleanup (IModel *ModelInfo)
 	{
 	GUARD;
 	CleanupPolys (ModelInfo);
@@ -1166,7 +1151,6 @@ void AddBrushToWorldFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 	#if 0
 	switch (Filter)
 		{
-		case F_ROOT:					bug(" -> Root"); break;
 		case F_OUTSIDE:					bug(" -> Outside"); break;
 		case F_COPLANAR_OUTSIDE:		bug(" -> Coplanar Outside"); break;
 		case F_COSPATIAL_FACING_IN:		bug(" -> Cospatial facing in"); break;
@@ -1178,7 +1162,6 @@ void AddBrushToWorldFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 	//
 	switch (Filter)
 		{
-		case F_ROOT:
 		case F_OUTSIDE:
 		case F_COPLANAR_OUTSIDE:
 		case F_COSPATIAL_FACING_OUT:
@@ -1194,15 +1177,8 @@ void AddBrushToWorldFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 void AddWorldToBrushFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 	EPolyNodeFilter Filter, ENodePlace ENodePlace)
 	{
-	(void)iNode;
-	(void)ModelInfo;
-	(void)ENodePlace;
-	//
 	switch (Filter)
 		{
-		case F_ROOT:
-			debug(LOG_Bsp,"AddWorldToBrushFunc: F_ROOT"); // Shouldn't happen
-			break;
 		case F_OUTSIDE:
 		case F_COPLANAR_OUTSIDE:
 			//
@@ -1228,7 +1204,6 @@ void SubtractBrushFromWorldFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 	{
 	switch (Filter)
 		{
-		case F_ROOT:
 		case F_OUTSIDE:
 		case F_COSPATIAL_FACING_OUT:
 		case F_COSPATIAL_FACING_IN:
@@ -1236,9 +1211,9 @@ void SubtractBrushFromWorldFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 			break;
 		case F_COPLANAR_INSIDE:
 		case F_INSIDE:
-			EdPoly->Flip();
+			EdPoly->Reverse();
 			GUnrealEditor.bspAddNode (ModelInfo,iNode,ENodePlace,NF_IsNew,EdPoly); // Add to Bsp back
-			EdPoly->Flip();
+			EdPoly->Reverse();
 			break;
 		};
 	};
@@ -1246,15 +1221,8 @@ void SubtractBrushFromWorldFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 void SubtractWorldToBrushFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 	EPolyNodeFilter Filter, ENodePlace ENodePlace)
 	{
-	(void)iNode;
-	(void)ModelInfo;
-	(void)ENodePlace;
-	//
 	switch (Filter)
 		{
-		case F_ROOT:
-			debug(LOG_Bsp,"AddWorldToBrushFunc: F_ROOT"); // Shouldn't happen
-			break;
 		case F_OUTSIDE:
 		case F_COPLANAR_OUTSIDE:
 		case F_COSPATIAL_FACING_IN:
@@ -1278,15 +1246,8 @@ void SubtractWorldToBrushFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 void IntersectBrushWithWorldFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 	EPolyNodeFilter Filter,ENodePlace ENodePlace)
 	{
-	(void)iNode;
-	(void)ModelInfo;
-	(void)ENodePlace;
-	//
 	switch (Filter)
 		{
-		case F_ROOT:
-			// Shouldn't happen
-			break;
 		case F_OUTSIDE:
 		case F_COPLANAR_OUTSIDE:
 		case F_COSPATIAL_FACING_IN:
@@ -1306,17 +1267,8 @@ void IntersectBrushWithWorldFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 void IntersectWorldWithBrushFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 	EPolyNodeFilter Filter,ENodePlace ENodePlace)
 	{
-	(void)iNode;
-	(void)ModelInfo;
-	(void)ModelInfo;
-	(void)ENodePlace;
-	//
 	switch (Filter)
 		{
-		case F_ROOT:
-			// Shouldn't happen
-			debug (LOG_Bsp,"IntersectWorldWithBrushFunc: F_ROOT");
-			break;
 		case F_OUTSIDE:
 		case F_COPLANAR_OUTSIDE:
 		case F_COSPATIAL_FACING_IN:
@@ -1336,15 +1288,8 @@ void IntersectWorldWithBrushFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 void DeIntersectBrushWithWorldFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 	EPolyNodeFilter Filter,ENodePlace ENodePlace)
 	{
-	(void)iNode;
-	(void)ModelInfo;
-	(void)ENodePlace;
-	//
 	switch (Filter)
 		{
-		case F_ROOT:
-			// Shouldn't happen
-			break;
 		case F_INSIDE:
 		case F_COPLANAR_INSIDE:
 		case F_COSPATIAL_FACING_OUT:
@@ -1364,16 +1309,8 @@ void DeIntersectBrushWithWorldFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPol
 void DeIntersectWorldWithBrushFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly,
 	EPolyNodeFilter Filter,ENodePlace ENodePlace)
 	{
-	(void)iNode;
-	(void)ModelInfo;
-	(void)ModelInfo;
-	(void)ENodePlace;
-	//
 	switch (Filter)
 		{
-		case F_ROOT:
-			// Shouldn't happen
-			break;
 		case F_OUTSIDE:
 		case F_COPLANAR_OUTSIDE:
 		case F_COSPATIAL_FACING_OUT:
@@ -1384,9 +1321,9 @@ void DeIntersectWorldWithBrushFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPol
 		case F_COSPATIAL_FACING_IN:
 			if (EdPoly->Fix()>=3)
 	            {
-				EdPoly->Flip();
+				EdPoly->Reverse();
 				GModelInfo->FPolys[GModelInfo->NumFPolys++]=*EdPoly;
-				EdPoly->Flip();
+				EdPoly->Reverse();
 				};
 			break;
 		};
@@ -1400,37 +1337,38 @@ void DeIntersectWorldWithBrushFunc (IModel *ModelInfo, INDEX iNode, FPoly *EdPol
 // Handle a piece of a polygon that was filtered to a leaf.
 //
 void FilterLeaf (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
-	INDEX iNode, FPoly *EdPoly, FCoplanarInfo CoplanarInfo, ELoc LeafLoc, ENodePlace ENodePlace)
+	INDEX iNode, FPoly *EdPoly, FCoplanarInfo CoplanarInfo, int LeafOutside, ENodePlace ENodePlace)
 	{
 	GUARD;
 	EPolyNodeFilter    FilterType;
 	//
 	if (CoplanarInfo.iOriginalNode==INDEX_NONE) // Processing regular, non-coplanar polygons:
 		{
-		if (LeafLoc==LOC_OUTSIDE) FilterType = F_OUTSIDE;
-		else                      FilterType = F_INSIDE;
-		//
+		FilterType = LeafOutside ? F_OUTSIDE : F_INSIDE;
 		FilterFunc (ModelInfo, iNode, EdPoly, FilterType, ENodePlace);
 		}
 	else if (CoplanarInfo.ProcessingBack) // Finished filtering polygon through tree in back of parent coplanar:
 		{
 		DoneFilteringBack:
 		//
-		if      ((LeafLoc==LOC_INSIDE )&&(CoplanarInfo.FrontLeafLoc==LOC_INSIDE )) FilterType = F_COPLANAR_INSIDE;
-		else if ((LeafLoc==LOC_OUTSIDE)&&(CoplanarInfo.FrontLeafLoc==LOC_OUTSIDE)) FilterType = F_COPLANAR_OUTSIDE;
-		else if ((LeafLoc==LOC_INSIDE )&&(CoplanarInfo.FrontLeafLoc==LOC_OUTSIDE)) FilterType = F_COSPATIAL_FACING_OUT;
-		else if ((LeafLoc==LOC_OUTSIDE)&&(CoplanarInfo.FrontLeafLoc==LOC_INSIDE )) FilterType = F_COSPATIAL_FACING_IN;
-		else appError ("FilterLeaf: Bad Locs");
-		//
+		if      ((!LeafOutside) && (!CoplanarInfo.FrontLeafOutside)) FilterType = F_COPLANAR_INSIDE;
+		else if (( LeafOutside) && ( CoplanarInfo.FrontLeafOutside)) FilterType = F_COPLANAR_OUTSIDE;
+		else if ((!LeafOutside) && ( CoplanarInfo.FrontLeafOutside)) FilterType = F_COSPATIAL_FACING_OUT;
+		else if (( LeafOutside) && (!CoplanarInfo.FrontLeafOutside)) FilterType = F_COSPATIAL_FACING_IN;
+		else
+			{
+			appError ("FilterLeaf: Bad Locs");
+			return;
+			};
 		FilterFunc (ModelInfo, CoplanarInfo.iOriginalNode, EdPoly, FilterType, NODE_Plane);
 		}
 	else
 		{
-		CoplanarInfo.FrontLeafLoc = LeafLoc;
+		CoplanarInfo.FrontLeafOutside = LeafOutside;
 		//
 		if (CoplanarInfo.iBackNode==INDEX_NONE)
 			{
-			LeafLoc = CoplanarInfo.BackNodeLoc;
+			LeafOutside = CoplanarInfo.BackNodeOutside;
 			goto DoneFilteringBack; // Back tree is empty
 			}
 		else
@@ -1441,7 +1379,7 @@ void FilterLeaf (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
 			// back tree and EdPoly = the final EdPoly to insert.
 			//
 			CoplanarInfo.ProcessingBack=1;
-			FilterEdPoly (FilterFunc,ModelInfo,CoplanarInfo.iBackNode,EdPoly,CoplanarInfo,CoplanarInfo.BackNodeLoc);
+			FilterEdPoly (FilterFunc,ModelInfo,CoplanarInfo.iBackNode,EdPoly,CoplanarInfo,CoplanarInfo.BackNodeOutside);
 			};
 		};
 	UNGUARD("FilterLeaf");
@@ -1455,14 +1393,14 @@ void FilterLeaf (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
 // in order to handle coplanar CSG properly.
 //
 void FilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
-	INDEX iNode, FPoly *EdPoly, FCoplanarInfo CoplanarInfo, ELoc Loc)
+	INDEX iNode, FPoly *EdPoly, FCoplanarInfo CoplanarInfo, int Outside)
 	{
 	GUARD;
 	FPoly          *TempFrontEdPoly, *TempBackEdPoly;
 	FBspNode       *Node;
 	FBspSurf       *Poly;
 	INDEX          SplitResult,iOurFront,iOurBack;
-	ELoc           NewFrontLoc,NewBackLoc;
+	int			   NewFrontOutside,NewBackOutside;
 	//
 	FilterLoop:
 	//
@@ -1478,7 +1416,7 @@ void FilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
 		// Filter other half:
 		//
 		ModelInfo->NumFPolys++;
-		FilterEdPoly (FilterFunc,ModelInfo,iNode,TempFrontEdPoly,CoplanarInfo,Loc);
+		FilterEdPoly (FilterFunc,ModelInfo,iNode,TempFrontEdPoly,CoplanarInfo,Outside);
 		ModelInfo->NumFPolys--;
 		};
 	if (((ModelInfo->NumBspNodes+2)>=ModelInfo->MaxBspNodes) ||
@@ -1517,10 +1455,10 @@ void FilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
 		{
 		Front:
 		//
-		if (Node->IsCsg()) Loc=LOC_OUTSIDE;
+		Outside = Outside || Node->IsCsg();
 		if (Node->iFront==INDEX_NONE)
 			{
-			FilterLeaf (FilterFunc,ModelInfo,iNode,EdPoly,CoplanarInfo,Loc,NODE_Front);
+			FilterLeaf (FilterFunc,ModelInfo,iNode,EdPoly,CoplanarInfo,Outside,NODE_Front);
 			}
 		else
 			{
@@ -1530,11 +1468,11 @@ void FilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
 		}
 	else if (SplitResult==SP_Back)
 		{
-		if (Node->IsCsg()) Loc=LOC_INSIDE;
+		Outside = Outside && !Node->IsCsg();
 		//
 		if (Node->iBack==INDEX_NONE)
 			{
-			FilterLeaf (FilterFunc,ModelInfo,iNode,EdPoly,CoplanarInfo,Loc,NODE_Back);
+			FilterLeaf (FilterFunc,ModelInfo,iNode,EdPoly,CoplanarInfo,Outside,NODE_Back);
 			}
 		else
 			{
@@ -1558,8 +1496,8 @@ void FilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
 		CoplanarInfo.iOriginalNode        = iNode;
 		CoplanarInfo.iBackNode            = INDEX_NONE;
 		CoplanarInfo.ProcessingBack       = 0;
-		CoplanarInfo.BackNodeLoc          = Loc; // Default
-		NewFrontLoc                       = Loc; // Default
+		CoplanarInfo.BackNodeOutside      = Outside; // Default
+		NewFrontOutside                   = Outside; // Default
 		//
 		// See whether Node's iFront or iBack points to the side of the tree on the front
 		// of this polygon (will be as expected if this polygon is facing the same
@@ -1570,45 +1508,45 @@ void FilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
 			iOurFront = Node->iFront;
 			iOurBack  = Node->iBack;
 			if (Node->IsCsg())
-	            {CoplanarInfo.BackNodeLoc=LOC_INSIDE; NewFrontLoc=LOC_OUTSIDE;};
+	            {CoplanarInfo.BackNodeOutside=0; NewFrontOutside=1;};
 			}
 		else
 			{
 			iOurFront = Node->iBack;
 			iOurBack  = Node->iFront;
 			if (Node->IsCsg())
-	            {CoplanarInfo.BackNodeLoc=LOC_OUTSIDE; NewFrontLoc=LOC_INSIDE;};
+	            {CoplanarInfo.BackNodeOutside=1; NewFrontOutside=0;};
 			};
 		//
 		// Process front and back:
 		//
 		if ((iOurFront==INDEX_NONE)&&(iOurBack==INDEX_NONE)) // No front or back
 			{
-			CoplanarInfo.ProcessingBack = 1;
-			CoplanarInfo.FrontLeafLoc   = NewFrontLoc;
-			FilterLeaf (FilterFunc,ModelInfo,iNode,EdPoly,CoplanarInfo,CoplanarInfo.BackNodeLoc,NODE_Plane);
+			CoplanarInfo.ProcessingBack		= 1;
+			CoplanarInfo.FrontLeafOutside	= NewFrontOutside;
+			FilterLeaf (FilterFunc,ModelInfo,iNode,EdPoly,CoplanarInfo,CoplanarInfo.BackNodeOutside,NODE_Plane);
 			}
 		else if ((iOurFront==INDEX_NONE)&&(iOurBack!=INDEX_NONE)) // Back but no front
 			{
-			CoplanarInfo.ProcessingBack = 1;
-			CoplanarInfo.iBackNode      = iOurBack;
-			CoplanarInfo.FrontLeafLoc   = NewFrontLoc;
+			CoplanarInfo.ProcessingBack		= 1;
+			CoplanarInfo.iBackNode			= iOurBack;
+			CoplanarInfo.FrontLeafOutside	= NewFrontOutside;
 			//
-			iNode = iOurBack;
-			Loc=CoplanarInfo.BackNodeLoc;
+			iNode   = iOurBack;
+			Outside = CoplanarInfo.BackNodeOutside;
 			goto FilterLoop;
 			}
 		else // Has a front and maybe a back
 			{
 			//
 			// Set iOurBack up to process back on next call to FilterLeaf, and loop
-			// to process front.  Next call to FilterLeaf will set FrontLeafLoc.
+			// to process front.  Next call to FilterLeaf will set FrontLeafOutside.
 			//
 			CoplanarInfo.ProcessingBack = 0;
 			CoplanarInfo.iBackNode      = iOurBack; // May be a node or may be INDEX_NONE
 			//
-			iNode = iOurFront;
-			Loc   = NewFrontLoc;
+			iNode   = iOurFront;
+			Outside = NewFrontOutside;
 			goto  FilterLoop;
 			};
 		}
@@ -1621,20 +1559,20 @@ void FilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
 		//
 		// Front half of split:
 		//
-		if (Node->IsCsg())	{NewFrontLoc=LOC_OUTSIDE; NewBackLoc=LOC_INSIDE;}
-		else				{NewFrontLoc=Loc;         NewBackLoc=Loc;      };
+		if (Node->IsCsg())	{NewFrontOutside=1; NewBackOutside=0;}
+		else				{NewFrontOutside=NewBackOutside=Outside;};
 		//
 		if (Node->iFront==INDEX_NONE)
-			FilterLeaf (FilterFunc,ModelInfo,iNode,TempFrontEdPoly,CoplanarInfo,NewFrontLoc,NODE_Front);
+			FilterLeaf (FilterFunc,ModelInfo,iNode,TempFrontEdPoly,CoplanarInfo,NewFrontOutside,NODE_Front);
 		else
-			FilterEdPoly (FilterFunc, ModelInfo,Node->iFront, TempFrontEdPoly,CoplanarInfo,NewFrontLoc);
+			FilterEdPoly (FilterFunc, ModelInfo,Node->iFront, TempFrontEdPoly,CoplanarInfo,NewFrontOutside);
 		//
 		// Back half of split:
 		//
 		if (Node->iBack==INDEX_NONE)
-			FilterLeaf (FilterFunc,ModelInfo,iNode,TempBackEdPoly,CoplanarInfo,NewBackLoc,NODE_Back);
+			FilterLeaf (FilterFunc,ModelInfo,iNode,TempBackEdPoly,CoplanarInfo,NewBackOutside,NODE_Back);
 		else
-			FilterEdPoly (FilterFunc,ModelInfo,Node->iBack,TempBackEdPoly,CoplanarInfo,NewBackLoc);
+			FilterEdPoly (FilterFunc,ModelInfo,Node->iBack,TempBackEdPoly,CoplanarInfo,NewBackOutside);
 		ModelInfo->NumFPolys -= 2;
 		};
 	UNGUARD("FilterEdPoly");
@@ -1644,21 +1582,19 @@ void FilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,
 // Regular entry into FilterEdPoly (so higher-level callers don't have to
 // deal with unnecessary info). Filters starting at root.
 //
-void BspFilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,FPoly *EdPoly)
+void BspFilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,FPoly *EdPoly,int RootOutside)
 	{
 	GUARD;
 	FCoplanarInfo StartingCoplanarInfo;
 	StartingCoplanarInfo.iOriginalNode = INDEX_NONE; // No coplanars
 	//
-	// Start out with LOC_OUTSIDE so that root is classified as outside
-	//
 	if (ModelInfo->NumBspNodes==0) // Process root node
 		{
-		FilterFunc (ModelInfo,0,EdPoly,F_ROOT,NODE_Root);
+		FilterFunc (ModelInfo,0,EdPoly,RootOutside ? F_OUTSIDE : F_INSIDE,NODE_Root);
 		}
 	else
 		{
-		FilterEdPoly (FilterFunc,ModelInfo,0,EdPoly,StartingCoplanarInfo,LOC_OUTSIDE);
+		FilterEdPoly (FilterFunc,ModelInfo,0,EdPoly,StartingCoplanarInfo,RootOutside);
 		};
 	UNGUARD("BspFilterEdPoly");
 	};
@@ -1671,7 +1607,7 @@ void BspFilterEdPoly (BSP_FILTER_FUNC FilterFunc, IModel *ModelInfo,FPoly *EdPol
 // Convert a Bsp node to an EdPoly.  Returns number of vertices in Bsp
 // node (0 or 3-MAX_NODE_VERTICES).
 //
-int FEditor::bspNodeToFPoly (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly)
+int FGlobalEditor::bspNodeToFPoly (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly)
 	{
 	GUARD;
 	FBspNode	*Node     	= &ModelInfo->BspNodes [iNode];
@@ -1694,6 +1630,9 @@ int FEditor::bspNodeToFPoly (IModel *ModelInfo, INDEX iNode, FPoly *EdPoly)
 	//
 	EdPoly->PanU		= Poly->PanU;
 	EdPoly->PanV		= Poly->PanV;
+	//
+	EdPoly->iZone[0]	= Node->iZone[0];
+	EdPoly->iZone[1]	= Node->iZone[1];
 	//
 	MasterEdPoly = polyFindMaster (ModelInfo,Node->iSurf);
 	if (MasterEdPoly == NULL)
@@ -1792,11 +1731,11 @@ void FilterWorldThroughBrush (
 				//
 				if (CSGOper==CSG_Add)
 					{
-					BspFilterEdPoly(AddWorldToBrushFunc,BrushModelInfo,TempEdPoly);
+					BspFilterEdPoly(AddWorldToBrushFunc,BrushModelInfo,TempEdPoly,1);
 					}
 				else // CSG_Subtract
 					{
-					BspFilterEdPoly(SubtractWorldToBrushFunc,BrushModelInfo,TempEdPoly);
+					BspFilterEdPoly(SubtractWorldToBrushFunc,BrushModelInfo,TempEdPoly,1);
 					};
 				if (GDiscarded == 0)
 					{
@@ -1818,12 +1757,12 @@ void FilterWorldThroughBrush (
 			else if (CSGOper==CSG_Intersect)
 				{
 				GModelInfo	= BrushInfo;
-				BspFilterEdPoly (IntersectWorldWithBrushFunc,BrushModelInfo,TempEdPoly);
+				BspFilterEdPoly (IntersectWorldWithBrushFunc,BrushModelInfo,TempEdPoly,1);
 				}
 			else if (CSGOper==CSG_Deintersect)
 				{
 				GModelInfo	= BrushInfo;
-				BspFilterEdPoly (DeIntersectWorldWithBrushFunc,BrushModelInfo,TempEdPoly);
+				BspFilterEdPoly (DeIntersectWorldWithBrushFunc,BrushModelInfo,TempEdPoly,1);
 				};
 			};
 		//
@@ -1853,7 +1792,7 @@ void FilterWorldThroughBrush (
 //
 // Perform any CSG operation between the brush and the world.
 //
-int FEditor::bspBrushCSG (UModel *Brush, UModel *Model, DWORD PolyFlags, ECsgOper CSGOper, int BuildBounds)
+int FGlobalEditor::bspBrushCSG (UModel *Brush, UModel *Model, DWORD PolyFlags, ECsgOper CSGOper, int BuildBounds)
 	{
 	GUARD;
 	IModel			BrushInfo;
@@ -1862,7 +1801,7 @@ int FEditor::bspBrushCSG (UModel *Brush, UModel *Model, DWORD PolyFlags, ECsgOpe
 	FPoly			EdPoly,*DestEdPoly;
 	FLOAT			Orientation;
 	FModelCoords	Coords,Uncoords;
-	int				NumPolysFromBrush,i,j,ReallyBig;
+	int				NumPolysFromBrush=0,i,j,ReallyBig;
 	char			*Descr;
 	//
 	// See if an overflow is likely:
@@ -1938,12 +1877,12 @@ int FEditor::bspBrushCSG (UModel *Brush, UModel *Model, DWORD PolyFlags, ECsgOpe
 				if (CSGOper==CSG_Intersect)
 		            {
 					GModelInfo = &BrushInfo;
-					BspFilterEdPoly (IntersectBrushWithWorldFunc,&ModelInfo,&EdPoly);
+					BspFilterEdPoly (IntersectBrushWithWorldFunc,&ModelInfo,&EdPoly,FBspNode::ROOT_OUTSIDE);
 					}
 				else if (CSGOper==CSG_Deintersect)
 		            {
 					GModelInfo = &BrushInfo;
-					BspFilterEdPoly (DeIntersectBrushWithWorldFunc,&ModelInfo,&EdPoly);
+					BspFilterEdPoly (DeIntersectBrushWithWorldFunc,&ModelInfo,&EdPoly,FBspNode::ROOT_OUTSIDE);
 					};
 				};
 			};
@@ -1970,8 +1909,8 @@ int FEditor::bspBrushCSG (UModel *Brush, UModel *Model, DWORD PolyFlags, ECsgOpe
 			// 
 			// Filter through the Bsp:
          	//
-         	if (CSGOper==CSG_Add)			BspFilterEdPoly(AddBrushToWorldFunc,&ModelInfo,&EdPoly);
-			else if (CSGOper==CSG_Subtract) BspFilterEdPoly(SubtractBrushFromWorldFunc,&ModelInfo,&EdPoly);
+         	if (CSGOper==CSG_Add)			BspFilterEdPoly(AddBrushToWorldFunc,&ModelInfo,&EdPoly,FBspNode::ROOT_OUTSIDE);
+			else if (CSGOper==CSG_Subtract) BspFilterEdPoly(SubtractBrushFromWorldFunc,&ModelInfo,&EdPoly,FBspNode::ROOT_OUTSIDE);
 			};
 		};
 	if (!(PolyFlags & (PF_NotSolid | PF_Semisolid)))
@@ -2068,7 +2007,7 @@ int FEditor::bspBrushCSG (UModel *Brush, UModel *Model, DWORD PolyFlags, ECsgOpe
 	if ((CSGOper==CSG_Intersect)||(CSGOper==CSG_Deintersect))
 		{
 		if (ReallyBig) GApp->StatusUpdate ("Merging",0,0);
-		bspMergeCoplanars (Brush,1);
+		bspMergeCoplanars (Brush,1,0);
 		};
 	if (ReallyBig) GApp->EndSlowTask();
 	return 1;
@@ -2204,142 +2143,125 @@ void BspTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, co
 	};
 
 /*---------------------------------------------------------------------------------------
-   Functions for maintaining linked geometry lists
+   Functions for maintaining linked geometry lists.
 ---------------------------------------------------------------------------------------*/
 
 //
-//	Allocate all stuff for a point-vertex list:
+// A node and vertex number corresponding to a point, used in generating Bsp side links.
 //
-void AllocPointVertList (IModel *ModelInfo, FPointVertList *PointVerts)
-	{
-	GUARD;
-	INDEX iNode,Count;
-	//
-	// Count number of unique vertices in world:
-	//
-	PointVerts->Max = 0;
-	for (iNode=0; iNode < ModelInfo->NumBspNodes; iNode++)
-		{
-		PointVerts->Max += ModelInfo->BspNodes[iNode].NumVertices;
-		};
-	PointVerts->Max *= 2; // Allow for extra entries added
-	//
-	// Allocate working tables:
-	//
-	PointVerts->Index     = (FPointVert *)GMem.Get((int)(ModelInfo->NumPoints+1) * sizeof (FPointVert));
-	PointVerts->Pool      = (FPointVert *)GMem.Get(0);
-	PointVerts->ModelInfo = ModelInfo;
-	PointVerts->Num       = 1; // So that entry zero (end tag) is unused
-	//
-	// Build quick reference table for all points in this level's point table, listing all
-	// node/vertex pairs that exist at that point.
-	//
-	for (Count=0; Count <= ModelInfo->NumPoints; Count++) PointVerts->Index [Count].iNext = 0;
-	UNGUARD("AllocPointVertList");
-	};
-
-//
-// Free a point/vertex list.
-//
-void FreePointVertList (FPointVertList *PointVerts)
-	{
-	GUARD;
-	GMem.Release(PointVerts->Index);
-	UNGUARD("FreePointVertList");
-	};
-
-//
-// Add all of a node's vertices to a node-vertex list:
-//
-void AddNodeToVertList (FPointVertList *PointVerts, INDEX iNode)
-	{
-	GUARD;
-	IModel	*ModelInfo 	= PointVerts->ModelInfo;
-	FBspNode	*Node 		= &ModelInfo->BspNodes [iNode];
-	FVertPool	*VertPool   = &ModelInfo->VertPool [Node->iVertPool];
-	INDEX		pVertex;
-	BYTE		i;
-	//
-	for (i=0; i < Node->NumVertices; i++)
-		{
-		pVertex = VertPool[i].pVertex;
-		//
-		// Add new point/vertex pair to array, and insert new array entry
-		// between index and first entry:
-		//
-		PointVerts->Pool  [PointVerts->Num].iNode 	= iNode;
-		PointVerts->Pool  [PointVerts->Num].nVertex	= i;
-		PointVerts->Pool  [PointVerts->Num].iNext	= PointVerts->Index[pVertex].iNext;
-		PointVerts->Index [pVertex        ].iNext	= PointVerts->Num;
-		//
-		PointVerts->Num++;
-		};
-	UNGUARD("AddNodeToVertList");
-	};
-
-//
-// Add all nodes' vertices in the model to a node-vertex list:
-//
-void AddAllNodesToVertList (FPointVertList *PointVerts)
-	{
-	GUARD;
-	IModel	*ModelInfo 	= PointVerts->ModelInfo;
+class FPointVert 
+{
+public:
 	INDEX		iNode;
-	//
-	for (iNode=0; iNode < ModelInfo->NumBspNodes; iNode++)
-		{
-		AddNodeToVertList (PointVerts,iNode);
-		};
-	UNGUARD("AddAllNodesToVertList");
-	};
+	INDEX		nVertex;
+	FPointVert	*Next;
+};
 
 //
-// Remove all of a node's vertices from a node-vertex list:
+// A list of point/vertex links, used in generating Bsp side links.
 //
-void RemoveNodeFromVertList (FPointVertList *PointVerts, INDEX iNode)
+class FPointVertList
+{
+public:
+
+	// Variables.
+	IModel		*ModelInfo;	// Model.
+	FPointVert	**Index;	// Starting link.
+
+	// Allocate.
+	void Alloc( IModel *ThisModelInfo )
 	{
-	GUARD;
-	IModel	*ModelInfo 	= PointVerts->ModelInfo;
-	FBspNode	*Node 		= &ModelInfo->BspNodes [iNode];
-	FVertPool	*VertPool	= &ModelInfo->VertPool [Node->iVertPool];
-	FPointVert	*PrevPtr,*NodePtr;
-	INDEX		pVertex;
-	BYTE		i;
-	//
-	// Loop through all of the node's vertices and search through the
-	// corresponding point's node-vert list, and delink this node:
-	//
-	for (i = 0; i < Node->NumVertices; i++)
+		guard(FPointVertList::Alloc);
+
+		// Allocate working tables.
+		ModelInfo = ThisModelInfo;
+		Index     = (FPointVert **)GMem.GetZeroed( ModelInfo->NumPoints * sizeof (FPointVert*) );
+
+		unguard;
+	}
+
+	// Free.
+	void Free()
+	{
+		guard(FPointVertList::Free);
+		GMem.Release(Index);
+		unguard;
+	}
+
+	// Add all of a node's vertices to a node-vertex list.
+	void AddNode( INDEX iNode )
+	{
+		guard(FPointVertList::AddNode);
+
+		FBspNode	*Node 		= &ModelInfo->BspNodes [iNode];
+		FVertPool	*VertPool   = &ModelInfo->VertPool [Node->iVertPool];
+
+		for( INDEX i=0; i < Node->NumVertices; i++ )
 		{
-		pVertex = VertPool [i].pVertex;
-		//
-		PrevPtr = &PointVerts->Index [pVertex];
-		//
-		while (PrevPtr->iNext != 0)
+			INDEX pVertex = VertPool[i].pVertex;
+
+			// Add new point/vertex pair to array, and insert new array entry
+			// between index and first entry.
+
+			FPointVert *PointVert	= (FPointVert *)GMem.Get( sizeof(FPointVert) );
+			
+			PointVert->iNode 		= iNode;
+			PointVert->nVertex		= i;
+			PointVert->Next			= Index[pVertex];
+
+			Index[pVertex]			= PointVert;
+		}
+		unguard;
+	}
+
+	// Add all nodes' vertices in the model to a node-vertex list.
+	void AddAllNodes()
+	{
+		guard(FPointVertList::AddAllNodes);
+
+		for( INDEX iNode=0; iNode < ModelInfo->NumBspNodes; iNode++ )
+			AddNode( iNode );
+
+		unguard;
+	}
+
+	// Remove all of a node's vertices from a node-vertex list.
+	void RemoveNode( INDEX iNode )
+	{
+		guard(FPointVertList::RemoveNode);
+
+		FBspNode	*Node 		= &ModelInfo->BspNodes [iNode];
+		FVertPool	*VertPool	= &ModelInfo->VertPool [Node->iVertPool];
+
+		// Loop through all of the node's vertices and search through the
+		// corresponding point's node-vert list, and delink this node.
+		int Count=0;
+		for( INDEX i = 0; i < Node->NumVertices; i++ )
+		{
+			INDEX pVertex = VertPool[i].pVertex;
+
+			for( FPointVert **PrevLink = &Index[pVertex]; *PrevLink; PrevLink=&(*PrevLink)->Next )
 			{
-			NodePtr = &PointVerts->Pool [PrevPtr->iNext];
-			if (NodePtr->iNode == iNode)
+				if( (*PrevLink)->iNode == iNode )
 				{
-				//
-				// Delink this entry from the list
-				//
-				PrevPtr->iNext = NodePtr->iNext;
-				goto Next;
+					// Delink this entry from the list.
+					*PrevLink = (*PrevLink)->Next;
+					Count++;
+
+					if( *PrevLink == NULL )
+						break;
 				}
-			PrevPtr = NodePtr;
-			};
-		//
-		// Node's vertex wasn't found, there's a bug:
-		//
-		if (PrevPtr->iNext==0) appError ("RemoveNodeFromVertList: List is corrupted");
-		//
-		Next:;
-		};
-	UNGUARD("RemoveNodeFromVertList");
-	};
+			}
+
+			// Node's vertex wasn't found, there's a bug.
+			checkLogic(Count>=1);
+		}
+		unguard;
+	}
+};
 
 /*---------------------------------------------------------------------------------------
-   Geometry optimization
+   Geometry optimization.
 ---------------------------------------------------------------------------------------*/
 
 //
@@ -2352,42 +2274,66 @@ void RemoveNodeFromVertList (FPointVertList *PointVerts, INDEX iNode)
 //
 // Maintains node-vertex list, if not NULL.
 //
-void AddPointToNode (IModel *ModelInfo, FPointVertList *PointVerts,
-	INDEX iNode, INDEX VertexNumber, INDEX pVertex)
-	{
-	GUARD;
+void AddPointToNode
+(
+	IModel			*ModelInfo,
+	FPointVertList	*PointVerts,
+	INDEX			iNode, 
+	INDEX			VertexNumber, 
+	INDEX			pVertex 
+)
+{
+	guard(AddPointToNode);
+
 	FBspNode	*Node 	  = &ModelInfo->BspNodes [iNode];
 	FBspSurf	*Poly 	  = &ModelInfo->BspSurfs [Node->iSurf];
 	FVertPool	*VertPool = &ModelInfo->VertPool [Node->iVertPool];
 	FVertPool	*NewVertPool;
-	BYTE		i;
-	//
-	if ((Node->NumVertices+1) >= FBspNode::MAX_NODE_VERTICES) return; // Just refuse
-	//
-	// Make sure vertex pool is big enough:
-	//
-	if ((ModelInfo->NumVertPool + (int)(Node->NumVertices+1)) >= ModelInfo->MaxVertPool) appError ("AddPointToNode: Vertex pool overflow");
-	//
-	// Remove node from vertex list, since vertex numbers will be reordered:
-	//
-	if (PointVerts != NULL) RemoveNodeFromVertList (PointVerts,iNode);
-	//
-	Node->iVertPool 			= ModelInfo->NumVertPool;
-	NewVertPool     			= &ModelInfo->VertPool [Node->iVertPool];
-	//
-	for (i=0; i<VertexNumber; i++) 					NewVertPool[i]		= VertPool[i];
-	for (i=VertexNumber; i<Node->NumVertices; i++)	NewVertPool[i+1]	= VertPool[i];
-	//
+
+	if( (Node->NumVertices+1) >= FBspNode::MAX_NODE_VERTICES )
+	{
+		// Just refuse to add point: This is a non-fatal problem.
+		debugf(LOG_Bsp,"Node side limit reached");
+		return;
+	}
+
+	// Make sure vertex pool is big enough.
+	if( (ModelInfo->NumVertPool + (int)(Node->NumVertices+1)) >= ModelInfo->MaxVertPool )
+	{
+		appError("Vertex pool overflow");
+	}
+
+	// Remove node from vertex list, since vertex numbers will be reordered.
+	if( PointVerts )
+		PointVerts->RemoveNode( iNode );
+
+	Node->iVertPool	= ModelInfo->NumVertPool;
+	NewVertPool		= &ModelInfo->VertPool[Node->iVertPool];
+
+	// Make sure this node doesn't already contain the vertex.
+	for( INDEX i=0; i<Node->NumVertices; i++ )
+		checkLogic(VertPool[i].pVertex!=pVertex);
+	
+	// Copy the old vertex pool to the new one.
+	for( i=0; i<VertexNumber; i++ )
+		NewVertPool[i] = VertPool[i];
+	
+	for( i=VertexNumber; i<Node->NumVertices; i++ )
+		NewVertPool[i+1]	= VertPool[i];
+
+	// Add the new point to the new vertex pool.
 	NewVertPool[VertexNumber].pVertex = pVertex;
 	NewVertPool[VertexNumber].iSide   = INDEX_NONE;
-	//
+
 	Node->NumVertices++;
 	ModelInfo->NumVertPool += Node->NumVertices;
-	//
-	if (PointVerts != NULL) AddNodeToVertList (PointVerts,iNode);		
-	//
-	UNGUARD("AddPointToNode");
-	};
+
+	// Update the point-vertex list.
+	if( PointVerts )
+		PointVerts->AddNode( iNode );
+
+	unguard;
+}
 
 //
 // Add a point to all sides of polygons in which the side intersects with
@@ -2395,374 +2341,372 @@ void AddPointToNode (IModel *ModelInfo, FPointVertList *PointVerts,
 // as this side.  pVertex is the index of the point to handle, and
 // ReferenceVertex defines the direction of this side.
 //
-void DistributePoint (IModel *ModelInfo, FPointVertList *PointVerts,	
-	INDEX iNode, INDEX pVertex)
-	{
-	GUARD;
+int DistributePoint
+(
+	IModel			*ModelInfo,
+	FPointVertList	*PointVerts,	
+	INDEX			iNode,
+	INDEX			pVertex
+)
+{
+	guard(DistributePoint);
+
 	FBspNode		*Node 		= &ModelInfo->BspNodes [iNode];
-	FBspSurf		*Poly 		= &ModelInfo->BspSurfs [Node->iSurf];
 	FVector			*FPoints	= ModelInfo->FPoints;
 	FVector			*FVectors	= ModelInfo->FVectors;
 	FVertPool		*VertPool;
 	FVector			Side,SidePlaneNormal,MidPoint,MidDistVect;
-	FLOAT			Dist,Size;
-	INDEX			iFront,iBack;
-	BYTE			i,j;
-	int				FoundSide,SkippedColinear;
-	//
-	// Make a local copy of iFront and iBack because Node may change within the routine:
-	//
-	iFront = Node->iFront;
-	iBack  = Node->iBack;
-	//
-	Dist = FPointPlaneDist (FPoints [pVertex],FPoints [Poly->pBase],FVectors [Poly->vNormal]);
-	//
-	if (Dist < -THRESH_OPTGEOM_COPLANAR) // Back
-		{
-		if (iBack != INDEX_NONE) DistributePoint (ModelInfo,PointVerts,iBack,pVertex);
-		}
-	else if (Dist >= THRESH_OPTGEOM_COPLANAR) // Front
-		{
-		if (iFront != INDEX_NONE) DistributePoint (ModelInfo,PointVerts,iFront,pVertex);
-		}
-	else // Coplanar
-		{
-		//
+	FLOAT			Size;
+	int				FoundSide,SkippedColinear,SkippedInside;
+	int				Count = 0;
+
+	// Make a local copy of iFront and iBack because Node may change within the routine.
+	INDEX iFront = Node->iFront;
+	INDEX iBack  = Node->iBack;
+
+	FLOAT Dist = Node->Plane.PlaneDot(FPoints[pVertex]);
+
+	if( Dist < -THRESH_OPTGEOM_COPLANAR )
+	{
+		// Back.
+		if( iBack != INDEX_NONE )
+			Count += DistributePoint( ModelInfo, PointVerts, iBack, pVertex );
+	}
+	else if( Dist >= THRESH_OPTGEOM_COPLANAR )
+	{
+		// Front.
+		if (iFront != INDEX_NONE)
+			Count += DistributePoint( ModelInfo, PointVerts, iFront, pVertex );
+	}
+	else
+	{
 		// This point is coplanar with this node, so check point for intersection with
-		// this node's sides, then loop with its coplanars:
-		//
-		while (iNode != INDEX_NONE)
-			{
+		// this node's sides, then loop with its coplanars.
+		while( iNode != INDEX_NONE )
+		{
 			Node 		= &ModelInfo->BspNodes [iNode];
 			VertPool	= &ModelInfo->VertPool [Node->iVertPool];
-			// Normal may be opposite coplanar parents' normal
-			Poly 		= &ModelInfo->BspSurfs [Node->iSurf];
-			//
-			// Skip this polygon if it already contains the point in question:
-			//
-			for (i=0; i<Node->NumVertices; i++) if (VertPool[i].pVertex==pVertex) goto Skip;
-			//
+
+			// Skip this node if it already contains the point in question.
+			for( INDEX i=0; i<Node->NumVertices; i++ )
+				if( VertPool[i].pVertex==pVertex )
+					goto Skip;
+
 			// Loop through all sides and see if (A) side is colinear with point, and
 			// (B) point falls within inside of this side.
-			//
+
 			FoundSide       = -1;
 			SkippedColinear = 0;
-			//
-			for (i=0; i<Node->NumVertices; i++)
-				{
-				j = (i>0) ? (i-1) : (Node->NumVertices-1);
-				//
-				// Create cutting plane perpendicular to both this side and the polygon's normal:
-				//
-				if (VertPool[i].pVertex==VertPool[j].pVertex) appError("Duplicate vertex");
-				//
-				Side = FPoints [VertPool[i].pVertex] - FPoints [VertPool[j].pVertex];
-				SidePlaneNormal = Side ^ FVectors [Poly->vNormal];
-				//
+			SkippedInside   = 0;
+
+			for( i=0; i<Node->NumVertices; i++ )
+			{
+				INDEX j = (i>0) ? (i-1) : (Node->NumVertices-1);
+
+				// Create cutting plane perpendicular to both this side and the polygon's normal.
+				Side            = FPoints [VertPool[i].pVertex] - FPoints [VertPool[j].pVertex];
+				SidePlaneNormal = Side ^ Node->Plane;
+
 				Size = SidePlaneNormal.Size();
-				if (Size<0.00001)
-					{
-					#ifdef _DEBUG
-						Poly->PolyFlags |= PF_Selected;
-					#endif
-					//debugf(LOG_Bsp,"Normalization error %f",Size);
-					goto Skip;
-					};
-				SidePlaneNormal /= Size;
-				//
-				Dist = FPointPlaneDist
-					(
-					FPoints [pVertex],
-					FPoints [VertPool[i].pVertex],
-					SidePlaneNormal
-					);
-				if (Dist >= THRESH_OPTGEOM_COSIDAL)
-					{
-					goto Skip; // Point is outside polygon, can't possibly fall on a side
-					}
-				else if (Dist > -THRESH_OPTGEOM_COSIDAL)
-					{
-					//
-					// This point we're adding falls on this line.
-					//
-					// Verify that it falls within this side; though it's colinear
-					// it may be out of the bounds of the line's endpoints if this side
-					// is colinear with an adjacent side.
-					//
-					// Do this by checking distance from point to side's midpoint and
-					// comparing with the side's half-length.
-					//
-					MidPoint    = (FPoints [VertPool[i].pVertex] + FPoints [VertPool[j].pVertex])*0.5;
-					MidDistVect = FPoints[pVertex] - MidPoint;
-					//
-					if (MidDistVect.SizeSquared() <= (0.5*0.5*Side.SizeSquared())) FoundSide = i;
-					else SkippedColinear=1;
-					}
-				else {}; //	Point is inside polygon, so continue.
-				};
-			if (FoundSide >= 0)
+				if( Size>0.00001 )
 				{
-				//
+					// Points aren't coincedent.
+					Dist = ((FPoints[pVertex]-FPoints[VertPool[i].pVertex]) | SidePlaneNormal)/Size;
+
+					if( Dist >= THRESH_OPTGEOM_COSIDAL )
+					{
+						// Point is outside polygon, can't possibly fall on a side.
+						goto Skip;
+					}
+					else if( Dist > -THRESH_OPTGEOM_COSIDAL )
+					{
+						// This point we're adding falls on this line.
+						//
+						// Verify that it falls within this side; though it's colinear
+						// it may be out of the bounds of the line's endpoints if this side
+						// is colinear with an adjacent side.
+						//
+						// Do this by checking distance from point to side's midpoint and
+						// comparing with the side's half-length.
+
+						MidPoint    = (FPoints [VertPool[i].pVertex] + FPoints [VertPool[j].pVertex])*0.5;
+						MidDistVect = FPoints[pVertex] - MidPoint;
+
+						if( MidDistVect.SizeSquared() <= Square(0.501)*Side.SizeSquared() )
+						{
+							FoundSide = i;
+						}
+						else
+						{
+							SkippedColinear = 1;
+						}
+					}
+					else
+					{
+						// Point is inside polygon, so continue checking.
+						SkippedInside = 1;
+					}
+				}
+				else
+				{
+					debugf(LOG_Bsp,"Found tiny side");
+					//Poly->PolyFlags |= PF_Selected;
+				}
+			}
+			if( FoundSide >= 0 )
+			{
 				// AddPointToNode will reorder the vertices in this node.  This is okay
 				// because it's called outside of the vertex loop.
-				//
 				AddPointToNode (ModelInfo,PointVerts,iNode,FoundSide,pVertex);
-				}
-			else if (SkippedColinear)
-				{
-				//
+				Count++;
+			}
+			else if( SkippedColinear )
+			{
 				// This happens occasionally because of the fuzzy Dist comparison.  It is
 				// not a sign of a problem when the vertex being distributed is colinear
 				// with one of this polygon's sides, but slightly outside of this polygon.
-				//
-				//debug(LOG_Bsp,"Skipped colinear");
+
+				debug(LOG_Bsp,"Skipped colinear");
 				//Poly->PolyFlags |= PF_Selected;
-				}
-			else {}; // Point is on interior of polygon
-			//
-			// Go to next coplanar node:
-			//
+			}
+			else if( SkippedInside )
+			{
+				// Point is on interior of polygon.
+				debug(LOG_Bsp,"Skipped interior");
+				//Poly->PolyFlags |= PF_Selected;
+			}
+
+			// Go to next coplanar node.
 			Skip:
 			iNode = Node->iPlane;
-			};
-		//
+		}
+
 		// Now recurse with both front and back.  Since the point is coplanar with this
 		// plane, it may also be coplanar with planes in either front (or back). (This is
 		// true with points and lines, but not planes).
-		//
-		if (iBack  != INDEX_NONE) DistributePoint (ModelInfo,PointVerts,iBack, pVertex);
-		if (iFront != INDEX_NONE) DistributePoint (ModelInfo,PointVerts,iFront,pVertex);
-		};
-	UNGUARD("DistributePoint");
-	};
+
+		if (iBack  != INDEX_NONE) Count += DistributePoint (ModelInfo,PointVerts,iBack, pVertex);
+		if (iFront != INDEX_NONE) Count += DistributePoint (ModelInfo,PointVerts,iFront,pVertex);
+	}
+	return Count;
+	unguard;
+}
+
+//
+// Merge points that are near.
+//
+void MergeNearPoints( IModel *Model, FLOAT Dist )
+{
+	guard(Heal);
+	INDEX *PointRemap = (INDEX *)GMem.Get(Model->NumPoints * sizeof(INDEX));
+	int Merged=0,Collapsed=0;
+
+	// Find nearer point for all points.
+	for( INDEX i=0; i<Model->NumPoints; i++ )
+	{
+		PointRemap[i] = i;
+		FVector *Point = &Model->FPoints[i];
+		for( INDEX j=0; j<i; j++ )
+		{
+			FVector *TestPoint = &Model->FPoints[j];
+			if( (*TestPoint-*Point).SizeSquared() < Dist*Dist )
+			{
+				PointRemap[i] = j;
+				Merged++;
+				break;
+			}
+		}
+	}
+
+	// Remap VertPool.
+	for( i=0; i<Model->NumVertPool; i++ )
+		Model->VertPool[i].pVertex = PointRemap[Model->VertPool[i].pVertex];
+
+	// Remap Surfs.
+	for( i=0; i<Model->NumBspSurfs; i++ )
+		Model->BspSurfs[i].pBase = PointRemap[Model->BspSurfs[i].pBase];
+
+	// Fix nodes.
+	for( i=0; i<Model->NumBspNodes; i++ )
+	{
+		FBspNode  *Node = &Model->BspNodes[i];
+		FVertPool *Pool = &Model->VertPool[Node->iVertPool];
+		
+		int k=0;
+		for( int j=0; j<Node->NumVertices; j++ )
+		{
+			FVertPool *A = &Pool[j];
+			FVertPool *B = &Pool[j ? j-1 : Node->NumVertices-1];
+			
+			if( A->pVertex != B->pVertex )
+				Pool[k++]=Pool[j];
+		}
+		Node->NumVertices = k>=3 ? k : 0;
+		if(k<3) Collapsed++;
+	}
+
+	// Success.
+	debugf("MergeNearPoints merged %i/%i, collapsed %i",Merged,Model->NumPoints,Collapsed);
+	GMem.Release(PointRemap);
+	unguard;
+}
 
 //
 // Optimize a level's Bsp, eliminating T-joints where possible, and building side
 // links.  This does not always do a 100% perfect job, mainly due to imperfect 
 // levels, however it should never fail or return incorrect results.
 //
-void FEditor::bspOptGeom (UModel *Model)
-	{
-	GUARD;
-	IModel				ModelInfo;
-	FPointVertList		PointVerts;
-	FBspNode			*Node,*OtherNode;
-	FVertPool			*VertPool,*OtherVertPool;
-	INDEX				iNode,iOtherNode;
-	BYTE				ThisVert,PrevVert,OtherVert;
-	int					i,j,Delta;
-	int					TeesFound;
-	//
+void FGlobalEditor::bspOptGeom(UModel *Model)
+{
+	guard(FGlobalEditor::bspOptGeom);
+	IModel ModelInfo;
+	FPointVertList PointVerts;
+
 	debug (LOG_Bsp,"BspOptGeom begin");
-	//
+
 	Model->Lock				(&ModelInfo,LOCK_NoTrans);
-	AllocPointVertList 		(&ModelInfo,&PointVerts);
-	AddAllNodesToVertList	(&PointVerts);
-	//
+	//MergeNearPoints		(&ModelInfo,0.5);
+	bspRefresh				(&ModelInfo,1);
+	PointVerts.Alloc		(&ModelInfo);
+	PointVerts.AddAllNodes	();
+
+	// First four entries are reserved for view-clipped sides.
 	ModelInfo.NumSharedSides=4;
-	for (i=0; i<ModelInfo.NumVertPool; i++) ModelInfo.VertPool[i].iSide=INDEX_NONE;
-	//
-	TeesFound = 0;
-	//
+	
+	// Mark all sides as unlinked.
+	for( int i=0; i<ModelInfo.NumVertPool; i++ )
+		ModelInfo.VertPool[i].iSide = INDEX_NONE;
+
+	INT TeesFound = 0, Distributed = 0;
+
 	// Eliminate T-joints on each node by finding all vertices that aren't attached to
 	// two shared sides, then filtering them down through the BSP and adding them to
 	// the sides they belong on.
-	//
-	Node = &ModelInfo.BspNodes[0];
-	for (iNode=0; iNode < ModelInfo.NumBspNodes; iNode++)
+	
+	for( INDEX iNode=0; iNode < ModelInfo.NumBspNodes; iNode++ )
+	{
+		FBspNode *Node = &ModelInfo.BspNodes[iNode];
+		
+		// Loop through all sides (side := line from PrevVert to ThisVert)		
+		FVertPool *VertPool = &ModelInfo.VertPool[Node->iVertPool];
+		for( BYTE ThisVert=0; ThisVert < Node->NumVertices; ThisVert++ )
 		{
-		//
-		// Loop through all sides (side := line from PrevVert to ThisVert)
-		//
-		VertPool = &ModelInfo.VertPool [Node->iVertPool];
-		//
-		for (ThisVert=0; ThisVert < Node->NumVertices; ThisVert++)
-			{
-			PrevVert = (ThisVert>0) ? (ThisVert - 1) : (Node->NumVertices-1);
-			//
+			BYTE PrevVert = (ThisVert>0) ? (ThisVert - 1) : (Node->NumVertices-1);
+
 			// Count number of nodes sharing this side, i.e. number of nodes for
 			// which two adjacent vertices are identical to this side's two vertices.
-			//
-			i = PointVerts.Index[VertPool[ThisVert].pVertex].iNext;
-			while (i != 0)
-				{
-				j = PointVerts.Index [VertPool[PrevVert].pVertex].iNext;
-				while (j != 0)
-					{
-					if ((PointVerts.Pool[i].iNode==PointVerts.Pool[j].iNode) && (PointVerts.Pool[i].iNode != iNode))
-						{						
+			for( FPointVert *PV1 = PointVerts.Index[VertPool[ThisVert].pVertex]; PV1; PV1=PV1->Next )
+				for( FPointVert *PV2 = PointVerts.Index[VertPool[PrevVert].pVertex]; PV2; PV2=PV2->Next )
+					if( PV1->iNode==PV2->iNode && PV1->iNode!=iNode )
 						goto SkipIt;
-						};
-					j = PointVerts.Pool[j].iNext;
-					};
-				i = PointVerts.Pool[i].iNext;
-				};
-			//
+
 			// Didn't find another node that shares our two vertices; must add each
 			// vertex to all polygons where the vertex lies on the polygon's side.
 			// DistributePoint will not affect the current node but may change others
 			// and may increase the number of nodes in the Bsp.
-			//
+
 			TeesFound++;
-			DistributePoint (&ModelInfo,&PointVerts,0,VertPool[ThisVert].pVertex);
-			DistributePoint (&ModelInfo,&PointVerts,0,VertPool[PrevVert].pVertex);
-			//
-			SkipIt:; // Go to next vertex
-			};		
-		Node++;
-		};
-	//
+			Distributed = 0;
+			Distributed += DistributePoint( &ModelInfo, &PointVerts, 0, VertPool[ThisVert].pVertex );
+			Distributed += DistributePoint( &ModelInfo, &PointVerts, 0, VertPool[PrevVert].pVertex );
+			//if (Distributed != 1) debugf("Dist %i",Distributed);
+			SkipIt:;
+		}
+	}
+
 	// Build side links
 	// Definition of side: Side (i) links node vertex (i) to vertex ((i+1)%n)
-	//
 	debug(LOG_Bsp,"BspOptGeom building sidelinks");
-	//
-	FreePointVertList 		(&PointVerts);
-	AllocPointVertList 		(&ModelInfo,&PointVerts);
-	AddAllNodesToVertList	(&PointVerts);
-	//
-	Node = &ModelInfo.BspNodes[0];
-	for (iNode=0; iNode < ModelInfo.NumBspNodes; iNode++)
+
+	PointVerts.Free			();
+	PointVerts.Alloc		(&ModelInfo);
+	PointVerts.AddAllNodes	();
+
+	for( iNode=0; iNode < ModelInfo.NumBspNodes; iNode++ )
+	{
+		FBspNode *Node = &ModelInfo.BspNodes[iNode];
+		
+		FVertPool *VertPool = &ModelInfo.VertPool [Node->iVertPool];
+		for( BYTE ThisVert=0; ThisVert < Node->NumVertices; ThisVert++ )
 		{
-		VertPool = &ModelInfo.VertPool [Node->iVertPool];
-		for (ThisVert=0; ThisVert < Node->NumVertices; ThisVert++)
+			if( VertPool[ThisVert].iSide == INDEX_NONE )
 			{
-			if (VertPool[ThisVert].iSide==INDEX_NONE)
+				BYTE PrevVert = (ThisVert>0) ? (ThisVert - 1) : (Node->NumVertices-1);
+
+				// See if this node links to another one.
+				for( FPointVert *PV1=PointVerts.Index[VertPool[ThisVert].pVertex]; PV1; PV1=PV1->Next )
 				{
-				PrevVert = (ThisVert>0) ? (ThisVert - 1) : (Node->NumVertices-1);
-				//
-				// See if this node links to another one:
-				//
-				i = PointVerts.Index[VertPool[ThisVert].pVertex].iNext;
-				while (i != 0)
+					for( FPointVert *PV2=PointVerts.Index[VertPool[PrevVert].pVertex]; PV2; PV2=PV2->Next )
 					{
-					j = PointVerts.Index [VertPool[PrevVert].pVertex].iNext;
-					while (j != 0)
+						if( PV1->iNode==PV2->iNode && PV1->iNode!=iNode )
 						{
-						if ((PointVerts.Pool[i].iNode==PointVerts.Pool[j].iNode) && (PointVerts.Pool[i].iNode != iNode))
-							{
-							//
 							// Make sure that the other node's two vertices are adjacent and
-							// ordered opposite this node's vertices:
-							//
-							iOtherNode    = PointVerts.Pool     [j].iNode;
-							OtherNode	  = &ModelInfo.BspNodes [iOtherNode];
-							OtherVertPool = &ModelInfo.VertPool [OtherNode->iVertPool];
-							//
-							Delta = 
-								(OtherNode->NumVertices + PointVerts.Pool[j].nVertex - 
-								PointVerts.Pool[i].nVertex) % OtherNode->NumVertices;
-							if (Delta==1)
-								{
-								//
+							// ordered opposite this node's vertices.
+
+							INDEX		iOtherNode		= PV2->iNode;
+							FBspNode	*OtherNode		= &ModelInfo.BspNodes [iOtherNode];
+							FVertPool	*OtherVertPool	= &ModelInfo.VertPool [OtherNode->iVertPool];
+
+							INT Delta = 
+								(OtherNode->NumVertices + PV2->nVertex - PV1->nVertex) % 
+								OtherNode->NumVertices;
+
+							if( Delta==1 )
+							{
 								// Side is properly linked!
-								//
-								OtherVert = PointVerts.Pool[j].nVertex;
-								if (OtherVertPool[OtherVert].iSide==INDEX_NONE)
-									{
+								INDEX OtherVert = PV2->nVertex;
+								if( OtherVertPool[OtherVert].iSide==INDEX_NONE )
+								{
 									// Create a new 'shared side' for these two sides:
 									VertPool      [ThisVert ].iSide = ModelInfo.NumSharedSides;
 									OtherVertPool [OtherVert].iSide = ModelInfo.NumSharedSides;
 									ModelInfo.NumSharedSides++;
-									//
-									if (VertPool[(ThisVert+Node->NumVertices-1)%Node->NumVertices].pVertex!=OtherVertPool[OtherVert].pVertex) appError("Logic error 1");
-									if (VertPool[ThisVert].pVertex!=OtherVertPool[(OtherVert+OtherNode->NumVertices-1)%OtherNode->NumVertices].pVertex) appError("Logic error 2");
-									}
+
+									// Validation check.
+									checkLogic(VertPool[(ThisVert+Node->NumVertices-1)%Node->NumVertices].pVertex==OtherVertPool[OtherVert].pVertex);
+									checkLogic(VertPool[ThisVert].pVertex==OtherVertPool[(OtherVert+OtherNode->NumVertices-1)%OtherNode->NumVertices].pVertex);
+								}
 								else
-									{
+								{
 									// This side is shared by >2 polys (OK, can happen in valid maps)
-									//VertPool[ThisVert].iSide = OtherVertPool[OtherVert].iSide;
-									};
+									//debugf(LOG_Bsp,"Multiply shared side");
+									VertPool[ThisVert].iSide = OtherVertPool[OtherVert].iSide;
+								}
 								goto SkipSide;
-								};
-							};
-						j = PointVerts.Pool[j].iNext;
-						};
-					i = PointVerts.Pool[i].iNext;
-					};
-				//This node doesn't have correct side linking
+							}
+						}
+					}
+				}
+				// This node doesn't have correct side linking
 				//ModelInfo.BspSurfs[Node->iSurf].PolyFlags |= PF_Selected;
-				};
-			SkipSide:; // Go to next vertex
-			};		
-		Node++;
-		};
-	i=0; j=0;
-	for (iNode=0; iNode < ModelInfo.NumBspNodes; iNode++)
+				debug(LOG_Bsp,"Failed to link side");
+				//ModelInfo.BspSurfs[Node->iSurf].PolyFlags |= PF_Selected;
+			}
+			// Go to next side.
+			SkipSide:;
+		}
+	}
+	i=0; int j=0;
+	for( iNode=0; iNode < ModelInfo.NumBspNodes; iNode++ )
+	{
+		FBspNode  *Node     = &ModelInfo.BspNodes [iNode];
+		FVertPool *VertPool = &ModelInfo.VertPool [Node->iVertPool];
+		
+		for( BYTE ThisVert=0; ThisVert < Node->NumVertices; ThisVert++ )
 		{
-		Node     = &ModelInfo.BspNodes [iNode];
-		VertPool = &ModelInfo.VertPool [Node->iVertPool];
-		for (ThisVert=0; ThisVert < Node->NumVertices; ThisVert++)
-			{
 			i++;
 			if (VertPool[ThisVert].iSide!=INDEX_NONE) j++;
-			};
-		};
-	//
-	// Done!
-	//
+		}
+	}
+
+	// Done.
 	debug  (LOG_Bsp,"BspOptGeom end");
 	debugf (LOG_Bsp,"Processed %i T-points, linked: %i/%i sides",TeesFound,j,i);
-	//
-	FreePointVertList (&PointVerts);
-	Model->Unlock     (&ModelInfo);
-	UNGUARD("BspOptGeom");
-	};
 
-/*---------------------------------------------------------------------------------------
-   Bsp unique planes
----------------------------------------------------------------------------------------*/
-
-//
-// Go through Bsp and codense all iUniquePlanes, eliminating redundent
-// planes.
-//
-void FEditor::bspBuildUniquePlanes(UModel *Model)
-	{
-	GUARD;
-	IModel	ModelInfo;
-	Model->Lock(&ModelInfo,LOCK_NoTrans);
-	//
-	FVector		*TempPlanes = (FVector *)GMem.Get(ModelInfo.NumBspNodes * sizeof(FVector));
-	FBspNode	*Node		= &ModelInfo.BspNodes[0];
-	FVector		*V;
-	//
-	debugf(LOG_Info,"BuildNodeUniquePlanes begin",ModelInfo.Model->Name);
-	//
-	ModelInfo.NumUniquePlanes=0;
-	for (int i=0; i<ModelInfo.NumBspNodes; i++)
-		{
-		FBspSurf *Poly   = &ModelInfo.BspSurfs[Node->iSurf];
-		FVector  *Base   = &ModelInfo.FPoints [Poly->pBase];
-		FVector  *Normal = &ModelInfo.FVectors[Poly->vNormal];
-		//
-		FVector  Temp    = *Normal;
-		Temp.W = *Base | *Normal;
-		//
-		V		= &TempPlanes[0];
-		for (int j=0; j<ModelInfo.NumUniquePlanes; j++)
-			{
-			if ((OurAbs(V->X-Temp.X)+OurAbs(V->Y-Temp.Y)+OurAbs(V->Z-Temp.Z)+OurAbs(V->W-Temp.W))<0.01)
-				{
-				Node->iUniquePlane  = j;
-				Node->NodeFlags    |= NF_UniquePlane;
-				goto Next;
-				};
-			V++;
-			};
-		*V = Temp; 
-		Node->iUniquePlane  = ModelInfo.NumUniquePlanes++;
-		Node->NodeFlags    |= NF_UniquePlane;
-		//
-		Next:;
-		Node++;
-		};
-	GMem.Release(TempPlanes);
-	debugf(LOG_Info,"BuildNodeUniquePlanes end, n=%i/%i, p=%i",ModelInfo.NumUniquePlanes,ModelInfo.NumBspNodes,ModelInfo.NumPoints);
-	Model->Unlock(&ModelInfo);
-	//
-	UNGUARD("BuildNodeUniquePlanes");
-	};
+	PointVerts.Free	();
+	Model->Unlock   (&ModelInfo);
+	unguard;
+}
 
 /*---------------------------------------------------------------------------------------
    Bsp point/vector refreshing
@@ -2784,17 +2728,16 @@ void TagReferencedNodes (IModel *ModelInfo,INDEX *NodeRef,INDEX *PolyRef,INDEX i
 // If the Bsp's point and vector tables are nearly full, reorder them and delete
 // unused ones:
 //
-void FEditor::bspRefresh (IModel *ModelInfo,int ForceRefresh)
+void FGlobalEditor::bspRefresh (IModel *ModelInfo,int ForceRefresh)
 	{
 	GUARD;
 	FBspNode	*Node;
 	FBspSurf	*Poly;
 	FVertPool	*VertPool;
-	INDEX		*VectorRef,*PointRef,*NodeRef,*PolyRef;
+	INDEX		*VectorRef,*PointRef,*NodeRef,*PolyRef,i,n;
 	BYTE		B;
-	INDEX		i,n;
 	//
-	// Remove unreferenced Bsp polys:
+	// Remove unreferenced Bsp surfs:
 	//
 	if ((((int)ModelInfo->NumVectors *8) >= ((int)ModelInfo->MaxVectors *7)) ||
 		(((int)ModelInfo->NumPoints  *8) >= ((int)ModelInfo->MaxPoints  *7)) ||
@@ -2810,7 +2753,7 @@ void FEditor::bspRefresh (IModel *ModelInfo,int ForceRefresh)
 		//
 		if (ForceRefresh==2) memset(PolyRef,0,ModelInfo->NumBspSurfs * sizeof (INDEX)); // Don't remap surfs
 		//
-		// Remap Bsp nodes and polys:
+		// Remap Bsp nodes and surfs:
 		//
 		n=0; for (i=0; i<ModelInfo->NumBspSurfs; i++) if (PolyRef[i]!=INDEX_NONE)
 			{

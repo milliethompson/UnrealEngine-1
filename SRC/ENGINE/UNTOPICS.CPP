@@ -14,7 +14,7 @@
 #include "Unreal.h"
 
 /*-------------------------------------------------------------------------------
-	FTopicTable init/exit/register
+	FTopicTable init/exit/register.
 -------------------------------------------------------------------------------*/
 
 //
@@ -22,86 +22,110 @@
 // Only initializes on the very first call to it, because the topic
 // table init function may be called several times during startup.
 //
-void FGlobalTopicTable::Init (void)
-	{
-	GUARD;
+void FGlobalTopicTable::Init()
+{
+	guard(FGlobalTopicTable::Init);
+
 	static int Started=0;
-	if (!Started)
-		{
+	if( !Started )
+	{
 		Started			= 1;
 		FirstHandler	= NULL;
-		};
-	UNGUARD("FGlobalTopicTable::Init");
-	};
+	}
+	unguard;
+}
 
 //
 // Shut down the topic table by clearing freeing its linked list.
 //
-void FGlobalTopicTable::Exit (void)
-	{
-	GUARD;
+void FGlobalTopicTable::Exit()
+{
+	guard(FGlobalTopicTable::Exit);
 	FirstHandler = NULL;
-	UNGUARD("FGlobalTopicTable::Exit");
-	};
+	unguard;
+}
 
 //
-// WARNING! This routine is called in the resource type constructors before
+// Register a topic.
+//
+//warning: This routine is called in the resource type constructors before
 // anything has been initialized and before the code has actually begun
 // executing.  Anything done here must be 100% safe independent of startup order.
 //
 void FGlobalTopicTable::Register(const char *TopicName,FTopicHandler *Handler)
-	{
+{
 	static int Started=0;
-	if (!Started)
-		{
+	if( !Started )
+	{
 		Init();
 		Started = 1;
-		};
-	if (TopicName && *TopicName && (strlen(TopicName)<NAME_SIZE))
-		{
-		//
-		// Create a new TopicInfo entry and insert it in the linked list of topics
-		//
+	}
+	if( TopicName && *TopicName && (strlen(TopicName)<NAME_SIZE) )
+	{
+		// Create a new TopicInfo entry and insert it in the linked list of topics.
 		strcpy(Handler->TopicName,TopicName);
 		Handler->Next			= FirstHandler;
 		FirstHandler			= Handler;
-		};
-	};
+	}
+}
 
 /*-------------------------------------------------------------------------------
-	FTopicTable Find/Get/Set
+	FTopicTable Find/Get/Set.
 -------------------------------------------------------------------------------*/
 
 //
 // Find a named topic in the topic table, and return a pointer
 // to its handler, or NULL if not found.
 //
-FTopicHandler *FGlobalTopicTable::Find (const char *TopicName)
-	{
+FTopicHandler *FGlobalTopicTable::Find(const char *TopicName)
+{
+	guard(FGlobalTopicTable::Find);
+
 	FTopicHandler *Handler = FirstHandler;
-	while (Handler)
-		{
+	while( Handler )
+	{
 		if (stricmp(TopicName,Handler->TopicName)==0) return Handler;
 		Handler = Handler ->Next;
-		};
+	}
 	return NULL;
-	};
 
-void FGlobalTopicTable::Get (ULevel *Level, const char *Topic, const char *Item, char *Data)
-	{
-	*Data = 0; // Handlers expect data to default to an empty response
-	FTopicHandler *Handler = Find(Topic);
-	if (!Level) Level = GServer.Levels->Element(0);
-	if (Handler) Handler->Get(Level,Topic,Item,Data);
-	};
+	unguard;
+}
 
-void FGlobalTopicTable::Set (ULevel *Level, const char *Topic, const char *Item, const char *Value)
-	{
+void FGlobalTopicTable::Get(ULevel *Level, const char *Topic, const char *Item, char *Data)
+{
+	guard(FGlobalTopicTable::Get);
+
+	// Handlers expect data to default to an empty response.
+	*Data = 0;
+
+	// Try to find it.
 	FTopicHandler *Handler = Find(Topic);
-	if (!Level) Level = GServer.Levels->Element(0);
-	if (Handler) Handler->Set(Level,Topic,Item,Value);
-	};
+
+	if (!Level)
+		Level = GServer.Levels->Element(0);
+
+	if (Handler)
+		Handler->Get(Level,Topic,Item,Data);
+
+	unguard;
+}
+
+void FGlobalTopicTable::Set(ULevel *Level, const char *Topic, const char *Item, const char *Value)
+{
+	guard(FGlobalTopicTable::Set);
+
+	FTopicHandler *Handler = Find(Topic);
+
+	if (!Level) 
+		Level = GServer.Levels->Element(0);
+
+	if (Handler) 
+		Handler->Set(Level,Topic,Item,Value);
+
+	unguard;
+}
 
 /*-------------------------------------------------------------------------------
-	The End
+	The End.
 -------------------------------------------------------------------------------*/

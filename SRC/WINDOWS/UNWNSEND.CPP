@@ -1,9 +1,9 @@
-// InpSenDi.cpp : implementation file
 /*
 ==============================================================================
+UnWnSend.cpp: Input sensitivity dialog
 
 Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
-Compiled with Visual C++ 4.0, Calling method=__fastcall
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
     This is the CDialog class for handling the Unreal input sensitivity dialog.
@@ -32,9 +32,10 @@ static char THIS_FILE[] = __FILE__;
 // CDialogInputSensitivity dialog
 
 
-CDialogInputSensitivity::CDialogInputSensitivity(CWnd* pParent /*=NULL*/)
+CDialogInputSensitivity::CDialogInputSensitivity(UCamera * Camera, CWnd* pParent /*=NULL*/)
 	: CDialog(CDialogInputSensitivity::IDD, pParent)
 {
+    this->Camera = Camera;
 	//{{AFX_DATA_INIT(CDialogInputSensitivity)
 	AnalogThreshold = 0;
 	DigitalThreshold = 0;
@@ -45,9 +46,11 @@ BOOL CDialogInputSensitivity::OnInitDialog()
 {
     CDialog::OnInitDialog();
     ChangesWereSaved = FALSE;
-    CurrentMovement = FInput::M_None;
+    CurrentMovement = FPlatformInput::M_None;
+    Input = Camera->Console->GetInput();
+    PlatformInput = Input->PlatformInput;
 
-    LoadValuesFrom( GInput.MovementsInfo );
+    LoadValuesFrom( Input->MovementsInfo );
 
     // Initialize sliders and spinners:
     {
@@ -66,27 +69,27 @@ BOOL CDialogInputSensitivity::OnInitDialog()
 //----------------------------------------------------------------------------
 //                Arrange the movements
 //----------------------------------------------------------------------------
-void CDialogInputSensitivity::ArrangeMovements(BOOL Merged, FInput::TMovement Selection) 
+void CDialogInputSensitivity::ArrangeMovements(BOOL Merged, FPlatformInput::TMovement Selection) 
 {
     AxesAreMerged = Merged;
     PrepareSymmetryButtons();
     // Initialize movement list
     MovementList.ResetContent();
-    for( int Movement_ = 1; Movement_ < FInput::MovementCount; ++Movement_ )
+    for( int Movement_ = 1; Movement_ < FPlatformInput::MovementCount; ++Movement_ )
     {
-        const FInput::TMovement Movement = FInput::TMovement(Movement_);
+        const FPlatformInput::TMovement Movement = FPlatformInput::TMovement(Movement_);
         const char * Description = 0; // Leave as 0 if movement is not to be added.
         if( AxesAreMerged )
         {
             // Show only positive axes, but with a neutral description:
-            if( FInput::IsPositive(Movement) )
+            if( PlatformInput->IsPositive(Movement) )
             {
-                Description = FInput::NeutralDescription(Movement);
+                Description = PlatformInput->NeutralDescription(Movement);
             }
         }
         else
         {
-            Description = FInput::Description(Movement);
+            Description = PlatformInput->Description(Movement);
         }
         if( Description != 0 )
         {
@@ -157,11 +160,11 @@ void CDialogInputSensitivity::SetSpeed(FLOAT Value)
 //----------------------------------------------------------------------------
 //        Load values from an array of MovementCount values.
 //----------------------------------------------------------------------------
-void CDialogInputSensitivity::LoadValuesFrom( const FInput::TMovementInfo * Info )
+void CDialogInputSensitivity::LoadValuesFrom( const FPlatformInput::TMovementInfo * Info )
 {
-    for( int Movement_ = 1; Movement_ < FInput::MovementCount; ++Movement_ )
+    for( int Movement_ = 1; Movement_ < FPlatformInput::MovementCount; ++Movement_ )
     {
-        const FInput::TMovement Movement = FInput::TMovement(Movement_);
+        const FPlatformInput::TMovement Movement = FPlatformInput::TMovement(Movement_);
         MovementInfo[Movement] = Info[Movement];
     }
 }
@@ -169,11 +172,11 @@ void CDialogInputSensitivity::LoadValuesFrom( const FInput::TMovementInfo * Info
 //----------------------------------------------------------------------------
 //           Save value into an array of MovementCount values.
 //----------------------------------------------------------------------------
-void CDialogInputSensitivity::SaveValuesInto( FInput::TMovementInfo * Info )
+void CDialogInputSensitivity::SaveValuesInto( FPlatformInput::TMovementInfo * Info )
 {
-    for( int Movement_ = 1; Movement_ < FInput::MovementCount; ++Movement_ )
+    for( int Movement_ = 1; Movement_ < FPlatformInput::MovementCount; ++Movement_ )
     {
-        const FInput::TMovement Movement = FInput::TMovement(Movement_);
+        const FPlatformInput::TMovement Movement = FPlatformInput::TMovement(Movement_);
         Info[Movement] = MovementInfo[Movement];
     }
 }
@@ -186,12 +189,12 @@ void CDialogInputSensitivity::PrepareDialogSettings()
     const int Selection = MovementList.GetCurSel();
     CurrentMovement = // The movement associated with an item is stored in the item's data.
         Selection == LB_ERR 
-    ?   FInput::M_None 
-    :   FInput::TMovement( MovementList.GetItemData(Selection) )
+    ?   FPlatformInput::M_None 
+    :   FPlatformInput::TMovement( MovementList.GetItemData(Selection) )
     ;
     if( CurrentMovement != 0 )
     {
-        const FInput::TSensitivity & Sensitivity = CurrentSensitivity();
+        const FPlatformInput::TSensitivity & Sensitivity = CurrentSensitivity();
         SetAnalogThreshold      ( Sensitivity.AnalogThreshold       );
         SetDigitalThreshold     ( Sensitivity.DigitalThreshold      );
         SetSpeed                ( Sensitivity.Speed                 );
@@ -205,14 +208,14 @@ BOOL CDialogInputSensitivity::RememberDialogSettings()
     BOOL IsOkay = UpdateData(TRUE);
     if( IsOkay && CurrentMovement != 0 )
     {
-        FInput::TSensitivity & Sensitivity = CurrentSensitivity();
+        FPlatformInput::TSensitivity & Sensitivity = CurrentSensitivity();
         Sensitivity.AnalogThreshold         = GetAnalogThreshold      ();
         Sensitivity.DigitalThreshold        = GetDigitalThreshold     ();
         Sensitivity.Speed                   = GetSpeed                ();
         // If the axes are merged, duplicate the settings in the opposite movement.
         if( AxesAreMerged )
         {
-            MovementInfo[ FInput::OppositeMovement(CurrentMovement) ].Sensitivity = Sensitivity;
+            MovementInfo[ PlatformInput->OppositeMovement(CurrentMovement) ].Sensitivity = Sensitivity;
         }
     }
     return IsOkay;
@@ -286,7 +289,7 @@ static BOOL IsSame(FLOAT Value1, FLOAT Value2)
 //                     Compare old and new sensitivity settings
 //----------------------------------------------------------------------------
 // Return TRUE if all the settings are the same (or very close), FALSE otherwise.
-static BOOL IsSame(const FInput::TMovementInfo & Value1, const FInput::TMovementInfo & Value2 )
+static BOOL IsSame(const FPlatformInput::TMovementInfo & Value1, const FPlatformInput::TMovementInfo & Value2 )
 {
     return 
         IsSame( Value1.Sensitivity.AnalogThreshold, Value2.Sensitivity.AnalogThreshold )    
@@ -305,17 +308,17 @@ BOOL CDialogInputSensitivity::Accept()
     {
         // See if any movements have changed...
         BOOL ChangesWereMade = FALSE;
-        for( int Movement_ = 1; !ChangesWereMade && Movement_ < FInput::MovementCount; ++Movement_ )
+        for( int Movement_ = 1; !ChangesWereMade && Movement_ < FPlatformInput::MovementCount; ++Movement_ )
         {
-            const FInput::TMovement Movement = FInput::TMovement(Movement_);
-            if( !IsSame( MovementInfo[Movement], GInput.MovementsInfo[Movement] ) )
+            const FPlatformInput::TMovement Movement = FPlatformInput::TMovement(Movement_);
+            if( !IsSame( MovementInfo[Movement], PlatformInput->MovementsInfo[Movement] ) )
             {
                 ChangesWereMade = TRUE;
             }
         }
         if( ChangesWereMade )
         {
-            SaveValuesInto( GInput.MovementsInfo );
+            SaveValuesInto( PlatformInput->MovementsInfo );
         }
         ChangesWereSaved = ChangesWereMade;
     }
@@ -329,12 +332,12 @@ void CDialogInputSensitivity::OnUseDefaults()
 {
     if( CurrentMovement != 0 )
     {
-        FInput::TMovementInfo Defaults[FInput::MovementCount];
+        FPlatformInput::TMovementInfo Defaults[FPlatformInput::MovementCount];
         memmove( Defaults, MovementInfo, sizeof(Defaults) );
         // Get the default values:
         FKeyValues::TStringList DefaultValues = FConfiguration::GetSection
         (
-            FConfiguration::InputSection
+            Input->SectionName()
         ,   GApp->FactoryProfileFileName()
         );
         FInput::SetValues(DefaultValues,Defaults);
@@ -343,7 +346,7 @@ void CDialogInputSensitivity::OnUseDefaults()
         if( AxesAreMerged )
         {
             // We also restore the opposite movement:
-            const FInput::TMovement Opposite = FInput::OppositeMovement(CurrentMovement);
+            const FPlatformInput::TMovement Opposite = PlatformInput->OppositeMovement(CurrentMovement);
             MovementInfo[Opposite] = Defaults[Opposite];
         }
         ArrangeMovements(AxesAreMerged && AxesAreSymmetrical(), CurrentMovement );
@@ -355,12 +358,12 @@ void CDialogInputSensitivity::OnUseDefaults()
 //----------------------------------------------------------------------------
 void CDialogInputSensitivity::OnUseDefaultsForAll() 
 {
-    FInput::TMovementInfo Defaults[FInput::MovementCount];
+    FPlatformInput::TMovementInfo Defaults[FPlatformInput::MovementCount];
     memmove( Defaults, MovementInfo, sizeof(Defaults) );
     // Get the default values:
     FKeyValues::TStringList DefaultValues = FConfiguration::GetSection
     (
-        FConfiguration::InputSection
+        Input->SectionName()
     ,   GApp->FactoryProfileFileName()
     );
     FInput::SetValues(DefaultValues,Defaults);
@@ -390,10 +393,10 @@ void CDialogInputSensitivity::PrepareSymmetryButtons()
 BOOL CDialogInputSensitivity::AxesAreSymmetrical()
 {
     BOOL IsSymmetrical = TRUE;
-    for( int Movement_ = 1; IsSymmetrical && Movement_ < FInput::MovementCount; ++Movement_ )
+    for( int Movement_ = 1; IsSymmetrical && Movement_ < FPlatformInput::MovementCount; ++Movement_ )
     {
-        const FInput::TMovement Movement = FInput::TMovement(Movement_);
-        const FInput::TMovement OppositeMovement = FInput::OppositeMovement(Movement);
+        const FPlatformInput::TMovement Movement = FPlatformInput::TMovement(Movement_);
+        const FPlatformInput::TMovement OppositeMovement = PlatformInput->OppositeMovement(Movement);
         if( !IsSame( MovementInfo[Movement], MovementInfo[OppositeMovement] ) )
         {
             IsSymmetrical = FALSE;
@@ -409,14 +412,14 @@ void CDialogInputSensitivity::OnMergeAxes()
 {
     if( RememberDialogSettings() )
     {
-        for( int Movement_ = 1; Movement_ < FInput::MovementCount; ++Movement_ )
+        for( int Movement_ = 1; Movement_ < FPlatformInput::MovementCount; ++Movement_ )
         {
-            const FInput::TMovement Movement = FInput::TMovement(Movement_);
-            const FInput::TMovement Opposite = FInput::OppositeMovement(Movement);
+            const FPlatformInput::TMovement Movement = FPlatformInput::TMovement(Movement_);
+            const FPlatformInput::TMovement Opposite = PlatformInput->OppositeMovement(Movement);
             // Average the sensitivity values for the positive/negative axes.
             // We actually do this twice for each pair.
-            FInput::TSensitivity & Info1 = MovementInfo[Movement].Sensitivity;
-            FInput::TSensitivity & Info2 = MovementInfo[Opposite].Sensitivity;
+            FPlatformInput::TSensitivity & Info1 = MovementInfo[Movement].Sensitivity;
+            FPlatformInput::TSensitivity & Info2 = MovementInfo[Opposite].Sensitivity;
             Info1.AnalogThreshold = (Info1.AnalogThreshold + Info2.AnalogThreshold)/2;
             Info1.DigitalThreshold = (Info1.DigitalThreshold + Info2.DigitalThreshold)/2;
             Info1.Speed = (Info1.Speed + Info2.Speed)/2;

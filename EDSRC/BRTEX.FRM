@@ -6,14 +6,14 @@ Begin VB.Form frmTexBrowser
    ClientLeft      =   6825
    ClientTop       =   4905
    ClientWidth     =   2445
-   Height          =   4710
+   Height          =   4665
    Icon            =   "BrTex.frx":0000
    Left            =   6765
    LinkTopic       =   "Form1"
    ScaleHeight     =   4305
    ScaleWidth      =   2445
    ShowInTaskbar   =   0   'False
-   Top             =   4560
+   Top             =   4605
    Width           =   2565
    Begin VB.VScrollBar BrowserScroller 
       Height          =   1650
@@ -37,7 +37,10 @@ Begin VB.Form frmTexBrowser
    Begin VB.ComboBox TexFamily 
       BackColor       =   &H00C0C0C0&
       Height          =   315
+      ItemData        =   "BrTex.frx":030A
       Left            =   60
+      List            =   "BrTex.frx":030C
+      MousePointer    =   1  'Arrow
       Sorted          =   -1  'True
       Style           =   2  'Dropdown List
       TabIndex        =   0
@@ -164,8 +167,8 @@ Begin VB.Form frmTexBrowser
       GroupAllowAllUp =   0   'False
       RoundedCorners  =   0   'False
       BevelWidth      =   1
-      PictureUp       =   "BrTex.frx":030A
-      PictureDn       =   "BrTex.frx":041C
+      PictureUp       =   "BrTex.frx":030E
+      PictureDn       =   "BrTex.frx":0420
    End
    Begin Threed.SSRibbon Tex2 
       Height          =   315
@@ -183,8 +186,8 @@ Begin VB.Form frmTexBrowser
       GroupAllowAllUp =   0   'False
       RoundedCorners  =   0   'False
       BevelWidth      =   1
-      PictureUp       =   "BrTex.frx":0438
-      PictureDn       =   "BrTex.frx":054A
+      PictureUp       =   "BrTex.frx":043C
+      PictureDn       =   "BrTex.frx":054E
    End
    Begin Threed.SSRibbon Tex4 
       Height          =   315
@@ -201,8 +204,8 @@ Begin VB.Form frmTexBrowser
       GroupAllowAllUp =   0   'False
       RoundedCorners  =   0   'False
       BevelWidth      =   1
-      PictureUp       =   "BrTex.frx":0566
-      PictureDn       =   "BrTex.frx":0678
+      PictureUp       =   "BrTex.frx":056A
+      PictureDn       =   "BrTex.frx":067C
    End
    Begin Threed.SSRibbon TexSphere 
       Height          =   315
@@ -219,8 +222,8 @@ Begin VB.Form frmTexBrowser
       GroupNumber     =   2
       RoundedCorners  =   0   'False
       BevelWidth      =   1
-      PictureUp       =   "BrTex.frx":0694
-      PictureDn       =   "BrTex.frx":07A6
+      PictureUp       =   "BrTex.frx":0698
+      PictureDn       =   "BrTex.frx":07AA
    End
    Begin Threed.SSCommand FamPlus 
       Height          =   315
@@ -298,7 +301,7 @@ End Function
 '
 
 Private Sub BroLoad_Click()
-    Dim Fnames As String
+    Dim Fnames As String, Temp As String
     '
     ' Dialog for "Load Texture Family":
     '
@@ -312,9 +315,14 @@ Private Sub BroLoad_Click()
         Screen.MousePointer = 11
         Fnames = Trim(frmDialogs.TexFamLoad.filename)
         While (Fnames <> "")
-            Ed.Server.Exec "TEXTURE LOADFAMILY FILE=" & Quotes(GrabFname(Fnames))
+            Temp = GrabFname(Fnames)
+            Ed.Server.Exec "TEXTURE LOADFAMILY FILE=" & Quotes(Temp)
         Wend
-        RefreshTextureFamily ("")
+        While InStr(Temp, "\")
+            Temp = Mid(Temp, InStr(Temp, "\") + 1)
+        Wend
+        If InStr(Temp, ".") Then Temp = Left(Temp, InStr(Temp, ".") - 1)
+        RefreshTextureFamily (Temp)
         Screen.MousePointer = 0
     End If
 Skip:
@@ -410,7 +418,9 @@ Private Sub BroImport_Click()
     GString = Trim(frmDialogs.TexImport.filename)
     '
     frmTexImport.TexFamily = CurTexFamily()
-    If frmTexImport.TexFamily = "" Then frmTexImport.TexFamily = "Untitled"
+    If frmTexImport.TexFamily = "" Or frmTexImport.TexFamily = AllString Then
+        frmTexImport.TexFamily = "Untitled"
+    End If
     '
     frmTexImport.Show 1 ' Modal import accept/cancel box
     If GlobalAbortedModal = 0 Then RefreshTextureFamily (frmTexImport.TexFamily)

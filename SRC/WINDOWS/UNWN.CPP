@@ -16,9 +16,10 @@
 #include "UnWnCam.h"
 #include "UnConfig.h"
 #include "UnWnProp.h" // Properties dialog.
+#include "UnInput.h"
 
 /////////////////////////////////////////////////////////////////////////////
-// Globals
+// Globals.
 /////////////////////////////////////////////////////////////////////////////
 
 CUnrealWnApp			App;
@@ -26,14 +27,14 @@ FWindowsCameraManager	CameraManager;
 extern FTaskManager		*TaskManager;
 
 extern UNRENDER_API  FGlobalRender  *GRendPtr;
-extern UNGAME_API    FVirtualGame   *GGamePtr;
+extern UNGAME_API    FGameBase	    *GGamePtr;
 extern UNNETWORK_API NDriver		*GDirectPlayDriver;
-extern UNEDITOR_API  FEditor		GUnrealEditor;
+extern UNEDITOR_API  FGlobalEditor	GUnrealEditor;
 
-FRenderDevice *FindRenderDevice(void);
+FRenderDevice *FindRenderDevice();
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnApp
+// CUnrealWnApp.
 /////////////////////////////////////////////////////////////////////////////
 
 BEGIN_MESSAGE_MAP(CUnrealWnApp, CWinApp)
@@ -61,7 +62,7 @@ BEGIN_MESSAGE_MAP(CUnrealWnApp, CWinApp)
 END_MESSAGE_MAP()
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnApp construction
+// CUnrealWnApp construction.
 /////////////////////////////////////////////////////////////////////////////
 
 //
@@ -69,9 +70,9 @@ END_MESSAGE_MAP()
 // Not guarded.
 //
 CUnrealWnApp::CUnrealWnApp()
-	{
+{
 	//***********************************************************
-	// DANGER: Be wary of placing code in this constructor which
+	//warning: Be wary of placing code in this constructor which
 	// may rely on uninitialized data.  You must not call any
 	// FGlobalPlatform functions, including the Log functions.
 	//***********************************************************
@@ -80,15 +81,16 @@ CUnrealWnApp::CUnrealWnApp()
 	OleCrashed					= 0;
 	PlatformCrashed				= 0;
 	hWndMain					= NULL;
-	hWndEdCallback				= NULL;
+	hWndCallback				= NULL;
 	UsageCount					= 0;
 	Dialog						= NULL;
-	//
-	strcpy (Error,"General Protection Fault in Unreal\r\n\r\n"); // Default (undetectable) error
-	};
+
+	// Default (undetectable) error.
+	strcpy (Error,"General Protection Fault in Unreal\r\n\r\n");
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnApp initialization
+// CUnrealWnApp initialization.
 /////////////////////////////////////////////////////////////////////////////
 
 //
@@ -104,220 +106,217 @@ CUnrealWnApp::CUnrealWnApp()
 // Not guarded.
 //
 BOOL CUnrealWnApp::InitInstance()
-	{
+{
 	int Slave = RunEmbedded() || RunAutomated();
 	char *Ptr;
-	//
+
 	// Figure out what directory we're in and switch into 
-	// the Unreal\System directory:
-	//
+	// the Unreal\System directory.
+	
 	strcpy(BaseDir,m_pszHelpFilePath);
 	strupr(BaseDir);
-	//
+
 	Ptr=(char *)mystrstr(BaseDir,MFC_HELP_PARTIAL);
 	if (Ptr==NULL)
-		{
+	{
 		AfxMessageBox("Unreal is not installed properly.  Please reinstall.");
 		return FALSE;
-		};
+	}
 	*Ptr=0; // Now BaseDir is set.
 	SetCurrentDirectory(BaseDir);
-	//
-	// Parse the command line to see if launched as OLE server:
-	//
+
+	// Parse the command line to see if launched as OLE server.
 	strcpy(CmdLine,m_lpCmdLine);
 	if (Slave)
-		{
-		strcat(CmdLine," -EDITOR AUDIO=OFF");
-		#ifdef _DEBUG
+	{
+		strcat(CmdLine," -EDITOR");
+#ifdef _DEBUG
 		strcat(CmdLine," -DEBUG");
-		#endif
-		};
-	//
+#endif
+	}
+
 	// Initialize the global platform information.  Prior to this point of
 	// Unreal's execution, do not call any FGlobalPlatform functions, including
 	// the log functions.
-	//
-	Platform.Init(CmdLine,BaseDir); // Set global platform information
-	//
-	// Set globals:
-	//
+	Platform.Init(CmdLine,BaseDir);
+
+	// Set globals.
 	GApp					= &Platform;
 	Platform.CameraManager  = &CameraManager;
 	Platform.RenDev			= FindRenderDevice();
-	//
-	// Password dialog:
-	//
+    Platform.Input          = &GPlatformInput;        
+    GInput.PlatformInput    = &GPlatformInput;
+
+	// Password dialog.
 	#if 0
-		{
+	{
 		Platform.GetProfile("Login","Name",Platform.LockName,"",sizeof(Platform.LockName));
 		Platform.GetProfile("Login","Password",Platform.LockPassword,"",sizeof(Platform.LockPassword));
-		//
-		if (!Platform.PasswordDialog
-			(
+
+		if( !Platform.PasswordDialog
+		(
 			"Confidential Unreal version","Password check",
 			Platform.LockName,Platform.LockPassword)
-			)
+		)
 			return FALSE;
+		
 		Platform.SetProfile("Login","Name",    Platform.LockName);
 		Platform.SetProfile("Login","Password",Platform.LockPassword);
-		};
+	}
 	#endif
-	//
-	// Initialize OLE libraries
-	//
-	if (!AfxOleInit())
-		{
+
+	// Initialize OLE libraries.
+	if( !AfxOleInit() )
+	{
 		AfxMessageBox(IDP_OLE_INIT_FAILED);
 		return FALSE;
-		};
-	//
-	// Standard initialization:
-	//
+	}
+
+	// Standard initialization.
 	Enable3dControls();
-	//
-	// Handle OLE or regular startup:
-	//
-	if (Slave)
-		{
-		//
+
+	// Handle OLE or regular startup.
+	if( Slave )
+	{
 		// Register all OLE server (factories) as running.  This enables the
 		// OLE libraries to create objects from other applications.
-		//
 		COleTemplateServer::RegisterAll();
-		}
+	}
 	else
-		{
-		//
-		// Register all OLE classes:
-		//
+	{
+		// Register all OLE classes.
 		COleObjectFactory::UpdateRegistryAll();
 		RegisterFileTypes(BaseDir);
-		//
-		// Register our type library:
-		//
+
+		// Register our type library.
 		CString		cTlbFname = (CString)BaseDir + TYPELIB_PARTIAL;
 		CString		cHlpFname = (CString)BaseDir + HELP_RELATIVE_FNAME;
 		BSTR		bTlbFname = cTlbFname.AllocSysString();
 		BSTR		bHlpFname = cHlpFname.AllocSysString();
 		ITypeLib	*tlUnreal;
-		//
-		if (LoadTypeLib(bTlbFname,&tlUnreal) ||
-			RegisterTypeLib (tlUnreal,bTlbFname,bHlpFname))
-			{
+
+		if( LoadTypeLib(bTlbFname,&tlUnreal) ||
+			RegisterTypeLib (tlUnreal,bTlbFname,bHlpFname) )
+		{
 			char Msg[256];
 			sprintf
-				(
+			(
 				Msg,
 				"Type library %s couldn't be registered.  Please reinstall Unreal.",
 				cTlbFname
-				);
+			);
 			AfxMessageBox(Msg);
 			return FALSE;
-			};
-		};
-	if (mystrstr(CmdLine,"/REGSERVER")||mystrstr(CmdLine,"-REGSERVER")) return FALSE; // Only register the server
-	if (!(mystrstr(CmdLine,"-LOG")||mystrstr(CmdLine,"-EDITOR"))) Platform.LaunchWithoutLog=1;
-	//
-	// Start up:
-	//
+		}
+	}
+
+	// Only register the server?
+	if (mystrstr(CmdLine,"/REGSERVER")||mystrstr(CmdLine,"-REGSERVER")) 
+		return FALSE;
+	
+	// Launch with splash screen?
+	if (!(mystrstr(CmdLine,"-LOG")||mystrstr(CmdLine,"-EDITOR"))) 
+		Platform.LaunchWithoutLog=1;
+
+	// Start up.
 	AfxOleLockApp();
 	Dialog = new CUnrealWnDlg;
-	//
+
 	Timer.Init(40);
 	int ExceptionExit=0;
 	if (Platform.Debugging)
-		{
+	{
 		AfxMessageBox("Running in debug mode");
 		m_pMainWnd		= Dialog;
-		//
+
 		Dialog->Create(IDD_UNWN_DIALOG);
 		MessagePump();
-		//
+
 		Timer.Exit();
 		GUnreal.Exit();
-		}
+	}
 	else
-		{
+	{
 		try
-			{
-			GUARD;
-			//
+		{
+			guard(CUnrealWnApp::InitInstance);
+
 			m_pMainWnd	= Dialog;
-			//
+
 			Dialog->Create(IDD_UNWN_DIALOG);
 			MessagePump();
-			//
+
 			Platform.ServerAlive = 0;
 			if (OleCrashed || Platform.InAppError) goto Crashed;
-			//
+
 			Timer.Exit();
 			GUnreal.Exit();
-			//
-			UNGUARD("CUnrealWnApp::InitInstance");
-			}
-		catch(...) // Exception due to appError call or GPF
-			{
+
+			unguard;
+		}
+		catch(...)
+		{
+			// Exception due to appError call or GPF.
 			Crashed:
 			ExceptionExit			= 1;
 			PlatformCrashed			= 1;
 			Timer.Exit();
-			//
-			if (OleCrashed || InOle)
-				{
-				// Ole has already cleaned up after the error
-				}
+
+			if( OleCrashed || InOle )
+			{
+				// Ole has already cleaned up after the error.
+			}
 			else
-				{
+			{
 				Platform.Logf("Shutting down Unreal engine");
 				Platform.ShutdownAfterError();
-				//
+
 				FinalizeErrorText();
 				Platform.Logf("Exiting due to error");
 				Platform.CloseLog();
-				//
+
 				Dialog->SetFocus();
 				Dialog->MessageBox(Platform.ErrorHist,"Unrecoverable Unreal Error",MB_OK|MB_ICONEXCLAMATION|MB_APPLMODAL);
 				Dialog->ShowWindow(SW_HIDE);
-				};
+			}
 			delete Dialog;
 			ExitProcess(1);
 			goto Out;
-			};
-		};
+		}
+	}
 	Platform.CheckAllocations();
 	Platform.CloseLog();
 	Platform.Exit();
 	delete Dialog;
-	//
+
 	// Since the dialog has been closed, return FALSE so that we exit the
 	// application, rather than start the MFC message pump.
-	//
+
 	Out:
-	while (!AfxOleCanExitApp()) AfxOleUnlockApp();
 	GdiFlush();
-	//
+	AfxOleUnlockApp();
+	//_exit(0); // Force buggy MFC Ole code to shut down
+
 	return FALSE;
-	};
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// Unreal initialization
+// Unreal initialization.
 /////////////////////////////////////////////////////////////////////////////
 
 //
 // Launch the Unreal engine.
-// Not guarded.
 //
-void CUnrealWnApp::InitializeUnreal(void)
-	{
-	GUARD;
-	//
+void CUnrealWnApp::InitializeUnreal()
+{
+	guard(CUnrealWnApp::InitializeUnreal);
+
 	Platform.Startup();
 	int IsEditor = mystrstr(CmdLine,"-EDITOR") ? 1 : 0;
 	int IsNet    = mystrstr(CmdLine,"-NET")    ? 1 : 0;
-	//
+
 	GUnreal.Init
-		(
+	(
 		&Platform,
 		TaskManager,
 		Platform.CameraManager,
@@ -325,94 +324,94 @@ void CUnrealWnApp::InitializeUnreal(void)
 		GGamePtr,
 		IsNet    ? &NetManager    : NULL,
 		IsEditor ? &GUnrealEditor : NULL
-		);
-	UNGUARD("CUnrealWnApp::InitializeUnreal");
-	};
+	);
+	unguard;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// Global Ole application locking/unlocking
+// Global Ole application locking/unlocking.
 /////////////////////////////////////////////////////////////////////////////
 
 //
 // Lock the app.
 // This replaces AfxOleLockApp.
 //
-void CUnrealWnApp::UnrealLockApp(void)
-	{
-	GUARD;
-	//
+void CUnrealWnApp::UnrealLockApp()
+{
+	guard(CUnrealWnApp::UnrealLockApp);
+
 	UsageCount++;
 	debugf(LOG_Win,"UnrealLockApp %i",UsageCount);
-	//
-	UNGUARD("CUnrealWnApp::UnrealLockApp");
-	};
+
+	unguard;
+}
 
 //
 // Unlock the app and release it if the lock count is zero.
 // This replaces AfxOleUnlockApp.
 //
-void CUnrealWnApp::UnrealUnlockApp(void)
-	{
-	GUARD;
-	//
+void CUnrealWnApp::UnrealUnlockApp()
+{
+	guard(CUnrealWnApp::UnrealUnlockApp);
+
 	debugf(LOG_Win,"UnrealUnlockApp %i",UsageCount);
-	if (--UsageCount <= 0) App.Dialog->Exit();
-	//
-	UNGUARD("CUnrealWnApp::UnrealUnlockApp");
-	};
+	
+	if (--UsageCount <= 0)
+		App.Dialog->Exit();
+
+	unguard;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// Error
+// Error.
 /////////////////////////////////////////////////////////////////////////////
 
 //
 // Add the final bit of text to an error message.
 // Not guarded.
 //
-void CUnrealWnApp::FinalizeErrorText(void)
-	{
+void CUnrealWnApp::FinalizeErrorText()
+{
 	strcat(App.Platform.ErrorHist, ".  " GAME_NAME " " GAME_VERSION
 		" was compiled on " __DATE__ ".");
 	strcat(App.Platform.ErrorHist,"\r\n\r\nTo report this error, send the "
 		" " LOG_PARTIAL " file to Epic along with a description of "
 		" what you were doing.");
-	};
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// Registering file types
+// Registering file types.
 /////////////////////////////////////////////////////////////////////////////
 
 // Not guarded.
 void RegDoSet(HKEY Key,CString Value)
-	{
+{
 	RegSetValue(Key,"",REG_SZ,LPCSTR(Value),Value.GetLength());
-	};
+}
 
 // Not guarded.
 void RegSetEx(HKEY Key,CString SubKey,CString Value)
-	{
+{
 	RegSetValueEx(Key,SubKey,0,REG_SZ,(BYTE *)LPCSTR(Value),Value.GetLength());
-	};
+}
 
 // Not guarded.
 void CUnrealWnApp::RegisterFileTypes(char *BaseDir)
-	{
+{
 	CString Base = BaseDir;
 	HKEY Key1,Key2,Key3,Key4;
 	FILE *Temp;
-	//
-	// Register map file type:
-	//
+
+	// Register map file type.
 	RegCreateKey				(HKEY_CLASSES_ROOT,MAP_EXTENSION,&Key1);
 		RegDoSet				(Key1,OLE_MAP_TYPE);
 	RegCloseKey					(Key1);
-	//
+
 	RegCreateKey				(HKEY_CLASSES_ROOT,OLE_APP,&Key1);
 		RegDoSet				(Key1,OLE_APP_DESCRIPTION);
 	RegCloseKey					(Key1);
-	//
-	// Register application/unreal MIME type
-	//
+
+	// Register application/unreal MIME type.
 	/*
 	RegCreateKey				(HKEY_CLASSES_ROOT,"MIME",&Key1);
 		RegCreateKey			(Key1,"Database",&Key2);
@@ -424,9 +423,8 @@ void CUnrealWnApp::RegisterFileTypes(char *BaseDir)
 		RegCloseKey				(Key2);
 	RegCloseKey					(Key1);
 	*/
-	//
-	// Register UnServer.exe (and optionally UnrealEd.exe) shell launch info:
-	//
+
+	// Register UnServer.exe (and optionally UnrealEd.exe) shell launch info.
 	RegCreateKey				(HKEY_CLASSES_ROOT,OLE_MAP_TYPE,&Key1);
 		RegDoSet				(Key1,OLE_MAP_DESCRIPTION);
 		RegCreateKey			(Key1,"DefaultIcon",&Key2);
@@ -459,9 +457,8 @@ void CUnrealWnApp::RegisterFileTypes(char *BaseDir)
 				};
 		RegCloseKey				(Key2);
 	RegCloseKey					(Key1);
-	//
-	// Register with Internet Explorer:
-	//
+
+	// Register with Internet Explorer.
 	RegCreateKey				(HKEY_CLASSES_ROOT,"Unreal",&Key1);
 		RegDoSet				(Key1,"URL:Unreal Protocol");
 		RegCreateKey			(Key1,"DefaultIcon",&Key2);
@@ -478,9 +475,8 @@ void CUnrealWnApp::RegisterFileTypes(char *BaseDir)
 			RegCloseKey			(Key3);
 		RegCloseKey				(Key2);
 	RegCloseKey					(Key1);
-	//
-	// Register with Netscape:
-	//
+
+	// Register with Netscape.
 	/*
 	RegCreateKey				(HKEY_CURRENT_USER,"Software",&Key1);
 		RegCreateKey			(Key1,"Netscape",&Key2);
@@ -497,37 +493,37 @@ void CUnrealWnApp::RegisterFileTypes(char *BaseDir)
 		RegCloseKey				(Key2);
 	RegCloseKey					(Key1);
 	*/
-	};
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnApp 'File' menu command handlers
+// CUnrealWnApp 'File' menu command handlers.
 /////////////////////////////////////////////////////////////////////////////
 
 void CUnrealWnApp::OnFileExit() 
-	{
-	GUARD;
+{
+	guard(CUnrealWnApp::OnFileExit);
 	Dialog->Exit();
-	UNGUARD("CUnrealWnApp::OnFileExit");
-	};
+	unguard;
+}
 
 void CUnrealWnApp::OnFileBeginGame() 
-	{
-	GUARD;
+{
+	guard(CUnrealWnApp::OnFileBeginGame);
 	AfxMessageBox("Begin game: Unimplemented");
-	UNGUARD("CUnrealWnApp::OnFileBeginGame");
-	};
+	unguard;
+}
 
 void CUnrealWnApp::OnFileEndGame() 
-	{
-	GUARD;
+{
+	guard(CUnrealWnApp::OnFileEndGame);
 	AfxMessageBox("End game: Unimplemented");
-	UNGUARD("CUnrealWnApp::OnFileEndGame");
-	};
+	unguard;
+}
 
 void CUnrealWnApp::OnFileLoadGame() 
-	{
-	GUARD;
-	//
+{
+	guard(CUnrealWnApp::OnFileLoadGame);
+	
 	SetCurrentDirectory((CString)BaseDir + MAP_RELATIVE_PATH);
 	CFileDialog LoadDialog
 		(
@@ -537,49 +533,49 @@ void CUnrealWnApp::OnFileLoadGame()
 		);
 	if (LoadDialog.DoModal()==IDOK)
 		{
-		// Load it
+		// Load it.
 		};
 	SetCurrentDirectory(BaseDir);
-	//
-	UNGUARD("CUnrealWnApp::OnFileLoadGame");
-	};
+	
+	unguard;
+}
 
 void CUnrealWnApp::OnFileSaveGame() 
-	{
-	GUARD;
-	//
+{
+	guard(CUnrealWnApp::OnFileSaveGame);
+
 	SetCurrentDirectory((CString)BaseDir + MAP_RELATIVE_PATH);
 	CFileDialog SaveDialog
-		(
+	(
 		FALSE,MAP_EXTENSION,NULL,OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
 		SAVE_MAP_MASK,
 		NULL
-		);
-	if (SaveDialog.DoModal()==IDOK)
-		{
+	);
+	if( SaveDialog.DoModal()==IDOK )
+	{
 		// Save it
-		};
+	}
 	SetCurrentDirectory(BaseDir);
-	//
-	UNGUARD("CUnrealWnApp::OnFileSaveGame");
-	};
+
+	unguard;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnApp 'NetGame' menu command handlers
+// CUnrealWnApp 'NetGame' menu command handlers.
 /////////////////////////////////////////////////////////////////////////////
 
 void CUnrealWnApp::OnNetGame() 
-	{
-	GUARD;
-	//
+{
+	guard(CUnrealWnApp::OnNetGame);
+
 	char URL[256];
-	//
+
 	ENetworkPlayMode ResultMode;
 	NSocket          *ClientSocket;
-	//
+
 	ResultMode = GNetManager->BeginGameByUI(URL,&ClientSocket);
-	switch (ResultMode)
-		{
+	switch( ResultMode )
+	{
 		case PM_NONE:
 			break;
 		case PM_LOCAL:
@@ -593,136 +589,136 @@ void CUnrealWnApp::OnNetGame()
 		default:
 			GApp->Error("Illegal network play mode");
 			break;
-		};
-	UNGUARD("CUnrealWnApp::OnNetGame");
-	};
+	}
+	unguard;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnApp 'Window' menu command handlers
+// CUnrealWnApp 'Window' menu command handlers.
 /////////////////////////////////////////////////////////////////////////////
 
 void CUnrealWnApp::OnWindowNewCamera() 
-	{
-	GUARD;
+{
+	guard(CUnrealWnApp::OnWindowNewCamera);
 	GUnreal.OpenCamera();
-	UNGUARD("CUnrealWnApp::OnWindowNewCamera");
-	};
+	unguard;
+}
 
 void CUnrealWnApp::OnWindowAlwaysOnTop() 
-	{
-	GUARD;
-	//
+{
+	guard(CUnrealWnApp::OnWindowAlwaysOnTop);
+
 	AlwaysOnTop = !AlwaysOnTop;
 	if (AlwaysOnTop)	Dialog->SetWindowPos(&Dialog->wndTopMost,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE);
 	else				Dialog->SetWindowPos(&Dialog->wndNoTopMost,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE);
 	UpdateUI();
-	//
-	UNGUARD("CUnrealWnApp::OnWindowAlwaysOnTop");
-	};
+
+	unguard;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnApp 'Edit' menu command handlers
+// CUnrealWnApp 'Edit' menu command handlers.
 /////////////////////////////////////////////////////////////////////////////
 
 void CUnrealWnApp::OnEditCopy() 
-	{
-	GUARD;
-	if (Dialog->FocusEditControl) Dialog->FocusEditControl->Copy();
-	UNGUARD("CUnrealWnApp::OnEditCopy");
-	};
+{
+	guard(CUnrealWnApp::OnEditCopy);
+	if (Dialog->FocusEditControl) 
+		Dialog->FocusEditControl->Copy();
+	unguard;
+}
 
 void CUnrealWnApp::OnEditPaste()
-	{
-	GUARD;
-	if (Dialog->FocusEditControl) Dialog->FocusEditControl->Paste();
-	UNGUARD("CUnrealWnApp::OnEditPaste");
-	};
+{
+	guard(CUnrealWnApp::OnEditPaste);
+	if (Dialog->FocusEditControl) 
+		Dialog->FocusEditControl->Paste();
+	unguard;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnApp 'Help' menu command handlers
+// CUnrealWnApp 'Help' menu command handlers.
 /////////////////////////////////////////////////////////////////////////////
 
 void CUnrealWnApp::OnHelpAboutUnreal() 
-	{
-	GUARD;
+{
+	guard(CUnrealWnApp::OnHelpAboutUnreal);
 	::WinHelp (Dialog->m_hWnd,HELP_LINK_FNAME,1,200);;
-	UNGUARD("CUnrealWnApp::OnHelpAboutUnreal");
-	};
+	unguard;
+}
 
 void CUnrealWnApp::OnHelpEpicsWebSite() 
-	{
-	GUARD;
+{
+	guard(CUnrealWnApp::OnHelpEpicsWebSite);
 	GApp->LaunchURL(URL_WEB,"");
-	UNGUARD("CUnrealWnApp::OnHelpEpicsWebSite");
-	};
+	unguard;
+}
 
 void CUnrealWnApp::OnHelpHelpTopics() 
-	{
-	GUARD;
+{
+	guard(CUnrealWnApp::OnHelpHelpTopics);
 	::WinHelp (Dialog->m_hWnd,HELP_LINK_FNAME,11,0);
-	UNGUARD("CUnrealWnApp::OnHelpHelpTopics");
-	};
+	unguard;
+}
 
 void CUnrealWnApp::OnHelpOrderingUnreal()
-	{
-	GUARD;
+{
+	guard(CUnrealWnApp::OnHelpOrderingUnreal);
 	::WinHelp (Dialog->m_hWnd,HELP_LINK_FNAME,1,202);	
-	UNGUARD("CUnrealWnApp::OnHelpOrderingUnreal");
-	};
+	unguard;
+}
 
 void CUnrealWnApp::OnHelpOrderNow()
-	{
-	GUARD;
+{
+	guard(CUnrealWnApp::OnHelpOrderNow);
 	// TODO: Launch order program
-	UNGUARD("CUnrealWnApp::OnHelpOrderNow");
-	};
+	unguard;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnApp 'Log' menu command handlers
+// CUnrealWnApp 'Log' menu command handlers.
 /////////////////////////////////////////////////////////////////////////////
 
 void CUnrealWnApp::OnLogCloseLog()
-	{
-	GUARD;
-	//
+{
+	guard(CUnrealWnApp::OnLogCloseLog);
+
 	Platform.CloseLog();
 	UpdateUI();
-	//
-	UNGUARD("CUnrealWnApp::OnLogCloseLog");
-	};
+
+	unguard;
+}
 
 void CUnrealWnApp::OnLogOpenUnrealLog()
-	{
-	GUARD;
-	//
+{
+	guard(CUnrealWnApp::OnLogOpenUnrealLog);
+
 	Platform.OpenLog(LOG_PARTIAL);
 	UpdateUI();
-	//
-	UNGUARD("CUnrealWnApp::OnLogOpenUnrealLog");
-	};
+
+	unguard;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealWnApp user interface updater
+// CUnrealWnApp user interface updater.
 /////////////////////////////////////////////////////////////////////////////
 
-void CUnrealWnApp::UpdateUI(void)
-	{
-	GUARD;
-	//
-	// Log:
-	//
+void CUnrealWnApp::UpdateUI()
+{
+	guard(CUnrealWnApp::UpdateUI);
+
+	// Log.
 	Dialog->GetMenu()->EnableMenuItem(ID_LOG_OPENUNREALLOG,MF_BYCOMMAND | ((Platform.LogFile==NULL)?MF_ENABLED:MF_GRAYED));
 	Dialog->GetMenu()->EnableMenuItem(ID_LOG_CLOSELOG,     MF_BYCOMMAND | ((Platform.LogFile!=NULL)?MF_ENABLED:MF_GRAYED));
-	//
-	// Always on top:
-	//
+
+	// Always on top.
 	Dialog->GetMenu()->CheckMenuItem(ID_WINDOW_ALWAYSONTOP,MF_BYCOMMAND | (AlwaysOnTop?MF_CHECKED:MF_UNCHECKED));
-	//
-	UNGUARD("CUnrealWnApp::UpdateUI");
-	};
+
+	unguard;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// Message routing
+// Message routing.
 /////////////////////////////////////////////////////////////////////////////
 
 //
@@ -730,18 +726,18 @@ void CUnrealWnApp::UpdateUI(void)
 // MFC accelerators to work.
 //
 void CUnrealWnApp::RouteMessage(void *Msg)
+{
+	guard(CUnrealWnApp::RouteMessage);
+	if( !App.PreTranslateMessage((MSG *)Msg) )
 	{
-	GUARD;
-	if (!App.PreTranslateMessage((MSG *)Msg))
-		{
 		TranslateMessage((MSG *)Msg);
 		DispatchMessage ((MSG *)Msg);
-		};
-	UNGUARD("CUnrealWnApp::RouteMessage");
-	};
+	}
+	unguard;
+}
 
 /////////////////////////////////////////////////////////////////////////////
-// String translation
+// String translation.
 /////////////////////////////////////////////////////////////////////////////
 
 //
@@ -753,37 +749,44 @@ void CUnrealWnApp::RouteMessage(void *Msg)
 #define ACTIVE_STRINGS 16
 #define US(tag) (GTranslate(#tag,ghModule))
 char *Translate(DWORD ID,DWORD hModule)
-	{
-	GUARD;
-	//
+{
+	guard(Translate);
+
 	static char Buffer[16][256];
 	static int	n					= 0;
 	static		HINSTANCE hModule	= AfxGetInstanceHandle();
-	//
+
 	if (!Tag)					appError("Null string");
 	if (++n >= ACTIVE_STRINGS)	n = 0;
-	//
+
 	char *Result	= Buffer[n];
 	HRSRC hR		= FindResourceEx(hModule,RT_STRING,Tag,MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL));
 	//EnumResourceLanguages
-	//
+
 	if		(!hR) sprintf(Result, "<%s NOT FOUND>",Tag);
 	else if (!LoadString(hModule,hR,Result,255)) sprintf(Result,"<%s LOAD FAILED>",Tag);
-	//
+
 	return Result;
-	//
-	UNGUARD("Translate");
-	};
+
+	unguard;
+}
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
-//           Menu "Properties" handlers...
+//           Menu "Properties" handlers.
 /////////////////////////////////////////////////////////////////////////////
 
 void CUnrealWnApp::OnPropertiesProperties() 
 {
     CDialog * ExistingDialog = CDialogProperties::LatestInstance;
-    if( ExistingDialog != 0 )
+    
+    // Figure out which Camera structure we corrspond to.
+    UCamera * Camera = GCameraManager->CurrentCamera();
+    if( Camera == 0 )
+    {
+        debugf( LOG_Info, "Camera not found!" );
+    }
+    else if( ExistingDialog != 0 )
     {
         // The properties dialog already exists, just show it.
         ExistingDialog->SetActiveWindow();
@@ -791,13 +794,12 @@ void CUnrealWnApp::OnPropertiesProperties()
     else
     {
         // Create a new properties dialog and display it.
-        CDialog * Dialog = new CDialogProperties();
+        CDialog * Dialog = new CDialogProperties(Camera);
         Dialog->Create(CDialogProperties::IDD);
         Dialog->ShowWindow(SW_SHOW);
     }
 }
 
-
 /////////////////////////////////////////////////////////////////////////////
-// The End
+// The End.
 /////////////////////////////////////////////////////////////////////////////

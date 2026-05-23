@@ -101,6 +101,22 @@ public:
     // The returned list should be freed.
     TStringList Pairs() const;
 
+    virtual const char * SectionName() const; // The section name used in profiles
+
+    //       Interpret a set of pairs from a profile file
+    // Use the platform-dependent routines to read the key-value pairs
+    // from the given file. Call SetValues with the resulting list.
+    // If FileName==0, the default profile file is used.
+    // If Section==0, the SectionName() is used.
+    // Return TRUE if the values were all set okay, FALSE otherwise.
+    // If FALSE is returned, some values may have been set successfully
+    BOOL LoadValues(const char * Section = 0, const char * FileName = 0);
+
+    //       Save the key-value pairs to a profile file
+    // Use the platform-dependent routines to write the key-value pairs
+    // to the given file. If FileName==0, the default profile file is used.
+    // If Section==0, the SectionName() is used.
+    void SaveValues(const char * Section = 0, const char * FileName = 0);
 };
 
 #endif

@@ -12,40 +12,39 @@
 #define _INC_UNENGINE
 
 /*-----------------------------------------------------------------------------
-	FUnrealEngine: Unreal engine
+	Unreal engine.
 -----------------------------------------------------------------------------*/
 
 class UNREAL_API FUnrealEngine
-	{
-	public:
-	//
+{
+public:
+
 	int Init
-		(
+	(
 		class FGlobalPlatform	*Platform, 
 		class FTaskManager		*TaskManager,
 		class FCameraManager	*CameraManager, 
 		class FGlobalRender		*Rend, 
-		class FVirtualGame		*Game,
+		class FGameBase			*Game,
 		class NManager			*NetManager,
-		class FEditor			*Editor
-		);
-	void Exit(void);
-	void ErrorExit(void);
-	//
-	UCamera *OpenCamera(void);
+		class FGlobalEditor		*Editor
+	);
+	void Exit();
+	void ErrorExit();
+
+	UCamera *OpenCamera();
 	void Draw (UCamera *Camera, int Scan);
-	//
+
 	void EnterWorld(const char *WorldURL);
 	void GetWorldInfo(char *WorldURL, char *WorldTitle);
-	//
-	void InitGame(void);
-	void ExitGame(void);
-	//
+
+	void InitGame();
+	void ExitGame();
+
 	int Exec(const char *Cmd,FOutputDevice *Out=GApp);
-	};
+};
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/
 #endif // _INC_UNENGINE
-

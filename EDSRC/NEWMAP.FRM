@@ -165,11 +165,12 @@ Private Sub Ok_Click()
    Ed.MapFname = ""
    frmMain.Caption = Ed.EditorAppName
    '
-   Ed.CloseLevelWindows
-   '
    Ed.Server.Exec "MAP NEW"
-   Call Ed.Server.SetProp("LEV", "0", Title.Text)
-   Call Ed.Server.SetProp("LEV", "1", Creator.Text)
+   '
+   Call Ed.Server.SetProp("Actor", "LevelProperties", "LevelTitle=" & Title.Text)
+   Call Ed.Server.SetProp("Actor", "LevelProperties", "LevelAuthor=" & Creator.Text)
+   '
+   PostLoad
    '
    Unload Me
    '

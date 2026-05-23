@@ -1,10 +1,10 @@
 VERSION 4.00
-Begin VB.Form frmParSolRect 
+Begin VB.Form frmParSolCube 
    BorderStyle     =   3  'Fixed Dialog
-   Caption         =   "Build a Rectangle"
+   Caption         =   "Build a Cube"
    ClientHeight    =   4395
-   ClientLeft      =   6465
-   ClientTop       =   4395
+   ClientLeft      =   3540
+   ClientTop       =   2355
    ClientWidth     =   2490
    ControlBox      =   0   'False
    BeginProperty Font 
@@ -20,13 +20,13 @@ Begin VB.Form frmParSolRect
    Height          =   4755
    HelpContextID   =   153
    Icon            =   "PsRect.frx":0000
-   Left            =   6405
+   Left            =   3480
    LinkTopic       =   "Form5"
    MaxButton       =   0   'False
    ScaleHeight     =   4395
    ScaleWidth      =   2490
    ShowInTaskbar   =   0   'False
-   Top             =   4095
+   Top             =   2055
    Width           =   2610
    Begin Threed.SSPanel SSPanel1 
       Height          =   1455
@@ -120,7 +120,7 @@ Begin VB.Form frmParSolRect
       EndProperty
       Height          =   375
       Left            =   960
-      TabIndex        =   16
+      TabIndex        =   6
       Top             =   3960
       Width           =   615
    End
@@ -139,6 +139,7 @@ Begin VB.Form frmParSolRect
       Left            =   1680
       TabIndex        =   8
       Top             =   1080
+      Value           =   -1  'True
       Width           =   735
    End
    Begin VB.OptionButton IsHollow 
@@ -156,7 +157,6 @@ Begin VB.Form frmParSolRect
       Left            =   1680
       TabIndex        =   9
       Top             =   1320
-      Value           =   -1  'True
       Width           =   855
    End
    Begin VB.TextBox Group 
@@ -296,7 +296,7 @@ Begin VB.Form frmParSolRect
       ForeColor       =   &H80000008&
       Height          =   255
       Left            =   1680
-      TabIndex        =   15
+      TabIndex        =   16
       Top             =   720
       Visible         =   0   'False
       Width           =   615
@@ -316,7 +316,7 @@ Begin VB.Form frmParSolRect
       EndProperty
       Height          =   255
       Left            =   240
-      TabIndex        =   14
+      TabIndex        =   15
       Top             =   3120
       Width           =   975
    End
@@ -335,7 +335,7 @@ Begin VB.Form frmParSolRect
       EndProperty
       Height          =   255
       Left            =   0
-      TabIndex        =   13
+      TabIndex        =   14
       Top             =   2760
       Width           =   1215
    End
@@ -354,7 +354,7 @@ Begin VB.Form frmParSolRect
       EndProperty
       Height          =   255
       Left            =   600
-      TabIndex        =   12
+      TabIndex        =   13
       Top             =   1680
       Width           =   615
    End
@@ -373,7 +373,7 @@ Begin VB.Form frmParSolRect
       EndProperty
       Height          =   255
       Left            =   720
-      TabIndex        =   11
+      TabIndex        =   12
       Top             =   2040
       Width           =   495
    End
@@ -392,7 +392,7 @@ Begin VB.Form frmParSolRect
       EndProperty
       Height          =   255
       Left            =   600
-      TabIndex        =   10
+      TabIndex        =   11
       Top             =   2400
       Width           =   615
    End
@@ -411,12 +411,12 @@ Begin VB.Form frmParSolRect
       EndProperty
       Height          =   375
       Left            =   240
-      TabIndex        =   6
+      TabIndex        =   10
       Top             =   3480
       Width           =   2175
    End
 End
-Attribute VB_Name = "frmParSolRect"
+Attribute VB_Name = "frmParSolCube"
 Attribute VB_Creatable = False
 Attribute VB_Exposed = False
 Option Explicit
@@ -431,7 +431,7 @@ Private Sub Build_Click()
     Dim Hollow As Integer
     Dim N As Integer
     '
-    Call InitBrush("Rectangle")
+    Call InitBrush("Cube")
     '
     ' Validate parameters
     '
@@ -447,8 +447,8 @@ Private Sub Build_Click()
     If Not Eval(RThickness, Temp) Then Exit Sub
     WThickness = Temp
     '
-    Group = UCase$(frmParSolRect.Group)
-    Hollow = Int(frmParSolRect.IsHollow.Value)
+    Group = UCase$(Group)
+    Hollow = Int(IsHollow.Value)
     '
     If HHeight <= 0 Or HWidth <= 0 Or HBreadth <= 0 Then
         MsgBox ("You must give all numbers, and they all must be positive and nonzero")
@@ -492,7 +492,7 @@ Private Sub Build_Click()
     End If
     '
     Call SendBrush(Ed.Server)
-    Call Ed.StatusText("Built a Rectangle")
+    Call Ed.StatusText("Built a Cube")
 End Sub
 
 Private Sub Command1_Click()
@@ -504,7 +504,7 @@ Private Sub Command2_Click()
 End Sub
 
 Private Sub Form_Load()
-    Call Ed.SetOnTop(Me, "BuildRectangle", TOP_NORMAL)
+    Call Ed.SetOnTop(Me, "BuildCube", TOP_NORMAL)
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
@@ -514,4 +514,28 @@ End Sub
 Private Sub Trigger_Change()
     Build_Click
 End Sub
+
+'
+' Focus change highlighting routines.
+'
+Private Sub RHeight_GotFocus()
+    SelectAll RHeight
+End Sub
+
+Private Sub RWidth_GotFocus()
+    SelectAll RWidth
+End Sub
+
+Private Sub RBreadth_GotFocus()
+    SelectAll RBreadth
+End Sub
+
+Private Sub RThickness_GotFocus()
+    SelectAll RThickness
+End Sub
+
+Private Sub Group_GotFocus()
+    SelectAll Group
+End Sub
+
 

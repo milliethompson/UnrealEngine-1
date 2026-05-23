@@ -23,6 +23,8 @@ ADBG:  Define this symbol
 
 /********************************* INCLUDES ********************************/
 
+#pragma warning (disable : 4201) /* nonstandard extension used : nameless struct/union */
+#include <windows.h>
 #include "Unreal.h"		// Unreal engine includes
 #include "SoundEng.h"	// Headers for using SoundEng.lib
 
@@ -271,6 +273,19 @@ USound::QueryDataReferences(FResourceCallback &Callback)
 	UNGUARD("USound::QueryDataReferences");
 } /* End USound::QueryDataReferences() */
 
+/*
+** USound::Flip:
+**   Use ToHost() templates to perform optional byte order conversion.
+*/
+void
+USound::Flip()
+{
+	GUARD;
+	UResource::Flip();
+	//todo:
+	UNGUARD("USound::Flip");
+} /* End USound::Flip() */
+
 AUTOREGISTER_RESOURCE(RES_Sound,USound,0xB2D90875,0xCCD211cf,0x91360000,0xC028B992);
 
 /*************************************************************************
@@ -332,7 +347,7 @@ UNREAL_API AudioCmdLine(const char *Str)
 		** Save the specified audio resources
 		** to a file.
 		*/
-		if (GetCMD(&Str,"ALL") && GetSTRING(Str,"FILE=",TempFname,79))
+		if (GetCMD(&Str,"(All)") && GetSTRING(Str,"FILE=",TempFname,79))
 		{
 			/*
 			** Save all sound resources to specified file.
@@ -419,7 +434,31 @@ UNREAL_API AudioCmdLine(const char *Str)
 		** when the user presses the "test sound"
 		** button in the Unreal editor.
 		*/
-		/* Not coded yet */
+		char		TempName[256];	/* Name of resource. */
+		USound *	Sound;		/* Ptr to resource. */
+		INT		pid;		/* Playback ID of sound. */
+
+		if (!GetSTRING(Str, "NAME=", TempName, 256))
+		{
+			debugf(LOG_Audio, "AUDIO TEST:  No NAME= specified!\n");
+			return;
+		}
+
+		Sound = NULL;
+		if (!GetUSound(Str, "NAME=", &Sound))
+		{
+			debugf(LOG_Audio, "AUDIO TEST:  Specified sound not found in resource list!\n");
+			return;
+		}
+
+		/* Play the specified sound effect. */
+		GAudio.Init(TRUE);
+		GAudio.InitLevel(4096);
+		pid = GAudio.PlaySfxPrimitive(Sound);
+		MessageBox((HWND)NULL, "Testing Playback", TempName, MB_OK);
+		GAudio.SfxStop(pid);
+		GAudio.ExitLevel();
+		GAudio.Exit();
 	}
 	else if (GetCMD(&Str, "KILL"))
 	{
@@ -497,7 +536,7 @@ UNREAL_API AudioCmdLine(const char *Str)
 
 //
 // Query a list of sounds.  Call with sound family's name,
-// or "All" for all families.
+// or "(All)" for all families.
 //
 static void
 audioQuerySoundForLink(char *FamilyName)
@@ -505,7 +544,7 @@ audioQuerySoundForLink(char *FamilyName)
 	GUARD;
 
 	FName	Name;
-	int	All = !stricmp(FamilyName,"All");
+	int	All = !stricmp(FamilyName,"(All)");
 	USound	*Sound;
 
 #ifdef ADBG
@@ -549,13 +588,13 @@ audioQueryFamilyForLink(void)
 
 	if (GTempFamList == NULL)
 	{
-		GTempFamList = (FName *)appMalloc(MAX_FAM_RESULTS * sizeof (FName),"Ammon"); // Must free !!
+		GTempFamList = (FName *)appMalloc(MAX_FAM_RESULTS * sizeof (FName),"Ammon");
 	}
 
 	GCurFamResult  = 0;
 	GNumFamResults = 0;
 
-	GTempFamList [GNumFamResults++].Add("All");
+	GTempFamList [GNumFamResults++].Add("(All)");
 	FOR_ALL_TYPED_RES(Sound,RES_Sound,USound)
 	{
 		ListName = Sound->FamilyName;

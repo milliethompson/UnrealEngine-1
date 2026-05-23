@@ -1,10 +1,10 @@
-// InpSenDi.h : header file
-//
 /*
 ==============================================================================
+UnWnSend.h: Input sensitivity dialog
+Used by: Property page dialog
 
 Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
-Compiled with Visual C++ 4.0, Calling method=__fastcall
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
     This is the MFC-generated class for handling the Unreal input
@@ -18,13 +18,14 @@ Revision history:
 /////////////////////////////////////////////////////////////////////////////
 // CDialogInputSensitivity dialog
 
+#include "Unreal.h"
 #include "UnInput.h"
 
 class CDialogInputSensitivity : public CDialog
 {
 // Construction
 public:
-	CDialogInputSensitivity(CWnd* pParent = NULL);   // standard constructor
+	CDialogInputSensitivity(UCamera * Camera, CWnd* pParent = NULL);   // standard constructor
     BOOL OnInitDialog();
 
     BOOL Accept(); 
@@ -72,15 +73,18 @@ protected:
 	DECLARE_MESSAGE_MAP()
 
 private:
-    FInput::TMovement CurrentMovement; // The currently selected movement or 0.
-    FInput::TMovementInfo MovementInfo[FInput::MovementCount]; // A copy of the movement values being edited.
+    FPlatformInput::TMovement CurrentMovement; // The currently selected movement or 0.
+    FPlatformInput::TMovementInfo MovementInfo[FPlatformInput::MovementCount]; // A copy of the movement values being edited.
+    UCamera * Camera;
+    FPlatformInput * PlatformInput;
+    FInput * Input;
     BOOL AxesAreMerged; // TRUE if the positive/negative axes have been merged.
 
     void PrepareSymmetryButtons(); // Prepare Merge/Separate buttons based on AxesAreMerged.
 
     BOOL AxesAreSymmetrical(); // Return TRUE if axes pairs are the same.
 
-    void ArrangeMovements(BOOL Merged, FInput::TMovement Selection = FInput::M_None);
+    void ArrangeMovements(BOOL Merged, FPlatformInput::TMovement Selection = FPlatformInput::M_None);
         // Arrange the movements, setting the appropriate information into
         // the displayed list. Call this initially and after merging or 
         // separating the axes. If Merged, the axes are merged in the display.
@@ -97,9 +101,9 @@ private:
     void SetDigitalThreshold      (FLOAT Value); // Set the displayed digital threshold.
     void SetSpeed                 (FLOAT Value); // Set the displayed speed.
 
-    FInput::TMovementInfo & CurrentInfo() { return MovementInfo[CurrentMovement]; }
-    FInput::TSensitivity & CurrentSensitivity() { return CurrentInfo().Sensitivity; }
+    FPlatformInput::TMovementInfo & CurrentInfo() { return MovementInfo[CurrentMovement]; }
+    FPlatformInput::TSensitivity & CurrentSensitivity() { return CurrentInfo().Sensitivity; }
 
-    void LoadValuesFrom( const FInput::TMovementInfo * Info ); // Load values from an array of MovementCount values.
-    void SaveValuesInto( FInput::TMovementInfo * Info ); // Save value into an array of MovementCount values.
+    void LoadValuesFrom( const FPlatformInput::TMovementInfo * Info ); // Load values from an array of MovementCount values.
+    void SaveValuesInto( FPlatformInput::TMovementInfo * Info ); // Save value into an array of MovementCount values.
 };

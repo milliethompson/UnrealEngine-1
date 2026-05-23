@@ -16,16 +16,17 @@ Begin VB.Form frmExtrude
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H00400000&
-   Height          =   2265
+   Height          =   2220
    HelpContextID   =   109
    Icon            =   "Extrude.frx":0000
    Left            =   4815
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
+   MinButton       =   0   'False
    ScaleHeight     =   1860
    ScaleWidth      =   4095
    ShowInTaskbar   =   0   'False
-   Top             =   7485
+   Top             =   7530
    Width           =   4215
    Begin VB.CommandButton btnCancel 
       Appearance      =   0  'Flat

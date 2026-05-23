@@ -3,20 +3,20 @@ Begin VB.Form frmClassBrowser
    BorderStyle     =   0  'None
    Caption         =   "Class Browser"
    ClientHeight    =   6450
-   ClientLeft      =   7365
-   ClientTop       =   4305
+   ClientLeft      =   8700
+   ClientTop       =   4050
    ClientWidth     =   2475
-   Height          =   6855
+   Height          =   6810
    HelpContextID   =   329
    Icon            =   "BrClass.frx":0000
-   Left            =   7305
+   Left            =   8640
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
    ScaleHeight     =   6450
    ScaleWidth      =   2475
    ShowInTaskbar   =   0   'False
-   Top             =   3960
+   Top             =   3750
    Width           =   2595
    Begin VB.PictureBox ClassHolder 
       BackColor       =   &H00C0C0C0&
@@ -391,11 +391,11 @@ Private Sub Refresh_Click()
     '
     QuerySource = -1
     Classes.Clear
-    Classes.AddItem "Root"
+    Classes.AddItem "Actor"
     Classes.ListIndex = 0
     '
     QuerySource = Classes.ListIndex
-    Ed.Server.Exec "CLASS QUERY PARENT=ROOT"
+    Ed.Server.Exec "CLASS QUERY PARENT=ACTOR"
     Call UpdateOutline(Classes, "Class", "QueryRes")
     '
     SetCurrent

@@ -68,6 +68,13 @@ struct UNREAL_API FParse
     // a properly quoted single character, 0 is returned.
     static char GetQuotedCharacter(const char * & Text);
 
+    //             Get an integer value
+    // Remove the leading whitespace and get an integer number from Text.
+    // Text is left pointing after the integer value and any trailing whitespace.
+    // If a valid integer value is found, TRUE is returned and the value is
+    // saved in Value. Otherwise, FALSE is returned and Value is undefined.
+    static BOOL GetInteger(const char * & Text, int & Value );
+
     //             Get a floating point value
     // Remove the leading whitespace and get a floating point number from Text.
     // Text is left pointing after the floating point value and any trailing whitespace.

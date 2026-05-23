@@ -54,7 +54,7 @@ char *GTransTypeNames[] = {"Actor","BrushLoc","BrushPoly","BspNode","BspSurf"};
 // Lock the transaction tracking resource and get a local copy of its info
 // into TRANS.
 //
-void UTransBuffer::Lock(void)
+void UTransBuffer::Lock()
 	{
 	GUARD;
 	DWORD			TransactionSize	= MaxTrans 		* sizeof (FTransaction);
@@ -76,7 +76,7 @@ void UTransBuffer::Lock(void)
 // Copy the local TRANS stuff into the transaction tracking resource and
 // unlock it:
 //
-void UTransBuffer::Unlock (void)
+void UTransBuffer::Unlock ()
 	{
 	GUARD;
 	if (!GApp->ServerAlive) return;
@@ -121,7 +121,7 @@ void UTransBuffer::Reset (const char *Action)
 // Delete the first transaction from the transaction list, remove all of its entries
 // from the change log and data tables, and scroll the list down.
 //
-void UTransBuffer::DeleteFirstTransaction(void)
+void UTransBuffer::DeleteFirstTransaction()
 	{
 	GUARD;
 	FTransaction 	*FirstTrans,*LastTrans;
@@ -261,7 +261,7 @@ void UTransBuffer::Begin (ULevel *Level, const char *SessionName)
 //
 // End a transaction
 //
-void UTransBuffer::End (void)
+void UTransBuffer::End ()
 	{
 	GUARD;
 	//
@@ -295,7 +295,7 @@ void UTransBuffer::ForceOverflow (const char *Reason)
 //
 // Abort a transaction and restore original state
 //
-void UTransBuffer::Rollback(void)
+void UTransBuffer::Rollback(ULevel *Level)
 	{
 	GUARD;
 	//
@@ -309,7 +309,7 @@ void UTransBuffer::Rollback(void)
 	else
 		{
 		End();
-		Undo();
+		Undo(Level);
 		//
 		// Prevent rolled-back transaction from being redone:
 		//
@@ -329,7 +329,7 @@ void UTransBuffer::Rollback(void)
 //
 // Reopen the previous transaction and continue it
 //
-void UTransBuffer::Continue (void)
+void UTransBuffer::Continue ()
 	{
 	GUARD;
 	//
@@ -427,7 +427,7 @@ void UTransBuffer::ApplyChange (FTransChangeLog *Change, BYTE *SourcePtr, DWORD 
 	{
 	GUARD;
 	UResource		*Res   	= Change->Res;
-	FResourceType	*Type  	= &GRes.Types [Res->Type];
+	FResourceType	*Type  	= &GRes.GetType(Res->Type);
 	BYTE			*DestPtr;
 	//
 	// Validate everything and set up dest data pointer:
@@ -508,7 +508,7 @@ int UTransBuffer::CanUndo (char *Str)
 //
 // Undo a transaction, 1 if undone, 0 if not possible
 //
-int UTransBuffer::Undo (void)
+int UTransBuffer::Undo (ULevel *Level)
 	{
 	GUARD;
 	FTransaction	*Transaction;
@@ -564,6 +564,9 @@ int UTransBuffer::Undo (void)
 	EndChanges (Transaction);
 	//
 	Unlock();
+	//
+	Level->ActorList->RelistActors();
+	//
 	return 1;
 	UNGUARD("UTransBuffer::Undo");
 	};
@@ -613,7 +616,7 @@ int UTransBuffer::CanRedo (char *Str)
 //
 // Redo a transaction, 1 if undone, 0 if not possible
 //
-int UTransBuffer::Redo (void)
+int UTransBuffer::Redo (ULevel *Level)
 	{
 	GUARD;
 	FTransaction	*Transaction;
@@ -663,20 +666,11 @@ int UTransBuffer::Redo (void)
 	EndChanges (Transaction);
 	UndoTransCount++;
 	//
+	Level->ActorList->RelistActors();
+	//
 	Unlock();
 	return 1;
 	UNGUARD("UTransBuffer::Redo");
-	};
-
-//
-// Redo all transactions remaining, return number redone
-//
-int UTransBuffer::RedoAll (void)
-	{
-	GUARD;
-	if (!GApp->ServerAlive) return 0;
-	return 0;
-	UNGUARD("UTransBuffer::RedoAll");
 	};
 
 /*-----------------------------------------------------------------------------
@@ -691,7 +685,7 @@ int UTransBuffer::RedoAll (void)
 void UTransBuffer::NoteSingleChange (UResource *Res, int Index)
 	{
 	GUARD;
-	FResourceType   *Type 		 = &GRes.Types	 [Res->Type ];
+	FResourceType   *Type 		 = &GRes.GetType(Res->Type);
 	FTransaction	*Transaction = &Transactions [NumTrans-1];
 	FTransChangeLog	*Changes;
 	BYTE			*SourcePtr,*DestPtr;
@@ -951,20 +945,21 @@ void UTransBuffer::NoteResHeader (UResource *Res)
 -----------------------------------------------------------------------------*/
 
 void UTransBuffer::Register(FResourceType *Type)
-	{
-	GUARD;
+{
+	guard(UTransBuffer::Register);
+
 	Type->HeaderSize = sizeof (UTransBuffer);
 	Type->RecordSize = sizeof (BYTE);
 	Type->Version    = 1;
 	strcpy (Type->Descr,"TransBuffer");
-	UNGUARD("UTransBuffer::Register");
-	};
-void UTransBuffer::InitHeader(void)
-	{
-	GUARD;
-	//
-	// Init resource header to defaults:
-	//
+	
+	unguard;
+}
+void UTransBuffer::InitHeader()
+{
+	guard(UTransBuffer::InitHeader);
+
+	// Init resource header to defaults.
 	Locked			= 0;
 	Overflow		= 0;
 	TransCount		= 0;
@@ -974,39 +969,44 @@ void UTransBuffer::InitHeader(void)
 	NumChanges		= 0;
 	MaxChanges		= 0;
 	MaxDataOffset	= 0;
-	//
+
 	strcpy (ResetAction,"create");
-	UNGUARD("UTransBuffer::InitHeader");
-	};
-void UTransBuffer::InitData(void)
-	{
-	GUARD;
+
+	unguard;
+}
+void UTransBuffer::InitData()
+{
+	guard(UTransBuffer::InitData);
+
 	Overflow		= 0;
 	TransCount		= 0;
 	UndoTransCount	= 0;
 	NumTrans		= 0;
 	NumChanges		= 0;
-	UNGUARD("UTransBuffer::InitData");
-	};
-int UTransBuffer::QuerySize(void)
-	{
-	GUARD;
+
+	unguard;
+}
+int UTransBuffer::QuerySize()
+{
+	guard(UTransBuffer::QuerySize);
+
 	DWORD TransactionSize  = MaxTrans 	* sizeof (FTransaction);
 	DWORD ChangeLogSize    = MaxChanges * sizeof (FTransChangeLog);
 	DWORD DataSize		   = MaxDataOffset;
 	DWORD TotalSize		   = TransactionSize + ChangeLogSize + DataSize;
 	return TotalSize;
-	UNGUARD("UTransBuffer::QuerySize");
-	};
-int UTransBuffer::QueryMinSize(void)
-	{
-	GUARD;
+
+	unguard;
+}
+int UTransBuffer::QueryMinSize()
+{
+	guard(UTransBuffer::QueryMinSize);
 	return QuerySize();
-	UNGUARD("UTransBuffer::QueryMinSize");
-	};
+	unguard;
+}
 void UTransBuffer::QueryDataReferences(FResourceCallback &Callback)
-	{
-	GUARD;
+{
+	guard(UTransBuffer::QueryDataReferences);
 	FTransChangeLog *Changes = (FTransChangeLog  *)((BYTE *)GetData() + MaxTrans * sizeof (FTransaction));
 	for (int i=0; i<NumChanges; i++)
 		{
@@ -1015,6 +1015,12 @@ void UTransBuffer::QueryDataReferences(FResourceCallback &Callback)
 			Callback.Resource(this,&Changes[i].Res,0);
 			};
 		};
-	UNGUARD("UTransBuffer::QueryDataReferences");
+	unguard;
 	};
+void UTransBuffer::Flip()
+{
+	guard(UTransBuffer::Flip);
+	appError("Not implemented; resource type not saveable.");
+	unguard;
+}
 AUTOREGISTER_RESOURCE(RES_TransBuffer,UTransBuffer,0xB2D90854,0xCCD211cf,0x91360000,0xC028B992);

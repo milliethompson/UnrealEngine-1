@@ -3,8 +3,8 @@ Begin VB.Form frmSurfaceProps
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Surface Properties"
    ClientHeight    =   2595
-   ClientLeft      =   7020
-   ClientTop       =   7470
+   ClientLeft      =   4530
+   ClientTop       =   8115
    ClientWidth     =   6360
    BeginProperty Font 
       name            =   "Arial"
@@ -16,16 +16,16 @@ Begin VB.Form frmSurfaceProps
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   3000
+   Height          =   2955
    HelpContextID   =   124
    Icon            =   "SurfProp.frx":0000
-   Left            =   6960
+   Left            =   4470
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    ScaleHeight     =   2595
    ScaleWidth      =   6360
    ShowInTaskbar   =   0   'False
-   Top             =   7125
+   Top             =   7815
    Width           =   6480
    Begin VB.CommandButton Help 
       Caption         =   "&Help"
@@ -40,7 +40,7 @@ Begin VB.Form frmSurfaceProps
       EndProperty
       Height          =   375
       Left            =   5460
-      TabIndex        =   27
+      TabIndex        =   26
       Top             =   600
       Width           =   855
    End
@@ -59,7 +59,7 @@ Begin VB.Form frmSurfaceProps
       EndProperty
       Height          =   375
       Left            =   5460
-      TabIndex        =   26
+      TabIndex        =   25
       Top             =   120
       Width           =   855
    End
@@ -79,13 +79,13 @@ Begin VB.Form frmSurfaceProps
       EndProperty
       Height          =   375
       Left            =   5460
-      TabIndex        =   28
+      TabIndex        =   27
       Top             =   2160
       Width           =   855
    End
    Begin TabDlg.SSTab PropsTab 
       Height          =   2415
-      Left            =   120
+      Left            =   60
       TabIndex        =   4
       Top             =   120
       Width           =   5295
@@ -93,7 +93,7 @@ Begin VB.Form frmSurfaceProps
       _ExtentX        =   9340
       _ExtentY        =   4260
       _StockProps     =   15
-      Caption         =   "Rotate "
+      Caption         =   "Scale"
       BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
          name            =   "Arial"
          charset         =   0
@@ -104,7 +104,7 @@ Begin VB.Form frmSurfaceProps
          strikethrough   =   0   'False
       EndProperty
       TabsPerRow      =   6
-      Tab             =   1
+      Tab             =   4
       TabOrientation  =   0
       Tabs            =   6
       Style           =   1
@@ -117,7 +117,7 @@ Begin VB.Form frmSurfaceProps
       Tab(0).Control(0)=   "PolyFlagsHolder"
       TabCaption(1)   =   "Rotate "
       Tab(1).ControlCount=   1
-      Tab(1).ControlEnabled=   -1  'True
+      Tab(1).ControlEnabled=   0   'False
       Tab(1).Control(0)=   "Frame6"
       TabCaption(2)   =   "Pan "
       Tab(2).ControlCount=   3
@@ -143,22 +143,182 @@ Begin VB.Form frmSurfaceProps
       Tab(3).Control(12)=   "Label3"
       TabCaption(4)   =   "Scale"
       Tab(4).ControlCount=   2
-      Tab(4).ControlEnabled=   0   'False
+      Tab(4).ControlEnabled=   -1  'True
       Tab(4).Control(0)=   "Frame5"
       Tab(4).Control(1)=   "Frame2"
       TabCaption(5)   =   "Editor"
       Tab(5).ControlCount=   3
       Tab(5).ControlEnabled=   0   'False
-      Tab(5).Control(0)=   "Frame8"
-      Tab(5).Control(1)=   "Frame7"
-      Tab(5).Control(2)=   "Label2"
+      Tab(5).Control(0)=   "Frame1"
+      Tab(5).Control(1)=   "Frame8"
+      Tab(5).Control(2)=   "Frame7"
+      Begin VB.Frame Frame1 
+         Caption         =   "Surface Stats"
+         BeginProperty Font 
+            name            =   "MS Sans Serif"
+            charset         =   0
+            weight          =   400
+            size            =   8.25
+            underline       =   0   'False
+            italic          =   0   'False
+            strikethrough   =   0   'False
+         EndProperty
+         Height          =   795
+         Left            =   -74880
+         TabIndex        =   56
+         Top             =   1500
+         Width           =   4995
+         Begin VB.Label Label10 
+            Alignment       =   1  'Right Justify
+            Caption         =   "Mesh size:"
+            BeginProperty Font 
+               name            =   "MS Sans Serif"
+               charset         =   0
+               weight          =   400
+               size            =   8.25
+               underline       =   0   'False
+               italic          =   0   'False
+               strikethrough   =   0   'False
+            EndProperty
+            Height          =   255
+            Index           =   2
+            Left            =   120
+            TabIndex        =   64
+            Top             =   480
+            Width           =   915
+         End
+         Begin VB.Label MeshSize 
+            Caption         =   "###x###"
+            BeginProperty Font 
+               name            =   "MS Sans Serif"
+               charset         =   0
+               weight          =   400
+               size            =   8.25
+               underline       =   0   'False
+               italic          =   0   'False
+               strikethrough   =   0   'False
+            EndProperty
+            Height          =   255
+            Left            =   1140
+            TabIndex        =   63
+            Top             =   480
+            Width           =   735
+         End
+         Begin VB.Label Label10 
+            Alignment       =   1  'Right Justify
+            Caption         =   "Meshels:"
+            BeginProperty Font 
+               name            =   "MS Sans Serif"
+               charset         =   0
+               weight          =   400
+               size            =   8.25
+               underline       =   0   'False
+               italic          =   0   'False
+               strikethrough   =   0   'False
+            EndProperty
+            Height          =   255
+            Index           =   1
+            Left            =   3180
+            TabIndex        =   62
+            Top             =   240
+            Width           =   1035
+         End
+         Begin VB.Label SurfCache 
+            Caption         =   "###"
+            BeginProperty Font 
+               name            =   "MS Sans Serif"
+               charset         =   0
+               weight          =   400
+               size            =   8.25
+               underline       =   0   'False
+               italic          =   0   'False
+               strikethrough   =   0   'False
+            EndProperty
+            Height          =   255
+            Left            =   4320
+            TabIndex        =   61
+            Top             =   240
+            Width           =   615
+         End
+         Begin VB.Label Label12 
+            Alignment       =   1  'Right Justify
+            Caption         =   "Dynamic lights: "
+            BeginProperty Font 
+               name            =   "MS Sans Serif"
+               charset         =   0
+               weight          =   400
+               size            =   8.25
+               underline       =   0   'False
+               italic          =   0   'False
+               strikethrough   =   0   'False
+            EndProperty
+            Height          =   255
+            Left            =   1560
+            TabIndex        =   60
+            Top             =   240
+            Width           =   1215
+         End
+         Begin VB.Label DynamicLights 
+            Caption         =   "###"
+            BeginProperty Font 
+               name            =   "MS Sans Serif"
+               charset         =   0
+               weight          =   400
+               size            =   8.25
+               underline       =   0   'False
+               italic          =   0   'False
+               strikethrough   =   0   'False
+            EndProperty
+            Height          =   255
+            Left            =   2820
+            TabIndex        =   59
+            Top             =   240
+            Width           =   435
+         End
+         Begin VB.Label StaticLights 
+            Caption         =   "###"
+            BeginProperty Font 
+               name            =   "MS Sans Serif"
+               charset         =   0
+               weight          =   400
+               size            =   8.25
+               underline       =   0   'False
+               italic          =   0   'False
+               strikethrough   =   0   'False
+            EndProperty
+            Height          =   255
+            Left            =   1140
+            TabIndex        =   58
+            Top             =   240
+            Width           =   435
+         End
+         Begin VB.Label Label10 
+            Alignment       =   1  'Right Justify
+            Caption         =   "Static lights: "
+            BeginProperty Font 
+               name            =   "MS Sans Serif"
+               charset         =   0
+               weight          =   400
+               size            =   8.25
+               underline       =   0   'False
+               italic          =   0   'False
+               strikethrough   =   0   'False
+            EndProperty
+            Height          =   255
+            Index           =   0
+            Left            =   60
+            TabIndex        =   57
+            Top             =   240
+            Width           =   1035
+         End
+      End
       Begin VB.PictureBox PolyFlagsHolder 
          BorderStyle     =   0  'None
          Height          =   1995
          Left            =   -74940
          ScaleHeight     =   1995
          ScaleWidth      =   5175
-         TabIndex        =   52
+         TabIndex        =   51
          Top             =   360
          Width           =   5175
       End
@@ -174,8 +334,8 @@ Begin VB.Form frmSurfaceProps
             strikethrough   =   0   'False
          EndProperty
          Height          =   1215
-         Left            =   -74760
-         TabIndex        =   49
+         Left            =   240
+         TabIndex        =   48
          Top             =   600
          Width           =   1335
          Begin VB.ComboBox ScaleList 
@@ -191,7 +351,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   315
             Left            =   120
-            TabIndex        =   51
+            TabIndex        =   50
             Text            =   "1.0"
             Top             =   360
             Width           =   1095
@@ -209,7 +369,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   50
+            TabIndex        =   49
             Top             =   720
             Width           =   1095
          End
@@ -226,8 +386,8 @@ Begin VB.Form frmSurfaceProps
             strikethrough   =   0   'False
          EndProperty
          Height          =   1215
-         Left            =   -73200
-         TabIndex        =   42
+         Left            =   1800
+         TabIndex        =   41
          Top             =   600
          Width           =   3255
          Begin VB.TextBox U 
@@ -242,7 +402,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   315
             Left            =   1080
-            TabIndex        =   46
+            TabIndex        =   45
             Text            =   "1.0"
             Top             =   360
             Width           =   1095
@@ -259,7 +419,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   315
             Left            =   1080
-            TabIndex        =   45
+            TabIndex        =   44
             Text            =   "1.0"
             Top             =   720
             Width           =   1095
@@ -277,7 +437,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   2280
-            TabIndex        =   44
+            TabIndex        =   43
             Top             =   360
             Width           =   735
          End
@@ -294,7 +454,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   2280
-            TabIndex        =   43
+            TabIndex        =   42
             Top             =   720
             Width           =   735
          End
@@ -312,7 +472,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   48
+            TabIndex        =   47
             Top             =   360
             Width           =   855
          End
@@ -330,7 +490,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   47
+            TabIndex        =   46
             Top             =   720
             Width           =   855
          End
@@ -350,7 +510,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   40
+         TabIndex        =   39
          Top             =   1200
          Width           =   1215
       End
@@ -369,7 +529,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   29
+         TabIndex        =   28
          Top             =   600
          Width           =   1215
       End
@@ -388,7 +548,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   31
+         TabIndex        =   30
          Top             =   375
          Width           =   1215
       End
@@ -407,7 +567,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   37
+         TabIndex        =   36
          Top             =   1440
          Width           =   1215
       End
@@ -426,7 +586,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   32
+         TabIndex        =   31
          Top             =   1800
          Width           =   1215
       End
@@ -445,7 +605,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   30
+         TabIndex        =   29
          Top             =   960
          Width           =   1215
       End
@@ -461,7 +621,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   285
          Left            =   -71235
-         TabIndex        =   39
+         TabIndex        =   38
          Text            =   "256"
          Top             =   1410
          Width           =   930
@@ -478,9 +638,9 @@ Begin VB.Form frmSurfaceProps
             strikethrough   =   0   'False
          EndProperty
          Height          =   975
-         Left            =   -71640
-         TabIndex        =   19
-         Top             =   480
+         Left            =   -71580
+         TabIndex        =   18
+         Top             =   420
          Width           =   1695
          Begin VB.CommandButton SetGrpName 
             Caption         =   "Set Item Name"
@@ -495,7 +655,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   300
             Left            =   120
-            TabIndex        =   24
+            TabIndex        =   23
             Top             =   240
             Width           =   1455
          End
@@ -511,7 +671,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   315
             Left            =   120
-            TabIndex        =   25
+            TabIndex        =   24
             Top             =   600
             Width           =   1455
          End
@@ -528,9 +688,9 @@ Begin VB.Form frmSurfaceProps
             strikethrough   =   0   'False
          EndProperty
          Height          =   975
-         Left            =   -74520
-         TabIndex        =   18
-         Top             =   480
+         Left            =   -74880
+         TabIndex        =   17
+         Top             =   420
          Width           =   2535
          Begin VB.CommandButton CutHideAll 
             Caption         =   "Hide All"
@@ -545,7 +705,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   21
+            TabIndex        =   20
             Top             =   600
             Width           =   855
          End
@@ -562,7 +722,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   1080
-            TabIndex        =   23
+            TabIndex        =   22
             Top             =   600
             Width           =   1335
          End
@@ -579,7 +739,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   20
+            TabIndex        =   19
             Top             =   360
             Width           =   855
          End
@@ -596,7 +756,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   1080
-            TabIndex        =   22
+            TabIndex        =   21
             Top             =   360
             Width           =   1335
          End
@@ -613,7 +773,7 @@ Begin VB.Form frmSurfaceProps
             strikethrough   =   0   'False
          EndProperty
          Height          =   1095
-         Left            =   600
+         Left            =   -74400
          TabIndex        =   16
          Top             =   600
          Width           =   4095
@@ -630,7 +790,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   2280
-            TabIndex        =   56
+            TabIndex        =   55
             Top             =   720
             Width           =   1575
          End
@@ -647,7 +807,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   2280
-            TabIndex        =   55
+            TabIndex        =   54
             Top             =   360
             Width           =   1575
          End
@@ -664,7 +824,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   840
-            TabIndex        =   54
+            TabIndex        =   53
             Top             =   720
             Width           =   615
          End
@@ -681,7 +841,7 @@ Begin VB.Form frmSurfaceProps
             EndProperty
             Height          =   255
             Left            =   840
-            TabIndex        =   53
+            TabIndex        =   52
             Top             =   360
             Width           =   615
          End
@@ -951,7 +1111,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   41
+         TabIndex        =   40
          Top             =   1200
          Width           =   3015
       End
@@ -968,7 +1128,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   38
+         TabIndex        =   37
          Top             =   1440
          Width           =   2055
       End
@@ -985,7 +1145,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   36
+         TabIndex        =   35
          Top             =   1800
          Width           =   3015
       End
@@ -1002,7 +1162,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   35
+         TabIndex        =   34
          Top             =   960
          Width           =   3015
       End
@@ -1019,7 +1179,7 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   34
+         TabIndex        =   33
          Top             =   375
          Width           =   3015
       End
@@ -1036,27 +1196,9 @@ Begin VB.Form frmSurfaceProps
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   33
+         TabIndex        =   32
          Top             =   600
          Width           =   3015
-      End
-      Begin VB.Label Label2 
-         Alignment       =   2  'Center
-         Caption         =   "These options that apply only in UnrealEd, not during gameplay."
-         BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
-         EndProperty
-         Height          =   255
-         Left            =   -74760
-         TabIndex        =   17
-         Top             =   1560
-         Width           =   4935
       End
    End
 End
@@ -1074,8 +1216,8 @@ Dim Sqr2 As String
 '
 Public Sub GetSelectedPolys()
     Dim OnFlags As Long, OffFlags As Long
+    Dim N As Integer, L As Integer
     '
-    Dim N As Integer
     N = Val(Ed.Server.GetProp("Polys", "NumSelected"))
     If N = 0 Then
         PropsTab.Enabled = False
@@ -1087,7 +1229,12 @@ Public Sub GetSelectedPolys()
     OffFlags = Val(Ed.Server.GetProp("Polys", "SelectedClearFlags"))
     '
     Call PolyFlagsForm.SetFlagBits(OnFlags, OffFlags)
-    Caption = "Surface Properties (" & Str(N) & " selected)"
+    Caption = "Surface properties (" & Trim(Str(N)) & " selected)"
+    '
+    StaticLights.Caption = Ed.Server.GetProp("Polys", "StaticLights")
+    DynamicLights.Caption = Ed.Server.GetProp("Polys", "DynamicLights")
+    SurfCache.Caption = Ed.Server.GetProp("Polys", "Meshels")
+    MeshSize.Caption = Ed.Server.GetProp("Polys", "MeshSize")
 End Sub
 
 Public Sub PolyFlagsUpdate(NewOnFlags As Long, NewOffFlags As Long)
@@ -1164,11 +1311,12 @@ Private Sub Command5_Click()
     Dim UU As Double
     Dim VV As Double
     '
-    UU = Val(U.Text)
-    VV = Val(V.Text)
-    '
-    If (UU <> 0) And (VV <> 0) Then
-        Ed.Server.Exec "POLY TEXSCALE UU=" & Trim(Str(1# / UU)) & " VV=" & Trim(Str(1# / V))
+    If Eval(U.Text, UU) Then
+        If Eval(V.Text, VV) Then
+            If (UU <> 0) And (VV <> 0) Then
+                Ed.Server.Exec "POLY TEXSCALE UU=" & Trim(Str(1# / UU)) & " VV=" & Trim(Str(1# / V))
+            End If
+        End If
     End If
 End Sub
 

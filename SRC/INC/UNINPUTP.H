@@ -23,8 +23,10 @@ Description:
     processing. Mostly, the values needed are counts of the
     number of different inputs. 
 
-    Parts that are expected by other layers (and must be provided for
-    each platform) are marked with [Required].
+Notes:
+  1. Many of the functions should be static functions, but are not since we
+     are using the trick of making them virtual (so the definitions can appear
+     in the windows .dll and be used by the engine .dll).
 
 Revision history:
     * 06/01/96, Created by Mark
@@ -35,7 +37,7 @@ Revision history:
 
 #include "Unreal.h"
 
-class UNREAL_API FPlatformInput
+class FPlatformInput
 {
 public:
     enum { MaxJoystickButtonCount = 10 };
@@ -44,7 +46,7 @@ public:
         // Note: All TSwitch values must fit in a BYTE
         // Be careful if you add, remove, or rearrange these enumeration values.
         // There are arrays which expect this order (look for arrays of size SwitchCount.
-        S_None      = 0     // [Required] No switch (always 0)
+        S_None      = 0     // No switch (always 0)
         //----------------------------------------------------------
         //            Platform-specific switches
         //----------------------------------------------------------
@@ -203,22 +205,20 @@ public:
         //----------------------------------------------------------
         //            End of platform-specific switches
         //----------------------------------------------------------
-    ,   SwitchCount     // [Required] Number of kinds of switches, including S_None.
+    ,   SwitchCount     // Number of kinds of switches, including S_None.
     }
-    TSwitch; // [Required]
+    TSwitch;
 
-    // The abbreviations are used in .ini files where brevity may be important to keep 
-    // line lengths reasonable. The descriptive names are used in the user interface.
-    static const char * Abbreviation(TSwitch Switch); // [Required]
-    static const char * Description(TSwitch Switch); // [Required]
-    static BOOL IsTypingKey(TSwitch Switch); // [Required] Is the key used for console typing?
+    virtual const char * Abbreviation(TSwitch Switch) const; // Abbreviations are used where brevity is important, such as in .ini files.
+    virtual const char * Description(TSwitch Switch) const; // Descriptive name used for user interface.
+    virtual BOOL IsTypingKey(TSwitch Switch) const; // Is the key used for console typing?
     
     typedef enum
     {
         // Note: All TMovement values must fit in a BYTE
         // Be careful if you add, remove, or rearrange these enumeration values.
         // There are arrays which expect this order (look for arrays of size MovementCount.
-        M_None      = 0     // [Required] No movement (always 0)
+        M_None      = 0     // No movement (always 0)
         //----------------------------------------------------------
         //            Platform-specific movements
         //----------------------------------------------------------
@@ -256,9 +256,9 @@ public:
         //----------------------------------------------------------
         //            End of platform-specific movements
         //----------------------------------------------------------
-    ,   MovementCount       // [Required] Number of kinds of movements, including M_None.
+    ,   MovementCount       // Number of kinds of movements, including M_None.
     }
-    TMovement; // [Required]
+    TMovement;
 
     static BOOL IsMouseMovement(TMovement Movement)
     {
@@ -267,21 +267,20 @@ public:
 
     // The abbreviations are used in .ini files where brevity may be important to keep 
     // line lengths reasonable. The descriptive names are used in the user interface.
-    static const char * Abbreviation(TMovement Movement); // [Required]
-    static const char * Description(TMovement Movement); // [Required]
-    static const char * NeutralDescription(TMovement Movement); // [Required]
-    static BOOL IsPositive(TMovement Movement); // Is the movement a positive (not negative) movement? [Required]
+    virtual const char * Abbreviation(TMovement Movement) const;
+    virtual const char * Description(TMovement Movement) const;
+    virtual const char * NeutralDescription(TMovement Movement) const;
+    virtual BOOL IsPositive(TMovement Movement) const; // Is the movement a positive (not negative) movement?
 
 
-    static TMovement OppositeMovement(TMovement Movement); // Returns the similar but opposite movement.    
-    // Map a Windows VK_... key identifier to a switch. A value of 0
-    // means the key has no corresponding switch.
-    static TSwitch WindowsKeySwitches[256];
+    virtual TMovement OppositeMovement(TMovement Movement) const; // Returns the similar but opposite movement.    
+    TSwitch WindowsKeySwitches[256];
+        // Map a Windows VK_... key identifier to a switch. A value of 0
+        // means the key has no corresponding switch.
 
-    FPlatformInput(); 
-    void Initialize(); // [Required]
-    void Finalize();   // [Required]
-    void Reset(); // [Required] Reset the state of all switches, movements.
+    virtual void Initialize();
+    virtual void Exit();
+    virtual void Reset(); // Reset the state of all switches, movements.
 
     typedef enum
     {
@@ -298,38 +297,38 @@ public:
         //----------------------------------------------------------
         //            End of platform-specific device
         //----------------------------------------------------------
-    ,   DeviceCount       // [Required] Number of kinds of devices.
+    ,   DeviceCount       // Number of kinds of devices.
     }
-    TDevice; // [Required]
-    static const char * DeviceName(TDevice Device);
-    void UseDevice( TDevice Device, BOOL Use = TRUE ); // Use or ignore a device for input.
-    BOOL UsingDevice( TDevice Device ) const; // Are we using Device for input?
-    void CaptureDevices(BOOL Capture = TRUE); // For all devices in use, start or stop capturing input.
-    BOOL CapturingDevice(TDevice Device) const; // Are we using and capturing input from a device?
-    BOOL CapturingMouse() const { return CapturingDevice(MouseDevice); }
-    BOOL CapturingKeyboard() const { return CapturingDevice(KeyboardDevice); }
-    BOOL CapturingJoystick1() const { return CapturingDevice(Joystick1Device); }
-    BOOL CapturingJoystick2() const { return CapturingDevice(Joystick2Device); }
-    BOOL CapturingJoystick() const { return CapturingJoystick1() || CapturingJoystick2(); }
+    TDevice;
+    virtual const char * DeviceName(TDevice Device) const;
+    virtual void UseDevice( TDevice Device, BOOL Use = TRUE ); // Use or ignore a device for input.
+    virtual BOOL UsingDevice( TDevice Device ) const; // Are we using Device for input?
+    virtual void CaptureDevices(BOOL Capture = TRUE); // For all devices in use, start or stop capturing input.
+    virtual BOOL CapturingDevice(TDevice Device) const; // Are we using and capturing input from a device?
+    virtual BOOL CapturingMouse() const { return CapturingDevice(MouseDevice); }
+    virtual BOOL CapturingKeyboard() const { return CapturingDevice(KeyboardDevice); }
+    virtual BOOL CapturingJoystick1() const { return CapturingDevice(Joystick1Device); }
+    virtual BOOL CapturingJoystick2() const { return CapturingDevice(Joystick2Device); }
+    virtual BOOL CapturingJoystick() const { return CapturingJoystick1() || CapturingJoystick2(); }
 
-    FLOAT AnalogThreshold      (TMovement Movement) const { return MovementsInfo[Movement].Sensitivity.AnalogThreshold      ; }
-    FLOAT DifferentialThreshold(TMovement Movement) const { return MovementsInfo[Movement].Sensitivity.DifferentialThreshold; }
-    FLOAT DigitalThreshold     (TMovement Movement) const { return MovementsInfo[Movement].Sensitivity.DigitalThreshold     ; }
-    FLOAT Speed                (TMovement Movement) const { return MovementsInfo[Movement].Sensitivity.Speed                ; }
+    virtual FLOAT AnalogThreshold      (TMovement Movement) const { return MovementsInfo[Movement].Sensitivity.AnalogThreshold      ; }
+    virtual FLOAT DifferentialThreshold(TMovement Movement) const { return MovementsInfo[Movement].Sensitivity.DifferentialThreshold; }
+    virtual FLOAT DigitalThreshold     (TMovement Movement) const { return MovementsInfo[Movement].Sensitivity.DigitalThreshold     ; }
+    virtual FLOAT Speed                (TMovement Movement) const { return MovementsInfo[Movement].Sensitivity.Speed                ; }
 
-    void SetAnalogThreshold       (TMovement Movement, FLOAT Value) { MovementsInfo[Movement].Sensitivity.AnalogThreshold        = Value; }
-    void SetDifferentialThreshold (TMovement Movement, FLOAT Value) { MovementsInfo[Movement].Sensitivity.DifferentialThreshold  = Value; }
-    void SetDigitalThreshold      (TMovement Movement, FLOAT Value) { MovementsInfo[Movement].Sensitivity.DigitalThreshold       = Value; }
-    void SetSpeed                 (TMovement Movement, FLOAT Value) { MovementsInfo[Movement].Sensitivity.Speed                  = Value; }
+    virtual void SetAnalogThreshold       (TMovement Movement, FLOAT Value) { MovementsInfo[Movement].Sensitivity.AnalogThreshold        = Value; }
+    virtual void SetDifferentialThreshold (TMovement Movement, FLOAT Value) { MovementsInfo[Movement].Sensitivity.DifferentialThreshold  = Value; }
+    virtual void SetDigitalThreshold      (TMovement Movement, FLOAT Value) { MovementsInfo[Movement].Sensitivity.DigitalThreshold       = Value; }
+    virtual void SetSpeed                 (TMovement Movement, FLOAT Value) { MovementsInfo[Movement].Sensitivity.Speed                  = Value; }
 
-    static TDevice Device(TMovement Movement); // Which device owns Movement?
-    static TDevice Device(TSwitch Switch); // Which device owns Switch?
+    virtual TDevice Device(TMovement Movement) const; // Which device owns Movement?
+    virtual TDevice Device(TSwitch Switch) const; // Which device owns Switch?
 private:
     void CaptureDevice(TDevice Device, BOOL Capture = TRUE);
     void GatherInput(TDevice Device); // Gather input for a device.
 public:
-    void GatherInput(); // Gather input from devices.
-    void StartNextInputCycle(); // Checkpoint, call after input gathered and processed.
+    virtual void GatherInput(); // Gather input from devices.
+    virtual void StartNextInputCycle(); // Checkpoint, call after input gathered and processed.
         // This saves all movement new positions as the "old" positions, for later comparisons.
 
     // Platform state information
@@ -351,7 +350,7 @@ public:
         BOOL    DoubleIsPending : 1 ;   // The switch was double-pressed, but may not be held down.
         BOOL    IsToggledOn     : 1 ;   // The switch, treated as a toggle, is considered on (even though the switch might not be on).
         BOOL    IsDoubleToggledOn:1 ;   // The double switch, treated as a toggle, is considered on (even though the switch might not be on).
-        void    Empty(BOOL ResetToggles = TRUE);
+        virtual void    Empty(BOOL ResetToggles = TRUE);
         // Notes:
         //   1. The IsPending and DoubleIsPending flags are usually reset when the corresponding
         //      switch action has been processed. This is done by the higher layers, if they care.
@@ -374,10 +373,8 @@ public:
     // The abbreviations are used in .ini files where brevity may be important to keep 
     // line lengths reasonable. The descriptive names are used in the user interface.
     // The neutral description removes any positive/negative connotation from the description.
-    // The help gives a detailed English description.
-    static const char * Abbreviation(TMovementKind MovementKind); // [Required]
-    static const char * Description(TMovementKind MovementKind); // [Required]
-    static const char * Help(TMovementKind MovementKind); // [Required]
+    virtual const char * Abbreviation(TMovementKind MovementKind) const;
+    virtual const char * Description(TMovementKind MovementKind) const;
 
     static BOOL IsAnalog(TMovementKind MovementKind)
     {
@@ -422,60 +419,26 @@ public:
 
     TMovementInfo MovementsInfo[MovementCount];
 
-    void SetMovementRange // Sets MiddlePosition and HalfRange for the specified movements.
+    virtual void SetMovementRange // Sets MiddlePosition and HalfRange for the movement pair identified by the positive movement.
     (
         TMovement       PositiveMovement
-    ,   TMovement       NegativeMovement
     ,   FLOAT           MinValue
     ,   FLOAT           MaxValue
     );
 
-    void SetDefaultMovementInfo(); // Fills in MovementsInfo with default values.
+    virtual void SetDefaultMovementInfo(); // Fills in MovementsInfo with default values.
 
-    static TMovementKind DefaultMovementKind(TMovement Movement);
+    virtual TMovementKind DefaultMovementKind(TMovement Movement) const;
 
-    //tbi: These can be int's:
-    //todo: Actually, I think they can be deleted! Check the other mouse functions too.
-    FLOAT OldMouseX() const { return OldPosition[M_MouseR]; }
-    FLOAT OldMouseY() const { return OldPosition[M_MouseB]; }
-    FLOAT NewMouseX() const { return NewPosition[M_MouseR]; }
-    FLOAT NewMouseY() const { return NewPosition[M_MouseB]; }
-
-    // Handling the mouse sometimes requires playing around with the
-    // old and new positions, so these functions are provided:
-
-    void SetOldMouse(FLOAT X, FLOAT Y)
+    // Set the state of a switch (pressed or released).
+    // Return TRUE if the switch state changed, FALSE otherwise.
+    virtual BOOL SetSwitch(TSwitch Switch, BOOL IsPressed = TRUE)
     {
-        OldPosition[M_MouseR] = X;
-        OldPosition[M_MouseL] = X;
-        OldPosition[M_MouseB] = Y;
-        OldPosition[M_MouseF] = Y;
+        return IsPressed ? Press(Switch) : Release(Switch);
     }
-    void SetNewMouse(FLOAT X, FLOAT Y)
-    {
-        NewPosition[M_MouseR] = X;
-        NewPosition[M_MouseL] = X;
-        NewPosition[M_MouseB] = Y;
-        NewPosition[M_MouseF] = Y;
-    }
-    // Resets the old position to (X,Y), and uses the current
-    // changes to define the new position.
-    void ResetMouse(FLOAT X, FLOAT Y);
-
-    void SetSwitch(TSwitch Switch, BOOL IsPressed = TRUE)
-    {
-        if(IsPressed) 
-        { 
-            Press(Switch); 
-        } 
-        else 
-        { 
-            Release(Switch); 
-        }
-    }
-    void Press(TSwitch Switch); // Press the specified switch.
-    void DoublePress(TSwitch Switch); // Double-press the specified switch.
-    void Release(TSwitch Switch); // Release the specified switch.
+    virtual BOOL Press(TSwitch Switch); // Press the specified switch, return TRUE iff the switch was not already pressed.
+    virtual BOOL DoublePress(TSwitch Switch); // Double-press the specified switch. Return TRUE iff the switch was not already double-pressed.
+    virtual BOOL Release(TSwitch Switch); // Release the specified switch. Return TRUE iff the switch was not already released.
     BOOL IsOn( TSwitch Switch ) const // Is the given switch on?
     {
         return Switches[Switch].IsOn;
@@ -550,14 +513,22 @@ public:
         ;
     }
 
-    //                  NoteMovement
-    // This makes note of a movement pair's current position, and updates
-    // MovementPosition[] of the given movements, based on the values.
-    void NoteMovement
+    //                  NotePosition
+    // This makes note of the position of a movement pair (identified by the
+    // positive axis) updates MovementPosition[] of the movements based on the values.
+    virtual void NotePosition
     (
         TMovement       PositiveMovement    // The movement for position motion.
-    ,   TMovement       NegativeMovement    // The movement for negative motion.
-    ,   FLOAT           Value               // The current absolute position.
+    ,   FLOAT           Position            // The current absolute position.
+    );
+
+    //                  NoteChange
+    // This makes note of a change in position of a movement pair (identified by the
+    // positive axis) and updates MovementPosition[] of the movements based on the values.
+    virtual void NoteChange
+    (
+        TMovement       PositiveMovement    // The movement for position motion.
+    ,   FLOAT           Change              // The change in position.
     );
 
     //              InterpretMovement
@@ -568,7 +539,7 @@ public:
     //     Holds the magnitude of the movement, 0.0..1.0, or 0.0 for an active digital movement.
     //   MovementIsActive:
     //     TRUE if the movement is active, FALSE otherwise.
-    void InterpretMovement
+    virtual void InterpretMovement
     (
         FLOAT         & Magnitude        
     ,   BOOL          & MovementIsActive
@@ -576,5 +547,7 @@ public:
     ,   TMovementKind   MovementKind
     ) const;
 };
+
+extern FPlatformInput GPlatformInput;
 
 #endif

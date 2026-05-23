@@ -1,5 +1,15 @@
-// UnWnKeyD.cpp : implementation file
-//
+/*============================================================================
+UnWnKeyD.cpp: Keyboard input selection dialog
+
+Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
+
+Description:
+    Refer to the associated header file.
+
+Revision history:
+    * xx/xx/96: Created by Mark
+============================================================================*/
 
 #include "stdafx.h"
 #include "unwn.h"

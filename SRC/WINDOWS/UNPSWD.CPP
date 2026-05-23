@@ -19,29 +19,29 @@ static char THIS_FILE[] = __FILE__;
 #endif
 
 /*-----------------------------------------------------------------------------
-	CPasswordDlg dialog
+	CPasswordDlg dialog.
 -----------------------------------------------------------------------------*/
 
 CPasswordDlg::CPasswordDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CPasswordDlg::IDD, pParent)
-	{
-	GUARD;
+{
+	guard(CPasswordDlg::CPasswordDlg);
 	//{{AFX_DATA_INIT(CPasswordDlg)
 	//}}AFX_DATA_INIT
-	UNGUARD("CPasswordDlg::CPasswordDlg");
-	};
+	unguard;
+}
 
 void CPasswordDlg::DoDataExchange(CDataExchange* pDX)
-	{
-	GUARD;
+{
+	guard(CPasswordDlg::DoDataExchange);
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(CPasswordDlg)
 	DDX_Control(pDX, IDC_PROMPT, m_Prompt);
 	DDX_Control(pDX, IDC_PASSWORD, m_Password);
 	DDX_Control(pDX, IDC_NAME, m_Name);
 	//}}AFX_DATA_MAP
-	UNGUARD("CPasswordDlg::DoDataExchange");
-	};
+	unguard;
+}
 
 BEGIN_MESSAGE_MAP(CPasswordDlg, CDialog)
 	//{{AFX_MSG_MAP(CPasswordDlg)
@@ -49,52 +49,51 @@ BEGIN_MESSAGE_MAP(CPasswordDlg, CDialog)
 END_MESSAGE_MAP()
 
 /*-----------------------------------------------------------------------------
-	Custom
+	Custom.
 -----------------------------------------------------------------------------*/
 
 BOOL CPasswordDlg::OnInitDialog() 
-	{
-	GUARD;
+{
+	guard(CPasswordDlg::OnInitDialog);
 	CDialog::OnInitDialog();
-	//
-	// Custom initialization:
-	//
+
+	// Custom initialization.
 	SetWindowText(Title);
 	m_Name.ReplaceSel(Name);
 	m_Password.ReplaceSel(Password);
 	m_Prompt.SendMessage(WM_SETTEXT,0,(LPARAM)Prompt);
-	//
+
 	m_Name.SetFocus();
-	//
+
 	return FALSE;
-	UNGUARD("CPasswordDlg::OnInitDialog");
-	};
+	unguard;
+}
 
 void CPasswordDlg::OnCancel() 
-	{
-	GUARD;
+{
+	guard(CPasswordDlg::OnCancel);
 	CDialog::OnCancel();
-	UNGUARD("CPasswordDlg::OnCancel");
-	};
+	unguard;
+}
 
 void CPasswordDlg::OnOK() 
-	{
-	GUARD;
+{
+	guard(CPasswordDlg::OnOK);
 	char T[256]; CString C;
-	//
+
 	m_Name.GetLine(0,T);
 	C=T; C.TrimLeft(); C.TrimRight(); strcpy(Name,C);
-	//
+
 	m_Password.GetLine(0,T);
 	C=T; C.TrimLeft(); C.TrimRight(); strcpy(Password,C);
-	//
+
 	strcpy(Encryption,"");
-	//
+
 	CDialog::OnOK();
-	UNGUARD("CPasswordDlg::OnOK");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/
 

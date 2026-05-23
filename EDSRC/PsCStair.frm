@@ -2,45 +2,45 @@ VERSION 4.00
 Begin VB.Form frmParSolCurvedStair 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Build a Curved Stair"
-   ClientHeight    =   6444
-   ClientLeft      =   7920
-   ClientTop       =   1752
-   ClientWidth     =   2976
+   ClientHeight    =   6450
+   ClientLeft      =   3165
+   ClientTop       =   1425
+   ClientWidth     =   2970
    ControlBox      =   0   'False
    BeginProperty Font 
       name            =   "MS Sans Serif"
       charset         =   0
       weight          =   700
-      size            =   7.8
+      size            =   8.25
       underline       =   0   'False
       italic          =   0   'False
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   6768
+   Height          =   6810
    HelpContextID   =   151
-   Left            =   7872
+   Left            =   3105
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
-   ScaleHeight     =   6444
-   ScaleWidth      =   2976
+   ScaleHeight     =   6450
+   ScaleWidth      =   2970
    ShowInTaskbar   =   0   'False
-   Top             =   1476
-   Width           =   3072
+   Top             =   1125
+   Width           =   3090
    Begin VB.CheckBox chkAlignSide 
       Caption         =   "Align to Side"
       BeginProperty Font 
          name            =   "MS Sans Serif"
          charset         =   0
-         weight          =   700
-         size            =   7.8
+         weight          =   400
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   252
       Left            =   720
-      TabIndex        =   24
+      TabIndex        =   11
       Top             =   2400
       Value           =   1  'Checked
       Width           =   1812
@@ -50,55 +50,47 @@ Begin VB.Form frmParSolCurvedStair
       BeginProperty Font 
          name            =   "MS Sans Serif"
          charset         =   0
-         weight          =   700
-         size            =   7.8
+         weight          =   400
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   252
       Left            =   720
-      TabIndex        =   23
+      TabIndex        =   10
       Top             =   2160
       Width           =   2172
    End
    Begin VB.TextBox FirstStep 
+      BackColor       =   &H00FFFFFF&
       BeginProperty Font 
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   288
       Left            =   1440
-      TabIndex        =   3
+      TabIndex        =   0
       Text            =   "0"
       Top             =   2880
       Width           =   1452
    End
    Begin Threed.SSPanel SSPanel1 
-      Height          =   1932
+      Height          =   1935
       Left            =   120
-      TabIndex        =   18
+      TabIndex        =   20
       Top             =   120
-      Width           =   2772
+      Width           =   2775
       _Version        =   65536
       _ExtentX        =   4895
       _ExtentY        =   3413
       _StockProps     =   15
       BackColor       =   12632256
-      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   700
-         size            =   7.81
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
       BevelInner      =   1
       Begin VB.Line Line34 
          X1              =   2400
@@ -307,14 +299,14 @@ Begin VB.Form frmParSolCurvedStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   1320
-         TabIndex        =   21
+         TabIndex        =   23
          Top             =   1560
          Width           =   1215
       End
@@ -325,14 +317,14 @@ Begin VB.Form frmParSolCurvedStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
          EndProperty
          Height          =   495
          Left            =   120
-         TabIndex        =   20
+         TabIndex        =   22
          Top             =   600
          Width           =   495
       End
@@ -351,7 +343,7 @@ Begin VB.Form frmParSolCurvedStair
             name            =   "MS Sans Serif"
             charset         =   0
             weight          =   400
-            size            =   7.8
+            size            =   8.25
             underline       =   0   'False
             italic          =   0   'False
             strikethrough   =   0   'False
@@ -359,7 +351,7 @@ Begin VB.Form frmParSolCurvedStair
          ForeColor       =   &H80000008&
          Height          =   255
          Left            =   360
-         TabIndex        =   19
+         TabIndex        =   21
          Top             =   1440
          Width           =   975
       End
@@ -390,14 +382,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   1200
-      TabIndex        =   1
+      TabIndex        =   8
       Top             =   6000
       Width           =   735
    End
@@ -407,7 +399,7 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
@@ -415,7 +407,7 @@ Begin VB.Form frmParSolCurvedStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1440
-      TabIndex        =   6
+      TabIndex        =   3
       Text            =   "256"
       Top             =   3960
       Width           =   1455
@@ -426,7 +418,7 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
@@ -434,7 +426,7 @@ Begin VB.Form frmParSolCurvedStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1440
-      TabIndex        =   9
+      TabIndex        =   6
       Text            =   "CStair"
       Top             =   5040
       Width           =   1455
@@ -445,7 +437,7 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
@@ -453,7 +445,7 @@ Begin VB.Form frmParSolCurvedStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1440
-      TabIndex        =   8
+      TabIndex        =   5
       Text            =   "4"
       Top             =   4680
       Width           =   1455
@@ -464,7 +456,7 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
@@ -472,7 +464,7 @@ Begin VB.Form frmParSolCurvedStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1440
-      TabIndex        =   7
+      TabIndex        =   4
       Text            =   "90"
       Top             =   4320
       Width           =   1455
@@ -483,7 +475,7 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
@@ -491,7 +483,7 @@ Begin VB.Form frmParSolCurvedStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1440
-      TabIndex        =   5
+      TabIndex        =   2
       Text            =   "256-16"
       Top             =   3600
       Width           =   1455
@@ -502,7 +494,7 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
@@ -510,7 +502,7 @@ Begin VB.Form frmParSolCurvedStair
       ForeColor       =   &H00000000&
       Height          =   285
       Left            =   1440
-      TabIndex        =   4
+      TabIndex        =   1
       Text            =   "16"
       Top             =   3240
       Width           =   1455
@@ -523,14 +515,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   2040
-      TabIndex        =   2
+      TabIndex        =   9
       Top             =   6000
       Width           =   855
    End
@@ -543,14 +535,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   372
       Left            =   120
-      TabIndex        =   0
+      TabIndex        =   7
       Top             =   6000
       Width           =   972
    End
@@ -561,14 +553,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   252
       Left            =   120
-      TabIndex        =   22
+      TabIndex        =   24
       Top             =   2880
       Width           =   1212
    End
@@ -577,19 +569,10 @@ Begin VB.Form frmParSolCurvedStair
       Appearance      =   0  'Flat
       BackColor       =   &H80000005&
       Caption         =   "Trigger"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   700
-         size            =   7.8
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
       ForeColor       =   &H80000008&
       Height          =   252
       Left            =   0
-      TabIndex        =   17
+      TabIndex        =   19
       Top             =   5640
       Visible         =   0   'False
       Width           =   732
@@ -601,14 +584,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   252
       Left            =   120
-      TabIndex        =   16
+      TabIndex        =   18
       Top             =   3960
       Width           =   1212
    End
@@ -619,14 +602,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   492
       Left            =   480
-      TabIndex        =   15
+      TabIndex        =   17
       Top             =   5400
       Width           =   2292
    End
@@ -637,14 +620,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   252
       Left            =   240
-      TabIndex        =   14
+      TabIndex        =   16
       Top             =   5040
       Width           =   1092
    End
@@ -655,14 +638,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   252
       Left            =   240
-      TabIndex        =   13
+      TabIndex        =   15
       Top             =   4320
       Width           =   1092
    End
@@ -673,14 +656,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   252
       Left            =   120
-      TabIndex        =   12
+      TabIndex        =   14
       Top             =   4680
       Width           =   1212
    End
@@ -691,14 +674,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   252
       Left            =   120
-      TabIndex        =   11
+      TabIndex        =   13
       Top             =   3600
       Width           =   1212
    End
@@ -709,14 +692,14 @@ Begin VB.Form frmParSolCurvedStair
          name            =   "MS Sans Serif"
          charset         =   0
          weight          =   400
-         size            =   7.8
+         size            =   8.25
          underline       =   0   'False
          italic          =   0   'False
          strikethrough   =   0   'False
       EndProperty
       Height          =   252
       Left            =   240
-      TabIndex        =   10
+      TabIndex        =   12
       Top             =   3240
       Width           =   1092
    End
@@ -983,7 +966,7 @@ Private Sub Close_Click()
 End Sub
 
 Private Sub Form_Load()
-    Call Ed.SetOnTop(Me, "BuildCurvedStair", TOP_BROWSER)
+    Call Ed.SetOnTop(Me, "BuildCurvedStair", TOP_NORMAL)
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
@@ -996,5 +979,36 @@ End Sub
 
 Private Sub Trigger_Change()
     Build_Click
+End Sub
+
+'
+' Focus change highlighting routines.
+'
+Private Sub FirstStep_GotFocus()
+    SelectAll FirstStep
+End Sub
+
+Private Sub StepHeight_GotFocus()
+    SelectAll StepHeight
+End Sub
+
+Private Sub InnerRad_GotFocus()
+    SelectAll InnerRad
+End Sub
+
+Private Sub StepWidth_GotFocus()
+    SelectAll StepWidth
+End Sub
+
+Private Sub CurveAngle_GotFocus()
+    SelectAll CurveAngle
+End Sub
+
+Private Sub NumSteps_GotFocus()
+    SelectAll NumSteps
+End Sub
+
+Private Sub Group_GotFocus()
+    SelectAll Group
 End Sub
 

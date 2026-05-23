@@ -1,22 +1,23 @@
 '
-' UnrealEd class and child classes for class: Decorations
+' UnrealEd class and child classes for class: Decoration
 '
 
-DeclareClass Name=Decorations
+DeclareClass Name=Decoration
 DeclareClass Name=Vase
 DeclareClass Name=Chandelier
 DeclareClass Name=Hammok
 
-Begin Class Name=Decorations
+Begin Class Name=Decoration
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class Decorations Expands Root Intrinsic
+Class Decoration Expands Actor Intrinsic
+Dim EffectWhenDestroyed As Editable Class ' If non-0, the pyrotechnic or explosion when item is damaged.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Class=Decorations
+      Class=Decoration
       Texture=None
-      bStaticActor=True
+      bStatic=True
       bTemplateClass=False
       Mass=+00000.000000
    End DefaultProperties
@@ -25,7 +26,7 @@ End Class
 Begin Class Name=Vase
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class Vase Expands Decorations Intrinsic
+Class Vase Expands Decoration 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -39,7 +40,7 @@ End Class
 Begin Class Name=Chandelier
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class Chandelier Expands Decorations Intrinsic
+Class Chandelier Expands Decoration
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -52,32 +53,10 @@ End Class
 Begin Class Name=Hammok
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class Hammok Expands Decorations Intrinsic
+Class Hammok Expands Decoration 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
       Class=Hammok
    End DefaultProperties
 End Class
-
-Begin Class Name=Flame
-   Begin Text
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Class Flame Expands Decorations Intrinsic
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   End Text
-   Begin DefaultProperties
-      Class=Flame
-      MeshMap=Flame
-      DrawType=2
-      DrawScale=1.0
-      AnimRate=1.0
-      AnimCount=0
-      AnimSeq=1
-      bAnimate=True
-      LightType=4
-      LightBrightness=90
-      LightRadius=20
-   End DefaultProperties
-End Class
-

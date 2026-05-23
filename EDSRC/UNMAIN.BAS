@@ -11,6 +11,7 @@ Global Ed As UnrealEdApp
 ' Misc global constants
 '
 Global Const NoneString = "(none)"
+Global Const AllString = "(All)"
 
 Global GlobalError As String
 Global GlobalResume As Integer
@@ -147,6 +148,7 @@ Sub PostLoad()
     For i = 0 To GNumMiscForms - 1
         Call GMiscForms(i).PostLoad
     Next i
+    frmActorProperties.NoteClassChange
 End Sub
 
 Sub UpdateDialog(c As Control)

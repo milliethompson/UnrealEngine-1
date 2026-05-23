@@ -1,47 +1,40 @@
 /*=============================================================================
-	UnWnEdSv.h: Header file for CUnrealEdServer OLE class
-	Used by: Unreal/Windows interface
+	UnWnEdSv.h: Header file for CUnrealEdServer Ole class
 
 	Revision history:
 		* Created by Tim Sweeney
 =============================================================================*/
 
 /////////////////////////////////////////////////////////////////////////////
-// CUnrealEdServer window
+// CUnrealEdServer
 /////////////////////////////////////////////////////////////////////////////
 
 class CUnrealEdServer : public CWnd
-	{
+{
 	DECLARE_DYNCREATE(CUnrealEdServer)
-	//
-	// Construction
-	//
-	public:
+
+	// Construction.
+public:
 	CUnrealEdServer();
-	//
-	// Attributes
-	//
-	public:
-	//
-	// Operations
-	//
-	public:
-	//
-	// Overrides
-	//
+
+	// Attributes.
+public:
+
+	// Operations.
+public:
+
+	// Overrides.
 	// ClassWizard-generated virtual function overrides
 	//{{AFX_VIRTUAL(CUnrealEdServer)
 	public:
 	virtual void OnFinalRelease();
 	//}}AFX_VIRTUAL
-	//
-	// Implementation
-	//
+
+	// Implementation.
 	public:
 	virtual ~CUnrealEdServer();
-	//
-	// Generated message map functions
-	//
+
+	// Generated message map functions.
 	protected:
 	//{{AFX_MSG(CUnrealEdServer)
 		// NOTE - the ClassWizard will add and remove member functions here.
@@ -60,6 +53,6 @@ class CUnrealEdServer : public CWnd
 	//}}AFX_DISPATCH
 	DECLARE_DISPATCH_MAP()
 	DECLARE_INTERFACE_MAP()
-	};
+};
 
 /////////////////////////////////////////////////////////////////////////////

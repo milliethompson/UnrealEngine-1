@@ -14,16 +14,16 @@
 #include "UnRender.h"
 
 /*-----------------------------------------------------------------------------
-	Data types for importing James' creature meshes
+	Data types for importing James' creature meshes.
 -----------------------------------------------------------------------------*/
 
 //
-// Mesh and vertex summary
+// Mesh and vertex summary.
 //
 
 class FJSDataHeader
-	{
-	public:
+{
+public:
 	WORD	NumPolys;
 	WORD	NumVertices;
 	WORD	BogusRot;
@@ -31,14 +31,14 @@ class FJSDataHeader
 	DWORD	BogusNormX,BogusNormY,BogusNormZ;
 	DWORD	FixScale;
 	DWORD	Unused1,Unused2,Unused3;
-	};
+};
 
 class FJSAnivHeader
-	{
+{
 	public:
-	WORD	NumFrames;		// Number of animation frames
-	WORD	FrameSize;		// Size of one frame of animation
-	};
+	WORD	NumFrames;		// Number of animation frames.
+	WORD	FrameSize;		// Size of one frame of animation.
+};
 
 /*
 //
@@ -80,29 +80,31 @@ y=next 11 bits
 z=last 10 bits
 */
 
-
 #define UPDATE_PACKED_MIN(min,v)\
-	{\
+{\
 	if (((FLOAT)(v)->X) < ((min)->X)) (min)->X = (FLOAT)(v)->X;\
 	if (((FLOAT)(v)->Y) < ((min)->Y)) (min)->Y = (FLOAT)(v)->Y;\
 	if (((FLOAT)(v)->Z) < ((min)->Z)) (min)->Z = (FLOAT)(v)->Z;\
-	};
+};
+
 #define UPDATE_PACKED_MAX(max,v)\
-	{\
+{\
 	if (((FLOAT)(v)->X) > ((max)->X)) (max)->X = (FLOAT)(v)->X;\
 	if (((FLOAT)(v)->Y) > ((max)->Y)) (max)->Y = (FLOAT)(v)->Y;\
 	if (((FLOAT)(v)->Z) > ((max)->Z)) (max)->Z = (FLOAT)(v)->Z;\
-	};
+};
 
 //
 // Import a mesh from James' editor.  Uses file commands instead of resource
 // manager.  Slow but works fine.
 //
-void meshImport (const char *MeshName, const char *AnivFname, const char *DataFname)
-	{
+void meshImport( const char *MeshName, const char *AnivFname, const char *DataFname )
+{
+	guard(meshImport);
+
 	UMesh			*Mesh;
 	FMeshVertex		*TempVertex;
-	FBoundingVolume	*MeshBound;
+	FBoundingRect	*MeshBound;
 	FMeshTriangle	*MeshTriangle;
 	FILE			*AnivFile,*DataFile;
 	BYTE			*MeshData;
@@ -111,145 +113,148 @@ void meshImport (const char *MeshName, const char *AnivFname, const char *DataFn
 	FJSAnivHeader	JSAnivHdr;			// James' ANIV*.3D file header
 	int				i,j,k;
 	int				Ok = 0;
-	//
-	GUARD;
+
 	debugf(LOG_Info,"Importing %s",MeshName);
 	GApp->BeginSlowTask ("Importing mesh",1,0);
 	GApp->StatusUpdate  ("Reading files",0,0);
-	//
-	// Open James' animation vertex file and read header:
-	//
-	AnivFile = fopen (AnivFname,"r+b");
+
+	// Open James' animation vertex file and read header.
+	AnivFile = fopen( AnivFname, "rb" );
 	if (AnivFile==NULL) {debugf (LOG_Info,"Error opening %s",AnivFname); goto Out1;};
 	if (fread (&JSAnivHdr,sizeof(FJSAnivHeader),1,AnivFile)!=1) {debugf (LOG_Info,"Error reading %s",AnivFname); goto Out2;};
-	//
-	// Open James' mesh data file and read header:
-	//
-	DataFile = fopen (DataFname,"r+b");
-	if (DataFile==NULL) {debugf (LOG_Info,"Error opening %s",DataFile); goto Out2;};
+
+	// Open James' mesh data file and read header.
+	DataFile = fopen (DataFname,"rb");
+	if (DataFile==NULL) {debugf (LOG_Info,"Error opening %s",DataFname); goto Out2;};
 	if (fread (&JSDataHdr,sizeof(FJSDataHeader),1,DataFile)!=1) {debugf (LOG_Info,"Error reading %s",DataFile); goto Out3;};
-	//
-	//	Allocate mesh resource and set its header:
-	//
+
+	//	Allocate mesh resource and set its header.
 	Mesh = new(MeshName,CREATE_Replace)UMesh;
-	//
+
 	Mesh->MaxTriangles	= JSDataHdr.NumPolys;
 	Mesh->MaxVertices	= JSDataHdr.NumVertices;
-	Mesh->MaxVertLinks	= JSDataHdr.NumVertices * 6; // Overestimate
+	Mesh->MaxVertLinks	= JSDataHdr.NumVertices * 8; // Overestimate.
 	Mesh->MaxAnimFrames	= JSAnivHdr.NumFrames;
-	Mesh->MaxAnimSeqs		= 96; // Predefined limit of animation sequences (reasonable)
-	//
+	Mesh->MaxAnimSeqs	= 96; // Predefined limit of animation sequences (reasonable).
+
 	debugf (LOG_Info," * Triangles  %i",Mesh->MaxTriangles);
 	debugf (LOG_Info," * Vertex     %i",Mesh->MaxVertices);
 	debugf (LOG_Info," * AnimFrames %i",Mesh->MaxAnimFrames);
 	debugf (LOG_Info," * FrameSize  %i",JSAnivHdr.FrameSize);
 	debugf (LOG_Info," * AnimSeqs   %i",Mesh->MaxAnimSeqs);
-	//
-	// Allocate mesh data and distribute it:
-	//
+
+	// Allocate mesh data and distribute it.
 	MeshData = (BYTE *)Mesh->AllocData(1);
-	//
-	Mesh->NumTriangles  = Mesh->MaxTriangles;   // Just imported, never manipulated
+
+	Mesh->NumTriangles  = Mesh->MaxTriangles;   // Just imported, never manipulated.
 	Mesh->NumVertices   = Mesh->MaxVertices;
 	Mesh->NumVertLinks  = 0;
 	Mesh->NumAnimFrames = Mesh->MaxAnimFrames;
 	Mesh->NumAnimSeqs 	= 0;
 	Mesh->Origin		= GMath.ZeroVector;
 	Mesh->RotOrigin		= GMath.ZeroRotation;
-	//
+
 	Mesh->GetInfo(&MeshInfo);
-	//
-	// Import mesh triangles:
-	//
+
+	// Import mesh triangles.
 	debugf (LOG_Info,"Importing triangles");
 	MeshTriangle = &MeshInfo.Triangles [0];
-	fseek (DataFile,12,SEEK_CUR); // Skip empty stuff
-	//
-	for (i=0; i<Mesh->NumTriangles; i++)
-		{
-		if (!(i&15)) GApp->StatusUpdate  ("Importing Triangles",i,Mesh->NumTriangles);
+	fseek (DataFile,12,SEEK_CUR); // Skip empty stuff.
+	
+	for( i=0; i<Mesh->NumTriangles; i++ )
+	{
+		if (!(i&15)) GApp->StatusUpdate( "Importing Triangles",i,Mesh->NumTriangles );
 		if (fread (MeshTriangle,sizeof(FMeshTriangle),1,DataFile)!=1) {debugf (LOG_Info,"Error processing %s",DataFile); goto Out4;};
-		//
+
 		MeshTriangle->Flags = 0;
 		MeshTriangle++;
-		};
-	//
-	// Import mesh vertices:
-	//
+	}
+
+	// Import mesh vertices.
 	debugf (LOG_Info,"Importing vertices");
 	TempVertex = &MeshInfo.Vertex[0];
-	for (i=0; i<Mesh->NumAnimFrames; i++)
+	for( i=0; i<Mesh->NumAnimFrames; i++ )
+	{
+		if( !(i&3) ) GApp->StatusUpdate  ("Importing Vertices",i,Mesh->NumAnimFrames);
+		if( fread (TempVertex,sizeof(FMeshVertex),Mesh->NumVertices,AnivFile)!=(size_t)Mesh->NumVertices )
 		{
-		if (!(i&3)) GApp->StatusUpdate  ("Importing Vertices",i,Mesh->NumAnimFrames);
-		if (fread (TempVertex,sizeof(FMeshVertex),Mesh->NumVertices,AnivFile)!=(size_t)Mesh->NumVertices)
-			{
 			debugf (LOG_Info,"Vertex error in %s",AnivFname);
 			goto Out4;
-			};
+		}
 		fseek (AnivFile,JSAnivHdr.FrameSize - Mesh->NumVertices*sizeof(FMeshVertex),SEEK_CUR); // Skip empty stuff
 		TempVertex += Mesh->NumVertices;
-		};
-	//
-	// Compute per-frame bounding volumes plus overall bounding volume:
-	//
+	}
+
+	// Compute per-frame bounding volumes plus overall bounding volume.
 	Mesh->Bound.Min		= GMath.VectorMax;
 	Mesh->Bound.Max		= GMath.VectorMin;
-	//
+
 	TempVertex 	        = &MeshInfo.Vertex [0];
 	MeshBound           = &MeshInfo.Bound  [0];
-	//
-	for (i=0; i<Mesh->NumAnimFrames; i++)
-		{
+
+	for( i=0; i<Mesh->NumAnimFrames; i++ )
+	{
 		if (i&1) GApp->StatusUpdate("Bounding mesh",i,Mesh->NumVertices);
-		//
+
 		MeshBound->Min = GMath.VectorMax;
 		MeshBound->Max = GMath.VectorMin;
-		//		
-		for (j=0; j<Mesh->NumVertices; j++)
-			{
+
+		for( j=0; j<Mesh->NumVertices; j++ )
+		{
 			UPDATE_PACKED_MIN(&MeshBound->Min,TempVertex);
 			UPDATE_PACKED_MAX(&MeshBound->Max,TempVertex);
 			TempVertex++;
-			};
+		}
 		UPDATE_PACKED_MIN(&Mesh->Bound.Min,&MeshBound->Min);
 		UPDATE_PACKED_MAX(&Mesh->Bound.Max,&MeshBound->Max);
-		//
+
 		MeshBound++;
-		};
-	debugf (LOG_Info,"Bound %f,%f %f,%f %f,%f",Mesh->Bound.Min.X,Mesh->Bound.Max.X,Mesh->Bound.Max.Y,Mesh->Bound.Max.Y,Mesh->Bound.Min.Z,Mesh->Bound.Max.Z);
-	//
-	// Build reverse vertex-triangle links:
-	//
+	}
+	debugf(LOG_Info,"Bound %f,%f %f,%f %f,%f",Mesh->Bound.Min.X,Mesh->Bound.Max.X,Mesh->Bound.Max.Y,Mesh->Bound.Max.Y,Mesh->Bound.Min.Z,Mesh->Bound.Max.Z);
+
+	MeshBound = &MeshInfo.Bound  [0];
+	for( i=0; i<Mesh->NumAnimFrames; i++ )
+	{
+		debugf(LOG_Info,"seriofjerg %f,%f %f,%f %f,%f",MeshBound->Min.X,
+			MeshBound->Max.X,MeshBound->Min.Y,
+			MeshBound->Max.Y,MeshBound->Min.Z,MeshBound->Max.Z);
+		MeshBound++;
+	}
+
+	// Build list of triangles per vertex.
 	Mesh->NumVertLinks = 0;
-	for (i=0; i<Mesh->NumVertices; i++)
-		{
+	for( i=0; i<Mesh->NumVertices; i++ )
+	{
 		if (i&1) GApp->StatusUpdate("Linking mesh",i,Mesh->NumVertices);
+		
 		MeshInfo.VertLinkIndex[i].NumVertTriangles   = 0;
 		MeshInfo.VertLinkIndex[i].TriangleListOffset = Mesh->NumVertLinks;
-		for (j=0; j<Mesh->NumTriangles; j++)
+		for( j=0; j<Mesh->NumTriangles; j++ )
+		{
+			for( k=0; k<3; k++ )
 			{
-			for (k=0; k<3; k++)
+				if( MeshInfo.Triangles[j].iVertex[k] == i )
 				{
-				if (MeshInfo.Triangles[j].iVertex[k] == i)
-					{
-					MeshInfo.VertLinks[Mesh->NumVertLinks++] = (WORD)j;
-					MeshInfo.VertLinkIndex[i].NumVertTriangles++;
-					};
-				};
-			};
-		};	
-	debugf (LOG_Info,"Made %i links",Mesh->NumVertLinks);
-	//
-	// Exit labels:
-	//
+					MeshInfo.VertLinks     [Mesh->NumVertLinks++] = (WORD)j;
+					MeshInfo.VertLinkIndex [i].NumVertTriangles++;
+					
+					if( Mesh->NumVertLinks>Mesh->MaxVertLinks )
+						appError("Mesh too complex");
+				}
+			}
+		}
+	}
+	debugf (LOG_Info,"Made %i/%i links",Mesh->NumVertLinks,Mesh->MaxVertLinks);
+
+	// Exit labels.
 	Ok = 1;
 	Out4: if (!Ok) Mesh->Kill();
 	Out3: fclose  (DataFile);
 	Out2: fclose  (AnivFile);
 	Out1: GApp->EndSlowTask ();
-	UNGUARD("meshImport");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/

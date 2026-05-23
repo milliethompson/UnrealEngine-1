@@ -28,10 +28,17 @@ int APyrotechnics::Process(ILevel *Level, FName Message, void *Params)
         //--------------------------------------------------------------------
         //                      Initialization
         //--------------------------------------------------------------------
-        case ACTOR_Spawn:
+        case ACTOR_PreBeginPlay:
         {
-            TextureList = int(&Textures[0]); //tbi: Conversion            
+            if( TextureCount > 0 )
+            {
+                TextureList = int(&Textures[0]); //tbi: Conversion            
+            }
             AnimBase = AnimFirst;
+            break;
+        }
+        case ACTOR_PostBeginPlay:
+        {
             Actor.MakeSound( InitialSound );
             Actor.MakeNoise( Noise );
             break;
@@ -60,6 +67,7 @@ int APyrotechnics::Process(ILevel *Level, FName Message, void *Params)
     UNGUARD( "APyrotechnics::Process" );
 }
 
+#if 0 //todo: Delete
 //---------------------------------------------------------------------------
 //              ABigManGunFlash::Process
 //---------------------------------------------------------------------------
@@ -131,3 +139,4 @@ int AExplode3::Process(ILevel *Level, FName Message, void *Params)
     //tbi? For efficiency, remove ::Process function.
     return ProcessParent;
 }
+#endif

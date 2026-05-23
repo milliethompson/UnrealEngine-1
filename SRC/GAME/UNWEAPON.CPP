@@ -81,7 +81,7 @@ int AWeapon::Process(ILevel *Level, FName Message, void *Params)
             LightRadius     = 30    ;
             LightPeriod     = 16    ;
 
-            // Remove any yaw/roll used to animate weapon(?)
+            // Remove any yaw/roll used to animate weapon.
             {
                 ViewRot.Yaw     += DrawYaw;
                 ViewRot.Roll    += DrawRoll;
@@ -90,97 +90,6 @@ int AWeapon::Process(ILevel *Level, FName Message, void *Params)
                 YawSpeed        = 0 ;
                 RollSpeed       = 0 ;
             }
-            #if 0 //tba: Moved to unfactor
-            const int Usage = Message.Index==ACTOR_Use ? 0 : 1;
-            if (InvState==INV_Active && ( ReusePeriod[Usage]==0 || (GServer.Ticks-LastUseTime)>=ReusePeriod[Usage] ) )
-            {
-                bWasReleased = FALSE;
-                PUse & UseInfo = PUse::Convert(Params);
-                APawn & Parent = FActor::Pawn(iParent);
-                UseInfo.Count = 0; // Will be set to number of discharges.
-                FVector RecoilVelocity;
-                {
-                    FCoords Coords;
-                    ((AActor*)this)->GetViewCoords(&Coords); //tbi: Conversion
-                    RecoilVelocity = Coords.ZAxis * (-RecoilForce[Usage] / Parent.Mass);
-                }
-                USound *    DischargeSound  = DischargeSounds[Usage]    ;
-                UClass *    ProjectileClass = this->ProjectileClass[Usage]    ;
-                const BOOL  RepeatSound     = bRepeatSounds[Usage]      ;
-                const FLOAT Noise           = this->Noise[Usage]        ;
-                int         DischargeLimit  = Discharges[Usage]         ;
-                const int   AmmoPerDischarge= AmmoUsed[Usage]           ;
-                int         AmmoAvailable   = Parent.AmmoCount[AmmoType];
-                const int   RecoilPitch     = Degrees(this->RecoilPitch[Usage])/2;
-                // AmmoHeld is the ammo we consider to be held by the weapon, although
-                // for standard ammo it is really held by the weapon holder.
-                int AmmoHeld = 
-                    ReloadCount==0 ? AmmoAvailable 
-                :   (AmmoAvailable-1)%ReloadCount + 1
-                ;
-                if( AmmoType == AmmoType_None || ProjectileClass == 0 )
-                {
-                    appError( "Weapon has no ammo type or no projectile class." );
-                }
-                BOOL SoundPlayed = FALSE;
-                const AProjectile & DefaultProjectile = FActor::Actor( ProjectileClass->DefaultActor ).Projectile();
-                for
-                (
-                    int WhichShot=1; 
-                    AmmoAvailable >= AmmoPerDischarge 
-                    &&  AmmoHeld >= AmmoPerDischarge 
-                    &&  WhichShot<=DischargeLimit
-                    ;
-                    WhichShot++
-                )
-                {
-                    LastUseTime = GServer.Ticks;
-                    InvState = Usage==0 ? INV_Using1 : INV_Using2;
-                    AmmoAvailable -= AmmoPerDischarge;
-                    AmmoHeld -= AmmoPerDischarge;
-                    UseInfo.Count++;
-                    Parent.ViewRot.Pitch += RecoilPitch;
-                    Parent.Noise += Noise;
-                    Parent.Velocity += RecoilVelocity;
-                    if( !SoundPlayed || RepeatSound )
-                    { 
-                        Actor.MakeSound(DischargeSound);
-                        SoundPlayed = TRUE;
-                    }
-                    if( WhichShot==1 )
-                    {
-                        FActor::Spawn(MuzzleEffectClass[Usage],Location);
-                    }
-                    if( DefaultProjectile.bIsInstantHit )
-                    {
-                        // Need to build this into a function (get view coords, get draw coords):
-                        // Temporarily, remove DrawPitch from the view pitch...
-                        ViewRot.Pitch -= DrawPitch;
-                        FCoords Coords; ((AActor *)this)->GetViewCoords(&Coords);
-                        ViewRot.Pitch += DrawPitch;
-                        FVector Direction = Coords.ZAxis;
-                        PerturbNormalVector(Direction,Coords,Dispersion[Usage]);
-                        FVector HitLocation;
-                        FVector HitNormal;
-                        INDEX   iHitNode;
-                        Level->RayHit
-                        (
-                            iMe,&Location,&Direction,
-                            DefaultProjectile.Mass*DefaultProjectile.Speed,0.0, 
-                            0,TRUE,
-                            &HitLocation,&HitNormal,&iHitNode
-                        );
-                    }
-                    else
-                    {
-                        GGame.SpawnForwardProjectile( iMe, ProjectileClass, ProjStartDist );
-                    }
-                }
-                bNeedsReloading = AmmoHeld < AmmoUsed[0]*int(Discharges[0]);
-                Parent.AmmoCount[AmmoType] = AmmoAvailable;
-                Parent.bStatusChanged = TRUE;
-            }
-            #endif
             return ProcessParent;
             break;
         }
@@ -225,24 +134,33 @@ int AWeapon::Process(ILevel *Level, FName Message, void *Params)
             const PHitNotify & Info = PHitNotify::Convert(Params);
             FActor & VictimActor = FActor::Actor(Info.iHitActor);
             APawn & Parent = FActor::Pawn(iParent); 
+            const BOOL HitAPawn = VictimActor.IsKindOf("Pawn");
+            const FVector & HitLocation = Info.HitLocation;
             // Send ACTOR_Touch to the hit actor, in case it is interested...
             {
-                FActor * Projectile = FActor::Spawn(DefaultProjectile.Class,Info.HitLocation);
+                FActor * Projectile = Actor.Instigate(DefaultProjectile.Class,&Info.HitLocation);
                 if( Projectile != 0 )
                 {
                     VictimActor.Send_Touch(Projectile->iMe);
                     GLevel->DestroyActor(Projectile->iMe);
                 }
             }
-            if( VictimActor.IsA(GClasses.Pawn) )
+            Actor.Instigate
+            ( 
+                 HitAPawn && DefaultProjectile.EffectOnPawnImpact != 0
+                 ?  DefaultProjectile.EffectOnPawnImpact 
+                 :  DefaultProjectile.EffectOnImpact
+             ,   &HitLocation
+             );
+            if( TRUE /*tbd:HitAPawn*/ )
             {
                 APawn & Victim = VictimActor.Pawn();
-                const FVector & HitLocation = Info.HitLocation;
                 PHit HitInfo;
                 HitInfo.Empty();
-                HitInfo.iSourceActor    = iParent       ;
-                HitInfo.iSourceWeapon   = iMe        ;
-                HitInfo.HitLocation     = HitLocation   ;
+                HitInfo.iSourceActor    = iParent     ;
+                HitInfo.iInstigator     = iInstigator ;
+                HitInfo.iSourceWeapon   = iMe         ;
+                HitInfo.HitLocation     = HitLocation ;
                 //tbc? The hit location is currently just the hit pawn's location.
                 // Let's move that location a little towards the source of the hit,
                 // so that any drawn effects don't appear inside the hit pawn.
@@ -255,7 +173,6 @@ int AWeapon::Process(ILevel *Level, FName Message, void *Params)
                     if( DamageAmount < 0 ) { DamageAmount = 0.0; }
                     HitInfo.Damage[Which] = DamageAmount;
                 }
-                FActor::Spawn(DefaultProjectile.EffectOnPawnImpact != 0 ? DefaultProjectile.EffectOnPawnImpact : DefaultProjectile.EffectOnImpact,HitInfo.HitLocation);
                 FActor::Send_Hit(Info.iHitActor,HitInfo);
                 // Handle any explosive charge imparted to target:
                 if( DefaultProjectile.ExplosiveTransfer != 0 )
@@ -277,7 +194,13 @@ int AWeapon::Process(ILevel *Level, FName Message, void *Params)
             const AProjectile & DefaultProjectile = FActor::Actor( ProjectileClass->DefaultActor ).Projectile();
             const PWallNotify & Info = *(PWallNotify*)Params; //tbi: Conversion
             const FVector & HitLocation = Info.WallLocation;
-            FActor::Spawn(DefaultProjectile.EffectOnWallImpact != 0 ? DefaultProjectile.EffectOnWallImpact : DefaultProjectile.EffectOnImpact,HitLocation);
+            Actor.Instigate
+            (
+                DefaultProjectile.EffectOnWallImpact != 0 
+                ?   DefaultProjectile.EffectOnWallImpact 
+                :   DefaultProjectile.EffectOnImpact
+            ,   &HitLocation
+            );
             return ProcessDone;
             break;
         }
@@ -368,29 +291,6 @@ int AAutoMag::Process(ILevel *Level, FName Message, void *Params)
                 return ProcessDone;
                 break;
             }
-                #if 0 //tbd: obsolete
-                const int Usage = Message.Index==ACTOR_Use ? 0 : 1;
-                PUse & UseInfo = *(PUse *)Params; //tbi: conversion
-                if (InvState==INV_Active)
-                {
-                    AWeapon::Process(Level,Message,&UseInfo); //tbc!
-                    if( UseInfo.Count > 0 )
-                    {
-                        // The weapon was used, select the appropriate animation.
-                        if( Usage==0 ) // Normal use
-                        {
-                            Actor.Animate( EAMA_Shoot, 1, 1.0, ACTOR_EndAnimation ); 
-                        }
-                        else // Secondary use
-                        {
-                            Actor.Animate( EAMA_Shoot2, 1, 1.0, ACTOR_EndAnimation ); 
-                        }
-                    }
-                }
-                    return ProcessDone;
-                break;
-            }
-                #endif
             //--------------------------------------------------------------------
             //                   Use close-up attack
             //--------------------------------------------------------------------
@@ -412,7 +312,7 @@ int AAutoMag::Process(ILevel *Level, FName Message, void *Params)
             {
                 if( InvState == INV_Active )
                 {
-                    AWeapon::Process(Level,Message,Params); //tbi
+                    Level->SendMessage(iMe,Message,Params,Class->ParentClass); // Do parent processing first.
                     if( InvState == INV_Reloading )
                     {
                         Actor.ReplaceAnimation( EAMA_Twirl, 1, 1.0, ACTOR_EndAnimation ); 
@@ -552,7 +452,7 @@ int AQuadShot::Process(ILevel *Level, FName Message, void *Params)
         {
             if( InvState == INV_Active )
             {
-                AWeapon::Process(Level,Message,Params); //tbi
+                Level->SendMessage(iMe,Message,Params,Class->ParentClass); // Do parent processing first.
                 if( InvState == INV_Reloading )
                 {
                     Actor.ReplaceAnimation( EQSA_Reload, 1, 0.5, ACTOR_EndAnimation ); 

@@ -11,66 +11,70 @@
 #include "Unreal.h"
 
 /*-----------------------------------------------------------------------------
-	FMemPool implementation (not including inlines)
+	FMemPool implementation (not including inlines).
 -----------------------------------------------------------------------------*/
 
 //
 // Allocate this memory pool's buffer.
 //
 void FMemPool::AllocatePool(int NewSize, const char *Name)
-	{
-	GUARD;
+{
+	guard(FMemPool::AllocatePool);
+
 	char Descr[80]; sprintf(Descr,"MemPool(%s)",Descr);
 	Start = appMallocArray(NewSize,BYTE,Descr);
 	Size  = NewSize;
 	InitPool();
-	UNGUARD("FMemPool::AllocatePool");
-	};
+	
+	unguard;
+}
 
 //
 // Initialize this memory pool to its empty state.
 //
-void FMemPool::InitPool(void)
-	{
-	GUARD;
+void FMemPool::InitPool()
+{
+	guard(FMemPool::InitPool);
 	Top = Start;
 	End = Start + Size;
-	UNGUARD("FMemPool::InitPool");
-	};
+	unguard;
+}
 
 //
 // Free this memory pool's buffer.
 //
-void FMemPool::FreePool(void)
-	{
-	GUARD;
+void FMemPool::FreePool()
+{
+	guard(FMemPool::FreePool);
+
 	appFree(Start);
 	Start = NULL;
 	Top   = NULL;
 	End   = NULL;
 	Size  = 0;
-	UNGUARD("FMemPool::FreePool");
-	};
+
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Memory pool errors
+	Memory pool errors.
 -----------------------------------------------------------------------------*/
 
-void FMemPool::OverflowError(void)
-	{
+void FMemPool::OverflowError()
+{
 	appError("FMemPool::OverflowError");
-	};
+}
 
-void FMemPool::AccessError(void)
-	{
+void FMemPool::AccessError()
+{
 	appError("FMemPool::AccessError");
-	};
+}
 
-void FMemPool::SizeError(void)
-	{
+void FMemPool::SizeError()
+{
 	appError("FMemPool::SizeError");
-	};
+}
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/

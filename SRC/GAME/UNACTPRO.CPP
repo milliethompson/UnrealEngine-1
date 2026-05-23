@@ -33,10 +33,10 @@ INDEX FGame::SpawnProjectile
     FActor & Parent = FActor::Actor(iParentActor);
     FVector Start = Parent.Location + Velocity * (StartDist/Velocity.Size());
     //
-    INDEX iActor = GLevel->SpawnActor(Class,NAME_NONE,&Start);
-    if (iActor != INDEX_NONE)
+    FActor * ProjectileActor = Parent.Instigate(Class,&Start);
+    if( ProjectileActor != 0 )
     {
-        AProjectile & Projectile = FActor::Projectile(iActor);
+        AProjectile & Projectile = ProjectileActor->Projectile();
         //
         Projectile.Velocity     = Velocity      ;
         Projectile.iParent      = iParentActor  ;
@@ -56,7 +56,7 @@ INDEX FGame::SpawnProjectile
             Projectile.LifeSpan = 700;
         }
     }
-    return iActor;
+    return ProjectileActor != 0 ? ProjectileActor->iMe : INDEX_NONE;
     UNGUARD("FGame::SpawnProjectile");
 }
 
@@ -105,17 +105,6 @@ INDEX FGame::SpawnForwardProjectile
     UNGUARD("FGame::SpawnForwardProjectile");
 }
 
-//todo: Delete this when FVector::Mirror is fixed.
-static inline FVector TempMirror (const FVector &Vector, const FVector &MirrorNormal) 
-	{
-	FLOAT   OutFactor = 2.0 * ( Vector.X * MirrorNormal.X + Vector.Y * MirrorNormal.Y + Vector.Z * MirrorNormal.Z );
-	FVector Result;
-	Result.X = Vector.X - OutFactor * MirrorNormal.X;
-	Result.Y = Vector.Y - OutFactor * MirrorNormal.Y;
-	Result.Z = Vector.Z - OutFactor * MirrorNormal.Z;
-	return Result;
-	};
-
 //----------------------------------------------------------------------------
 //                 AProjectile base processing
 //----------------------------------------------------------------------------
@@ -125,7 +114,6 @@ int AProjectile::Process(ILevel *Level, FName Message, void *Params)
     FActor & Actor = FActor::Actor(*this);
     switch (Message.Index)
     {
-        case ACTOR_Spawn: //tbi: Once all actors get BeginPlay, remove Spawn
         //----------------------------------------------------------
         //                     Initialization
         //----------------------------------------------------------
@@ -145,18 +133,15 @@ int AProjectile::Process(ILevel *Level, FName Message, void *Params)
         case ACTOR_Tick:
         case ACTOR_PlayerTick:
         {
-            ARoot::Process(Level,Message,Params); //tbi: When call to parent is supported
-            if (Class) // If the projectile didn't die...
+            //todo: Delete:  ARoot::Process(Level,Message,Params);
+            // Move the projectile and check for wall collision
+            Level->MoveActor(iMe,&Velocity);
+            if (Level->ModelInfo.FuzzyPointClass(Location,CollisionRadius*1.01,0)<0.9999)
             {
-                // Move the projectile and check for wall collision
-                Level->MoveActor(iMe,&Velocity);
-                if (Level->ModelInfo.FuzzyPointClass (&Location,CollisionRadius*1.01)<0.9999)
-                {
-                    // The projectile collided with a wall.
-                    Actor.Send_HitWall();
-                };
+                // The projectile collided with a wall.
+                Actor.Send_HitWall();
             }
-            return ProcessDone;
+            return ProcessParent;
             break;
         }
         //----------------------------------------------------------
@@ -166,12 +151,12 @@ int AProjectile::Process(ILevel *Level, FName Message, void *Params)
         {
             const BOOL ShouldBounce = bBounce && ( MaxBounceCount==0 || BounceCount<MaxBounceCount );
             BOOL ShouldDie = !ShouldBounce;
-            FActor::Spawn(EffectOnWallImpact != 0 ? EffectOnWallImpact : EffectOnImpact, Actor.Location);
+            Actor.Instigate(EffectOnWallImpact != 0 ? EffectOnWallImpact : EffectOnImpact);
             if (ShouldBounce)
             {
                 FVector Reflection;
                 BounceCount++;
-                const BOOL ReflectsOkay = Level->ModelInfo.SphereReflect(&Location,CollisionRadius*1.01,&Reflection);
+                const BOOL ReflectsOkay = Level->ModelInfo.SphereReflect(Location,CollisionRadius*1.01,Reflection);
                 if( ReflectsOkay )
                 {
                     Reflection.Normalize();
@@ -179,8 +164,7 @@ int AProjectile::Process(ILevel *Level, FName Message, void *Params)
                     {
                         // Make sure the incident angle of the bounce is such that
                         // we want to do the bounce.
-                        FVector Direction = Velocity;
-                        Direction.Normalize();
+                        FVector Direction = Velocity.Normal();
                         const FLOAT Cosine = - (Direction | Reflection); // Cosine of incident angle (relative to normal)
                         if( Cosine > BounceIncidence )
                         {
@@ -189,7 +173,7 @@ int AProjectile::Process(ILevel *Level, FName Message, void *Params)
                     }
                     if( !ShouldDie )
                     {
-                        Velocity = TempMirror( Velocity, Reflection);
+                        Velocity = Velocity.Mirror( Reflection);
                         DrawRot = Velocity.Rotation();
                     }
                 }
@@ -212,46 +196,68 @@ int AProjectile::Process(ILevel *Level, FName Message, void *Params)
         {
             PTouch & TouchInfo = *(PTouch*)Params;
             FActor & HitActor = FActor::Actor(TouchInfo.iActor );
-            UClass * Effect = (HitActor.IsA(GClasses.Pawn) && EffectOnPawnImpact != 0) ? EffectOnPawnImpact : EffectOnImpact;
-            FActor::Spawn(Effect,Location);
-
-            PHit HitInfo;
-            HitInfo.Empty();
-            //tbi: What if the object struck is not a pawn?
-            for( int Which = 0; Which < DMT_Count; Which++ )
+            const BOOL HitAPawn = HitActor.IsKindOf("Pawn");
+            // If we touched something which is not a projectile target,
+            // then let's just pass through it. (If the HitActor did not
+            // allow the projectile to pass through, we would get an ACTOR_Bump
+            // instead of an ACTOR_Touch message.
+            if( HitActor.bProjTarget )
             {
-                FLOAT DamageAmount = Damage[Which] - Age * DamageDecay[Which];
-                if( DamageAmount < 0 ) { DamageAmount = 0.0; }
-                HitInfo.Damage[Which] = DamageAmount;
+                UClass * Effect = (HitAPawn && EffectOnPawnImpact != 0) ? EffectOnPawnImpact : EffectOnImpact;
+                Actor.Instigate(Effect);
+                PHit HitInfo;
+                HitInfo.Empty();
+                for( int Which = 0; Which < DMT_Count; Which++ )
+                {
+                    FLOAT DamageAmount = Damage[Which] - (Age-1) * DamageDecay[Which];
+                    if( DamageAmount < 0 ) { DamageAmount = 0.0; }
+                    HitInfo.Damage[Which] = DamageAmount;
+                }
+                HitInfo.iInstigator     = iInstigator   ;
+                HitInfo.iSourceActor    = iMe           ;
+                HitInfo.iSourceWeapon   = INDEX_NONE    ;
+                HitInfo.Momentum        = Mass * Velocity.Size();
+                FActor & ParentActor = FActor::Actor(iParent);
+                if( ParentActor.Class->IsKindOf("Weapon") )
+                {
+                    //todo:[Delete] HitInfo.iSourceActor  = ParentActor.iParent;
+                    HitInfo.iSourceWeapon = iParent;
+                }
+                HitActor.Send_Hit( HitInfo );
+                // Handle any explosive charge imparted to target:
+                if( ExplosiveTransfer != 0 )
+                {
+                    HitActor.AddExplosiveCharge(ExplosiveTransfer);
+                }
+                Actor.Send_Die();
+                //todo: [Delete] LifeSpan = 1; 
+                //todo: [Delete] Velocity = GMath.ZeroVector;
             }
-            HitInfo.iSourceActor    = iMe           ;
-            HitInfo.iSourceWeapon   = INDEX_NONE    ;
-            HitInfo.Momentum        = Mass * Velocity.Size();
-            FActor & ParentActor = FActor::Actor(iParent);
-            if( ParentActor.Class->IsKindOf(GClasses.Weapon) )
-            {
-                HitInfo.iSourceActor  = ParentActor.iParent;
-                HitInfo.iSourceWeapon = iParent;
-            }
-            HitActor.Send_Hit( HitInfo );
-            // Handle any explosive charge imparted to target:
-            if( ExplosiveTransfer != 0 )
-            {
-                //tbi: This is duplicated in unweapon.cpp!
-                HitActor.AddExplosiveCharge(ExplosiveTransfer);
-            }
-
-            LifeSpan = 2; 
-            Velocity = GMath.ZeroVector;
-            return ProcessDone;
+            return ProcessParent;
             break;
+        }
+        //----------------------------------------------------------
+        //     The projectile bumped into something impenetrable
+        //----------------------------------------------------------
+        case ACTOR_Bump:
+        {
+            PTouch & TouchInfo = *(PTouch*)Params;
+            FActor & HitActor = FActor::Actor(TouchInfo.iActor );
+            const BOOL HitAPawn = HitActor.IsKindOf("Pawn");
+            if( !HitActor.bProjTarget )
+            {
+                // Let's treat this like hitting a wall, but don't allow bouncing...            
+                Actor.Instigate(EffectOnWallImpact != 0 ? EffectOnWallImpact : EffectOnImpact);
+                Level->DestroyActor(iMe);
+            }
+            return ProcessDone;
         }
         //----------------------------------------------------------
         //           The projectile should cease to exist.
         //----------------------------------------------------------
         case ACTOR_Die:
         {
-            FActor::Spawn( EffectAtLifeSpan, Location );
+            Actor.Instigate( EffectAtLifeSpan );
             return ProcessParent;
             break;
         }
@@ -260,6 +266,7 @@ int AProjectile::Process(ILevel *Level, FName Message, void *Params)
     UNGUARD("AProjectile::Process");
 }
 
+#if 0 //todo: Delete
 //----------------------------------------------------------------------------
 //                 AFireball base processing
 //----------------------------------------------------------------------------
@@ -320,6 +327,7 @@ int ATentacleProjectile::Process(ILevel *Level, FName Message, void *Params)
     return ProcessParent;
     UNGUARD("ATentacleProjectile::Process");
 }
+#endif
 
 /*-----------------------------------------------------------------------------
 	The End

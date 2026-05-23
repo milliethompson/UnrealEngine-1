@@ -1,0 +1,6 @@
+rem Config.gk: Gatekeeper-generated configuration file.
+rem Do not edit this! Edit Autoexec.gk instead.
+
+Set Gate GatekeeperName=Unnamed Port=23 IsUplinked=0 UplinkList="unreal.epicgames.com 23" ContactName= ContactEmail= ContactOrganization= ContactWeb= LevelDirectoryList="..\\Maps\\*.unr"
+Set Game DefaultMaxLevelPlayers=16 DefaultMaxLevelCameras=20 DefaultLevelParms=tim@epicgames.com
+Set Passwords Admin= Info= Downlink= DefaultLevelAdmin= DefaultLevelPlayer= DefaultLevelCamera=

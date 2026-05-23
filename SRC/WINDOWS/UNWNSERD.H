@@ -1,5 +1,16 @@
-// UnWnSerD.h : header file
-//
+/*============================================================================
+UnWnSerD.h: Dialog to handle the server property page
+Used by: Properties dialog to display server page
+
+Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
+
+Description:
+    This defines the class used to present the server property page.
+
+Revision history:
+    * xx/xx/96, Created by Mark
+============================================================================*/
 
 /////////////////////////////////////////////////////////////////////////////
 // CDialogServerProperties dialog

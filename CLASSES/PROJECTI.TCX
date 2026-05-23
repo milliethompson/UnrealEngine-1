@@ -18,28 +18,27 @@ Begin Class Name=Projectile
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 '
-' This is a built-in Unreal class and it shouldn't be modified
-'
 ' A projectile fired from a weapon. 
 ' A delayed-hit projectile moves around for some time after it is created.
 ' An instant-hit projectile acts immediately. 
 '
-Class Projectile Expands Root Intrinsic
+' This is a built-in Unreal class and it shouldn't be modified.
+'
+Class Projectile Expands Actor Intrinsic
 
-' Editable projectile parameters
-
-Dim bVerticalSeek         As Editable Boolean
-Dim bFollowFloor          As Editable Boolean
-Dim bBounce               As Editable Boolean
+' Projectile flags.
+Dim bVerticalSeek         As Editable Boolean ' Automatically seek target vertically.
+Dim bFollowFloor          As Editable Boolean ' Follow the floor as we move.
+Dim bBounce               As Editable Boolean ' Bounce off walls.
 Dim bIsInstantHit         As Editable Boolean ' Is the projectile instant-hit?
 
-' Effects on impact or at the end of the projectiles life: (only 1 is selected)
+' Effects on impact or at the end of the projectiles life (only 1 is selected).
 Dim EffectAtLifeSpan      As Editable Class   ' Explosion or pyrotechnic when projectile expires.
 Dim EffectOnWallImpact    As Editable Class   ' Explosion or pyrotechnic when projectile hits a wall.
 Dim EffectOnPawnImpact    As Editable Class   ' Explosion or pyrotechnic when projectile hits a pawn.
 Dim EffectOnImpact        As Editable Class   ' Default explosion or pyrotechnic on impact (when other effects do not apply).
 
-' Motion information:
+' Motion information.
 Dim Speed                 As Editable Real    ' Initial speed of projectile.
 Dim Acceleration          As Editable Real    '
 Dim MaxSpeed              As Editable Real    ' Limit on speed of projectile (0 means no limit)
@@ -47,11 +46,11 @@ Dim MaxBounceCount        As Editable Byte    ' If bBounce, limit on number of b
 Dim BounceCount           As          Byte    ' Number of times projectile has bounced.
 Dim BounceIncidence       As Editable Real    ' If bBounce, cosine of smallest incident angle (measured to normal) which causes bouncing. 0 for no restriction.
 
-' Other properties
+' Other properties.
 Dim FollowFloorHeight as Real
 Dim Textures(20) As Editable Texture ' A sequence of animating textures - the first TextureCount are used.
 
-' Damage attributes:
+' Damage attributes.
 ' DamageDecay() identifies the damage lost per tick (for a delayed-hit projectile)
 ' or the damage lost per unit distance travelled (for an instant-hit projectile).
 Dim Damage(4)             As Editable Real    ' Indexed by EDamageType
@@ -72,7 +71,7 @@ Dim Hack                  As EDamageType      ' Hack so that EDamageType is not 
       bTemplateClass=False
       bMomentum=True
       LifeSpan=140
-      EffectAtLifeSpan=None
+      EffectAtLifeSpan=None  
       EffectAtLifeSpan=None
       EffectOnWallImpact=None
       EffectOnPawnImpact=None
@@ -89,7 +88,7 @@ Begin Class Name=StingerProjectile
 '
 ' This is a built-in Unreal class and it shouldn't be modified
 '
-Class StingerProjectile Expands Projectile Intrinsic
+Class StingerProjectile Expands Projectile 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -132,7 +131,7 @@ Begin Class Name=TentacleProjectile
 '
 ' This is a built-in Unreal class and it shouldn't be modified
 '
-Class TentacleProjectile Expands Projectile Intrinsic
+Class TentacleProjectile Expands Projectile 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -167,7 +166,7 @@ Begin Class Name=Fireball
 '
 ' This is a built-in Unreal class and it shouldn't be modified
 '
-Class Fireball Expands Projectile Intrinsic
+Class Fireball Expands Projectile 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -221,7 +220,7 @@ Begin Class Name=Fireball2
 '
 ' This is a built-in Unreal class and it shouldn't be modified
 '
-Class Fireball2 Expands Projectile Intrinsic
+Class Fireball2 Expands Projectile 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -274,7 +273,7 @@ Begin Class Name=BulletProjectile
 '
 ' This is a built-in Unreal class and it shouldn't be modified
 '
-Class BulletProjectile Expands Projectile Intrinsic
+Class BulletProjectile Expands Projectile 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -286,10 +285,9 @@ Class BulletProjectile Expands Projectile Intrinsic
       Damage(0)=+00010.000000
       DamageDecay(0)=+00000.01000
       bIsInstantHit=True
-      EffectOnImpact=None
+      EffectOnImpact=WallHit
       EffectOnWallImpact=WallHit
       EffectOnPawnImpact=PawnHit
-      EffectOnImpact=WallHit
    End DefaultProperties
 End Class
 
@@ -299,7 +297,7 @@ Begin Class Name=ShellProjectile
 '
 ' This is a built-in Unreal class and it shouldn't be modified
 '
-Class ShellProjectile Expands Projectile Intrinsic
+Class ShellProjectile Expands Projectile 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -311,7 +309,6 @@ Class ShellProjectile Expands Projectile Intrinsic
       Damage(0)=11
       DamageDecay(0)=+00000.01300
       bIsInstantHit=True
-      EffectOnImpact=None
       EffectOnWallImpact=WallHit
       EffectOnPawnImpact=PawnHit
       EffectOnImpact=WallHit

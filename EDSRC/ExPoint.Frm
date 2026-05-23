@@ -2,17 +2,19 @@ VERSION 4.00
 Begin VB.Form frmExPoint 
    Caption         =   "Extrude to Point"
    ClientHeight    =   1920
-   ClientLeft      =   6180
-   ClientTop       =   6690
+   ClientLeft      =   4005
+   ClientTop       =   4740
    ClientWidth     =   4095
    Height          =   2280
    Icon            =   "ExPoint.frx":0000
-   Left            =   6120
+   Left            =   3945
    LinkTopic       =   "Form1"
+   MaxButton       =   0   'False
+   MinButton       =   0   'False
    ScaleHeight     =   1920
    ScaleWidth      =   4095
    ShowInTaskbar   =   0   'False
-   Top             =   6390
+   Top             =   4440
    Width           =   4215
    Begin VB.CommandButton btnLoft 
       Appearance      =   0  'Flat

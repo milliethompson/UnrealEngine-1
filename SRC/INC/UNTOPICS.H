@@ -12,50 +12,53 @@
 #define _INC_UNTOPICS
 
 /*-------------------------------------------------------------------------------
-	FTopicHandler
+	FTopicHandler.
 -------------------------------------------------------------------------------*/
 
 //
 // The topic handler base class.  All specific topic handlers are derived from this.
 //
 class FTopicHandler
-	{
-	public:
-	char TopicName[NAME_SIZE];		// Name of topic handler, set by FTopicTable::Register
-	FTopicHandler *Next;			// Next topic handler in linked list of global topic list
+{
+public:
+	// Name of topic handler, set by FTopicTable::Register.
+	char TopicName[NAME_SIZE];
+
+	// Next topic handler in linked list of global topic list.
+	FTopicHandler *Next;
+
+	// Public functions.
 	virtual void Set (ULevel *Level, const char *Topic, const char *Item, const char *Value)=0;
 	virtual void Get (ULevel *Level, const char *Topic, const char *Item, char *Result)=0;
-	};
+};
 
 /*-------------------------------------------------------------------------------
-	FGlobalTopicTable
+	FGlobalTopicTable.
 -------------------------------------------------------------------------------*/
 
 //
 // Global topic table class.  Contains all available topics.
 //
 class UNREAL_API FGlobalTopicTable
-	{
-	public:
-	//
-	// Variables:
-	//
-	FTopicHandler *FirstHandler; // Linked list; last entry is NULL
-	//
-	// Functions:
-	//
+{
+public:
+
+	// Variables.
+	FTopicHandler *FirstHandler; // Linked list; last entry is NULL.
+
+	// Functions.
 	void	Register(const char *TopicName,FTopicHandler *Handler);
-	void	Init	(void);
-	void 	Exit	(void);
+	void	Init	();
+	void 	Exit	();
 	void	Get		(ULevel *Level, const char *Topic, const char *Item, char *Data);
 	void	Set		(ULevel *Level, const char *Topic, const char *Item, const char *Value);
-	//
+
 	private:
 	FTopicHandler *Find (const char *TopicName);
-	};
+};
 
 /*-------------------------------------------------------------------------------
-	Autoregistration macro
+	Autoregistration macro.
 -------------------------------------------------------------------------------*/
 
 //
@@ -78,7 +81,7 @@ class UNREAL_API FGlobalTopicTable
 	HANDLERCLASS autoregister##HANDLERCLASS(NAME);
 
 /*-------------------------------------------------------------------------------
-	Generic topic handler sample
+	Generic topic handler sample.
 -------------------------------------------------------------------------------*/
 
 //
@@ -87,19 +90,18 @@ class UNREAL_API FGlobalTopicTable
 #if 0
 AUTOREGISTER_TOPIC("YourTopicName",YourTopicHandler);
 void YourTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, char *Data)
-	{
-	GUARD;
-	UNGUARD("YourTopicHandler::Get");
-	};
+{
+	guard(YourTopicHandler::Get);
+	unguard;
+};
 void YourTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, const char *Data)
-	{
-	GUARD;
-	UNGUARD("YourTopicHandler::Set");
-	};
+{
+	guard(YourTopicHandler::Set);
+	unguard;
+};
 #endif
 
 /*-------------------------------------------------------------------------------
-	The End
+	The End.
 -------------------------------------------------------------------------------*/
 #endif // _INC_UNTOPICS
-

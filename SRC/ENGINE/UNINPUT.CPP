@@ -3,17 +3,178 @@
 
 	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
+
+Definitions:
+
+    combo: A set of inputs which together define a player action. The simplest
+        combo can be a single input, which is called a combo even though it
+        has only one input. For example, the CursorUp key might be the combo 
+        which performs the MoveForward action. A combo can have one or two  
+        inputs, as listed below. Note that a combo has at most one 
+        movement. A combo with one input has no modifiers and a combo with
+        two inputs has one modifier.
+          1. input                      (input with no modifier)
+          2. switch + input             (input with 1 modifier switch)
+        When there is more than one input, the combo has 1 modifier
+        switch and a main input. Here are some examples that you may be
+        familiar with from other 3D action games:
+          1. CursorLeft                 (turns the player to the left)
+          2. Shift+CursorLeft           (turns the player faster to the left)
+    
+    input: A switch or a movement.
+
+    modifier: A switch which forms part of a multiple-input combo. The switch
+        is called a modifier because it is typically used to change the meaning
+        of an input. For example, CursorLeft might mean TurnLeft, but 
+        Alt+CursorLeft might mean MoveLeft. In this case, Alt is a modifier
+        which changes the meaning of CursorLeft from TurnLeft to MoveLeft.
+        Modifiers are always switches and never movements.
+
+    movement: a mouse movement or a joystick movement. Each joystick or mouse
+        axis of movement is separated into two distinct (but related) movements:
+        the "positive" movement and the "negative" movement. For example, the
+        mouse horizontal axis is separated into "mouse left" and "mouse right".
+        The joystick's X-axis is separated into "positive X" and "negative X"
+        movements. This lets actions or sensitivities be assigned to the 
+        directions independently.
+
+    movement combo: A combo where the main input is a movement.
+        Example: Shift + MouseForward
+   
+    switch: a mouse button, a keyboard key, or a joystick button.
+
+    switch combo: A combo where the main input is a switch.
+
+Input combos:
+
+    Input combos are briefly explained above under "combo". Here we provide
+    more detail. Below are the most complex forms of a switch or modifier combo.
+
+    Switch combo   : Modifier*2(T) + Switch*2(T)
+    Movement combo : Modifier1*2(T) + Movement(Kind)
+       
+    Notes:
+      1. Remember that the modifiers are optional and are always switches.
+      2. "*2" is an optional indicator which means the switch is activated
+         only when double-pressed (pressed twice quickly).
+      3. "(T)" is an optional indicator which means the switch is toggled
+         on or off each time it is activated.
+      4. (Kind) is an optional definition of the kind of movement. This is
+         described below.
+     
+    The movement kind defines how mouse or joystick movements are to be treated.
+     (Digital)
+         The movement is either on or off, depending on how far away the
+         movement is from the neutral or center position. For example,
+         moving the joystick forward might turn on the MoveForward action.
+         Once you start moving, pushing the joystick further forward doesn't
+         make you move any faster (this is the "digital" nature of the movement).
+ 
+     (Analog)
+         The position of the movement translates to the size or position of
+         the player action. For example, if moving a joystick forward causes
+         the player to move forward, then moving the joystick forward some
+         more causes the player to move forward faster. 
+     
+     (Differential)
+         The *change* in the movement translates to a change in the player's
+         action. For example, moving the mouse forward a little moves the
+         player forward a little. Note that it doesn't matter where the mouse
+         is - it is the change in movement that results in the action.
+         Differential movements are typically used for mouse movements.
+
+When input combos are active:
+
+    A switch combo is active if...
+        A switch combo is active if its modifier (if any) is active and
+        if the main switch input is active.
+
+    A movement combo is active if ...
+        A movement combo is active if its modifier (if any) is active and
+        if the movement input is active.
+
+    A switch (or modifier) is active if...
+        Whether a switch is considered active depends on whether or not it is
+        doubled (*2) or toggled (T). The cases are described below.
+           Switch: (neither doubled nor toggled)
+              Such a switch is active while it is held down.
+           Switch*2: (doubled but not toggled)
+              Such a switch is active while held down after being pressed
+              twice quickly.
+           Switch(T): (toggled but not doubled)
+              Such a switch is active the first time it is pressed.
+              Thereafter, the switch changes from active to inactive or
+              inactive to active each time it is pressed again.
+              Note that when the switch is active, it remains active even
+              after the switch is released.
+           Switch*2(T): (both doubled and toggled)
+              Such a switch is active the first time it is double-pressed.
+              Thereafter, the switch changes from active to inactive or
+              inactive to active each time it is double-pressed again.
+
+    For the purpose of explaining the activation of movements, consider
+    the following definition:
+        The relative position of a device in a particular direction is
+        the distance from the center (neutral) position divided by the
+        maximum distance from the center in that direction. This relative
+        position is expressed as a percentage. If the device is not moved
+        in the direction, or is moved in the opposite direction, the relative
+        position is 0. The relative position is always non-negative.
+    For example, if the joystick is pushed forward half-way between its
+    rest position and its maximum position, then the relative position
+    of the joystick in the "joystick forward" direction is 50%, and the
+    relative position of the joystick in the "joystick backward" direction
+    is 0%. The mouse is assigned maximum movements based on the screen size.
+
+    Similarly, consider the following definition for movement changes:
+        The relative change of a device in a particular direction is
+        the change in that direction (from the previous position) divided by the
+        maximum distance from the center in that direction. This relative
+        position is expressed as a percentage. If the device is not moved
+        in the direction, or is moved in the opposite direction, the relative
+        change is 0. The relative change is always non-negative.
+    For example, if the joystick is moved forward an extra 5 units, where
+    the maximum joystick position in that direction is 50 units, then the
+    relative change in the "joystick forward" direction is 10%, and the
+    relative change of the joystick in the "joystick backward" direction
+    is 0%.
+    
+    A Digital movement is active if...
+        A Digital movement is active if the relative position of the device
+        in the movement direction is not less than the digital threshold
+        for the movement. Each movement is assigned a configurable digital 
+        threshold.
+        For example, if the "joystick left" movement has a digital threshold
+        of 33%, then moving the joystick left within 1/3 of its "leftward"
+        range won't active the digital movement. As soon as the joystick 
+        moves to 1/3 of the range, the digital movement is active and it 
+        remains active until the joystick is moved back to within 1/3 of 
+        the leftward range. In this case, there is a 33% "dead zone"
+        to the left of the center of the joystick.
+    
+    An Analog movement is active if...
+        An analog movement is active if the relative position of the device in
+        the movement direction is not less than the analog threshold for the
+        movement. Each movement is assigned a configurable analog threshold.
+        In addition, the position of the device is used to determine the
+        size of the corresponding action.
+    
+    A Differential movement is active if...
+        A differential movement is active if the relative change of the device in
+        the movement direction is not less than the differential threshold for the
+        movement. In addition, the size of the change is used to determine the
+        size of the corresponding action.
+
 =============================================================================*/
 
 #include "Unreal.h"
 #include "UnInput.h"
 #include "UnKeyVal.h"
 #include "UnParse.h"
-#include "UnAction.h"
 
 #define DebugParsing 0 // 1 to debug parsing, 0 otherwise.
 
-#define Debugging (DebugParsing)
+#define InputDebugging (DebugParsing)
 
 static const char * ToggleText = "(T)";
 static const char * DoubleText = "*2" ;
@@ -25,6 +186,11 @@ static const char * SpeedSuffix                 = "Speed"       ; // Identifies 
 static const char * UseKey                      = "Use"         ;
 
 static char TextBuffer[200]; // For returning short-lived strings.
+
+static const char * InputSectionName = "Input";
+
+FInput GInput;
+
 //
 // This is still somewhat hacked.
 //
@@ -43,8 +209,8 @@ void pGetStoredMove(UCamera *Camera);
 #define arrayCount_(Array) ( sizeof(Array) / sizeof((Array)[0]) )
 
 
-#if Debugging
-    static void __cdecl Debug(const char * Message, ...)
+#if InputDebugging
+    static void CDECL Debug(const char * Message, ...)
     {
         char Text[1000];
         va_list ArgumentList;
@@ -54,7 +220,7 @@ void pGetStoredMove(UCamera *Camera);
         debugf(LOG_Info,Text);
     }
 #else
-    static inline void __cdecl Debug(const char * Message, ...)
+    static inline void CDECL Debug(const char * Message, ...)
     {
     }
 #endif
@@ -118,10 +284,11 @@ static BOOL ParseToggler( const char * & Text )
 static FInput::TMovementKind ParseMovementSuffix
 (
     const char * & Text
+,   const FInput & Input
 )
 {   
     const char * CheckText = Text;
-    FInput::TMovementKind Kind = FInput::NoMovementKind;
+    FInput::TMovementKind Kind = FPlatformInput::NoMovementKind;
     char Suffix[50];
     if
     ( 
@@ -130,13 +297,13 @@ static FInput::TMovementKind ParseMovementSuffix
         &&  FParse::StartsWith(CheckText,')')
     )
     {
-        for( int Check_ = 1; Kind==0 && Check_ < FInput::MovementKindCount; Check_++ )
+        for( int Check_ = 1; Kind==0 && Check_ < FPlatformInput::MovementKindCount; Check_++ )
         {
             const FInput::TMovementKind Check = FInput::TMovementKind(Check_);
             if
             ( 
-                    stricmp( Suffix, FInput::Abbreviation(Check) ) == 0 
-                ||  stricmp( Suffix, FInput::Description(Check) ) == 0 
+                    stricmp( Suffix, Input.PlatformInput->Abbreviation(Check) ) == 0 
+                ||  stricmp( Suffix, Input.PlatformInput->Description(Check) ) == 0 
             )
             {
                 Kind = Check;
@@ -156,8 +323,6 @@ static FInput::TMovementKind ParseMovementSuffix
 	Input packet building
 ------------------------------------------------------------------------------*/
 
-FInput GInput;
-
 //
 // Build a player movement packet based on keyboard, mouse, and joystick
 // movement.  Buffer must have plenty of free space.  Returns length of packet.
@@ -169,56 +334,57 @@ int PPlayerTick::BuildAllMovement(UCamera *Camera)
 	//
 	// Process buttons/keys:
 	//
-	//
-	if (Camera)
+	if (Camera && Camera->Current)
     {
+        Camera->Console->SetActionStatus(*this);
+        #if 0 //todo: [Delete] (obsolete)
         FVector Move;
         FFloatRotation Rotation;
 		GCameraManager->GetStoredMove(Camera,&Move,&Rotation); // Called only to get dmTick (direct mouse support) called
         memmove( &Movements, GAction.Movements, sizeof(Movements) );
         memmove( &Actions, GAction.Status, sizeof(GAction.Status) );
         GAction.EmptyMovements(); // Reset all movements since they might be accumulated later
+        #endif
     }
 	else
     {
-        // No input source - we have built a null movement packet
+        // No input source - we build a null movement packet
+        memset( this, 0, Length ); // Assumes zero-ness of components is desired.
     }
-
 	return Length;
 	UNGUARD("PPlayerTick::BuildAllMovement");
 	};
-
 
 //----------------------------------------------------------------------------
 //             Reset the state of all switches.
 //----------------------------------------------------------------------------
 void FInput::Reset()
 {
-    for( int Switch_ = 0; Switch_ < arrayCount_(Switches); Switch_++ )
-    {
-        const FInput::TSwitch Switch = FInput::TSwitch(Switch_);
-        Switches[Switch].Empty(FALSE); // Clear the switch, but leave toggles on.
-    }
-    memset( SwitchPressTimes, 0, sizeof(SwitchPressTimes) );
-    FPlatformInput::Reset();
+    PlatformInput->Reset();
 }
 
 //----------------------------------------------------------------------------
 //                    Initialize
 //----------------------------------------------------------------------------
-void FInput::Initialize()
+// Note: Caller is expected to set PlatformInput before initialization.
+void FInput::Initialize(FPlatformInput * PlatformInput)
 {
     GUARD;
-    FPlatformInput::Initialize();
+    this->PlatformInput = PlatformInput;
+    PlatformInput->Initialize();
+    Switches = &PlatformInput->Switches[0];
+    MovementsInfo = &PlatformInput->MovementsInfo[0];
+    LoadValues();
     UNGUARD("FInput::Initialize");
 }
 
 //----------------------------------------------------------------------------
-//                    Finalize
+//                    Exit
 //----------------------------------------------------------------------------
-void FInput::Finalize()
+void FInput::Exit()
 {
-    FPlatformInput::Finalize();
+    PlatformInput->Exit();
+    PlatformInput = 0;
 }
 
 
@@ -234,25 +400,25 @@ FInput::TStringList FInput::Keys() const
     for( int Movement_ = 1; Movement_ < MovementCount; ++Movement_ )
     {
         const TMovement Movement = TMovement(Movement_);
-        sprintf( Key, "%s%s", Abbreviation(Movement), AnalogThresholdSuffix );
+        sprintf( Key, "%s%s", PlatformInput->Abbreviation(Movement), AnalogThresholdSuffix );
         Keys.Add( Key );
     }
     for( Movement_ = 1; Movement_ < MovementCount; ++Movement_ )
     {
         const TMovement Movement = TMovement(Movement_);
-        sprintf( Key, "%s%s", Abbreviation(Movement), DifferentialThresholdSuffix );
+        sprintf( Key, "%s%s", PlatformInput->Abbreviation(Movement), DifferentialThresholdSuffix );
         Keys.Add( Key );
     }
     for( Movement_ = 1; Movement_ < MovementCount; ++Movement_ )
     {
         const TMovement Movement = TMovement(Movement_);
-        sprintf( Key, "%s%s", Abbreviation(Movement), DigitalThresholdSuffix );
+        sprintf( Key, "%s%s", PlatformInput->Abbreviation(Movement), DigitalThresholdSuffix );
         Keys.Add( Key );
     }
     for( Movement_ = 1; Movement_ < MovementCount; ++Movement_ )
     {
         const TMovement Movement = TMovement(Movement_);
-        sprintf( Key, "%s%s", Abbreviation(Movement), SpeedSuffix );
+        sprintf( Key, "%s%s", PlatformInput->Abbreviation(Movement), SpeedSuffix );
         Keys.Add( Key );
     }
     return Keys;
@@ -280,8 +446,8 @@ char * FInput::Value(const char * Key) const
             ( 
                 Text
             ,   "%c%s"
-            ,   UsingDevice(Device) ? '+' : '-'
-            ,   DeviceName(Device) 
+            ,   PlatformInput->UsingDevice(Device) ? '+' : '-'
+            ,   PlatformInput->DeviceName(Device) 
             );
         }
     }
@@ -347,6 +513,14 @@ char * FInput::Value(const char * Key) const
 }
 
 //----------------------------------------------------------------------------
+//                   Section name
+//----------------------------------------------------------------------------
+const char * FInput::SectionName() const
+{
+    return InputSectionName;
+}
+
+//----------------------------------------------------------------------------
 //            Set the value associated with a text key.
 //----------------------------------------------------------------------------
 BOOL FInput::SetValue(const char * Key, const char * Value)
@@ -385,7 +559,7 @@ BOOL FInput::SetValue(const char * Key, const char * Value)
                 for( int CheckDevice_ = 0; !Found && CheckDevice_ < DeviceCount; CheckDevice_++ )
                 {
                     const TDevice CheckDevice = TDevice(CheckDevice_);
-                    if( stricmp(SubValue,DeviceName(CheckDevice)) == 0 )
+                    if( stricmp(SubValue,PlatformInput->DeviceName(CheckDevice)) == 0 )
                     {
                         Device = CheckDevice;
                         Found = TRUE;
@@ -398,7 +572,7 @@ BOOL FInput::SetValue(const char * Key, const char * Value)
                 else
                 {
                     Debug( "%s found (%i): isused: %i", SubValue, int(Device), int(IsUsed) );
-                    UseDevice(Device,IsUsed);
+                    PlatformInput->UseDevice(Device,IsUsed);
                 }
             }
         }
@@ -573,17 +747,17 @@ BOOL FInput::SetValues(TStringList PairList, TMovementInfo * Info )
 //                Find a movement from its name.
 //----------------------------------------------------------------------------
 // Returning the matching switch or FInput::M_None if not found.
-static FInput::TMovement MovementFromName( const char * Text )
+static FInput::TMovement MovementFromName( const char * Text)
 {
-    FInput::TMovement Movement = FInput::M_None;
+    FInput::TMovement Movement = FInput::TMovement(0);
     if( Text != 0 && Text[0] != 0 )
     {
         for( int Check = 1; Movement==0 && Check < FInput::MovementCount; Check++ )
         {
             if
             ( 
-                    stricmp( Text, FInput::Abbreviation( FInput::TMovement(Check) ) ) == 0 
-                ||  stricmp( Text, FInput::Description( FInput::TMovement(Check) ) ) == 0 
+                    stricmp( Text, GInput.PlatformInput->Abbreviation( FInput::TMovement(Check) ) ) == 0 
+                ||  stricmp( Text, GInput.PlatformInput->Description( FInput::TMovement(Check) ) ) == 0 
             )
             {
                 Movement = FInput::TMovement(Check);
@@ -599,7 +773,7 @@ static FInput::TMovement MovementFromName( const char * Text )
 // Returning the matching switch or FInput::S_None if not found.
 static FInput::TSwitch SwitchFromName(const char * Text)
 {
-    FInput::TSwitch Switch = FInput::S_None;
+    FInput::TSwitch Switch = FInput::TSwitch(0);
     char AdjustedText[100]; // For when we want to try an altered name.
     if( Text != 0 && Text[0] != 0 )
     {
@@ -607,8 +781,8 @@ static FInput::TSwitch SwitchFromName(const char * Text)
         {
             if
             ( 
-                    stricmp( Text, FInput::Abbreviation( FInput::TSwitch(Check) ) ) == 0
-                ||  stricmp( Text, FInput::Description( FInput::TSwitch(Check) ) ) == 0 
+                    stricmp( Text, GInput.PlatformInput->Abbreviation( FInput::TSwitch(Check) ) ) == 0
+                ||  stricmp( Text, GInput.PlatformInput->Description( FInput::TSwitch(Check) ) ) == 0 
             )
             {
                 Switch = FInput::TSwitch(Check);
@@ -644,7 +818,7 @@ FInput::TMovement FInput::ParseMovement
     const char * & Text
 )
 {   
-    FInput::TMovement Movement = FInput::M_None;
+    FInput::TMovement Movement = FInput::TMovement(0);
     const char * CheckText = Text;
     char Name[50]; // Name of the movement
     if( FParse::GetWord(CheckText,Name,arrayCount_(Name)-1) > 0 )
@@ -675,7 +849,7 @@ FInput::TSwitch FInput::ParseSwitch
     const char * & Text
 )
 {   
-    FInput::TSwitch Switch = FInput::S_None;
+    FInput::TSwitch Switch = FInput::TSwitch(0);
     FParse::SkipWhiteSpace(Text);
     const char * CheckText = Text;
     char Name[50]; // Name of the switch
@@ -776,8 +950,8 @@ const char * FInput::TMetaMovement::Text(BOOL Descriptive) const
     Text[0] = 0;
     if( Movement != 0 )
     {
-        Text += sprintf( Text, "%s", Name(Movement,Descriptive) );
-        Text += sprintf( Text, "(%s)", Name(Kind,Descriptive) );
+        Text += sprintf( Text, "%s", GInput.Name(Movement,Descriptive) );
+        Text += sprintf( Text, "(%s)", GInput.Name(Kind,Descriptive) );
     }    
     strcpy( TextBuffer, Description );
     return TextBuffer;
@@ -814,7 +988,7 @@ const char * FInput::TMetaSwitch::Text(BOOL Descriptive) const
     Text[0] = 0;
     if( Switch != 0 )
     {
-        Text += sprintf( Text, "%s", Name(Switch,Descriptive) );
+        Text += sprintf( Text, "%s", GInput.Name(Switch,Descriptive) );
         if( Descriptive )
         {
             if( IsDouble && IsToggle )
@@ -865,7 +1039,7 @@ BOOL FInput::TMetaSwitch::Parse(const char * & Text)
 {
     FParse::SkipWhiteSpace(Text);
     const char * CheckText = Text;
-    Switch = FInput::ParseSwitch(CheckText);
+    Switch = GInput.ParseSwitch(CheckText);
     if( Switch != 0 ) // Did we find a switch?
     {
         IsDouble = ParseDoubler(CheckText);
@@ -903,13 +1077,13 @@ BOOL FInput::TMetaMovement::Parse(const char * & Text)
 {
     FParse::SkipWhiteSpace(Text);
     const char * CheckText = Text;
-    Movement = FInput::ParseMovement(CheckText);
+    Movement = GInput.ParseMovement(CheckText);
     if( Movement != 0 ) // Did we find a Movement?
     {
-        Kind = ParseMovementSuffix(CheckText);
+        Kind = ParseMovementSuffix(CheckText,GInput);
         if( Kind == 0 )
         {
-            Kind = FInput::DefaultMovementKind(Movement);
+            Kind = GInput.PlatformInput->DefaultMovementKind(Movement);
         }
         if( DebugParsing ) { Debug( "TMetaMovement::Parse(\"%s\")=>\"%s\"", Text, this->Text(FALSE) ); }
         FParse::SkipWhiteSpace(CheckText);
@@ -1013,8 +1187,6 @@ BOOL FInput::TCombo::Parse(const char * & Text)
     }
     return IsOkay;
 }
-
-
 
 /*------------------------------------------------------------------------------
 	The End

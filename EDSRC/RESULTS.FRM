@@ -3,19 +3,19 @@ Begin VB.Form frmResults
    BorderStyle     =   5  'Sizable ToolWindow
    Caption         =   "Results Window"
    ClientHeight    =   2160
-   ClientLeft      =   4920
-   ClientTop       =   10200
+   ClientLeft      =   3870
+   ClientTop       =   5370
    ClientWidth     =   8190
-   Height          =   2565
+   Height          =   2520
    Icon            =   "Results.frx":0000
-   Left            =   4860
+   Left            =   3810
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
    MinButton       =   0   'False
    ScaleHeight     =   2160
    ScaleWidth      =   8190
    ShowInTaskbar   =   0   'False
-   Top             =   9855
+   Top             =   5070
    Width           =   8310
    Begin VB.ListBox Results 
       BackColor       =   &H00000000&
@@ -52,7 +52,7 @@ Option Explicit
 '
 Sub UpdateResults()
     Dim S As String, L As String
-    S = Ed.Server.GetProp("TEXT", "ScriptError")
+    S = Ed.Server.GetProp("Text", "Results")
     '
     Results.Clear
     L = GrabLine(S)
@@ -101,11 +101,9 @@ Private Sub Form_Load()
     '
     Call Ed.SetOnTop(Me, "CompileResults", TOP_PANEL)
     '
-    Dim R As RECT
-    Call GetWindowRect(frmMain.hwnd, R)
-    Left = frmMain.CX
+    Left = frmMain.Left + frmMain.CX
     Width = frmMain.CXL
-    Top = frmMain.ScaleHeight - Height
+    Top = frmMain.Top + frmMain.Height - Height
     '
 End Sub
 

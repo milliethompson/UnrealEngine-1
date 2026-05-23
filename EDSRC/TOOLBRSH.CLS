@@ -19,7 +19,7 @@ End Sub
 
 Public Sub DoHelp(ByVal Tool As String, ByRef UnrealEdApp As Object)
     Select Case (Tool)
-    Case "RECTANGLE": ToolHelp (153)
+    Case "CUBE": ToolHelp (153)
     Case "SPHERE": ToolHelp (154)
     Case "CYLINDER": ToolHelp (156)
     Case "CONE": ToolHelp (150)
@@ -35,7 +35,7 @@ End Sub
 
 Public Sub DoProperties(ByVal Tool As String, ByRef UnrealEdApp As Object)
     Select Case (Tool)
-    Case "RECTANGLE": frmParSolRect.Show
+    Case "CUBE": frmParSolCube.Show
     Case "SPHERE": frmParSolSphere.Show
     Case "CYLINDER": frmParSolTube.Show
     Case "CONE": frmParSolCone.Show
@@ -57,7 +57,7 @@ Public Sub DoClick(ByVal Tool As String, ByRef UnrealEdApp As Object)
     Call Ed.Tools.Highlight(Tool, True)
     '
     Select Case (Tool)
-    Case "RECTANGLE": frmParSolRect.Trigger = Count
+    Case "CUBE": frmParSolCube.Trigger = Count
     Case "SPHERE": frmParSolSphere.Trigger = Count
     Case "CYLINDER": frmParSolTube.Trigger = Count
     Case "CONE": frmParSolCone.Trigger = Count
@@ -96,7 +96,7 @@ Property Get HiPic(ByVal Tool As String) As Object
     Dim V As Integer
     '
     Select Case (Tool)
-    Case "RECTANGLE": V = 49
+    Case "CUBE": V = 49
     Case "SPHERE": V = 50
     Case "CYLINDER": V = 51
     Case "CONE": V = 52
@@ -116,7 +116,7 @@ Property Get Pic(ByVal Tool As String) As Object
     Dim V As Integer
     '
     Select Case (Tool)
-    Case "RECTANGLE": V = 49
+    Case "CUBE": V = 49
     Case "SPHERE": V = 50
     Case "CYLINDER": V = 51
     Case "CONE": V = 52
@@ -133,7 +133,7 @@ Property Get Pic(ByVal Tool As String) As Object
 End Property
 
 Public Sub InitTools(ByRef UnrealEdApp As Object)
-    Call UnrealEdApp.Tools.Register(Me, "RECTANGLE", "Build a rectangle", "Rectangle Properties...")
+    Call UnrealEdApp.Tools.Register(Me, "CUBE", "Build a cube", "Cube Properties...")
     Call UnrealEdApp.Tools.Register(Me, "SPHERE", "Build a sphere", "Sphere Properties...")
     Call UnrealEdApp.Tools.Register(Me, "CYLINDER", "Build a cylinder", "Cylinder Properties...")
     Call UnrealEdApp.Tools.Register(Me, "CONE", "Build a cone", "Cone Properties...")

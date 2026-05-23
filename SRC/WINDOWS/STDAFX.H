@@ -10,32 +10,34 @@
 =============================================================================*/
 
 /////////////////////////////////////////////////////////////////////////////
-// ANSI C components
+// ANSI C components.
 /////////////////////////////////////////////////////////////////////////////
 #include <math.h>
 
 /////////////////////////////////////////////////////////////////////////////
-// MFC components
+// MFC components.
 /////////////////////////////////////////////////////////////////////////////
-#include <afxwin.h>		// MFC core and standard components
-#include <afxext.h>		// MFC extensions
-#include <afxdisp.h>	// MFC OLE automation classes
-#include <afxtempl.h>	// MFC template classes
-#include <afxcmn.h>		// MFC support for Windows 95 Common Controls
+#include <afxwin.h>		// MFC core and standard components.
+#include <afxext.h>		// MFC extensions.
+#include <afxdisp.h>	// MFC OLE automation classes.
+#include <afxtempl.h>	// MFC template classes.
+#include <afxcmn.h>		// MFC support for Windows 95 Common Controls.
 
 /////////////////////////////////////////////////////////////////////////////
-// Windows API components
+// Windows API components.
 /////////////////////////////////////////////////////////////////////////////
 #include <mmsystem.h>
 
 /////////////////////////////////////////////////////////////////////////////
-// Unreal components
+// Unreal components.
 /////////////////////////////////////////////////////////////////////////////
-#include "UnPort.h"			// Unreal porting defines
-#include "UnPlatfm.h"		// Unreal platform-specific exchange stuff
+#include "UnBuild.h"		// Unreal build info.
+#include "UnPort.h"			// Unreal porting defines.
+#include "UnPlatfm.h"		// Unreal platform-specific exchange stuff.
+#include "UnChecks.h"		// Unreal checking code.
 
 /////////////////////////////////////////////////////////////////////////////
-// Custom
+// Custom.
 /////////////////////////////////////////////////////////////////////////////
 
 //
@@ -48,6 +50,19 @@ enum ECustomUnrealWindowsMessages
 	};
 
 /////////////////////////////////////////////////////////////////////////////
-// The End
+// Macros.
+/////////////////////////////////////////////////////////////////////////////
+
+// Macro replacing IMPLEMENT_OLECREATE to register a server as 
+// single-use rather than multiple-use.
+#define SINGLEUSE_IMPLEMENT_OLECREATE(class_name, external_name, \
+	l, w1, w2, b1, b2, b3, b4, b5, b6, b7, b8) \
+    COleObjectFactory class_name::factory(class_name::guid, \
+    RUNTIME_CLASS(class_name), TRUE, _T(external_name)); \
+    const GUID class_name::guid = \
+    { l, w1, w2, { b1, b2, b3, b4, b5, b6, b7, b8 } };
+
+/////////////////////////////////////////////////////////////////////////////
+// The End.
 /////////////////////////////////////////////////////////////////////////////
 

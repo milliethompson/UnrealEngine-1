@@ -1,10 +1,10 @@
-// InpDevDi.h : header file
-//
 /*
 ==============================================================================
+UnWnDevD.h: Input devices dialog
+Used by: Property dialog to present the devices page
 
 Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
-Compiled with Visual C++ 4.0, Calling method=__fastcall
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
     This is the MFC-generated class for handling the Unreal input

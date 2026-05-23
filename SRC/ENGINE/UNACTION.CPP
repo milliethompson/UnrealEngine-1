@@ -7,6 +7,33 @@ Compiled with Visual C++ 4.0.
 Description:
     Refer to the associated header file.
 
+Notes:
+
+  1. The current design is based on polling the action status -
+     instantaneous inputs such as keyboard keys or (in the
+     absence of DirectMouse drivers) mouse movements are fed
+     into the platform input handler. Occasionally (every tick),
+     polled inputs (DirectMouse mouse movements, joystick movements,
+     joystick buttons) are gathered and fed to the platform input
+     handler. Once this is done, FAction is called to interpret all
+     the input and map the input into actions.
+
+     This means that actions are not immediately activated. For
+     player movements this is fine, but it has caused some problems
+     for camera functions (like brightness adjustment or full-screen
+     activation) which cannot be processed in the poll-input/interpret-
+     actions cycle. 
+
+     An alternative is to update the action status as the inputs are
+     recieved, instead of doing all interpretation at the same time
+     each tick.
+
+     However, in a highly configurable input/action system it is not
+     trivial to keep actions updated (well, it isn't brain surgery,
+     but it isn't trivial either). For example, releasing a key
+     might not only deactivate an action, it might also activate
+     another action.
+
 Revision history:
     * 05/30/96: Created by Mark
 ==============================================================================*/
@@ -22,8 +49,7 @@ Revision history:
 
 #define arrayCount_(Array) ( sizeof(Array) / sizeof((Array)[0]) )
 
-FAction GAction;
-
+static const char * ActionSectionName = "Action";
 #if Debugging_
     static void __cdecl Debug(const char * Message, ...)
     {
@@ -44,6 +70,7 @@ struct TActionInfo
 {
     FAction::TAction    Action              ; // Unnecessary, but included for safety.
     FAction::TClass     Class               ; // The classification of the action.
+    BOOL                MustBeKeyboard      ; // Must the action be assigned keyboard inputs?
     FLOAT               AnalogFactor        ; // Multiply analog magnitude by this value.
     FLOAT               DifferentialFactor  ; // Multiply differential magnitude by this value.
     FAction::TAction    Opposite            ; // The opposite action, or NoAction if there is none.
@@ -79,79 +106,78 @@ static const TActionInfo ActionsInfo[FAction::ActionCount] =
     #define PAUp   PlayerAxis_Upward
     // Use CNone for actions that are to be supressed in the action dialogs.
     // This might be for debugging actions or unimplemented actions.
-    //Action                  Class    AF     DF   Opposite          Axis  IsP. Name               Help
-    { A::NoAction           , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "None"           , "None"                                                  } 
-,   { A::Accelerate         , CNone,  0.00,  0.00, A::Decelerate   , PANone, F, "Accelerate"     , "Increase forward speed"                                }
-,   { A::BankLeft           , CNone, -1.00, -1.00, A::BankRight    , PARoll, F, "BankLeft"       , "[Flying] Bank to the left"                             }
-,   { A::BankRight          , CNone, +1.00, +1.00, A::BankLeft     , PARoll, T, "BankRight"      , "[Flying] Bank to the right"                            }
-,   { A::Chat               , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "Chat"           , "Send a message to other players"                       }
-,   { A::ConsoleFull        , CAdmi,  0.00,  0.00, A::NoAction     , PANone, F, "ConsoleFull"    , "Open a full-screen console"                            }
-,   { A::ConsoleHalf        , CAdmi,  0.00,  0.00, A::NoAction     , PANone, F, "Console"        , "Open a half-screen console"                            }
-,   { A::ConsoleType        , CAdmi,  0.00,  0.00, A::NoAction     , PANone, F, "ConsoleType"    , "Type a console command"                                }
-,   { A::Crouch             , CMisc,  0.00,  0.00, A::NoAction     , PANone, F, "Crouch"         , "Crouch down to the ground"                             }
-,   { A::Decelerate         , CNone,  0.00,  0.00, A::Accelerate   , PANone, F, "Decelerate"     , "Decrease forward speed"                                }
-,   { A::FullScreen         , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "FullScreen"     , "Turn full-screen on or off"                            }
-,   { A::Jump               , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "Jump"           , "Jump upwards"                                          }
-,   { A::KeyboardLookShift  , CTurn,  0.00,  0.00, A::NoAction     , PANone, F, "KeyboardLook"   , "Change keyboard movements into looks and turns"        }
-,   { A::Kick               , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "Kick"           , "Kick some alien butt!"                                 }
-,   { A::LookDown           , CTurn, -1.00, -1.00, A::LookUp       , PAPitc, F, "LookDown"       , "Look downward"                                         } 
-,   { A::LookFromBehind     , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "LookFromBehind" , "[Debug] Change view to behind player pawn"             }
-,   { A::LookStraight       , CTurn,  0.00,  0.00, A::NoAction     , PANone, F, "LookStraight"   , "Look straight ahead (cancels LookUp or LookDown)"      }
-,   { A::LookUp             , CTurn, +1.00, +1.00, A::LookDown     , PAPitc, T, "LookUp"         , "Look upward"                                           }
-,   { A::LungeBackward      , CNone,  0.00,  0.00, A::LungeForward , PANone, F, "LungeBackward"  , "Move backward with a sudden short burst of speed"      }
-,   { A::LungeDown          , CNone,  0.00,  0.00, A::LungeUp      , PANone, F, "LungeDown"      , "[Flying] Move down with a sudden short burst of speed" }
-,   { A::LungeForward       , CNone,  0.00,  0.00, A::LungeBackward, PANone, F, "LungeForward"   , "Move forward with a sudden, short burst of speed"      }
-,   { A::LungeLeft          , CNone,  0.00,  0.00, A::LungeRight   , PANone, F, "LungeLeft"      , "Move left with a sudden, short burst of speed"         }
-,   { A::LungeRight         , CNone,  0.00,  0.00, A::LungeLeft    , PANone, F, "LungeRight"     , "Move right with a sudden, short burst of speed"        }
-,   { A::LungeUp            , CNone,  0.00,  0.00, A::LungeDown    , PANone, F, "LungeUp"        , "[Flying] Move up with a sudden, short burst of speed"  }
-,   { A::MotionLookShift    , CTurn,  0.00,  0.00, A::NoAction     , PANone, F, "MouseLook"      , "Change mouse/joystick movements into look up/down"     }
-,   { A::MoveBackward       , CMove, -1.00, -1.00, A::MoveForward  , PAForw, F, "MoveBackward"   , "Move backward"                                         }
-,   { A::MoveDown           , CNone, -1.00, -1.00, A::MoveUp       , PAUp  , F, "MoveDown"       , "[Flying] Move downward"                                }
-,   { A::MoveForward        , CMove, +1.00, +1.00, A::MoveBackward , PAForw, T, "MoveForward"    , "Move forward"                                          } 
-,   { A::MoveLeft           , CMove, -1.00, -1.00, A::MoveRight    , PARigh, F, "MoveLeft"       , "Move to the left"                                      }
-,   { A::MoveRight          , CMove, +1.00, +1.00, A::MoveLeft     , PARigh, T, "MoveRight"      , "Move to the right"                                     }
-,   { A::MoveUp             , CNone, +1.00, +1.00, A::MoveDown     , PAUp  , T, "MoveUp"         , "[Flying] Move upward"                                  }
-,   { A::Pause              , CMisc,  0.00,  0.00, A::NoAction     , PANone, F, "Pause"          , "Pause or unpause the game"                             }
-,   { A::RollLeft           , CNone, -1.00, -1.00, A::RollRight    , PARoll, F, "RollLeft"       , "[Flying] Bank to the left (faster than BankLeft)"      }
-,   { A::RollRight          , CNone, +1.00, +1.00, A::RollLeft     , PARoll, T, "RollRight"      , "[Flying] Bank to the right (faster than BankRight)"    }
-,   { A::RunShift           , CMove,  0.00,  0.00, A::NoAction     , PANone, F, "Run"            , "Move faster"                                           }
-,   { A::RunBackward        , CMove, -2.00, -2.00, A::RunForward   , PAForw, F, "RunBackward"    , "Run backward (faster than MoveBackward)"               }
-,   { A::RunDown            , CNone, -2.00, -2.00, A::RunUp        , PAUp  , F, "RunDown"        , "[Flying] Move downward (faster than MoveDown)"         }
-,   { A::RunForward         , CMove, +2.00, +2.00, A::RunBackward  , PAForw, T, "RunForward"     , "Run forward (faster than MoveForward)"                 }
-,   { A::RunLeft            , CMove, -2.00, -2.00, A::RunRight     , PARigh, F, "RunLeft"        , "Run left (faster than MoveLeft)"                       }
-,   { A::RunRight           , CMove, +2.00, +2.00, A::RunLeft      , PARigh, T, "RunRight"       , "Run right (faster than MoveRight)"                     }
-,   { A::RunUp              , CNone, +2.00, +2.00, A::RunDown      , PAUp  , T, "RunUp"          , "[Flying] Move up (faster than MoveUp)"                 }
-,   { A::ScreenEnlarge      , CAdmi,  0.00,  0.00, A::NoAction     , PANone, F, "ScreenEnlarge"  , "Make the playing area larger"                          }
-,   { A::ScreenShot         , CMisc,  0.00,  0.00, A::NoAction     , PANone, F, "ScreenShot"     , "Take a snapshot of the screen in .pcx file format"     }
-,   { A::ScreenShrink       , CAdmi,  0.00,  0.00, A::NoAction     , PANone, F, "ScreenShrink"   , "Make the playing area smaller"                         }
-,   { A::SlideShift         , CMove,  0.00,  0.00, A::NoAction     , PANone, F, "Slide"          , "Change left/right turns into left/right moves"         }
-,   { A::SpinShift          , CTurn,  0.00,  0.00, A::NoAction     , PANone, F, "Spin"           , "Turn faster (changes Turn... into Spin...)"            }
-,   { A::SpinDown           , CNone, -2.00, -2.00, A::SpinUp       , PAPitc, F, "SpinDown"       , "[Flying] Turn downward (faster than TurnDown)"         }
-,   { A::SpinLeft           , CTurn, -2.00, -2.00, A::SpinRight    , PAYaw , F, "SpinLeft"       , "Turn left (faster than TurnLeft)"                      }
-,   { A::SpinRight          , CTurn, +2.00, +2.00, A::SpinLeft     , PAYaw , T, "SpinRight"      , "Turn right (faster than TurnRight)"                    }
-,   { A::SpinUp             , CNone, +2.00, +2.00, A::SpinDown     , PAPitc, T, "SpinUp"         , "[Flying] Turn upward (faster than TurnUp)"             }
-,   { A::TurnDown           , CNone, -1.00, -1.00, A::TurnUp       , PAPitc, F, "TurnDown"       , "[Flying] Turn downward"                                }
-,   { A::TurnLeft           , CTurn, -1.00, -1.00, A::TurnRight    , PAYaw , F, "TurnLeft"       , "Turn to the left"                                      }
-,   { A::TurnRight          , CTurn, +1.00, +1.00, A::TurnLeft     , PAYaw , T, "TurnRight"      , "Turn to the right"                                     }
-,   { A::TurnUp             , CNone, +1.00, +1.00, A::TurnDown     , PAPitc, T, "TurnUp"         , "[Flying] Turn upward"                                  }
-,   { A::WeaponFire         , CWeap,  0.00,  0.00, A::NoAction     , PANone, F, "WeaponFire"     , "Fire current weapon"                                   }
-,   { A::WeaponSpecial      , CWeap,  0.00,  0.00, A::NoAction     , PANone, F, "WeaponSpecial"  , "Use current weapon's special function"                 }
-,   { A::WeaponCloseUp      , CWeap,  0.00,  0.00, A::NoAction     , PANone, F, "WeaponCloseUp"  , "Use current weapon's close-up function"                }
-,   { A::WeaponNext         , CWeap,  0.00,  0.00, A::NoAction     , PANone, F, "WeaponNext"     , "Select next weapon"                                    }
-,   { A::WeaponPrevious     , CWeap,  0.00,  0.00, A::NoAction     , PANone, F, "WeaponPrevious" , "Select previous weapon"                                }
-,   { A::WeaponReady        , CWeap,  0.00,  0.00, A::NoAction     , PANone, F, "WeaponReady"    , "Lower or raise the current weapon"                     }
-,   { A::WeaponSet1         , CWeap,  0.00,  0.00, A::NoAction     , PANone, F, "WeaponAutoMag"  , "Select AutoMag"                                        }
-,   { A::WeaponSet2         , CWeap,  0.00,  0.00, A::NoAction     , PANone, F, "WeaponQuadShot" , "Select QuadShot"                                       }
-,   { A::WeaponSet3         , CWeap,  0.00,  0.00, A::NoAction     , PANone, F, "WeaponStinger"  , "Select Stinger"                                        }
-,   { A::WeaponSet4         , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "Weapon4"        , "Select weapon set #4, or cycle within set"             }
-,   { A::WeaponSet5         , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "Weapon5"        , "Select weapon set #5, or cycle within set"             }
-,   { A::WeaponSet6         , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "Weapon6"        , "Select weapon set #6, or cycle within set"             }
-,   { A::WeaponSet7         , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "Weapon7"        , "Select weapon set #7, or cycle within set"             }
-,   { A::WeaponSet8         , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "Weapon8"        , "Select weapon set #8, or cycle within set"             }
-,   { A::WeaponSet9         , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "Weapon9"        , "Select weapon set #9, or cycle within set"             }
-,   { A::WeaponSet10        , CNone,  0.00,  0.00, A::NoAction     , PANone, F, "Weapon10"       , "Select weapon set #10, or cycle within set"            }
-,   { A::WeaponSwap         , CWeap,  0.00,  0.00, A::NoAction     , PANone, F, "WeaponSwap"     , "Switch between two most recently used weapons"         }
-,   { A::Zoom               , CMisc,  0.00,  0.00, A::NoAction     , PANone, F, "Zoom"           , "Zooms (magnifies) view"                                }
+    //Action                  Class mbk  AF     DF   Opposite          Axis  IsP. Name               Help
+    { A::NoAction           , CNone, F, 0.00,  0.00, A::NoAction     , PANone, F, "None"           , "None"                                                  } 
+,   { A::Accelerate         , CAdva, F, 0.00,  0.00, A::Decelerate   , PANone, F, "Accelerate"     , "Increase forward speed"                                }
+,   { A::BankLeft           , CTurn, F,-1.00, -1.00, A::BankRight    , PARoll, F, "BankLeft"       , "[Flying] Bank to the left"                             }
+,   { A::BankRight          , CTurn, F,+1.00, +1.00, A::BankLeft     , PARoll, T, "BankRight"      , "[Flying] Bank to the right"                            }
+,   { A::Brightness         , CAdmi, T, 0.00,  0.00, A::NoAction     , PANone, F, "Brightness"     , "Adjust full-screen brightness"                         }
+,   { A::Chat               , CAdva, T, 0.00,  0.00, A::NoAction     , PANone, F, "Chat"           , "Send a message to other players"                       }
+,   { A::ConsoleFull        , CAdmi, T, 0.00,  0.00, A::NoAction     , PANone, F, "ConsoleFull"    , "Open a full-screen console"                            }
+,   { A::ConsoleHalf        , CAdmi, T, 0.00,  0.00, A::NoAction     , PANone, F, "Console"        , "Open a half-screen console"                            }
+,   { A::ConsoleType        , CAdmi, T, 0.00,  0.00, A::NoAction     , PANone, F, "ConsoleType"    , "Type a console command"                                }
+,   { A::Crouch             , CMisc, F, 0.00,  0.00, A::NoAction     , PANone, F, "Crouch"         , "Crouch down to the ground"                             }
+,   { A::Decelerate         , CAdva, F, 0.00,  0.00, A::Accelerate   , PANone, F, "Decelerate"     , "Decrease forward speed"                                }
+,   { A::FullScreen         , CAdmi, F, 0.00,  0.00, A::NoAction     , PANone, F, "FullScreen"     , "Turn full-screen on or off"                            }
+,   { A::Jump               , CMisc, F, 0.00,  0.00, A::NoAction     , PANone, F, "Jump"           , "Jump upwards"                                          }
+,   { A::KeyboardLookShift  , CTurn, F, 0.00,  0.00, A::NoAction     , PANone, F, "KeyboardLook"   , "Change keyboard movements into looks and turns"        }
+,   { A::Kick               , CNone, F, 0.00,  0.00, A::NoAction     , PANone, F, "Kick"           , "Kick some alien butt!"                                 }
+,   { A::LookDown           , CTurn, F,-1.00, -1.00, A::LookUp       , PAPitc, F, "LookDown"       , "Look downward"                                         } 
+,   { A::LookStraight       , CTurn, F, 0.00,  0.00, A::NoAction     , PANone, F, "LookStraight"   , "Look straight ahead (cancels LookUp or LookDown)"      }
+,   { A::LookUp             , CTurn, F,+1.00, +1.00, A::LookDown     , PAPitc, T, "LookUp"         , "Look upward"                                           }
+,   { A::LungeBackward      , CMove, F, 0.00,  0.00, A::LungeForward , PANone, F, "LungeBackward"  , "Move backward with a sudden short burst of speed"      }
+,   { A::LungeDown          , CMove, F, 0.00,  0.00, A::LungeUp      , PANone, F, "LungeDown"      , "[Flying] Move down with a sudden short burst of speed" }
+,   { A::LungeForward       , CMove, F, 0.00,  0.00, A::LungeBackward, PANone, F, "LungeForward"   , "Move forward with a sudden, short burst of speed"      }
+,   { A::LungeLeft          , CMove, F, 0.00,  0.00, A::LungeRight   , PANone, F, "LungeLeft"      , "Move left with a sudden, short burst of speed"         }
+,   { A::LungeRight         , CMove, F, 0.00,  0.00, A::LungeLeft    , PANone, F, "LungeRight"     , "Move right with a sudden, short burst of speed"        }
+,   { A::LungeUp            , CMove, F, 0.00,  0.00, A::LungeDown    , PANone, F, "LungeUp"        , "[Flying] Move up with a sudden, short burst of speed"  }
+,   { A::MotionLookShift    , CTurn, F, 0.00,  0.00, A::NoAction     , PANone, F, "MouseLook"      , "Change mouse/joystick movements into look up/down"     }
+,   { A::MoveBackward       , CMove, F,-1.00, -1.00, A::MoveForward  , PAForw, F, "MoveBackward"   , "Move backward"                                         }
+,   { A::MoveDown           , CMove, F,-1.00, -1.00, A::MoveUp       , PAUp  , F, "MoveDown"       , "[Flying] Move downward"                                }
+,   { A::MoveForward        , CMove, F,+1.00, +1.00, A::MoveBackward , PAForw, T, "MoveForward"    , "Move forward"                                          } 
+,   { A::MoveLeft           , CMove, F,-1.00, -1.00, A::MoveRight    , PARigh, F, "MoveLeft"       , "Move to the left"                                      }
+,   { A::MoveRight          , CMove, F,+1.00, +1.00, A::MoveLeft     , PARigh, T, "MoveRight"      , "Move to the right"                                     }
+,   { A::MoveUp             , CMove, F,+1.00, +1.00, A::MoveDown     , PAUp  , T, "MoveUp"         , "[Flying] Move upward"                                  }
+,   { A::Pause              , CMisc, F, 0.00,  0.00, A::NoAction     , PANone, F, "Pause"          , "Pause or unpause the game"                             }
+,   { A::RollLeft           , CTurn, F,-1.00, -1.00, A::RollRight    , PARoll, F, "RollLeft"       , "[Flying] Bank to the left (faster than BankLeft)"      }
+,   { A::RollRight          , CTurn, F,+1.00, +1.00, A::RollLeft     , PARoll, T, "RollRight"      , "[Flying] Bank to the right (faster than BankRight)"    }
+,   { A::RunShift           , CMove, F, 0.00,  0.00, A::NoAction     , PANone, F, "Run"            , "Move faster"                                           }
+,   { A::RunBackward        , CMove, F,-2.00, -2.00, A::RunForward   , PAForw, F, "RunBackward"    , "Run backward (faster than MoveBackward)"               }
+,   { A::RunDown            , CMove, F,-2.00, -2.00, A::RunUp        , PAUp  , F, "RunDown"        , "[Flying] Move downward (faster than MoveDown)"         }
+,   { A::RunForward         , CMove, F,+2.00, +2.00, A::RunBackward  , PAForw, T, "RunForward"     , "Run forward (faster than MoveForward)"                 }
+,   { A::RunLeft            , CMove, F,-2.00, -2.00, A::RunRight     , PARigh, F, "RunLeft"        , "Run left (faster than MoveLeft)"                       }
+,   { A::RunRight           , CMove, F,+2.00, +2.00, A::RunLeft      , PARigh, T, "RunRight"       , "Run right (faster than MoveRight)"                     }
+,   { A::RunUp              , CMove, F,+2.00, +2.00, A::RunDown      , PAUp  , T, "RunUp"          , "[Flying] Move up (faster than MoveUp)"                 }
+,   { A::ScreenEnlarge      , CAdmi, F, 0.00,  0.00, A::NoAction     , PANone, F, "ScreenEnlarge"  , "Make the playing area larger"                          }
+,   { A::ScreenShrink       , CAdmi, F, 0.00,  0.00, A::NoAction     , PANone, F, "ScreenShrink"   , "Make the playing area smaller"                         }
+,   { A::SlideShift         , CMove, F, 0.00,  0.00, A::NoAction     , PANone, F, "Slide"          , "Change left/right turns into left/right moves"         }
+,   { A::SpinShift          , CTurn, F, 0.00,  0.00, A::NoAction     , PANone, F, "Spin"           , "Turn faster (changes Turn... into Spin...)"            }
+,   { A::SpinDown           , CTurn, F,-2.00, -2.00, A::SpinUp       , PAPitc, F, "SpinDown"       , "[Flying] Turn downward (faster than TurnDown)"         }
+,   { A::SpinLeft           , CTurn, F,-2.00, -2.00, A::SpinRight    , PAYaw , F, "SpinLeft"       , "Turn left (faster than TurnLeft)"                      }
+,   { A::SpinRight          , CTurn, F,+2.00, +2.00, A::SpinLeft     , PAYaw , T, "SpinRight"      , "Turn right (faster than TurnRight)"                    }
+,   { A::SpinUp             , CTurn, F,+2.00, +2.00, A::SpinDown     , PAPitc, T, "SpinUp"         , "[Flying] Turn upward (faster than TurnUp)"             }
+,   { A::TurnDown           , CTurn, F,-1.00, -1.00, A::TurnUp       , PAPitc, F, "TurnDown"       , "[Flying] Turn downward"                                }
+,   { A::TurnLeft           , CTurn, F,-1.00, -1.00, A::TurnRight    , PAYaw , F, "TurnLeft"       , "Turn to the left"                                      }
+,   { A::TurnRight          , CTurn, F,+1.00, +1.00, A::TurnLeft     , PAYaw , T, "TurnRight"      , "Turn to the right"                                     }
+,   { A::TurnUp             , CTurn, F,+1.00, +1.00, A::TurnDown     , PAPitc, T, "TurnUp"         , "[Flying] Turn upward"                                  }
+,   { A::WeaponFire         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "WeaponFire"     , "Fire current weapon"                                   }
+,   { A::WeaponSpecial      , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "WeaponSpecial"  , "Use current weapon's special function"                 }
+,   { A::WeaponCloseUp      , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "WeaponCloseUp"  , "Use current weapon's close-up function"                }
+,   { A::WeaponNext         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "WeaponNext"     , "Select next weapon"                                    }
+,   { A::WeaponPrevious     , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "WeaponPrevious" , "Select previous weapon"                                }
+,   { A::WeaponReady        , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "WeaponReady"    , "Lower or raise the current weapon"                     }
+,   { A::WeaponSet1         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "WeaponAutoMag"  , "Select AutoMag"                                        }
+,   { A::WeaponSet2         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "WeaponQuadShot" , "Select QuadShot"                                       }
+,   { A::WeaponSet3         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "WeaponStinger"  , "Select Stinger"                                        }
+,   { A::WeaponSet4         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "Weapon4"        , "Select weapon set #4, or cycle within set"             }
+,   { A::WeaponSet5         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "Weapon5"        , "Select weapon set #5, or cycle within set"             }
+,   { A::WeaponSet6         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "Weapon6"        , "Select weapon set #6, or cycle within set"             }
+,   { A::WeaponSet7         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "Weapon7"        , "Select weapon set #7, or cycle within set"             }
+,   { A::WeaponSet8         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "Weapon8"        , "Select weapon set #8, or cycle within set"             }
+,   { A::WeaponSet9         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "Weapon9"        , "Select weapon set #9, or cycle within set"             }
+,   { A::WeaponSet10        , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "Weapon10"       , "Select weapon set #10, or cycle within set"            }
+,   { A::WeaponSwap         , CWeap, F, 0.00,  0.00, A::NoAction     , PANone, F, "WeaponSwap"     , "Switch between two most recently used weapons"         }
+,   { A::Zoom               , CMisc, F, 0.00,  0.00, A::NoAction     , PANone, F, "Zoom"           , "Zooms (magnifies) view"                                }
     // Remove cryptic abbreviations
     #undef A
     #undef T
@@ -181,6 +207,10 @@ const char * FAction::ActionHelp(TAction Action)
     return ActionsInfo[Action].Help;
 }
 
+BOOL FAction::MustBeKeyboard(TAction Action) const
+{
+    return ActionsInfo[Action].MustBeKeyboard;
+}
 
 FAction::TClass FAction::Class(TAction Action)
 {
@@ -205,6 +235,15 @@ static inline FLOAT AnalogFactor(FAction::TAction Action)
 static inline FLOAT DifferentialFactor(FAction::TAction Action)
 {
     return ActionsInfo[Action].DifferentialFactor;
+}
+
+//----------------------------------------------------------------------------
+//                 Register an action handler callback function
+//----------------------------------------------------------------------------
+void FAction::RegisterCallback( TAction Action, ActionCallbackType Callback, DWORD Datum )
+{
+    State.Callbacks[Action].Callback = Callback ;
+    State.Callbacks[Action].Datum    = Datum    ;
 }
 
 //----------------------------------------------------------------------------
@@ -261,22 +300,24 @@ void FAction::Initialize()
         MovementCombos[Movement].Initialize();
     }
     Reset();
+
+    LoadValues();
 }
 
 //----------------------------------------------------------------------------
-//                        Finalize
+//                        Exit
 //----------------------------------------------------------------------------
-void FAction::Finalize()
+void FAction::Exit()
 {
     for( int Switch_ = 0; Switch_ < arrayCount_(SwitchCombos); Switch_++ )
     {
         const FInput::TSwitch Switch = FInput::TSwitch(Switch_);
-        SwitchCombos[Switch].Finalize();
+        SwitchCombos[Switch].Exit();
     }
     for( int Movement_ = 0; Movement_ < arrayCount_(MovementCombos); Movement_++ )
     {
         const FInput::TMovement Movement = FInput::TMovement(Movement_);
-        MovementCombos[Movement].Finalize();
+        MovementCombos[Movement].Exit();
     }
 }
 //----------------------------------------------------------------------------
@@ -295,6 +336,7 @@ void FAction::Empty()
         MovementCombos[Movement].Initialize();
     }
     Reset();
+    CreateIndexes();
     UsePlainMouseMovements( FALSE );
 }
 
@@ -375,7 +417,7 @@ void FAction::TActionCombos::Add(const TActionCombo & ActionCombo)
         MakeRoom();
         TActionCombo & NewCombo = List[Count];
         NewCombo = ActionCombo;
-        NewCombo.Normalize();
+		NewCombo.Normalize();
         Count++;
     }
     UNGUARD( "TActionCombos::Add" );
@@ -422,6 +464,7 @@ void FAction::Empty(TAction Action)
     {
         MovementCombos[Movement].Empty(Action);
     }
+    CreateIndexes();
 }
 
 //----------------------------------------------------------------------------
@@ -497,6 +540,7 @@ void FAction::Add( const TActionCombo & ActionCombo )
     {
         MovementCombos[ ActionCombo.Movement() ].Add( ActionCombo );
     }
+    CreateIndexes();
 }
 
 //----------------------------------------------------------------------------
@@ -516,6 +560,7 @@ void FAction::Add
         (FInput::TCombo&)ActionCombo = Combos[Which];
         Add( ActionCombo );
     }
+    CreateIndexes();
 }
 
 //----------------------------------------------------------------------------
@@ -600,6 +645,14 @@ char * FAction::Value(const char * Key) const
 }
 
 //----------------------------------------------------------------------------
+//                   Section name
+//----------------------------------------------------------------------------
+const char * FAction::SectionName() const
+{
+    return ActionSectionName;
+}
+
+//----------------------------------------------------------------------------
 //            Set the value associated with a text key.
 //----------------------------------------------------------------------------
 BOOL FAction::SetValue(const char * Key, const char * Value)
@@ -659,14 +712,6 @@ static inline void TransformAxis(EMovementAxis Source, EMovementAxis Target, FAc
     }
 }
 
-template<class T>
-static inline void Swap( T & Value1, T & Value2)
-{
-    const T Saved1 = Value1;
-    Value1 = Value2;
-    Value2 = Saved1;
-}
-
 //----------------------------------------------------------------------------
 //                  Transform one action into another
 //----------------------------------------------------------------------------
@@ -681,7 +726,7 @@ static void Transform
     FAction::TActionStatus & Target = Info.Status[TargetAction];
     const EMovementAxis SourceAxis = FAction::Axis(SourceAction);
     const EMovementAxis TargetAxis = FAction::Axis(TargetAction);
-    if( FAction::CheckStatus(Source,FAction::IsActiveStatus) ) //tbd:&& !FAction::CheckStatus(Target,FAction::IsActiveStatus) )
+    if( FAction::CheckStatus(Source,FAction::IsActiveStatus) ) 
     {
         Target |= Source;
         TransformAxis( SourceAxis, TargetAxis, Info );
@@ -699,11 +744,6 @@ static void Swap
 ,   FAction::TAction      Action2
 )
 {
-//tbd:    FAction::TActionStatus & Info1 = Info.Status[Action1];
-//tbd:    FAction::TActionStatus & Info2 = Info.Status[Action2];
-//tbd:    FAction::TActionStatus Save1 = Info1;
-//tbd:    Info1 = Info2;
-//tbd:    Info2 = Save1;
     Swap( Info.Status[Action1], Info.Status[Action2] );
     const EMovementAxis Axis1 = FAction::Axis(Action1);
     const EMovementAxis Axis2 = FAction::Axis(Action2);
@@ -807,9 +847,9 @@ void FAction::CheckMouseState(FInput & Input)
     // originating from the mouse.
     State.MouseIsActive = 
         State.UsePlainMouseMovements
-    ||  Input.IsOn(FInput::S_LeftMouse)
-    ||  Input.IsOn(FInput::S_RightMouse)
-    ||  Input.IsOn(FInput::S_MiddleMouse)
+    ||  Input.PlatformInput->IsOn(FPlatformInput::S_LeftMouse)
+    ||  Input.PlatformInput->IsOn(FPlatformInput::S_RightMouse)
+    ||  Input.PlatformInput->IsOn(FPlatformInput::S_MiddleMouse)
     ;
 }
 
@@ -818,11 +858,12 @@ void FAction::CheckMouseState(FInput & Input)
 //----------------------------------------------------------------------------
 void FAction::UpdateSwitchActions(FInput & Input, BOOL IgnoreTypingKeys )
 {
+    FPlatformInput & PlatformInput = *Input.PlatformInput;
     for( int Switch_ = 1; Switch_ < FInput::SwitchCount; ++Switch_ )
     {
         const FInput::TSwitch Switch = FInput::TSwitch(Switch_);
         TActionCombos & ActionCombos = SwitchCombos[Switch];
-        if( !ActionCombos.IsEmpty() && ( !IgnoreTypingKeys || !FInput::IsTypingKey(Switch) ) )
+        if( !ActionCombos.IsEmpty() && ( !IgnoreTypingKeys || !PlatformInput.IsTypingKey(Switch) ) )
         {
             BOOL ModifiedActionDone = FALSE;
             // First, do any modified action...
@@ -833,13 +874,13 @@ void FAction::UpdateSwitchActions(FInput & Input, BOOL IgnoreTypingKeys )
                     TActionStatus & Status = this->Status[ActionCombo.Action];
                     const FInput::TModifiers & Modifiers = ActionCombo.Modifiers;
                     const FInput::TMetaSwitch & Modifier1 = Modifiers.MetaSwitch1;
-                    if( Modifier1.Switch != 0 && Input.IsOn(Modifier1.Switch,Modifier1.IsDouble,Modifier1.IsToggle) )
+                    if( Modifier1.Switch != 0 && PlatformInput.IsOn(Modifier1.Switch,Modifier1.IsDouble,Modifier1.IsToggle) )
                     {
                         SetStatus( Status, IsReadyStatus );
-                        if( !CheckBySwitch(Status) && Input.IsPending(Switch,ActionCombo.MetaSwitch.IsDouble,ActionCombo.MetaSwitch.IsToggle) )
+                        if( !CheckBySwitch(Status) && PlatformInput.IsPending(Switch,ActionCombo.MetaSwitch.IsDouble,ActionCombo.MetaSwitch.IsToggle) )
                         {
                             SetStatus( Status, IsActiveStatus );
-                            if( FInput::Device(Switch) == FInput::KeyboardDevice )
+                            if( PlatformInput.Device(Switch) == FPlatformInput::KeyboardDevice )
                             {
                                 SetStatus( Status, ByKeyboardStatus );
                             }
@@ -865,14 +906,14 @@ void FAction::UpdateSwitchActions(FInput & Input, BOOL IgnoreTypingKeys )
                     const FInput::TMetaSwitch & Modifier1 = Modifiers.MetaSwitch1;
                     if( Modifier1.Switch == 0 ) // Unmodified action?
                     {
-                        if( !CheckBySwitch(Status) && Input.IsPending(Switch,ActionCombo.MetaSwitch.IsDouble,ActionCombo.MetaSwitch.IsToggle) )
+                        if( !CheckBySwitch(Status) && PlatformInput.IsPending(Switch,ActionCombo.MetaSwitch.IsDouble,ActionCombo.MetaSwitch.IsToggle) )
                         {
                             //todo: Clean this test up. Temporary fix(?) for intel version - disable left mouse
                             // button when running in a window.
-                            if( State.UsePlainMouseMovements || Switch!=FInput::S_LeftMouse || ActionCombo.MetaSwitch.IsDouble )
+                            if( State.UsePlainMouseMovements || Switch!=FPlatformInput::S_LeftMouse || ActionCombo.MetaSwitch.IsDouble )
                             {
                                 SetStatus( Status, IsActiveStatus );
-                                if( FInput::Device(Switch) == FInput::KeyboardDevice )
+                                if( PlatformInput.Device(Switch) == FPlatformInput::KeyboardDevice )
                                 {
                                     SetStatus( Status, ByKeyboardStatus );
                                 }
@@ -895,12 +936,13 @@ void FAction::UpdateSwitchActions(FInput & Input, BOOL IgnoreTypingKeys )
 //----------------------------------------------------------------------------
 void FAction::UpdateMovementActions(FInput & Input)
 {
+    FPlatformInput & PlatformInput = *Input.PlatformInput;
     for( int Movement_ = 1; Movement_ < FInput::MovementCount; ++Movement_ )
     {
         const FInput::TMovement Movement = FInput::TMovement(Movement_);
         TActionCombos & ActionCombos = MovementCombos[Movement];
         const BOOL UseIt =
-            !FInput::IsMouseMovement( Movement )
+            !FPlatformInput::IsMouseMovement( Movement )
         ||  State.MouseIsActive
         ;
         if( !ActionCombos.IsEmpty() )
@@ -915,11 +957,11 @@ void FAction::UpdateMovementActions(FInput & Input)
                     TActionStatus & Status = this->Status[ActionCombo.Action];
                     const FInput::TModifiers & Modifiers = ActionCombo.Modifiers;
                     const FInput::TMetaSwitch & Modifier1 = Modifiers.MetaSwitch1;
-                    if( Modifier1.Switch != 0 && Input.IsOn(Modifier1.Switch,Modifier1.IsDouble,Modifier1.IsToggle) )
+                    if( Modifier1.Switch != 0 && PlatformInput.IsOn(Modifier1.Switch,Modifier1.IsDouble,Modifier1.IsToggle) )
                     {
                         FLOAT Magnitude;
                         BOOL MovementIsActive;
-                        Input.InterpretMovement(Magnitude,MovementIsActive,Movement,ActionCombo.MetaMovement.Kind);
+                        PlatformInput.InterpretMovement(Magnitude,MovementIsActive,Movement,ActionCombo.MetaMovement.Kind);
                         SetStatus( Status, IsReadyStatus );
                         ModifiedActionReady = TRUE;
                         if( UseIt && MovementIsActive )
@@ -930,15 +972,15 @@ void FAction::UpdateMovementActions(FInput & Input)
                             {
                                 SetStatus( Status, ByDigitalMovement );
                             }
-                            else if( FInput::IsAnalog(ActionCombo.MetaMovement.Kind) )
+                            else if( PlatformInput.IsAnalog(ActionCombo.MetaMovement.Kind) )
                             {
                                 Movements[Axis].Analog = Magnitude * AnalogFactor(ActionCombo.Action);
                             }
-                            else if( FInput::IsDifferential(ActionCombo.MetaMovement.Kind) )
+                            else if( PlatformInput.IsDifferential(ActionCombo.MetaMovement.Kind) )
                             {
                                 Movements[Axis].Differential += Magnitude * DifferentialFactor(ActionCombo.Action);
                             }
-                            if( ShowActions ) { debugf(LOG_Info,"Action: %s %3.3f (%s)",ActionName(ActionCombo.Action),Magnitude, FInput::Abbreviation(ActionCombo.MetaMovement.Kind)); }
+                            if( ShowActions ) { debugf(LOG_Info,"Action: %s %3.3f (%s)",ActionName(ActionCombo.Action),Magnitude, PlatformInput.Abbreviation(ActionCombo.MetaMovement.Kind)); }
                             ModifiedActionDone = TRUE;
                         }
                     }
@@ -957,7 +999,7 @@ void FAction::UpdateMovementActions(FInput & Input)
                     {
                         FLOAT Magnitude;
                         BOOL MovementIsActive;
-                        Input.InterpretMovement(Magnitude,MovementIsActive,Movement,ActionCombo.MetaMovement.Kind);
+                        PlatformInput.InterpretMovement(Magnitude,MovementIsActive,Movement,ActionCombo.MetaMovement.Kind);
                         if( MovementIsActive )
                         {
                             SetStatus( Status, IsActiveStatus );
@@ -966,15 +1008,15 @@ void FAction::UpdateMovementActions(FInput & Input)
                             {
                                 SetStatus( Status, ByDigitalMovement );
                             }
-                            else if( FInput::IsAnalog(ActionCombo.MetaMovement.Kind) )
+                            else if( PlatformInput.IsAnalog(ActionCombo.MetaMovement.Kind) )
                             {
                                 Movements[Axis].Analog = Magnitude * AnalogFactor(ActionCombo.Action);
                             }
-                            else if( FInput::IsDifferential(ActionCombo.MetaMovement.Kind) )
+                            else if( PlatformInput.IsDifferential(ActionCombo.MetaMovement.Kind) )
                             {
                                 Movements[Axis].Differential += Magnitude * DifferentialFactor(ActionCombo.Action);
                             }
-                            if( ShowActions ) { debugf(LOG_Info,"Action: %s %3.3f (%s) %s",ActionName(ActionCombo.Action),Magnitude, FInput::Abbreviation(ActionCombo.MetaMovement.Kind), FInput::DeviceName(FInput::Device(Movement)) ); }
+                            if( ShowActions ) { debugf(LOG_Info,"Action: %s %3.3f (%s) %s",ActionName(ActionCombo.Action),Magnitude, PlatformInput.Abbreviation(ActionCombo.MetaMovement.Kind), PlatformInput.DeviceName(PlatformInput.Device(Movement)) ); }
                         }
                     }
                 }
@@ -1072,7 +1114,8 @@ void FAction::TransformActions()
 //----------------------------------------------------------------------------
 void FAction::UpdateStatus(FInput & Input, BOOL IgnoreTypingKeys )
 {
-    Input.GatherInput();
+    FPlatformInput & PlatformInput = *Input.PlatformInput;
+    PlatformInput.GatherInput();
 
     EmptyActions();
     EmptyMovements();
@@ -1095,6 +1138,38 @@ void FAction::UpdateStatus(FInput & Input, BOOL IgnoreTypingKeys )
 
     TransformActions();
 
-    Input.StartNextInputCycle();
+    PlatformInput.StartNextInputCycle();
 
+}
+
+//----------------------------------------------------------------------------
+//          Trigger any callbacks for actions activated by Switch
+//----------------------------------------------------------------------------
+void FAction::TriggerActions(FInput & Input, FInput::TSwitch Switch, UCamera * Camera)
+{
+#if 0 //todo:
+    TActionList * Actions = State.SwitchedActions[Switch];
+    if( Actions != 0 )
+    {
+        for( int Which = 0; Which < Actions->Count(); Which++ )
+        {
+            const TAction Action = (*Actions)[Which];
+            const ActionCallbackType Callback = State.Callbacks[Action].Callback;
+debugf( LOG_Info, "Trigger? %s", ActionName(Action) );
+            if( Callback != 0 && IsActive(Action,Input) )
+            {
+                const DWORD Datum = State.Callbacks[Action].Datum;
+                Callback(Camera,Action,Datum);
+            }
+        }
+    }
+#endif
+}
+
+
+//----------------------------------------------------------------------------
+//             Create redundant indexes based on current combos
+//----------------------------------------------------------------------------
+void FAction::CreateIndexes()
+{
 }

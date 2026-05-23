@@ -124,7 +124,7 @@ END
 IDD_DPLAYSESSIONS DIALOGEX 0, 0, 284, 177
 STYLE WS_CHILD
 EXSTYLE WS_EX_NOPARENTNOTIFY
-FONT 8, "MS Sans Serif"
+FONT 8, "MS Sans Serif", 0, 0, 0x1
 BEGIN
     PUSHBUTTON      "< &Back",ID_BACK,127,159,50,15
     PUSHBUTTON      "Cancel",IDCANCEL,232,159,50,15
@@ -141,7 +141,7 @@ END
 IDD_INETPROVIDER DIALOGEX 0, 0, 284, 177
 STYLE WS_CHILD
 EXSTYLE WS_EX_NOPARENTNOTIFY
-FONT 8, "MS Sans Serif"
+FONT 8, "MS Sans Serif", 0, 0, 0x1
 BEGIN
     PUSHBUTTON      "< &Back",ID_BACK,127,159,50,15
     PUSHBUTTON      "Cancel",IDCANCEL,232,159,50,15
@@ -163,7 +163,7 @@ END
 IDD_SERVERPROP DIALOGEX 0, 0, 286, 178
 STYLE WS_CHILD
 EXSTYLE WS_EX_NOPARENTNOTIFY
-FONT 8, "MS Sans Serif", 0, 0, 0x1
+FONT 8, "MS Sans Serif"
 BEGIN
     PUSHBUTTON      "< &Back",ID_BACK,127,159,50,15
     PUSHBUTTON      "Cancel",IDCANCEL,232,159,50,15
@@ -185,7 +185,7 @@ BEGIN
     EDITTEXT        IDC_LEVEL,124,89,135,13,ES_AUTOHSCROLL | ES_READONLY
     PUSHBUTTON      "...",IDC_LEVEL_FIND,264,90,13,11
     LTEXT           "Now you must give your UnrealServer a name.  You may also give the server a password, which other players will be required to enter in order to join your server.  The password is optional.",
-                    IDC_STATIC,7,22,257,27
+                    IDC_STATIC,7,20,257,27
     PUSHBUTTON      "&Configure",ID_CONFIGURE,8,159,50,15
 END
 
@@ -367,7 +367,7 @@ END
 // Bitmap
 //
 
-IDB_NETWIZ              BITMAP  DISCARDABLE     "Res\\X_wix1.bmp"
+IDB_NETWIZ              BITMAP  DISCARDABLE     "Wizard.bmp"
 
 /////////////////////////////////////////////////////////////////////////////
 //

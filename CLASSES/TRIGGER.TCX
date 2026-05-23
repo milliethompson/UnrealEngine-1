@@ -13,7 +13,7 @@ Begin Class Name=Triggers
 ' This is the parent class of all triggers and built-in event generators.
 ' This is a built-in Unreal class and it shouldn't be modified.
 '
-Class Triggers Expands Root Intrinsic
+Class Triggers Expands Actor Intrinsic
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -39,13 +39,12 @@ Begin Class Name=Trigger
 '
 Class Trigger Expands Triggers Intrinsic
 
-EnumDef ETriggerType = TT_Proximity,TT_Use,TT_Shoot
+' Trigger types.
+EnumDef ETriggerType = TT_Proximity,TT_Shoot
 
-Dim TriggerType as ETriggerType
-Dim ClassesToDetect as Editable Class
-Dim Message as Editable String(80)
-Dim bShowMessage as Editable Boolean
-Dim bTriggerOnceOnly as Editable Boolean
+Dim TriggerType      As ETriggerType         ' Type of the trigger.
+Dim Message          As Editable String(80)  ' Human readable triggering message.
+Dim bTriggerOnceOnly As Editable Boolean     ' Only trigger once and then stop.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -71,7 +70,7 @@ Begin Class Name=Counter
 '
 Class Counter Expands Triggers Intrinsic
 
-Dim NumToCount as Editable Byte ' Number to count down from, minimum=1
+Dim NumToCount as Editable Byte ' Number to count down from, minimum=1.
 Dim CountMessage as Editable String(80)
 Dim CompleteMessage as Editable String(80)
 Dim bShowMessage as Editable Boolean

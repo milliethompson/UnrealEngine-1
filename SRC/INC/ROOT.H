@@ -1,10 +1,10 @@
 /*===========================================================================
-	C++ "Root" actor class definitions exported from UnrealEd
+	C++ "Actor" actor class definitions exported from UnrealEd
 ===========================================================================*/
-#pragma pack (push,1) /* Actor class data must be unaligned */
+#pragma pack (push,4) /* 4-byte alignment */
 
 ///////////////////////////////////////////////////////
-// Actor class ARoot
+// Actor class AActor
 ///////////////////////////////////////////////////////
 
 enum EDrawType {
@@ -12,20 +12,14 @@ enum EDrawType {
     DT_Sprite               =1,
     DT_MeshMap              =2,
     DT_Brush                =3,
-    DT_ParticleSystem       =4,
+    DT_MAX                  =4,
 };
 
 enum EBlitType {
     BT_None                 =0,
     BT_Normal               =1,
     BT_Transparent          =2,
-    BT_Ghost                =3,
-    BT_Glow                 =4,
-    BT_Fuzzy                =5,
-};
-
-enum EParticleType {
-    PT_None                 =0,
+    BT_MAX                  =3,
 };
 
 enum ELightType {
@@ -35,10 +29,8 @@ enum ELightType {
     LT_Blink                =3,
     LT_Flicker              =4,
     LT_Strobe               =5,
-    LT_Explode2             =6,
-    LT_Explode3             =7,
-    LT_DayLight             =8,
-    LT_NightLight           =9,
+    LT_BackdropLight        =6,
+    LT_MAX                  =7,
 };
 
 enum ELightEffect {
@@ -50,17 +42,19 @@ enum ELightEffect {
     LE_SlowWave             =5,
     LE_FastWave             =6,
     LE_CloudCast            =7,
-    LE_StormCast            =8,
+    LE_StaticSpot           =8,
     LE_Shock                =9,
     LE_Disco                =10,
     LE_Warp                 =11,
-    LE_NotImplemented       =12,
+    LE_Spotlight            =12,
     LE_StolenQuakeWater     =13,
     LE_ChurningWater        =14,
-    LE_NegativeLight        =15,
+    LE_Satellite            =15,
     LE_Interference         =16,
     LE_Cylinder             =17,
     LE_Rotor                =18,
+    LE_Unused               =19,
+    LE_MAX                  =20,
 };
 
 enum EAI_Task {
@@ -69,9 +63,10 @@ enum EAI_Task {
     EAI_TaskSearch          =2,
     EAI_TaskWait            =3,
     EAI_TaskAttack          =4,
+    EAI_MAX                 =5,
 };
 
-class ARoot : public AActorBase {
+class UNREAL_API AActorBase {
 public:
     UClass     *Class;
     FVector    Location;
@@ -80,28 +75,27 @@ public:
     FRotation  ViewRot;
     INDEX      iParent;
     INDEX      iWeapon;
+    BYTE       DrawType                 /* enum EDrawType */;
+    BYTE       BlitType                 /* enum EBlitType */;
     UTexture   *Texture;
     UMeshMap   *MeshMap;
     UModel     *Brush;
-    USound     *AmbientSound;
     FLOAT      DrawScale;
+    BYTE       InherentGlow;
+    USound     *AmbientSound;
+    BYTE       SoundRadius;
+    BYTE       SoundVolume;
     BYTE       AnimSeq;
     FLOAT      AnimRate;
     FLOAT      AnimBase;
     BYTE       AnimCount;
     BYTE       AnimFirst;
     BYTE       AnimLast;
-    int        AnimMessage;
+    INT        AnimMessage;
     FLOAT      CollisionRadius;
     FLOAT      CollisionHeight;
-    BYTE       DrawType                 /* EDrawType            */;
-    BYTE       BlitType                 /* EBlitType            */;
-    BYTE       ParticleType             /* EParticleType        */;
-    BYTE       ParticleCount;
-    BYTE       ParticleRate;
-    BYTE       SoundRadius;
-    BYTE       LightType                /* ELightType           */;
-    BYTE       LightEffect              /* ELightEffect         */;
+    BYTE       LightType                /* enum ELightType */;
+    BYTE       LightEffect              /* enum ELightEffect */;
     BYTE       LightBrightness;
     BYTE       LightHue;
     BYTE       LightSaturation;
@@ -109,49 +103,59 @@ public:
     BYTE       LightPeriod;
     BYTE       LightPhase;
     BYTE       LightCone;
-    BYTE       InherentBrightness;
+    BYTE       VolumeBrightness;
+    BYTE       VolumeRadius;
+    DWORD      bStatic:1;
+    DWORD      bHidden:1;
+    DWORD      bHiddenEd:1;
+    DWORD      bDirectional:1;
+    DWORD      bTemplateClass:1;
+    DWORD      bSelected:1;
+    DWORD      bNoDelete:1;
+    DWORD      bTempLightChanged:1;
+    DWORD      bTempDynamicLight:1;
+    DWORD      bUser0:1;
+    DWORD      bUser1:1;
+    DWORD      bUser2:1;
+    DWORD      bUser3:1;
+    DWORD      bUser4:1;
+    DWORD      bUser5:1;
+    DWORD      bUser6:1;
+    DWORD      bUser7:1;
+    DWORD      bSpecialLit:1;
+    DWORD      bOnHorizon:1;
+    DWORD      bActorShadows:1;
     DWORD      bAnimate:1;
     DWORD      bMeshWet:1;
     DWORD      bMeshShadowCast:1;
     DWORD      bMeshEnviroMap:1;
-    DWORD      bSpriteRotates:1;
-    DWORD      bUnused0:1;
-    DWORD      bActorShadows:1;
-    DWORD      bShinyReflect:1;
-    DWORD      bSpecialLight:1;
-    DWORD      bStaticActor:1;
-    DWORD      bHidden:1;
-    DWORD      bHiddenEd:1;
-    DWORD      bDirectional:1;
+    DWORD      bUnlit:1;
+    DWORD      bNoSmooth:1;
     DWORD      bCollideActors:1;
     DWORD      bCollideWorld:1;
     DWORD      bBlocksActors:1;
+    DWORD      bBlocksPlayers:1;
     DWORD      bBehindView:1;
-    DWORD      bSelected:1;
-    DWORD      bTempDynamicLight:1;
-    DWORD      bDrawOnHorizon:1;
-    DWORD      bTemplateClass:1;
-    DWORD      bTempLightChanged:1;
-    DWORD      bUnlit:1;
-    DWORD      bNoSmooth:1;
-    DWORD      bUnused4:1;
-    DWORD      bUnused5:1;
-    DWORD      bUnused6:1;
-    DWORD      bUnused7:1;
-    DWORD      bUnused8:1;
-    UCamera    *User;
+    DWORD      bPad0:1;
+    DWORD      bPad1:1;
+    DWORD      bPad2:1;
+    DWORD      bPad3:1;
+    DWORD      bPad4:1;
+    DWORD      bPad5:1;
+    DWORD      bPad6:1;
+    DWORD      bPad7:1;
     FName      Name;
-    FName      EventName;
+    FName      Event;
+    BYTE       Zone;
+    INDEX      iMe;
     INDEX      iTarget;
     INDEX      iInventory;
     INDEX      iFloor;
+    INDEX      iInstigator;
     FLOAT      Mass;
-    DWORD      bInactive:1;
-    DWORD      bPegged:1;
+    FLOAT      WaterSinkRate;
     DWORD      bGravity:1;
     DWORD      bMomentum:1;
-    DWORD      bProjTarget:1;
-    DWORD      bCanPossess:1;
     DWORD      bDifficulty1:1;
     DWORD      bDifficulty2:1;
     DWORD      bDifficulty3:1;
@@ -160,39 +164,50 @@ public:
     DWORD      bNetDeathMatch:1;
     DWORD      bNetPersistent:1;
     DWORD      bNetNoMonsters:1;
+    DWORD      bProjTarget:1;
+    DWORD      bCanBeTeleported:1;
+    DWORD      bIsSecretGoal:1;
+    DWORD      bIsKillGoal:1;
+    DWORD      bIsItemGoal:1;
+    INDEX      iTouchingActors[4];
+    DWORD      bWasTouchedByPlayer:1;
+    DWORD      bSleeping:1;
     DWORD      bTempEditor:1;
     DWORD      bJustDeleted:1;
-    DWORD      bCanBeTeleported:1;
-    DWORD      bUnused12:1;
-    DWORD      bUnused13:1;
-    DWORD      bUnused14:1;
-    DWORD      bUnused15:1;
-    INDEX      iMe;
-    BYTE       Zone;
+    BYTE       ScriptCountdown;
+    BYTE       ScriptTickRate;
+    INT        TimerCountdown;
+    FName      TimerMessage;
+    FName      DefaultEdCategory;
+    UClass     *BlockedClasses[3];
+    UClass     *PassedClasses[3];
     BYTE       ChanceOfExistence;
-    int        LifeSpan;
-    int        Age;
-    int        Era;
+    BYTE       RandomizerDivider;
+    BYTE       RandomizerRemainder;
+    INT        LifeSpan;
+    INT        Age;
+    INT        Era;
     BYTE       TriggerSequences[10];
     BYTE       TriggerFrames[10];
     BYTE       TriggerValues[10];
     BYTE       WhichTriggers;
-    int        TextureList;
+    INT        TextureList;
     BYTE       TextureCount;
-    BYTE       ScriptCountdown;
-    int        TimerCountdown;
-    int        TimerMessage;
-    FLOAT      WaterSinkRate;
-    BYTE       AITask                   /* EAI_Task             */;
+    BYTE       AITask                   /* enum EAI_Task */;
     INDEX      iPendingTeleporter;
     BYTE       TeleportDelay;
-    FName      DefaultEdCategory;
-    int Process(ILevel *Level, FName Message, void *Params);
+    #include "UnRoot.h"
 };
-AUTOREGISTER_CLASS(ARoot);
+class IMPLEMENTATION_API AActor : public AActorBase {
+public:
+    BYTE PropertyPad[643];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
+};
+AUTOREGISTER_CLASS(AActor);
 
 ///////////////////////////////////////////////////////
-// Actor class AProjectile:ARoot
+// Actor class AProjectile:AActor
 ///////////////////////////////////////////////////////
 
 enum EDamageType {
@@ -202,9 +217,10 @@ enum EDamageType {
     DMT_Electric            =3,
     DMT_Count               =4,
     DMT_None                =5,
+    DMT_MAX                 =6,
 };
 
-class AProjectile : public ARoot {
+class IMPLEMENTATION_API AProjectileBase : public AActorBase {
 public:
     DWORD      bVerticalSeek:1;
     DWORD      bFollowFloor:1;
@@ -225,80 +241,98 @@ public:
     FLOAT      Damage[4];
     FLOAT      DamageDecay[4];
     BYTE       ExplosiveTransfer;
-    BYTE       Hack                     /* EDamageType          */;
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE       Hack                     /* enum EDamageType */;
+};
+class IMPLEMENTATION_API AProjectile : public AProjectileBase {
+public:
+    BYTE PropertyPad[482];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AProjectile);
 
 ///////////////////////////////////////////////////////
-// Actor class AFireball:AProjectile:ARoot
+// Actor class AFireball:AProjectile:AActor
 ///////////////////////////////////////////////////////
 
-class AFireball : public AProjectile {
+class IMPLEMENTATION_API AFireballBase : public AProjectileBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
 };
-AUTOREGISTER_CLASS(AFireball);
-
-///////////////////////////////////////////////////////
-// Actor class AFireball2:AProjectile:ARoot
-///////////////////////////////////////////////////////
-
-class AFireball2 : public AProjectile {
+class IMPLEMENTATION_API AFireball : public AFireballBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE PropertyPad[482];
+    FActorPrivate Private;
 };
-AUTOREGISTER_CLASS(AFireball2);
-
 ///////////////////////////////////////////////////////
-// Actor class ABulletProjectile:AProjectile:ARoot
+// Actor class AFireball2:AProjectile:AActor
 ///////////////////////////////////////////////////////
 
-class ABulletProjectile : public AProjectile {
+class IMPLEMENTATION_API AFireball2Base : public AProjectileBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
 };
-AUTOREGISTER_CLASS(ABulletProjectile);
-
-///////////////////////////////////////////////////////
-// Actor class AShellProjectile:AProjectile:ARoot
-///////////////////////////////////////////////////////
-
-class AShellProjectile : public AProjectile {
+class IMPLEMENTATION_API AFireball2 : public AFireball2Base {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE PropertyPad[482];
+    FActorPrivate Private;
 };
-AUTOREGISTER_CLASS(AShellProjectile);
-
 ///////////////////////////////////////////////////////
-// Actor class AStingerProjectile:AProjectile:ARoot
+// Actor class ABulletProjectile:AProjectile:AActor
 ///////////////////////////////////////////////////////
 
-class AStingerProjectile : public AProjectile {
+class IMPLEMENTATION_API ABulletProjectileBase : public AProjectileBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
 };
-AUTOREGISTER_CLASS(AStingerProjectile);
-
-///////////////////////////////////////////////////////
-// Actor class ATentacleProjectile:AProjectile:ARoot
-///////////////////////////////////////////////////////
-
-class ATentacleProjectile : public AProjectile {
+class IMPLEMENTATION_API ABulletProjectile : public ABulletProjectileBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE PropertyPad[482];
+    FActorPrivate Private;
 };
-AUTOREGISTER_CLASS(ATentacleProjectile);
-
 ///////////////////////////////////////////////////////
-// Actor class APawn:ARoot
+// Actor class AShellProjectile:AProjectile:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API AShellProjectileBase : public AProjectileBase {
+public:
+};
+class IMPLEMENTATION_API AShellProjectile : public AShellProjectileBase {
+public:
+    BYTE PropertyPad[482];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class AStingerProjectile:AProjectile:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API AStingerProjectileBase : public AProjectileBase {
+public:
+};
+class IMPLEMENTATION_API AStingerProjectile : public AStingerProjectileBase {
+public:
+    BYTE PropertyPad[482];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class ATentacleProjectile:AProjectile:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ATentacleProjectileBase : public AProjectileBase {
+public:
+};
+class IMPLEMENTATION_API ATentacleProjectile : public ATentacleProjectileBase {
+public:
+    BYTE PropertyPad[482];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class APawn:AActor
 ///////////////////////////////////////////////////////
 
 enum EAI_Move {
-    EAI_MoveNone            =0,
-    EAI_MoveApproach        =1,
-    EAI_MoveBackOff         =2,
-    EAI_MoveRunAway         =3,
+    EAIM_MoveNone           =0,
+    EAIM_MoveApproach       =1,
+    EAIM_MoveBackOff        =2,
+    EAIM_MoveRunAway        =3,
+    EAIM_MAX                =4,
 };
 
 enum ELifeState {
@@ -306,31 +340,78 @@ enum ELifeState {
     LS_Alive                =1,
     LS_Dying                =2,
     LS_Dead                 =3,
+    LS_MAX                  =4,
 };
 
-class APawn : public ARoot {
+class IMPLEMENTATION_API APawnBase : public AActorBase {
 public:
-    int        YawSpeed;
-    int        PitchSpeed;
-    int        RollSpeed;
-    int        FixFrame;
+    UCamera    *Camera;
+    UPlayer    *Player;
+    CHAR       PlayerName[32];
+    CHAR       TeamName[32];
+    FRotation  RotSpeed;
+    FRotation  TargetRot;
     FLOAT      BaseEyeHeight;
     FLOAT      EyeHeight;
     FLOAT      Bob;
-    FName      TeamName;
-    int        TargetYaw;
-    int        TargetPitch;
-    int        TargetRoll;
-    BYTE       KillCount;
+    FLOAT      OrthoZoom;
+    FLOAT      FovAngle;
+    INT        ShowFlags;
+    INT        RendMap;
+    INT        Misc1;
+    INT        Misc2;
+    DWORD      bNone:1;
+    DWORD      bJump:1;
+    DWORD      bFire:1;
+    DWORD      bAltFire:1;
+    DWORD      bZoom:1;
+    DWORD      bRun:1;
+    DWORD      bLookAround:1;
+    DWORD      bDuck:1;
+    DWORD      bNextWeapon:1;
+    DWORD      bPrevWeapon:1;
+    DWORD      bWeapon1:1;
+    DWORD      bWeapon2:1;
+    DWORD      bWeapon3:1;
+    DWORD      bWeapon4:1;
+    DWORD      bWeapon5:1;
+    DWORD      bWeapon6:1;
+    DWORD      bWeapon7:1;
+    DWORD      bWeapon8:1;
+    DWORD      bWeapon9:1;
+    DWORD      bSlide:1;
+    DWORD      bConsole:1;
+    DWORD      bHalfConsole:1;
+    DWORD      bExtra9:1;
+    DWORD      bExtra8:1;
+    DWORD      bExtra7:1;
+    DWORD      bExtra6:1;
+    DWORD      bExtra5:1;
+    DWORD      bExtra4:1;
+    DWORD      bExtra3:1;
+    DWORD      bExtra2:1;
+    DWORD      bExtra1:1;
+    DWORD      bExtra0:1;
+    FLOAT      aNone;
+    FLOAT      aForward;
+    FLOAT      aTurn;
+    FLOAT      aSlide;
+    FLOAT      aUp;
+    FLOAT      aLookUp;
+    FLOAT      aLookSide;
+    FLOAT      aBaseX;
+    FLOAT      aBaseY;
+    FLOAT      aExtra6;
+    FLOAT      aExtra5;
+    FLOAT      aExtra4;
+    FLOAT      aExtra3;
+    FLOAT      aExtra2;
+    FLOAT      aExtra1;
+    FLOAT      aExtra0;
     BYTE       DeathCount;
-    BYTE       SecretCount;
-    int        ShotCount;
-    int        HitCount;
-    int        DamagedCount;
-    int        DamageCount;
-    int        HealthCount;
-    int        LowHealthCount;
-    int        HighHealthCount;
+    INT        ItemsFound;
+    INT        KillCount;
+    INT        SecretsFound;
     BYTE       ApproachPeriod;
     BYTE       ApproachRandomization;
     BYTE       AttackPeriod;
@@ -341,20 +422,13 @@ public:
     BYTE       TargetCloseness;
     BYTE       TargetZCloseness;
     BYTE       ApproachDirectness;
-    DWORD      bHasAI:1;
-    DWORD      bSensesTargets:1;
-    DWORD      bRespondsToNoise:1;
-    DWORD      bRespondsToSights:1;
-    DWORD      bHarmsMonsters:1;
-    DWORD      bNeverStill:1;
-    DWORD      bIsXenophobic:1;
     BYTE       LurkingDistance;
     FLOAT      AuralAcuity;
     BYTE       RunAwayHealthThreshold;
-    BYTE       AIMove                   /* EAI_Move             */;
-    BYTE       AIPreviousTask           /* EAI_Task             */;
-    BYTE       AIPreviousMove           /* EAI_Move             */;
-    int        AmmoCount[10];
+    BYTE       AIMove                   /* enum EAI_Move */;
+    BYTE       AIPreviousTask           /* enum EAI_Task */;
+    BYTE       AIPreviousMove           /* enum EAI_Move */;
+    INT        AmmoCount[10];
     USound     *MinorInjurySounds[3];
     USound     *MajorInjurySounds[3];
     USound     *DeathSounds[2];
@@ -368,39 +442,57 @@ public:
     FLOAT      NaturalArmor[4];
     FLOAT      HealRate;
     FLOAT      Armor[4];
+    FLOAT      AirDamping;
+    FLOAT      JumpDamping;
+    FLOAT      WaterDamping;
+    FLOAT      GroundDamping;
     FLOAT      SightRadius;
     FLOAT      PeripheralVision;
     BYTE       HearingAccuracy;
     BYTE       Visibility;
     FLOAT      Noise;
     FLOAT      LungeSpeed;
-    FLOAT      RunSpeed;
-    FLOAT      NormalSpeed;
+    FLOAT      GroundSpeed;
+    FLOAT      WaterSpeed;
+    FLOAT      AirSpeed;
     FLOAT      MaxStrength;
     FLOAT      Strength;
     FLOAT      Stamina;
     FLOAT      Health;
     FLOAT      DesiredSpeed;
-    BYTE       LifeState                /* ELifeState           */;
+    BYTE       LifeState                /* enum ELifeState */;
     INDEX      iKiller;
     UClass     *DeathSpawn;
     BYTE       HitDisplayTimer;
     BYTE       ExplorationTimer;
-    int        TargetLostTime;
+    INT        TargetLostTime;
     FVector    TargetLastLocation;
     FVector    TargetLastVelocity;
-    DWORD      bHasDistantMovingAttack:1;
-    DWORD      bHasDistantStillAttack:1;
-    DWORD      bHasCloseUpAttack:1;
     FLOAT      LastNonFallZ;
-    int        InvisibilityTimeLeft;
-    int        SilenceTimeLeft;
-    int        InvincibilityTimeLeft;
-    int        SuperStaminaTimeLeft;
-    int        SuperStrengthTimeLeft;
+    INT        InvisibilityTimeLeft;
+    INT        SilenceTimeLeft;
+    INT        InvincibilityTimeLeft;
+    INT        SuperStaminaTimeLeft;
+    INT        SuperStrengthTimeLeft;
     FLOAT      ExplosiveCharge;
     FLOAT      DelayedDamage;
     BYTE       DamageDelay;
+    BYTE       MaxStepUpHeight;
+    BYTE       MaxStepDownHeight;
+    BYTE       LookTimer;
+    INT        AmmoCapacity[10];
+    INDEX      iRecentWeapons[2];
+    DWORD      bCanPossess:1;
+    DWORD      bHasAI:1;
+    DWORD      bSensesTargets:1;
+    DWORD      bRespondsToNoise:1;
+    DWORD      bRespondsToSights:1;
+    DWORD      bHarmsMonsters:1;
+    DWORD      bNeverStill:1;
+    DWORD      bIsXenophobic:1;
+    DWORD      bHasDistantMovingAttack:1;
+    DWORD      bHasDistantStillAttack:1;
+    DWORD      bHasCloseUpAttack:1;
     DWORD      bHasInvisibility:1;
     DWORD      bHasSilence:1;
     DWORD      bHasInvincibility:1;
@@ -417,53 +509,65 @@ public:
     DWORD      bCheated:1;
     DWORD      bStatusChanged:1;
     DWORD      bIsAlarmed:1;
+    DWORD      bIsSwimming:1;
     DWORD      bCannotTurn:1;
     DWORD      bCannotMove:1;
-    BYTE       MaxStepUpHeight;
-    BYTE       MaxStepDownHeight;
-    int        AmmoCapacity[10];
-    INDEX      iRecentWeapons[2];
-    BYTE       HurtEffectCount;
-    BYTE       PickupEffectCount;
-    BYTE       HealthEffectCount;
-    BYTE       TeleportEffectCount;
-    int        bRenderUnderwater;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API APawn : public APawnBase {
+public:
+    BYTE PropertyPad[32];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(APawn);
 
 ///////////////////////////////////////////////////////
-// Actor class ACamera:APawn:ARoot
+// Actor class ACamera:APawn:AActor
 ///////////////////////////////////////////////////////
 
-class ACamera : public APawn {
+class IMPLEMENTATION_API ACameraBase : public APawnBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API ACamera : public ACameraBase {
+public:
+    BYTE PropertyPad[32];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ACamera);
 
 ///////////////////////////////////////////////////////
-// Actor class AWoman:APawn:ARoot
+// Actor class AHuman:APawn:AActor
 ///////////////////////////////////////////////////////
 
-class AWoman : public APawn {
+class IMPLEMENTATION_API AHumanBase : public APawnBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
 };
-AUTOREGISTER_CLASS(AWoman);
-
-///////////////////////////////////////////////////////
-// Actor class ADragon:APawn:ARoot
-///////////////////////////////////////////////////////
-
-class ADragon : public APawn {
+class IMPLEMENTATION_API AHuman : public AHumanBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE PropertyPad[32];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
+};
+AUTOREGISTER_CLASS(AHuman);
+
+///////////////////////////////////////////////////////
+// Actor class ADragon:APawn:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ADragonBase : public APawnBase {
+public:
+};
+class IMPLEMENTATION_API ADragon : public ADragonBase {
+public:
+    BYTE PropertyPad[32];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ADragon);
 
 ///////////////////////////////////////////////////////
-// Actor class ASkaarj:APawn:ARoot
+// Actor class ASkaarj:APawn:AActor
 ///////////////////////////////////////////////////////
 
 enum ESkaarjAnimationTriggers {
@@ -473,6 +577,7 @@ enum ESkaarjAnimationTriggers {
     SkaarjAT_Fire           =3,
     SkaarjAT_ClawLeft       =4,
     SkaarjAT_ClawRight      =5,
+    SkaarjAT_MAX            =6,
 };
 
 enum ESkaarjAnimations {
@@ -495,12 +600,13 @@ enum ESkaarjAnimations {
     SkaarjA_T5              =16,
     SkaarjA_T6              =17,
     SkaarjA_TakeHit         =18,
+    SkaarjA_MAX             =19,
 };
 
-class ASkaarj : public APawn {
+class IMPLEMENTATION_API ASkaarjBase : public APawnBase {
 public:
-    BYTE       Hack1                    /* ESkaarjAnimationTriggers */;
-    BYTE       Hack2                    /* ESkaarjAnimations    */;
+    BYTE       Hack1                    /* enum ESkaarjAnimationTriggers */;
+    BYTE       Hack2                    /* enum ESkaarjAnimations */;
     USound     *LungeSound;
     USound     *SpinSound;
     USound     *ClawSound;
@@ -509,12 +615,17 @@ public:
     BYTE       SpinDamage;
     BYTE       ClawDamage;
     BYTE       ShootDamage;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API ASkaarj : public ASkaarjBase {
+public:
+    BYTE PropertyPad[8];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ASkaarj);
 
 ///////////////////////////////////////////////////////
-// Actor class ABigMan:APawn:ARoot
+// Actor class ABigMan:APawn:AActor
 ///////////////////////////////////////////////////////
 
 enum EBigManAnimationTriggers {
@@ -525,6 +636,7 @@ enum EBigManAnimationTriggers {
     BigManAT_GutFire        =4,
     BigManAT_WalkFireLeft   =5,
     BigManAT_WalkFireRight  =6,
+    BigManAT_MAX            =7,
 };
 
 enum EBigManAnimations {
@@ -547,32 +659,43 @@ enum EBigManAnimations {
     BigManA_T5              =16,
     BigManA_TakeHit         =17,
     BigManA_DieBackward     =18,
+    BigManA_MAX             =19,
 };
 
-class ABigMan : public APawn {
+class IMPLEMENTATION_API ABigManBase : public APawnBase {
 public:
-    BYTE       Hack1                    /* EBigManAnimationTriggers */;
-    BYTE       Hack2                    /* EBigManAnimations    */;
+    BYTE       Hack1                    /* enum EBigManAnimationTriggers */;
+    BYTE       Hack2                    /* enum EBigManAnimations */;
     USound     *ShootSound;
     USound     *WhipSound;
     BYTE       ShootDamage;
     BYTE       WhipDamage;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API ABigMan : public ABigManBase {
+public:
+    BYTE PropertyPad[18];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ABigMan);
 
 ///////////////////////////////////////////////////////
-// Actor class AArchAngel:ABigMan:APawn:ARoot
+// Actor class AArchAngel:ABigMan:APawn:AActor
 ///////////////////////////////////////////////////////
 
-class AArchAngel : public ABigMan {
+class IMPLEMENTATION_API AArchAngelBase : public ABigManBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API AArchAngel : public AArchAngelBase {
+public:
+    BYTE PropertyPad[18];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AArchAngel);
 
 ///////////////////////////////////////////////////////
-// Actor class AGasbag:APawn:ARoot
+// Actor class AGasbag:APawn:AActor
 ///////////////////////////////////////////////////////
 
 enum EGasBagAnimationTriggers {
@@ -581,6 +704,7 @@ enum EGasBagAnimationTriggers {
     GasBagAT_PunchRight     =2,
     GasBagAT_Pound          =3,
     GasBagAT_Belch          =4,
+    GasBagAT_MAX            =5,
 };
 
 enum EGasBagAnimations {
@@ -598,30 +722,37 @@ enum EGasBagAnimations {
     GasBagA_T3              =11,
     GasBagA_T4              =12,
     GasBagA_TakeHit         =13,
+    GasBagA_MAX             =14,
 };
 
-class AGasbag : public APawn {
+class IMPLEMENTATION_API AGasbagBase : public APawnBase {
 public:
-    BYTE       Hack1                    /* EGasBagAnimationTriggers */;
-    BYTE       Hack2                    /* EGasBagAnimations    */;
+    BYTE       Hack1                    /* enum EGasBagAnimationTriggers */;
+    BYTE       Hack2                    /* enum EGasBagAnimations */;
     USound     *BelchSound;
     USound     *PunchSound;
     USound     *PoundSound;
     BYTE       BelchDamage;
     BYTE       PunchDamage;
     BYTE       PoundDamage;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API AGasbag : public AGasbagBase {
+public:
+    BYTE PropertyPad[13];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AGasbag);
 
 ///////////////////////////////////////////////////////
-// Actor class AManta:APawn:ARoot
+// Actor class AManta:APawn:AActor
 ///////////////////////////////////////////////////////
 
 enum EMantaAnimationTriggers {
     MantaAT_None            =0,
     MantaAT_Sting           =1,
     MantaAT_Whip            =2,
+    MantaAT_MAX             =3,
 };
 
 enum EMantaAnimations {
@@ -632,27 +763,34 @@ enum EMantaAnimations {
     MantaA_Die              =4,
     MantaA_Land             =5,
     MantaA_Launch           =6,
+    MantaA_MAX              =7,
 };
 
-class AManta : public APawn {
+class IMPLEMENTATION_API AMantaBase : public APawnBase {
 public:
-    BYTE       Hack1                    /* EMantaAnimationTriggers */;
-    BYTE       Hack2                    /* EMantaAnimations     */;
+    BYTE       Hack1                    /* enum EMantaAnimationTriggers */;
+    BYTE       Hack2                    /* enum EMantaAnimations */;
     USound     *StingSound;
     USound     *WhipSound;
     BYTE       StingDamage;
     BYTE       WhipDamage;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API AManta : public AMantaBase {
+public:
+    BYTE PropertyPad[18];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AManta);
 
 ///////////////////////////////////////////////////////
-// Actor class ATentacle:APawn:ARoot
+// Actor class ATentacle:APawn:AActor
 ///////////////////////////////////////////////////////
 
 enum ETentacleAnimationTriggers {
     TentacleAT_None         =0,
     TentacleAT_Shoot        =1,
+    TentacleAT_MAX          =2,
 };
 
 enum ETentacleAnimations {
@@ -661,138 +799,160 @@ enum ETentacleAnimations {
     TentacleA_Shoot         =2,
     TentacleA_Mebax         =3,
     TentacleA_Death         =4,
+    TentacleA_MAX           =5,
 };
 
-class ATentacle : public APawn {
+class IMPLEMENTATION_API ATentacleBase : public APawnBase {
 public:
-    BYTE       Hack1                    /* ETentacleAnimationTriggers */;
-    BYTE       Hack2                    /* ETentacleAnimations  */;
+    BYTE       Hack1                    /* enum ETentacleAnimationTriggers */;
+    BYTE       Hack2                    /* enum ETentacleAnimations */;
     USound     *ShootSound;
     USound     *MebaxSound;
     UClass     *Projectile;
     BYTE       WhipDamage;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API ATentacle : public ATentacleBase {
+public:
+    BYTE PropertyPad[15];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ATentacle);
 
 ///////////////////////////////////////////////////////
-// Actor class ALight:ARoot
+// Actor class ALight:AActor
 ///////////////////////////////////////////////////////
 
-class ALight : public ARoot {
+class IMPLEMENTATION_API ALightBase : public AActorBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API ALight : public ALightBase {
+public:
+    BYTE PropertyPad[643];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ALight);
 
 ///////////////////////////////////////////////////////
-// Actor class AKeypoint:ARoot
+// Actor class ASatellite:ALight:AActor
 ///////////////////////////////////////////////////////
 
-class AKeypoint : public ARoot {
+class IMPLEMENTATION_API ASatelliteBase : public ALightBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    FLOAT      Period;
+    FLOAT      Phase;
+};
+class IMPLEMENTATION_API ASatellite : public ASatelliteBase {
+public:
+    BYTE PropertyPad[632];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
+};
+AUTOREGISTER_CLASS(ASatellite);
+
+///////////////////////////////////////////////////////
+// Actor class ATorchFlame:ALight:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ATorchFlameBase : public ALightBase {
+public:
+};
+class IMPLEMENTATION_API ATorchFlame : public ATorchFlameBase {
+public:
+    BYTE PropertyPad[643];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
+};
+AUTOREGISTER_CLASS(ATorchFlame);
+
+///////////////////////////////////////////////////////
+// Actor class ASpotlight:ALight:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ASpotlightBase : public ALightBase {
+public:
+};
+class IMPLEMENTATION_API ASpotlight : public ASpotlightBase {
+public:
+    BYTE PropertyPad[643];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
+};
+AUTOREGISTER_CLASS(ASpotlight);
+
+///////////////////////////////////////////////////////
+// Actor class AKeypoint:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API AKeypointBase : public AActorBase {
+public:
+};
+class IMPLEMENTATION_API AKeypoint : public AKeypointBase {
+public:
+    BYTE PropertyPad[643];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AKeypoint);
 
 ///////////////////////////////////////////////////////
-// Actor class APlayerStart:AKeypoint:ARoot
+// Actor class APlayerStart:AKeypoint:AActor
 ///////////////////////////////////////////////////////
 
-class APlayerStart : public AKeypoint {
+class IMPLEMENTATION_API APlayerStartBase : public AKeypointBase {
 public:
-    FName      TeamName;
     UClass     *PlayerSpawnClass;
+    BYTE       TeamNumber;
 };
-AUTOREGISTER_CLASS(APlayerStart);
-
-///////////////////////////////////////////////////////
-// Actor class ATeleporter:AKeypoint:ARoot
-///////////////////////////////////////////////////////
-
-class ATeleporter : public AKeypoint {
+class IMPLEMENTATION_API APlayerStart : public APlayerStartBase {
 public:
-    char       TeleportURL[64];
+    BYTE PropertyPad[635];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class ATeleporter:AKeypoint:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ATeleporterBase : public AKeypointBase {
+public:
+    CHAR       TeleportURL[64];
+    FName      ProductRequired;
     DWORD      bChangesVelocity:1;
     DWORD      bChangesYaw:1;
     DWORD      bReversesX:1;
     DWORD      bReversesY:1;
     DWORD      bReversesZ:1;
-    FName      ProductRequired;
-    int        TargetYaw;
+    INT        TargetYaw;
     FVector    TargetVelocity;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API ATeleporter : public ATeleporterBase {
+public:
+    BYTE PropertyPad[548];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ATeleporter);
 
 ///////////////////////////////////////////////////////
-// Actor class ABlockMonsters:AKeypoint:ARoot
+// Actor class AZoneDescriptor:AKeypoint:AActor
 ///////////////////////////////////////////////////////
 
-class ABlockMonsters : public AKeypoint {
+class IMPLEMENTATION_API AZoneDescriptorBase : public AKeypointBase {
 public:
-};
-AUTOREGISTER_CLASS(ABlockMonsters);
-
-///////////////////////////////////////////////////////
-// Actor class ABlockAll:AKeypoint:ARoot
-///////////////////////////////////////////////////////
-
-class ABlockAll : public AKeypoint {
-public:
-};
-AUTOREGISTER_CLASS(ABlockAll);
-
-///////////////////////////////////////////////////////
-// Actor class ALevelDescriptor:AKeypoint:ARoot
-///////////////////////////////////////////////////////
-
-class ALevelDescriptor : public AKeypoint {
-public:
-    FVector    LevelGravity;
-    char       LevelTitle[64];
-    char       LevelAuthor[64];
-    char       LevelMusic[64];
-    FLOAT      Lightning;
-};
-AUTOREGISTER_CLASS(ALevelDescriptor);
-
-///////////////////////////////////////////////////////
-// Actor class AAmbientSound:AKeypoint:ARoot
-///////////////////////////////////////////////////////
-
-class AAmbientSound : public AKeypoint {
-public:
-};
-AUTOREGISTER_CLASS(AAmbientSound);
-
-///////////////////////////////////////////////////////
-// Actor class ATextMessage:AKeypoint:ARoot
-///////////////////////////////////////////////////////
-
-class ATextMessage : public AKeypoint {
-public:
-};
-AUTOREGISTER_CLASS(ATextMessage);
-
-///////////////////////////////////////////////////////
-// Actor class AZoneDescriptor:ARoot
-///////////////////////////////////////////////////////
-
-class AZoneDescriptor : public ARoot {
-public:
+    CHAR       ZoneName[32];
     DWORD      bWaterZone:1;
     DWORD      bFogZone:1;
-    DWORD      bRainZone:1;
     DWORD      bKillZone:1;
     DWORD      bEchoZone:1;
     DWORD      bNeutralZone:1;
     DWORD      bGravityZone:1;
-    DWORD      bVelocityZone:1;
+    DWORD      bTeamOnly:1;
     FVector    ZoneGravity;
     FVector    ZoneVelocity;
-    char       ZoneTitle[64];
     USound     *ZoneAmbientSound;
+    FLOAT      ZoneBreadth;
+    FLOAT      ZoneReflectivity;
     BYTE       AmbientBrightness;
     BYTE       AmbientHue;
     BYTE       AmbientSaturation;
@@ -801,18 +961,121 @@ public:
     BYTE       FogThickness;
     BYTE       FogHue;
     BYTE       FogSaturation;
-    FLOAT      Lightning;
 };
-AUTOREGISTER_CLASS(AZoneDescriptor);
-
+class IMPLEMENTATION_API AZoneDescriptor : public AZoneDescriptorBase {
+public:
+    BYTE PropertyPad[552];
+    FActorPrivate Private;
+};
 ///////////////////////////////////////////////////////
-// Actor class AMover:ARoot
+// Actor class ABlockMonsters:AKeypoint:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ABlockMonstersBase : public AKeypointBase {
+public:
+};
+class IMPLEMENTATION_API ABlockMonsters : public ABlockMonstersBase {
+public:
+    BYTE PropertyPad[643];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class ABlockAll:AKeypoint:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ABlockAllBase : public AKeypointBase {
+public:
+};
+class IMPLEMENTATION_API ABlockAll : public ABlockAllBase {
+public:
+    BYTE PropertyPad[643];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class ALevelDescriptor:AKeypoint:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ALevelDescriptorBase : public AKeypointBase {
+public:
+    FVector    LevelGravity;
+    FLOAT      DayFactor;
+    FLOAT      DayBase;
+    FLOAT      Time;
+    FLOAT      DayFraction;
+    FLOAT      NightFraction;
+    INT        Ticks;
+    INT        Year;
+    INT        Month;
+    INT        Day;
+    INT        Hour;
+    INT        Minute;
+    INT        Second;
+    INT        Millisecond;
+    CHAR       LevelTitle[64];
+    CHAR       LevelAuthor[64];
+    CHAR       LevelMusic[64];
+    CHAR       LevelEnterText[64];
+    DWORD      bLonePlayer:1;
+    DWORD      bMirrorSky:1;
+    FLOAT      TexUPanSpeed;
+    FLOAT      TexVPanSpeed;
+    FLOAT      SkyScale;
+    FLOAT      SkyDayBright;
+    FLOAT      SkyNightBright;
+    FLOAT      SkyUPanSpeed;
+    FLOAT      SkyVPanSpeed;
+    FLOAT      SkyWavyness;
+    FLOAT      SkyWavySpeed;
+    FLOAT      SkyFlicker;
+    UTexture   *SkyTexture;
+    UTexture   *SkyPalette;
+    BYTE       SkyFogBrightness;
+    BYTE       SkyFogHue;
+    BYTE       SkyFogSaturation;
+    INT        RandomSeed;
+    INT        RandomValue;
+    INT        ItemGoals;
+    INT        KillGoals;
+    INT        SecretGoals;
+};
+class IMPLEMENTATION_API ALevelDescriptor : public ALevelDescriptorBase {
+public:
+    BYTE PropertyPad[240];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class AAmbientSound:AKeypoint:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API AAmbientSoundBase : public AKeypointBase {
+public:
+};
+class IMPLEMENTATION_API AAmbientSound : public AAmbientSoundBase {
+public:
+    BYTE PropertyPad[643];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class ATextMessage:AKeypoint:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ATextMessageBase : public AKeypointBase {
+public:
+};
+class IMPLEMENTATION_API ATextMessage : public ATextMessageBase {
+public:
+    BYTE PropertyPad[643];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class AMover:AActor
 ///////////////////////////////////////////////////////
 
 enum EMoverBumpType {
     MB_StopWhenBump         =0,
     MB_ReturnWhenBump       =1,
     MB_CrushWhenBump        =2,
+    MB_MAX                  =3,
 };
 
 enum EMoverTriggerType {
@@ -826,53 +1089,59 @@ enum EMoverTriggerType {
     MT_ProximityOpenTimed   =7,
     MT_ProximityControl     =8,
     MT_StandOpenTimed       =9,
+    MT_MAX                  =10,
 };
 
 enum EMoverGlideType {
     MV_MoveByTime           =0,
     MV_GlideByTime          =1,
     MV_Sinusoid             =2,
+    MV_MAX                  =3,
 };
 
-class AMover : public ARoot {
+class IMPLEMENTATION_API AMoverBase : public AActorBase {
 public:
-    BYTE       MoverBumpType            /* EMoverBumpType       */;
-    BYTE       MoverTriggerType         /* EMoverTriggerType    */;
-    BYTE       MoverGlideType           /* EMoverGlideType      */;
+    BYTE       MoverBumpType            /* enum EMoverBumpType */;
+    BYTE       MoverTriggerType         /* enum EMoverTriggerType */;
+    BYTE       MoverGlideType           /* enum EMoverGlideType */;
     BYTE       KeyNum;
+    BYTE       PrevKeyNum;
     BYTE       WorldRaytraceKey;
     BYTE       BrushRaytraceKey;
-    BYTE       PrevKeyNum;
-    int        MoverTime;
-    int        RemainOpenTime;
+    INT        MoverTime;
+    INT        RemainOpenTime;
     FLOAT      BumpPlayerDamage;
+    FRotation  FreeRotation;
     DWORD      bCanInterruptMove:1;
     DWORD      bSlave:1;
     DWORD      bTrigger:1;
-    DWORD      bAdded:1;
     DWORD      bMoving:1;
     DWORD      bReverseWhenDone:1;
-    DWORD      bDynamicShadows:1;
     DWORD      bTriggerOnceOnly:1;
     USound     *OpenSound;
     USound     *ClosedSound;
     USound     *MoveAmbientSound;
     FVector    KeyPos[4];
     FRotation  KeyRot[4];
-    FRotation  FreeRotation;
+    INDEX      iSlaves[16];
     FVector    BasePos;
     FVector    OldPos;
     FRotation  BaseRot;
     FRotation  OldRot;
-    int        CurTime;
-    int        HoldTime;
-    INDEX      iSlaves[16];
-    int Process(ILevel *Level, FName Message, void *Params);
+    INT        CurTime;
+    INT        HoldTime;
+    DWORD      bAdded:1;
+};
+class IMPLEMENTATION_API AMover : public AMoverBase {
+public:
+    BYTE PropertyPad[348];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AMover);
 
 ///////////////////////////////////////////////////////
-// Actor class AInventory:ARoot
+// Actor class AInventory:AActor
 ///////////////////////////////////////////////////////
 
 enum EInvState {
@@ -885,25 +1154,27 @@ enum EInvState {
     INV_UsingCloseUp        =6,
     INV_Reloading           =7,
     INV_Playing             =8,
+    INV_MAX                 =9,
 };
 
 enum EInventorySet {
-    INV_NoSet               =0,
-    INV_WeaponSet1          =1,
-    INV_WeaponSet2          =2,
-    INV_WeaponSet3          =3,
-    INV_WeaponSet4          =4,
-    INV_WeaponSet5          =5,
-    INV_WeaponSet6          =6,
-    INV_WeaponSet7          =7,
-    INV_WeaponSet8          =8,
-    INV_WeaponSet9          =9,
-    INV_WeaponSet10         =10,
+    INVS_NoSet              =0,
+    INVS_WeaponSet1         =1,
+    INVS_WeaponSet2         =2,
+    INVS_WeaponSet3         =3,
+    INVS_WeaponSet4         =4,
+    INVS_WeaponSet5         =5,
+    INVS_WeaponSet6         =6,
+    INVS_WeaponSet7         =7,
+    INVS_WeaponSet8         =8,
+    INVS_WeaponSet9         =9,
+    INVS_WeaponSet10        =10,
+    INVS_MAX                =11,
 };
 
-class AInventory : public ARoot {
+class IMPLEMENTATION_API AInventoryBase : public AActorBase {
 public:
-    BYTE       InvState                 /* EInvState            */;
+    BYTE       InvState                 /* enum EInvState */;
     INDEX      iNextActive;
     DWORD      bInPickupState:1;
     DWORD      bActiveInSet:1;
@@ -911,31 +1182,36 @@ public:
     USound     *PickupSound;
     USound     *RespawnSound;
     DWORD      bRespawnNetOnly:1;
-    int        RespawnTime;
-    char       PickupMessage[64];
+    INT        RespawnTime;
+    CHAR       PickupMessage[64];
     DWORD      bTakesDamage:1;
     UClass     *EffectWhenDestroyed;
-    BYTE       OwningSet                /* EInventorySet        */;
+    BYTE       OwningSet                /* enum EInventorySet */;
     BYTE       AutoSwitchPriority;
     FLOAT      DrawForward;
     FLOAT      DrawDown;
-    int        DrawPitch;
-    int        DrawRoll;
-    int        DrawYaw;
-    UMeshMap   *PlayerViewMesh;
-    FLOAT      PlayerViewScale;
+    INT        DrawPitch;
+    INT        DrawRoll;
+    INT        DrawYaw;
     UMeshMap   *PickupMesh;
     FLOAT      PickupScale;
+    UMeshMap   *PlayerViewMesh;
+    FLOAT      PlayerViewScale;
     UTexture   *AmmoStatusIcon;
-    int        YawSpeed;
-    int        PitchSpeed;
-    int        RollSpeed;
-    int Process(ILevel *Level, FName Message, void *Params);
+    INT        YawSpeed;
+    INT        PitchSpeed;
+    INT        RollSpeed;
+};
+class IMPLEMENTATION_API AInventory : public AInventoryBase {
+public:
+    BYTE PropertyPad[484];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AInventory);
 
 ///////////////////////////////////////////////////////
-// Actor class AWeapon:AInventory:ARoot
+// Actor class AWeapon:AInventory:AActor
 ///////////////////////////////////////////////////////
 
 enum EAmmoType {
@@ -951,17 +1227,18 @@ enum EAmmoType {
     AmmoType_Reserved7      =9,
     AmmoType_Count          =10,
     AmmoType_None           =11,
+    AmmoType_MAX            =12,
 };
 
-class AWeapon : public AInventory {
+class IMPLEMENTATION_API AWeaponBase : public AInventoryBase {
 public:
     DWORD      bAutoVTarget:1;
     DWORD      bAutoHTarget:1;
     DWORD      bWasReleased:1;
     FLOAT      MaxTargetRange;
     FLOAT      SeekDamping;
-    BYTE       AmmoType                 /* EAmmoType            */;
-    int        AmmoUsed[2];
+    BYTE       AmmoType                 /* enum EAmmoType */;
+    INT        AmmoUsed[2];
     BYTE       Discharges[2];
     BYTE       ReloadCount;
     FLOAT      Noise[2];
@@ -973,20 +1250,25 @@ public:
     BYTE       bRepeatSounds[2];
     USound     *ReloadSound;
     USound     *CloseUpSound;
-    int        PickupAmmoCount;
+    INT        PickupAmmoCount;
     BYTE       CloseUpDamage;
     FLOAT      CloseUpStrengthFactor;
-    int        UseTime;
-    int        LastUseTime;
+    INT        UseTime;
+    INT        LastUseTime;
     UClass     *ProjectileClass[2];
     FLOAT      ProjStartDist;
     FLOAT      Dispersion[2];
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API AWeapon : public AWeaponBase {
+public:
+    BYTE PropertyPad[364];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AWeapon);
 
 ///////////////////////////////////////////////////////
-// Actor class AAutoMag:AWeapon:AInventory:ARoot
+// Actor class AAutoMag:AWeapon:AInventory:AActor
 ///////////////////////////////////////////////////////
 
 enum EAutoMagAnimations {
@@ -998,47 +1280,61 @@ enum EAutoMagAnimations {
     EAMA_Whip               =5,
     EAMA_T1                 =6,
     EAMA_T2                 =7,
+    EAMA_MAX                =8,
 };
 
 enum EAutoMagAnimationTriggers {
     AutoMagAT_None          =0,
     AutoMagAT_Fire1         =1,
     AutoMagAT_Fire2         =2,
+    AutoMagAT_MAX           =3,
 };
 
-class AAutoMag : public AWeapon {
+class IMPLEMENTATION_API AAutoMagBase : public AWeaponBase {
 public:
-    BYTE       Hack1                    /* EAutoMagAnimations   */;
-    BYTE       Hack2                    /* EAutoMagAnimationTriggers */;
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE       Hack1                    /* enum EAutoMagAnimations */;
+    BYTE       Hack2                    /* enum EAutoMagAnimationTriggers */;
+};
+class IMPLEMENTATION_API AAutoMag : public AAutoMagBase {
+public:
+    BYTE PropertyPad[362];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AAutoMag);
 
 ///////////////////////////////////////////////////////
-// Actor class AQuadShot:AWeapon:AInventory:ARoot
+// Actor class AQuadShot:AWeapon:AInventory:AActor
 ///////////////////////////////////////////////////////
 
 enum EQuadShotAnimations {
     EQSA_None               =0,
     EQSA_Fire               =1,
     EQSA_Reload             =2,
+    EQSA_MAX                =3,
 };
 
 enum EQuadShotAnimationTriggers {
     QuadShotAT_None         =0,
     QuadShotAT_Fire         =1,
+    QuadShotAT_MAX          =2,
 };
 
-class AQuadShot : public AWeapon {
+class IMPLEMENTATION_API AQuadShotBase : public AWeaponBase {
 public:
-    BYTE       Hack1                    /* EQuadShotAnimations  */;
-    BYTE       Hack2                    /* EQuadShotAnimationTriggers */;
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE       Hack1                    /* enum EQuadShotAnimations */;
+    BYTE       Hack2                    /* enum EQuadShotAnimationTriggers */;
+};
+class IMPLEMENTATION_API AQuadShot : public AQuadShotBase {
+public:
+    BYTE PropertyPad[362];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AQuadShot);
 
 ///////////////////////////////////////////////////////
-// Actor class AFlameGun:AWeapon:AInventory:ARoot
+// Actor class AFlameGun:AWeapon:AInventory:AActor
 ///////////////////////////////////////////////////////
 
 enum EFlameGunAnimations {
@@ -1046,17 +1342,23 @@ enum EFlameGunAnimations {
     EFGA_Still              =1,
     EFGA_Drop               =2,
     EFGA_Fire               =3,
+    EFGA_MAX                =4,
 };
 
-class AFlameGun : public AWeapon {
+class IMPLEMENTATION_API AFlameGunBase : public AWeaponBase {
 public:
-    BYTE       Hack1                    /* EFlameGunAnimations  */;
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE       Hack1                    /* enum EFlameGunAnimations */;
+};
+class IMPLEMENTATION_API AFlameGun : public AFlameGunBase {
+public:
+    BYTE PropertyPad[363];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AFlameGun);
 
 ///////////////////////////////////////////////////////
-// Actor class AStinger:AWeapon:AInventory:ARoot
+// Actor class AStinger:AWeapon:AInventory:AActor
 ///////////////////////////////////////////////////////
 
 enum EStingerAnimations {
@@ -1064,6 +1366,7 @@ enum EStingerAnimations {
     EStingA_Still           =1,
     EStingA_Fire1           =2,
     EStingA_Fire3           =3,
+    EStingA_MAX             =4,
 };
 
 enum EStingerAnimationTriggers {
@@ -1071,386 +1374,488 @@ enum EStingerAnimationTriggers {
     StingerAT_Fire1         =1,
     StingerAT_Fire2         =2,
     StingerAT_Fire3         =3,
+    StingerAT_MAX           =4,
 };
 
-class AStinger : public AWeapon {
+class IMPLEMENTATION_API AStingerBase : public AWeaponBase {
 public:
-    BYTE       Hack1                    /* EStingerAnimations   */;
-    BYTE       Hack2                    /* EStingerAnimationTriggers */;
+    BYTE       Hack1                    /* enum EStingerAnimations */;
+    BYTE       Hack2                    /* enum EStingerAnimationTriggers */;
     BYTE       PendingShots[5];
     BYTE       PendingShotCount;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API AStinger : public AStingerBase {
+public:
+    BYTE PropertyPad[356];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AStinger);
 
 ///////////////////////////////////////////////////////
-// Actor class APickup:AInventory:ARoot
+// Actor class APickup:AInventory:AActor
 ///////////////////////////////////////////////////////
 
-class APickup : public AInventory {
+class IMPLEMENTATION_API APickupBase : public AInventoryBase {
 public:
     BYTE       Unused;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API APickup : public APickupBase {
+public:
+    BYTE PropertyPad[483];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(APickup);
 
 ///////////////////////////////////////////////////////
-// Actor class APowerUp:APickup:AInventory:ARoot
+// Actor class APowerUp:APickup:AInventory:AActor
 ///////////////////////////////////////////////////////
 
-class APowerUp : public APickup {
+class IMPLEMENTATION_API APowerUpBase : public APickupBase {
 public:
     FLOAT      Strength;
     FLOAT      Stamina;
     FLOAT      Health;
     FLOAT      Armor[4];
-    int        TimeLimit;
+    INT        TimeLimit;
     DWORD      bInvisibility:1;
     DWORD      bSilence:1;
     DWORD      bInvincibility:1;
     DWORD      bSuperStrength:1;
     DWORD      bSuperStamina:1;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API APowerUp : public APowerUpBase {
+public:
+    BYTE PropertyPad[444];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(APowerUp);
 
 ///////////////////////////////////////////////////////
-// Actor class AArmor:APowerUp:APickup:AInventory:ARoot
+// Actor class AArmor:APowerUp:APickup:AInventory:AActor
 ///////////////////////////////////////////////////////
 
-class AArmor : public APowerUp {
+class IMPLEMENTATION_API AArmorBase : public APowerUpBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
 };
-AUTOREGISTER_CLASS(AArmor);
-
-///////////////////////////////////////////////////////
-// Actor class AHealth:APowerUp:APickup:AInventory:ARoot
-///////////////////////////////////////////////////////
-
-class AHealth : public APowerUp {
+class IMPLEMENTATION_API AArmor : public AArmorBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE PropertyPad[444];
+    FActorPrivate Private;
 };
-AUTOREGISTER_CLASS(AHealth);
-
 ///////////////////////////////////////////////////////
-// Actor class AAmmo:APickup:AInventory:ARoot
+// Actor class AHealth:APowerUp:APickup:AInventory:AActor
 ///////////////////////////////////////////////////////
 
-class AAmmo : public APickup {
+class IMPLEMENTATION_API AHealthBase : public APowerUpBase {
 public:
-    int        AmmoCount[10];
-    int Process(ILevel *Level, FName Message, void *Params);
 };
-AUTOREGISTER_CLASS(AAmmo);
-
-///////////////////////////////////////////////////////
-// Actor class AClip:AAmmo:APickup:AInventory:ARoot
-///////////////////////////////////////////////////////
-
-class AClip : public AAmmo {
+class IMPLEMENTATION_API AHealth : public AHealthBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE PropertyPad[444];
+    FActorPrivate Private;
 };
-AUTOREGISTER_CLASS(AClip);
-
 ///////////////////////////////////////////////////////
-// Actor class AShells:AAmmo:APickup:AInventory:ARoot
+// Actor class AAmmo:APickup:AInventory:AActor
 ///////////////////////////////////////////////////////
 
-class AShells : public AAmmo {
+class IMPLEMENTATION_API AAmmoBase : public APickupBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    INT        AmmoCount[10];
 };
-AUTOREGISTER_CLASS(AShells);
-
-///////////////////////////////////////////////////////
-// Actor class AStingerAmmo:AAmmo:APickup:AInventory:ARoot
-///////////////////////////////////////////////////////
-
-class AStingerAmmo : public AAmmo {
+class IMPLEMENTATION_API AAmmo : public AAmmoBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE PropertyPad[440];
+    FActorPrivate Private;
 };
-AUTOREGISTER_CLASS(AStingerAmmo);
-
 ///////////////////////////////////////////////////////
-// Actor class ATriggers:ARoot
+// Actor class AClip:AAmmo:APickup:AInventory:AActor
 ///////////////////////////////////////////////////////
 
-class ATriggers : public ARoot {
+class IMPLEMENTATION_API AClipBase : public AAmmoBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API AClip : public AClipBase {
+public:
+    BYTE PropertyPad[440];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class AShells:AAmmo:APickup:AInventory:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API AShellsBase : public AAmmoBase {
+public:
+};
+class IMPLEMENTATION_API AShells : public AShellsBase {
+public:
+    BYTE PropertyPad[440];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class AStingerAmmo:AAmmo:APickup:AInventory:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API AStingerAmmoBase : public AAmmoBase {
+public:
+};
+class IMPLEMENTATION_API AStingerAmmo : public AStingerAmmoBase {
+public:
+    BYTE PropertyPad[440];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class ATriggers:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ATriggersBase : public AActorBase {
+public:
+};
+class IMPLEMENTATION_API ATriggers : public ATriggersBase {
+public:
+    BYTE PropertyPad[643];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ATriggers);
 
 ///////////////////////////////////////////////////////
-// Actor class ATrigger:ATriggers:ARoot
+// Actor class ATrigger:ATriggers:AActor
 ///////////////////////////////////////////////////////
 
 enum ETriggerType {
     TT_Proximity            =0,
-    TT_Use                  =1,
-    TT_Shoot                =2,
+    TT_Shoot                =1,
+    TT_MAX                  =2,
 };
 
-class ATrigger : public ATriggers {
+class IMPLEMENTATION_API ATriggerBase : public ATriggersBase {
 public:
-    BYTE       TriggerType              /* ETriggerType         */;
-    UClass     *ClassesToDetect;
-    char       Message[80];
-    DWORD      bShowMessage:1;
+    BYTE       TriggerType              /* enum ETriggerType */;
+    CHAR       Message[80];
     DWORD      bTriggerOnceOnly:1;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API ATrigger : public ATriggerBase {
+public:
+    BYTE PropertyPad[552];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ATrigger);
 
 ///////////////////////////////////////////////////////
-// Actor class ACounter:ATriggers:ARoot
+// Actor class ACounter:ATriggers:AActor
 ///////////////////////////////////////////////////////
 
-class ACounter : public ATriggers {
+class IMPLEMENTATION_API ACounterBase : public ATriggersBase {
 public:
     BYTE       NumToCount;
-    char       CountMessage[80];
-    char       CompleteMessage[80];
+    CHAR       CountMessage[80];
+    CHAR       CompleteMessage[80];
     DWORD      bShowMessage:1;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API ACounter : public ACounterBase {
+public:
+    BYTE PropertyPad[472];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ACounter);
 
 ///////////////////////////////////////////////////////
-// Actor class ADispatcher:ATriggers:ARoot
+// Actor class ADispatcher:ATriggers:AActor
 ///////////////////////////////////////////////////////
 
-class ADispatcher : public ATriggers {
+class IMPLEMENTATION_API ADispatcherBase : public ATriggersBase {
 public:
     FName      OutEvents[8];
-    int        OutDelays[8];
+    INT        OutDelays[8];
     DWORD      bActive:1;
-    int        Count;
-    int Process(ILevel *Level, FName Message, void *Params);
+    INT        Count;
+};
+class IMPLEMENTATION_API ADispatcher : public ADispatcherBase {
+public:
+    BYTE PropertyPad[584];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ADispatcher);
 
 ///////////////////////////////////////////////////////
-// Actor class ADecorations:ARoot
+// Actor class ADecoration:AActor
 ///////////////////////////////////////////////////////
 
-class ADecorations : public ARoot {
+class IMPLEMENTATION_API ADecorationBase : public AActorBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    UClass     *EffectWhenDestroyed;
 };
-AUTOREGISTER_CLASS(ADecorations);
-
-///////////////////////////////////////////////////////
-// Actor class AVase:ADecorations:ARoot
-///////////////////////////////////////////////////////
-
-class AVase : public ADecorations {
+class IMPLEMENTATION_API ADecoration : public ADecorationBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE PropertyPad[636];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
-AUTOREGISTER_CLASS(AVase);
+AUTOREGISTER_CLASS(ADecoration);
 
 ///////////////////////////////////////////////////////
-// Actor class AChandelier:ADecorations:ARoot
+// Actor class AVase:ADecoration:AActor
 ///////////////////////////////////////////////////////
 
-class AChandelier : public ADecorations {
+class IMPLEMENTATION_API AVaseBase : public ADecorationBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
 };
-AUTOREGISTER_CLASS(AChandelier);
-
-///////////////////////////////////////////////////////
-// Actor class AHammok:ADecorations:ARoot
-///////////////////////////////////////////////////////
-
-class AHammok : public ADecorations {
+class IMPLEMENTATION_API AVase : public AVaseBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE PropertyPad[636];
+    FActorPrivate Private;
 };
-AUTOREGISTER_CLASS(AHammok);
-
 ///////////////////////////////////////////////////////
-// Actor class AFlame:ADecorations:ARoot
+// Actor class AChandelier:ADecoration:AActor
 ///////////////////////////////////////////////////////
 
-class AFlame : public ADecorations {
+class IMPLEMENTATION_API AChandelierBase : public ADecorationBase {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
 };
-AUTOREGISTER_CLASS(AFlame);
-
+class IMPLEMENTATION_API AChandelier : public AChandelierBase {
+public:
+    BYTE PropertyPad[636];
+    FActorPrivate Private;
+};
 ///////////////////////////////////////////////////////
-// Actor class APyrotechnics:ARoot
+// Actor class AHammok:ADecoration:AActor
 ///////////////////////////////////////////////////////
 
-class APyrotechnics : public ARoot {
+class IMPLEMENTATION_API AHammokBase : public ADecorationBase {
+public:
+};
+class IMPLEMENTATION_API AHammok : public AHammokBase {
+public:
+    BYTE PropertyPad[636];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class APyrotechnics:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API APyrotechnicsBase : public AActorBase {
 public:
     FLOAT      GravityMult;
     FLOAT      AccelerationFactor;
     BYTE       Noise;
     USound     *InitialSound;
     UTexture   *Textures[20];
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API APyrotechnics : public APyrotechnicsBase {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(APyrotechnics);
 
 ///////////////////////////////////////////////////////
-// Actor class AWallHit:APyrotechnics:ARoot
+// Actor class AWallHit:APyrotechnics:AActor
 ///////////////////////////////////////////////////////
 
-class AWallHit : public APyrotechnics {
-public:
-    int Process(ILevel *Level, FName Message, void *Params);
-};
-AUTOREGISTER_CLASS(AWallHit);
-
-///////////////////////////////////////////////////////
-// Actor class APawnHit:APyrotechnics:ARoot
-///////////////////////////////////////////////////////
-
-class APawnHit : public APyrotechnics {
-public:
-    int Process(ILevel *Level, FName Message, void *Params);
-};
-AUTOREGISTER_CLASS(APawnHit);
-
-///////////////////////////////////////////////////////
-// Actor class AExplode1:APyrotechnics:ARoot
-///////////////////////////////////////////////////////
-
-class AExplode1 : public APyrotechnics {
-public:
-    int Process(ILevel *Level, FName Message, void *Params);
-};
-AUTOREGISTER_CLASS(AExplode1);
-
-///////////////////////////////////////////////////////
-// Actor class AExplode3:APyrotechnics:ARoot
-///////////////////////////////////////////////////////
-
-class AExplode3 : public APyrotechnics {
-public:
-    int Process(ILevel *Level, FName Message, void *Params);
-};
-AUTOREGISTER_CLASS(AExplode3);
-
-///////////////////////////////////////////////////////
-// Actor class ABigManGunFlash:APyrotechnics:ARoot
-///////////////////////////////////////////////////////
-
-class ABigManGunFlash : public APyrotechnics {
-public:
-    int Process(ILevel *Level, FName Message, void *Params);
-};
-AUTOREGISTER_CLASS(ABigManGunFlash);
-
-///////////////////////////////////////////////////////
-// Actor class ASkaarjGunFlash:APyrotechnics:ARoot
-///////////////////////////////////////////////////////
-
-class ASkaarjGunFlash : public APyrotechnics {
-public:
-    int Process(ILevel *Level, FName Message, void *Params);
-};
-AUTOREGISTER_CLASS(ASkaarjGunFlash);
-
-///////////////////////////////////////////////////////
-// Actor class AGasBagBelchFlash:APyrotechnics:ARoot
-///////////////////////////////////////////////////////
-
-class AGasBagBelchFlash : public APyrotechnics {
-public:
-    int Process(ILevel *Level, FName Message, void *Params);
-};
-AUTOREGISTER_CLASS(AGasBagBelchFlash);
-
-///////////////////////////////////////////////////////
-// Actor class APlayerRespawn:APyrotechnics:ARoot
-///////////////////////////////////////////////////////
-
-class APlayerRespawn : public APyrotechnics {
+class IMPLEMENTATION_API AWallHitBase : public APyrotechnicsBase {
 public:
 };
-AUTOREGISTER_CLASS(APlayerRespawn);
-
+class IMPLEMENTATION_API AWallHit : public AWallHitBase {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+};
 ///////////////////////////////////////////////////////
-// Actor class ATeleportIn:APyrotechnics:ARoot
+// Actor class APawnHit:APyrotechnics:AActor
 ///////////////////////////////////////////////////////
 
-class ATeleportIn : public APyrotechnics {
+class IMPLEMENTATION_API APawnHitBase : public APyrotechnicsBase {
 public:
 };
-AUTOREGISTER_CLASS(ATeleportIn);
-
+class IMPLEMENTATION_API APawnHit : public APawnHitBase {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+};
 ///////////////////////////////////////////////////////
-// Actor class ATeleportOut:APyrotechnics:ARoot
+// Actor class AExplode1:APyrotechnics:AActor
 ///////////////////////////////////////////////////////
 
-class ATeleportOut : public APyrotechnics {
+class IMPLEMENTATION_API AExplode1Base : public APyrotechnicsBase {
 public:
 };
-AUTOREGISTER_CLASS(ATeleportOut);
-
-///////////////////////////////////////////////////////
-// Actor class AExplode2:APyrotechnics:ARoot
-///////////////////////////////////////////////////////
-
-class AExplode2 : public APyrotechnics {
+class IMPLEMENTATION_API AExplode1 : public AExplode1Base {
 public:
-    int Process(ILevel *Level, FName Message, void *Params);
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
 };
-AUTOREGISTER_CLASS(AExplode2);
-
 ///////////////////////////////////////////////////////
-// Actor class AExplosion:ARoot
+// Actor class AExplode3:APyrotechnics:AActor
 ///////////////////////////////////////////////////////
 
-class AExplosion : public ARoot {
+class IMPLEMENTATION_API AExplode3Base : public APyrotechnicsBase {
+public:
+};
+class IMPLEMENTATION_API AExplode3 : public AExplode3Base {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class ABigManGunFlash:APyrotechnics:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ABigManGunFlashBase : public APyrotechnicsBase {
+public:
+};
+class IMPLEMENTATION_API ABigManGunFlash : public ABigManGunFlashBase {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class ASkaarjGunFlash:APyrotechnics:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ASkaarjGunFlashBase : public APyrotechnicsBase {
+public:
+};
+class IMPLEMENTATION_API ASkaarjGunFlash : public ASkaarjGunFlashBase {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class AGasBagBelchFlash:APyrotechnics:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API AGasBagBelchFlashBase : public APyrotechnicsBase {
+public:
+};
+class IMPLEMENTATION_API AGasBagBelchFlash : public AGasBagBelchFlashBase {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class APlayerRespawn:APyrotechnics:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API APlayerRespawnBase : public APyrotechnicsBase {
+public:
+};
+class IMPLEMENTATION_API APlayerRespawn : public APlayerRespawnBase {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class ATeleportIn:APyrotechnics:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ATeleportInBase : public APyrotechnicsBase {
+public:
+};
+class IMPLEMENTATION_API ATeleportIn : public ATeleportInBase {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class ATeleportOut:APyrotechnics:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API ATeleportOutBase : public APyrotechnicsBase {
+public:
+};
+class IMPLEMENTATION_API ATeleportOut : public ATeleportOutBase {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class AExplode2:APyrotechnics:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API AExplode2Base : public APyrotechnicsBase {
+public:
+};
+class IMPLEMENTATION_API AExplode2 : public AExplode2Base {
+public:
+    BYTE PropertyPad[544];
+    FActorPrivate Private;
+};
+///////////////////////////////////////////////////////
+// Actor class AExplosion:AActor
+///////////////////////////////////////////////////////
+
+class IMPLEMENTATION_API AExplosionBase : public AActorBase {
 public:
     UClass     *Effect;
+    BYTE       Delay;
     USound     *InitialSound;
     BYTE       Noise;
     UClass     *Debris[10];
-    int        DebrisCount;
+    INT        DebrisCount;
     FLOAT      Radius;
     FLOAT      RadiusIncrement;
     BYTE       Damage[4];
     FLOAT      DamageIncrement;
     FLOAT      Momentum;
     FLOAT      MomentumIncrement;
-    int Process(ILevel *Level, FName Message, void *Params);
+};
+class IMPLEMENTATION_API AExplosion : public AExplosionBase {
+public:
+    BYTE PropertyPad[556];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AExplosion);
 
 ///////////////////////////////////////////////////////
-// Actor class AClipExplosion:AExplosion:ARoot
+// Actor class AClipExplosion:AExplosion:AActor
 ///////////////////////////////////////////////////////
 
-class AClipExplosion : public AExplosion {
+class IMPLEMENTATION_API AClipExplosionBase : public AExplosionBase {
 public:
+};
+class IMPLEMENTATION_API AClipExplosion : public AClipExplosionBase {
+public:
+    BYTE PropertyPad[556];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AClipExplosion);
 
 ///////////////////////////////////////////////////////
-// Actor class AShellExplosion:AExplosion:ARoot
+// Actor class AShellExplosion:AExplosion:AActor
 ///////////////////////////////////////////////////////
 
-class AShellExplosion : public AExplosion {
+class IMPLEMENTATION_API AShellExplosionBase : public AExplosionBase {
 public:
+};
+class IMPLEMENTATION_API AShellExplosion : public AShellExplosionBase {
+public:
+    BYTE PropertyPad[556];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(AShellExplosion);
 
 ///////////////////////////////////////////////////////
-// Actor class ATarydiumExplosion:AExplosion:ARoot
+// Actor class ATarydiumExplosion:AExplosion:AActor
 ///////////////////////////////////////////////////////
 
-class ATarydiumExplosion : public AExplosion {
+class IMPLEMENTATION_API ATarydiumExplosionBase : public AExplosionBase {
 public:
+};
+class IMPLEMENTATION_API ATarydiumExplosion : public ATarydiumExplosionBase {
+public:
+    BYTE PropertyPad[556];
+    FActorPrivate Private;
+    INT Process(ILevel *Level, FName Message, void *Params);
 };
 AUTOREGISTER_CLASS(ATarydiumExplosion);
 

@@ -1,26 +1,61 @@
 /*==============================================================================
-UnChecks.h: Help simplify and unify checking code
-Used by: Various
+UnChecks.h: Unified debugging and assertion code.
 
 Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Summary:
-    Below is a summary of the function declarations for the checking 
-    functions (although they might actually be implemented as macros).
+
+	Macros surrounding code in order to generate call stack upon crash:
+
+		guard(FunctionName);
+		unguard;
+		unguardf((PrintfStyleExpression)); // Note requirement of double parenthesis.
+
+		guardSlow(FunctionName);
+		unguardSlow;
+		unguardfSlow((PrintfStyleExpression));
+
+	Compile-time options:
+		NO_GUARD		(Off by default) Disables try/catch exception handling in guard.
+		NO_SLOW_GUARD	(On by default)  Disables try/catch exception handling in guardSlow.
+		CHECK_ALL		(Off by default) Perform all checks in release versions.
+
+    Checking functions:
+
         void checkInput  (BOOL Condition);
         void checkLogic  (BOOL Condition);
         void checkOutput (BOOL Condition);
         void checkState  (BOOL Condition);
         void checkVital  (BOOL Condition, const char * Message);
+		void checkFailed (const char * Message);
+
     The following debug checks are similar to the corresponding
     simple checks, but they are active only if _DEBUG is defined.
     Use the debug checks for checks you refuse to have in the
-    release code.
+    release code:
+
         void debugInput  (BOOL Condition);
         void debugLogic  (BOOL Condition);
         void debugOutput (BOOL Condition);
         void debugState  (BOOL Condition);
+
+	Logging functions:
+
+		void log		(PrintfStyleExpression);
+		void logInit	(PrintfStyleExpression);
+		void logExit	(PrintfStyleExpression);
+		void logInfo	(PrintfStyleExpression);
+
+	Other useful functions and macros:
+
+		LOGIC(expr;)
+			If CHECK_LOGIC (or CHECK_ALL) is defined, expr is emitted into
+			the code stream. Otherwise, expr is ignored.  This is useful for
+			performing minor work required for logic check which doesn't fit
+			cleanly into a checkLogic(Condition) expression.
+		BOOL IS_NAN(float)
+			Returns whether the parameter is not a number, 0 otherwise.
 
 Description:
 
@@ -53,6 +88,9 @@ Definitions:
         A check for valid argments passed to a called function. Sometimes
         called the pre-conditions for a function. Examples:
           - A list index function checks that the index is not too large.
+	guard:
+		A mechanism based on structured exception handling that enables a
+		program to display a human-readable call history when it fails.
     logic check:
          A localized check of the logic within a function or the correctness 
          of a function's local state. The expectation is that such checks 
@@ -80,22 +118,76 @@ Notes:
      The other kinds of checks, when they fail, provide implicit information 
      such as the text of the failed condition, the source file name, and
      the source file line number.
+  2. Because the checkXYZ and debugXYZ macros may compile to nothing, it is vital
+     that you don't rely on side-effects of their expressions.
+	 Example to avoid:
+	      - debugInput(X-- > 0); // Logic error: X won't be incremented in the release version!
 
 Requirements for this package:
   1. There should only be a few kinds of assertions - 5 or less. Any more
      would be too complicated and hard to remember.
   2. The interface to the user of this package should be the same regardless
      of the actual implementation.
-  3. When turned off, checks should cause little or no overhead.
+  3. When turned off, checks should cause no overhead.
+  4. Functions, variables, and macros must not conflict with existing C/C++
+     library, Windows, MFC, or GCC names (such as assert, ASSERT, etc)..
 
 Revision history:
-    * 03/22/96, Created by Mark
+    * 03/22/96, Created by Mark.
+	* 10/30/96, Extended and integrated with guard mechanism by Tim.
 ==============================================================================*/
 
 #ifndef _INC_CHECKS
 #define _INC_CHECKS
 
-#ifdef _DEBUG
+#ifndef  _INC_UNPLATFM
+#include "UnPlatfm.h"
+#endif
+
+/*-----------------------------------------------------------------------------
+	Guarding
+-----------------------------------------------------------------------------*/
+
+//
+// guard/unguardf/unguard macros:
+// For showing calling stack when errors occur in major functions.
+// Meant to be enabled in release builds.
+//
+#if defined(_DEBUG) || NO_GUARD /* No guard mechanism */
+	#define guard(func)			{static const char __FUNC_NAME__[]=#func;
+	#define unguardf(msg)		}
+	#define unguard				}
+#else /* Enable guard mechansim */
+	#define guard(func)			{static const char __FUNC_NAME__[]=#func; try{
+	#define unguardf(msg)		}catch(...){if(GApp->Debugging) GApp->DebugBreak(); GApp->GuardMessagef("%s",__FUNC_NAME__); GApp->GuardMessagef msg; GApp->GuardTrap=1; throw;}} /* Must enclose msg in double parenthesis */
+	#define unguard				}catch(...){if(GApp->Debugging) GApp->DebugBreak(); GApp->GuardMessagef("%s",__FUNC_NAME__); GApp->GuardTrap=1; throw;}}
+#endif
+
+//
+// guardSlow/unguardfSlow/unguardSlow macros:
+// For showing calling stack when errors occur in performance-critical functions.
+// Meant to be disabled in release builds.
+//
+#if defined(_DEBUG) || NO_GUARD || NO_SLOW_GUARD /* No slow guard mechanism */
+	#define guardSlow(func)		static const char __FUNC_NAME__[]=#func;{
+	#define unguardfSlow(msg)	}
+	#define unguardSlow			}
+#else /* Enable slow guard mechansim */
+	#define guardSlow(func)		guard(func)
+	#define unguardfSlow(msg)	unguardf(msg)
+	#define unguardSlow			unguard
+#endif
+
+/*-----------------------------------------------------------------------------
+	Check options.
+-----------------------------------------------------------------------------*/
+
+//
+// Which types of checks to perform.
+// checkXYZ is performed in all versions in which the corresponding CHECK_XYZ is defined to 1.
+// debugXYZ is performed only in _DEBUG builds and only when the above criteria are met.
+//
+#if defined(_DEBUG) || defined(CHECK_ALL)
     // Debug code: Use 1 to enable a check, or 0 to disable it.
     // You may use these macros in your own code: if(CHECK_INPUT) ...
     #define CHECK_INPUT  1
@@ -106,29 +198,38 @@ Revision history:
     // Release code: Use 1 to enable a check, or 0 to disable it.
     // You may use these macros in your own code: if(CHECK_INPUT) ...
     #define CHECK_INPUT  1
-    #define CHECK_LOGIC  0
+    #define CHECK_LOGIC  1
     #define CHECK_OUTPUT 1
     #define CHECK_STATE  1
 #endif
 
+//
+// Define the LOGIC macro.
+//
+#if CHECK_LOGIC
+	#define LOGIC(expr) expr
+#else
+	#define LOGIC(expr)
+#endif
+
+//
 // Pick one of these - whichever is best for you.
 // The more information provided to checkFailed, the more useful
 // the information, but the larger the code.
+//
 #define CHECK_FAILED(Condition,SourceFileName,LineNumber) checkFailed( #Condition, SourceFileName, LineNumber )
 //#define CHECK_FAILED(Condition,SourceFileName,LineNumber) checkFailed( __FILE__, __LINE__ )
 //#define CHECK_FAILED(Condition,SourceFileName,LineNumber) checkFailed( #Condition )
 //#define CHECK_FAILED(Condition,SourceFileName,LineNumber) checkFailed( __LINE__ )
 //#define CHECK_FAILED(Condition,SourceFileName,LineNumber) checkFailed()
 
-// Here is a convenience definition for when you want to do something
-// conditionally for debug code only, but you don't want to use
-// #if and the macro preprocessor:
-#if _DEBUG
-    static const int DebugCode = 1;
-#else
-    static const int DebugCode = 0;
-#endif
+/*-----------------------------------------------------------------------------
+	checkXYZ and debugXYZ macros.
+-----------------------------------------------------------------------------*/
 
+//
+// Define all checkXYZ macros.
+//
 #if CHECK_INPUT
     #define checkInput(Condition) (void) ( (Condition) || ( CHECK_FAILED( (Condition), __FILE__, __LINE__ ), 0 ) )
 #else
@@ -153,7 +254,10 @@ Revision history:
     #define checkState(Condition) 
 #endif
 
-#ifdef _DEBUG
+//
+// Define all debugXYZ macros.
+//
+#if defined(_DEBUG) || defined(CHECK_ALL)
     // Debug checks are the same as simple checks when debugging:
     #define debugInput(Condition)  checkInput(Condition)  
     #define debugLogic(Condition)  checkLogic(Condition)  
@@ -167,18 +271,63 @@ Revision history:
     #define debugState(Condition)
 #endif
 
+/*-----------------------------------------------------------------------------
+	checkVital and checkFailed
+-----------------------------------------------------------------------------*/
+
+//
+// Define the checkVital macro.
+//
+
 // The vital check is special - it might have a message constructed by the caller.
 #define checkVital(Condition,Message) (void) ( (Condition) || ( checkFailed( Message ), 0 ) )
 
-// These are the functions called when a check fails. Don't call these directly.
-// The fewer arguments provided to checkFailed, the less helpful the error 
-// message but the smaller the code. The message or source name each should not
-// exceed 200 characters.
+//
+// checkFailed functions.  These are referenced by the checkXYZ and debugXYZ macros, but
+// you may call them directly when you want to cause a critical error.
+//
 extern void UNREAL_API checkFailed( const char * Message, const char * SourceFileName, int LineNumber );
 extern void UNREAL_API checkFailed( const char * SourceFileName, int LineNumber );
 extern void UNREAL_API checkFailed( const char * Message );
 extern void UNREAL_API checkFailed( int LineNumber );
 extern void UNREAL_API checkFailed( );
 
-#endif // _INC_CHECKS
+/*-----------------------------------------------------------------------------
+	Static constants.
+-----------------------------------------------------------------------------*/
 
+//
+// The checkXYZ and debugXYZ macros make use of __FUNC_NAME__ to be the name of the current 
+// function that is compiling; the specific function name is defined as a static const
+// char[] when you use the guard() macro.  Here we define a static global __FUNC_NAME__
+// variable which is used when checkXYZ or debugXYZ are called outside the scope of
+// a guard() block.
+//
+static const char __FUNC_NAME__[] = "Unknown";
+
+//
+// Here is a convenience definition for when you want to do something
+// conditionally for debug code only, but you don't want to use
+// #if and the macro preprocessor.
+//
+#if _DEBUG
+    static const int DebugCode = 1;
+#else
+    static const int DebugCode = 0;
+#endif
+
+/*-----------------------------------------------------------------------------
+	Logging.
+-----------------------------------------------------------------------------*/
+
+//
+// Logging macros.  For displaying information on the console.
+// These only work when called when there is a FGlobalApp *GApp in the
+// current scope.
+//
+#define logf GApp->Logf
+
+/*-----------------------------------------------------------------------------
+	The End.
+-----------------------------------------------------------------------------*/
+#endif // _INC_CHECKS

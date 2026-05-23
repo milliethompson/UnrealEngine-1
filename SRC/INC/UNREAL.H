@@ -12,9 +12,8 @@
 #define _INC_UNREAL
 
 /*----------------------------------------------------------------------------
-	Low level includes
+	Low level includes.
 ----------------------------------------------------------------------------*/
-
 
 //
 // Version info and compile options specific to this build of the Unreal engine
@@ -34,12 +33,19 @@
 // All platform-independent hooks visible to Unreal which
 // call platform-specific routines elsewhere
 //
-#ifndef __PLATFORM__
+#ifndef _INC_UNPLATFM
 #include "UnPlatfm.h"
 #endif
 
+//
+// Debugging, checking, and guarding:
+//
+#ifndef _INC_CHECKS
+#include "UnChecks.h"
+#endif
+
 /*-----------------------------------------------------------------------------
-	Global variables
+	Global variables.
 -----------------------------------------------------------------------------*/
 
 //
@@ -61,101 +67,105 @@ UNREAL_API extern class FGlobalAudio			GAudio;
 UNREAL_API extern class FGlobalRender			*GRend;
 UNREAL_API extern class FCameraManager			*GCameraManager;
 UNREAL_API extern class UTransBuffer			*GTrans;
-UNREAL_API extern class FEditor					*GEditor;
-UNREAL_API extern class FVirtualGame			*GVirtualGame;
+UNREAL_API extern class FGlobalEditor			*GEditor;
+UNREAL_API extern class FGameBase				*GGameBase;
 UNREAL_API extern class NManager				*GNetManager;
 
 /*-----------------------------------------------------------------------------
-	High-level includes
+	High-level includes.
 -----------------------------------------------------------------------------*/
 
-#ifndef _INC_UNFILE		// Low-level, platform-independent file functions
+#ifndef _INC_UNFILE		// Low-level, platform-independent file functions.
 #include "UnFile.h"
 #endif
 
-#ifndef _INC_UNMATH		// Vector math functions
+#ifndef _INC_UNMATH		// Vector math functions.
 #include "UnMath.h"
 #endif
 
-#ifndef _INC_UNPARAMS	// Parameter parsing routines
+#ifndef _INC_UNPARAMS	// Parameter parsing routines.
 #include "UnParams.h"
 #endif
 
-#ifndef _INC_UNCACHE	// In-memory object caching
+#ifndef _INC_UNCACHE	// In-memory object caching.
 #include "UnCache.h"
 #endif
 
-#ifndef _INC_UNMEM		// Fast memory pool allocation
+#ifndef _INC_UNCID		// Cache identifiers.
+#include "UnCID.h"
+#endif
+
+#ifndef _INC_UNMEM		// Fast memory pool allocation.
 #include "UnMem.h"
 #endif
 
-#ifndef _INC_UNRESTYP	// Resource type definitions
+#ifndef _INC_UNRESTYP	// Resource type definitions.
 #include "UnResTyp.h"
 #endif
 
-#ifndef _INC_UNRES		// Resource manager
+#ifndef _INC_UNRES		// Resource manager.
 #include "UnRes.h"
 #endif
 
-#ifndef _INC_UNTOPICS	// Topic handlers for editor/server communication
+#ifndef _INC_UNTOPICS	// Topic handlers for editor/server communication.
 #include "UnTopics.h"
 #endif
 
-#ifndef _INC_UNACTOR	// Actor subsystem
+#ifndef _INC_UNACTOR	// Actor subsystem.
 #include "UnActor.h"
 #endif
 
-#ifndef _INC_UNLEVEL	// Level resource
+#ifndef _INC_UNLEVEL	// Level resource.
 #include "UnLevel.h"
 #endif
 
-#ifndef _INC_UNCAMERA	// Camera subsystem
+#ifndef _INC_UNCAMERA	// Camera subsystem.
 #include "UnCamera.h"
 #endif
 
-#ifndef _INC_UNFGAUD	// Audio subsystem FGlobalAudio
+#ifndef _INC_UNFGAUD	// Audio subsystem FGlobalAudio.
 #include "UnFGAud.h"
 #endif
 
-#ifndef _INC_UNSOUND	// Audio subsystem main
+#ifndef _INC_UNSOUND	// Audio subsystem main.
 #include "UnSound.h"
 #endif
 
-#ifndef _INC_UNGFX		// Graphics subsystem
+#ifndef _INC_UNGFX		// Graphics subsystem.
 #include "UnGfx.h"
 #endif
 
-#ifndef _INC_UNSERVER	// Unreal server
+#ifndef _INC_UNSERVER	// Unreal server.
 #include "UnServer.h"
 #endif
 
-#ifndef _INC_UNDEFLTS	// Unreal defaults
+#ifndef _INC_UNDEFLTS	// Unreal defaults.
 #include "UnDeflts.h"
 #endif
 
-#ifndef _INC_UNENGINE	// Unreal engine
+#ifndef _INC_UNENGINE	// Unreal engine.
 #include "UnEngine.h"
 #endif
 
-#ifndef _INC_UNVGAME	// Virtual game class
+#ifndef _INC_UNVGAME	// Virtual game class.
 #include "UnVGame.h"
 #endif
 
 //
 // Files required by the Unreal editor
 //
-#ifdef EDITOR
+#if EDITOR
 
-	#ifndef _INC_UNEDITOR	// Unreal editor
+	#ifndef _INC_UNEDITOR	// Unreal editor.
 	#include "UnEditor.h"
 	#endif
 
-	#ifndef _INC_UNEDTRAN	// Transaction tracking system
+	#ifndef _INC_UNEDTRAN	// Transaction tracking system.
 	#include "UnEdTran.h"
 	#endif
 
 #endif
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/
 #endif // _INC_UNREAL

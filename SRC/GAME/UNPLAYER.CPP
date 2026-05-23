@@ -46,20 +46,19 @@ static const FLOAT MoveNoise = 0.5;
 
 static const FLOAT RightwardFactor = 0.8; // Rightward motions are generally this fraction of forward motions.
 
+#if 0 //tbd: obsolete
 static const FLOAT VelocitySurfaceDamping     = 0.90  ; // Velocity of pawn on surfaces is damped by this factor.
 static const FLOAT VelocityFlyDamping         = 0.97  ; // Velocity of flying pawn in air is damped by this factor.
 static const FLOAT VelocityAirDamping         = 0.999 ; // Velocity of non-flying pawn in air is damped by this factor.
+#endif
 static const FLOAT UsualForwardAcceleration   = 0.50; // The usual forward or backward acceleration.
 static const FLOAT UsualRightwardAcceleration = RightwardFactor*UsualForwardAcceleration; // The usual rightward or leftward acceleration.
 static const FLOAT UsualUpwardAcceleration    = 0.40; // The usual upwards or downward acceleration.
 
 
-static const TPositiveAngle MaxPitchSpeed   = 0x600; 
 static const TPositiveAngle LevelPitch      = 0x000;
 static const int PitchAccelerationRatio = 8; // Value x where pitch is accelerated by P/x, where P is the change in pitch.
 static const TSignedAngle PitchLimit = 0x3400 ; // About 73 degrees upward/downward limit on pitch.
-// The change in pitch for changes in a differential analog movement.
-#define DifferentialPitchChange (PositiveAngle(PitchLimit)/4)
 
 static const FLOAT DifferentialMoveFactor = 20.0; //tbe:
 
@@ -71,7 +70,8 @@ static const FLOAT StopThresholdSpeed = 0.04; // Speeds below this are set to 0.
 //
 #define PLAYER_ROLL_SNAPBACK_RATIO  4
 #define PLAYER_MAX_YAW_SPEED        0x2C0
-#define PLAYER_YAW_ACCELERATION     0x78
+//#define PLAYER_YAW_ACCELERATION     0x78
+#define PLAYER_YAW_ACCELERATION     205
 #define PLAYER_PITCH_ACCELERATION   0x50
 #define PLAYER_PITCH_ZERO           0x20
 #define PLAYER_ROLL_ZERO            0x20
@@ -83,19 +83,19 @@ static const FLOAT StopThresholdSpeed = 0.04; // Speeds below this are set to 0.
 #define PLAYER_WALK_BOB_HEIGHT      4.5
 #define PLAYER_MAX_BOB_HEIGHT       6.0
 #define PLAYER_BOB_PER_SEC          1.0
-//tbd:#define EYEHEIGHT_DECELERATION_CF   0.21    /* Deceleration coefficient of eye going up/down stairs */
-#define EYEHEIGHT_DECELERATION_CF   0.10     /* Deceleration coefficient of eye going up/down stairs */
-#define STILL_BOB_HEIGHT            2.0        /* Changed TS 5-5. Still bobbing sucks */
+#define EYEHEIGHT_DECELERATION_CF   0.21     /* Deceleration coefficient of eye going up/down stairs */
+#define STILL_BOB_HEIGHT            2.0
 #define PLAYER_CROUCH_HEIGHT       -20.0
 
 //
 // Automatic view adjustment on stairs/inclines
 //
-#define CANE_LENGTH                    96.0
+#define CANE_DISTANCE_FACTOR           3.0 // Multiplied by collision radius to determine distance cane is placed from pawn's location.
 #define MIN_STAIR_SLOPE                0.20
-#define MAX_STAIR_SLOPE                1.0
+#define MAX_STAIR_SLOPE                1.5
 #define PLAYER_STAIR_UP_PITCH         TPositiveAngle(-0x0C00)
 #define PLAYER_STAIR_DOWN_PITCH       TPositiveAngle(+0x0C00)
+static const int PlayerAutoLevelDelay = 12; // Delay (in ticks) before view is leveled at top or bottom of stairs.
 
 //
 // Ramps and stairs
@@ -108,27 +108,6 @@ static const FLOAT StopThresholdSpeed = 0.04; // Speeds below this are set to 0.
 static const FLOAT LungeStaminaThreshold = 0.10     ; // The minimum amount of stamina to allow a lunge:
 static const FLOAT StaminaDecayRate      = 0.015    ; // Amount stamina decays each tick while lunging.
 static const FLOAT StaminaRechargeRate   = 0.005    ; // Amount stamina recharges each tick not lunging.
-
-static inline FLOAT Min(FLOAT Value1, FLOAT Value2)
-{
-    return Value1 <= Value2 ? Value1 : Value2;
-}
-
-static inline FLOAT Max(FLOAT Value1, FLOAT Value2)
-{
-    return Value1 >= Value2 ? Value1 : Value2;
-}
-
-static inline int Min(int Value1, int Value2)
-{
-    return Value1 <= Value2 ? Value1 : Value2;
-}
-
-static inline int Max(int Value1, int Value2)
-{
-    return Value1 >= Value2 ? Value1 : Value2;
-}
-
 
 static inline SignedAngle(TPositiveAngle Angle)
 {
@@ -155,6 +134,7 @@ static inline TPositiveAngle PositiveDegrees(int Degrees)
     return Degrees*65536/360;
 }
 
+static FVector LastPointOnSurface; // Place where player was last on a surface (for debugging).
 
 //tbd: This is temporary until we have a status bar and full status indicators (invisibility...)
 // Return an indicator for the status of a special ability.
@@ -175,7 +155,7 @@ static char * abilityStatus( char Indicator, BOOL IsActive, int TimeLeft )
 
 static void ShowPlayerStat( const APawn & Pawn ) //tbd: This is temporary until we have a status bar.
 {
-    if( FALSE && GInput.IsToggledOn( FInput::S_ScrollLock ) )
+    if( FALSE && GApp->Input->IsToggledOn( FPlatformInput::S_ScrollLock ) )
     {
         static char LastStatusText[100] = { 0 };
         char StatusText[100];
@@ -247,20 +227,21 @@ void FGame::PlayerYaw( APawn & Pawn, FLOAT Analog, FLOAT Differential )
     {
         Pawn.ViewRot.Yaw += Analog * Degrees(3);
     }
-    Pawn.ViewRot.Yaw += Differential * Degrees(20);
+    Pawn.ViewRot.Yaw += Differential * Degrees(90);
 }
 
 void FGame::PlayerPitch( APawn & Pawn, FLOAT Analog, FLOAT Differential )
 {
     if( Analog != 0 )
     {
-        Pawn.TargetPitch = TPositiveAngle( Analog*PitchLimit );
+        Pawn.TargetRot.Pitch = TPositiveAngle( Analog*PitchLimit );
+        Pawn.ViewRot.Pitch = Pawn.TargetRot.Pitch;
     }
-    Pawn.ViewRot.Pitch += TPositiveAngle( Differential * DifferentialPitchChange );
-    Pawn.TargetPitch   += TPositiveAngle( Differential * DifferentialPitchChange );
+    Pawn.ViewRot.Pitch += TPositiveAngle( Differential * Degrees(20) );
+    Pawn.TargetRot.Pitch   += TPositiveAngle( Differential * Degrees(20)  );
     if( Pawn.bLimitRotation )
     {
-        LimitPitch( Pawn.TargetPitch );
+        LimitPitch( Pawn.TargetRot.Pitch );
         LimitPitch( Pawn.ViewRot.Pitch );
     }
 }
@@ -284,7 +265,6 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
     APawn             & Pawn        = Actor.Pawn();
     PPlayerTick       & PlayerInfo  = PPlayerTick::Convert(Params);
     FVector             Floor;
-    FVector             MoveVector;
     FVector             Gravity = GLevel->GetZoneGravityAcceleration(iActor);
     FLOAT               DZ;
     FLOAT               RunMult             = 1.0   ;
@@ -303,16 +283,34 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
 
     FLOAT               BobAmplitude                ;
     SWORD               YawAccel            = 0     ;
-//tbd: [obsolete due to new rotation handling]    SWORD               AnalogYawSpeed      = 0     ;
     SWORD               AnalogRollSpeed     = 0     ;
 
     const FLOAT VelocityDamping = 
-        Pawn.bIsOnSurface   ? VelocitySurfaceDamping 
-    :   !Pawn.bGravity      ? VelocityFlyDamping
-    :                         VelocityAirDamping
+        Pawn.bIsSwimming    ? Pawn.WaterDamping
+    :   !Pawn.bGravity      ? Pawn.AirDamping
+    :   Pawn.bIsOnSurface   ? Pawn.GroundDamping 
+    :                         Pawn.JumpDamping
     ;
 
+    // While not on a surface, a non-swimming non-flying pawn has limited control.
+    const BOOL ControlIsLimited = !Pawn.bIsSwimming && Pawn.bGravity && !Pawn.bIsOnSurface;
+    const FLOAT ControlFactor = ControlIsLimited ? 0.20 : 1.0; // Fraction of control retained.
+
+    if( Pawn.bIsSwimming )
+    {
+        Gravity *= Pawn.WaterSinkRate;
+    }
     Pawn.Velocity *= VelocityDamping;
+
+    if( GCheat->ShowPawnPhysics ) 
+    {
+        static FLOAT LastDamping;
+        if( LastDamping != VelocityDamping )
+        {
+            LastDamping = VelocityDamping;
+            debugf( LOG_Info, "Damping: %3.3f", LastDamping );
+        }
+    }
 
     typedef FAction::TActionStatus TActionStatus;
     TActionStatus * Actions = &PlayerInfo.Actions[0];
@@ -328,17 +326,53 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         Level.SendMessage(iActor,ACTOR_TextMsg,&Msg);
         }
 	#endif
-    
+
+    #if 0 // Debugging stuff
+    if( (GServer.Ticks & 0x0f) == 0 )
+    {
+        BOOL Changed = FALSE;
+        if( GApp->Input->IsOn( FPlatformInput::S_7 ) )
+        {
+            Pawn.BaseEyeHeight *= 0.95;
+            Changed = TRUE;
+        }
+        else if( GApp->Input->IsOn( FPlatformInput::S_8 ) )
+        {
+            Pawn.BaseEyeHeight *= 1.05;
+            Changed = TRUE;
+        }
+        else if( GApp->Input->IsOn( FPlatformInput::S_9 ) )
+        {
+            Pawn.BaseEyeHeight -= .10;
+            Changed = TRUE;
+        }
+        else if( GApp->Input->IsOn( FPlatformInput::S_0 ) )
+        {
+            Pawn.BaseEyeHeight += .10;
+            Changed = TRUE;
+        }
+        if( Changed )
+        {
+            debugf( LOG_Info, "Height: %3.3f", Pawn.BaseEyeHeight );
+        }
+    }
+    #endif    
+
     // *** Warning *** 
     // Be careful about the order of processing actions, since 
     // some actions affect the behaviour of other actions.
 
 
-    const BOOL IsCrouching      = Pawn.bGravity && FAction::CheckStatus( Actions[FAction::Crouch], FAction::IsActiveStatus );
+    const BOOL IsCrouching      = !Pawn.bIsSwimming && Pawn.bGravity && FAction::CheckStatus( Actions[FAction::Crouch], FAction::IsActiveStatus );
     const FLOAT MovementFactor   = IsCrouching ? 0.6 : 1.0;
 
-    const FLOAT NormalSpeed = MovementFactor * Pawn.NormalSpeed   ;
-    const FLOAT RunSpeed    = MovementFactor * Pawn.RunSpeed      ;
+    const FLOAT RunSpeed    = MovementFactor * 
+    (
+            Pawn.bIsSwimming    ?   Pawn.WaterSpeed
+        :   Pawn.bGravity       ?   Pawn.GroundSpeed   
+        :                           Pawn.AirSpeed
+    );
+    const FLOAT NormalSpeed = RunSpeed * 0.5;
     const FLOAT LungeSpeed  = MovementFactor * Pawn.LungeSpeed    ;
     FLOAT MaxSpeed = NormalSpeed;
 
@@ -346,14 +380,13 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
     const FLOAT DefaultRightwardAcceleration = UsualRightwardAcceleration * MovementFactor;
     const FLOAT DefaultUpwardAcceleration = UsualUpwardAcceleration * MovementFactor;
 
-    const SWORD TurnYawAcceleration = IsCrouching ? PLAYER_YAW_ACCELERATION / 2 : PLAYER_YAW_ACCELERATION;
-    const SWORD SpinYawAcceleration = 2*TurnYawAcceleration;
-    const SWORD MaxTurnYawSpeed = IsCrouching ? PLAYER_MAX_YAW_SPEED / 2 : PLAYER_MAX_YAW_SPEED;
-    const SWORD MaxSpinYawSpeed = 2*MaxTurnYawSpeed;
-    SWORD MaxYawSpeed = MaxTurnYawSpeed;
+    const BOOL TurningIsSlow = IsCrouching || Pawn.bIsSwimming;
+    const SWORD TurnYawAcceleration = TurningIsSlow ? PLAYER_YAW_ACCELERATION / 2 : PLAYER_YAW_ACCELERATION;
 
-    const TPositiveAngle MaxPitchSpeed = IsCrouching ? ::MaxPitchSpeed / 2 : ::MaxPitchSpeed;
-    BOOL PlayerChoosesPitch = !Pawn.bGravity && !IsDead; 
+    const FLOAT OriginalVelocityZ = Pawn.Velocity.Z; // For debugging.
+    const FLOAT OriginalZ         = Pawn.Location.Z; // For debugging.
+
+    BOOL PlayerChoosesPitch = ( Pawn.bIsSwimming || !Pawn.bGravity ) && !IsDead; 
     BOOL Lunging = FALSE;
     //------------------------------------------------------
     //                        Notes
@@ -562,9 +595,9 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         const TActionStatus & Lunge  = Actions[FAction::LungeUp ];
         const TActionStatus & Run    = Actions[FAction::RunUp   ];
         const TActionStatus & Move   = Actions[FAction::MoveUp  ];
-        if( Pawn.bGravity )
+        if( Pawn.bGravity && !Pawn.bIsSwimming )
         {
-            // The pawn can't fly, so he can't move up.
+            // The pawn isn't flying or swimming, so he can't move up.
         }
         else if( FAction::CheckStatus( Lunge, FAction::IsActiveStatus ) )
         {
@@ -600,9 +633,9 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         const TActionStatus & Lunge  = Actions[FAction::LungeDown ];
         const TActionStatus & Run    = Actions[FAction::RunDown   ];
         const TActionStatus & Move   = Actions[FAction::MoveDown  ];
-        if( Pawn.bGravity )
+        if( Pawn.bGravity && !Pawn.bIsSwimming )
         {
-            // The pawn can't fly, so he can't move down.
+            // The pawn isn't flying or swimming, so he can't move down.
         }
         else if( FAction::CheckStatus( Lunge, FAction::IsActiveStatus ) )
         {
@@ -650,9 +683,8 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         {
             if( FAction::CheckStatus( Spin, FAction::BySwitchLikeStatus ) )
             {
-                YawAccel -= SpinYawAcceleration;
+                YawAccel -= 2*TurnYawAcceleration;
             }
-            MaxYawSpeed = MaxSpinYawSpeed;
         }
         if( FAction::CheckStatus( Turn, FAction::IsActiveStatus ) )
         {
@@ -674,9 +706,8 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         {
             if( FAction::CheckStatus( Spin, FAction::BySwitchLikeStatus ) )
             {
-                YawAccel += SpinYawAcceleration;
+                YawAccel += 2*TurnYawAcceleration;
             }
-            MaxYawSpeed = MaxSpinYawSpeed;
         }
         if( FAction::CheckStatus( Turn, FAction::IsActiveStatus ) )
         {
@@ -691,14 +722,6 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         const FLOAT & Analog        = PlayerInfo.Movements[PlayerAxis_Yaw].Analog;
         const FLOAT & Differential  = PlayerInfo.Movements[PlayerAxis_Yaw].Differential;
         GGame.PlayerYaw( Pawn, Analog, Differential );
-//tbd: [obsolete due to new rotation handling]
-#if 0
-        if( Analog != 0 )
-        {
-            AnalogYawSpeed = Analog * Degrees(3);
-        }
-        AnalogYawSpeed += Differential * Degrees(30);
-#endif
     }
 
     //---------------------------------------
@@ -708,9 +731,9 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
     {
         const TActionStatus & Spin = Actions[FAction::SpinUp ];
         const TActionStatus & Turn = Actions[FAction::TurnUp ];
-        if( Pawn.bGravity )
+        if( Pawn.bGravity && !Pawn.bIsSwimming )
         {
-            // Do nothing - pawn is not flying.
+            // Do nothing - pawn is not flying or swimming.
         }
         else if( FAction::CheckStatus( Spin, FAction::IsActiveStatus ) )
         {
@@ -729,9 +752,9 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
     {
         const TActionStatus & Spin = Actions[FAction::SpinDown ];
         const TActionStatus & Turn = Actions[FAction::TurnDown ];
-        if( Pawn.bGravity )
+        if( Pawn.bGravity && !Pawn.bIsSwimming )
         {
-            // Do nothing - pawn is not flying.
+            // Do nothing - pawn is not flying or swimming.
         }
         else if( FAction::CheckStatus( Spin, FAction::IsActiveStatus ) )
         {
@@ -757,11 +780,11 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         {
             if( FAction::CheckStatus( Look, FAction::BySwitchLikeStatus ) )
             {
-                Pawn.TargetPitch = Pawn.ViewRot.Pitch + TPositiveAngle( Degrees(5) );
+                Pawn.TargetRot.Pitch = Pawn.ViewRot.Pitch + TPositiveAngle( Degrees(3) );
             }
             if( Pawn.bLimitRotation )
             {
-                LimitPitch( Pawn.TargetPitch );
+                LimitPitch( Pawn.TargetRot.Pitch );
             }
             PlayerChoosesPitch = TRUE;
         }
@@ -789,11 +812,11 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         {
             if( FAction::CheckStatus( Look, FAction::BySwitchLikeStatus ) )
             {
-                Pawn.TargetPitch = Pawn.ViewRot.Pitch - TPositiveAngle( Degrees(5) );
+                Pawn.TargetRot.Pitch = Pawn.ViewRot.Pitch - TPositiveAngle( Degrees(3) );
             }
             if( Pawn.bLimitRotation )
             {
-                LimitPitch( Pawn.TargetPitch );
+                LimitPitch( Pawn.TargetRot.Pitch );
             }
             PlayerChoosesPitch = TRUE;
         }
@@ -811,13 +834,6 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         const FLOAT & Analog        = PlayerInfo.Movements[PlayerAxis_Pitch].Analog;
         const FLOAT & Differential  = PlayerInfo.Movements[PlayerAxis_Pitch].Differential;
         GGame.PlayerPitch( Pawn, Analog, Differential );
-#if 0 //tbd: obsolete 
-        if( Analog != 0 )
-        {
-            Pawn.TargetPitch = TPositiveAngle( Analog*PitchLimit );
-        }
-        Pawn.TargetPitch += TPositiveAngle( Differential * DifferentialPitchChange );
-#endif
     }
 
     //---------------------------------------
@@ -854,15 +870,15 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         const EInventorySet CurrentSet =
             Pawn.iWeapon != INDEX_NONE         ? EInventorySet(FActor::Inventory(Pawn.iWeapon).OwningSet)
         :   Pawn.iRecentWeapons[0]!=INDEX_NONE ? EInventorySet(FActor::Inventory(Pawn.iRecentWeapons[0]).OwningSet)
-        :   INV_NoSet
+        :   INVS_NoSet
         ;
         // Find an inventory item whose set is the smallest one
         // greater than the current set. Also keep track of the smallest
         // set from which the player has an item, in case there is no "next" set.
         INDEX iCheck = Pawn.iInventory;
-        EInventorySet BestSet; // Best set so far, defined only if iBest!=INDEX_NONE.
+        EInventorySet BestSet = INVS_NoSet; // Best set so far, defined only if iBest!=INDEX_NONE.
         BOOL iBest = INDEX_NONE; // Best item found so far, or INDEX_NONE.
-        EInventorySet LowestSet; // Lowest set so far, defined only if iLowest!=INDEX_NONE.
+        EInventorySet LowestSet = INVS_NoSet; // Lowest set so far, defined only if iLowest!=INDEX_NONE.
         BOOL iLowest = INDEX_NONE; // Lowest item found so far, or INDEX_NONE.
         while( iCheck != INDEX_NONE )
         {
@@ -887,9 +903,9 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         const EInventorySet NewSet =
             iBest != INDEX_NONE     ? BestSet
         :   iLowest != INDEX_NONE   ? LowestSet
-        :   INV_NoSet
+        :   INVS_NoSet
         ;
-        if( NewSet != INV_NoSet && ( NewSet != CurrentSet || Pawn.iWeapon==INDEX_NONE )  )
+        if( NewSet != INVS_NoSet && ( NewSet != CurrentSet || Pawn.iWeapon==INDEX_NONE )  )
         {
             Actor.SelectInventorySet(NewSet,FALSE,FALSE);
         }
@@ -904,15 +920,15 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         const EInventorySet CurrentSet =
             Pawn.iWeapon != INDEX_NONE         ? EInventorySet(FActor::Inventory(Pawn.iWeapon).OwningSet)
         :   Pawn.iRecentWeapons[0]!=INDEX_NONE ? EInventorySet(FActor::Inventory(Pawn.iRecentWeapons[0]).OwningSet)
-        :   INV_NoSet
+        :   INVS_NoSet
         ;
         // Find an inventory item whose set is the largest one
         // greater than the current set. Also keep track of the largest
         // set from which the player has an item, in case there is no "previous" set.
         INDEX iCheck = Pawn.iInventory;
-        EInventorySet BestSet; // Best set so far, defined only if iBest!=INDEX_NONE.
+        EInventorySet BestSet = INVS_NoSet; // Best set so far, defined only if iBest!=INDEX_NONE.
         BOOL iBest = INDEX_NONE; // Best item found so far, or INDEX_NONE.
-        EInventorySet HighestSet; // Highest set so far, defined only if iLowest!=INDEX_NONE.
+        EInventorySet HighestSet = INVS_NoSet; // Highest set so far, defined only if iLowest!=INDEX_NONE.
         BOOL iHighest = INDEX_NONE; // Highest item found so far, or INDEX_NONE.
         while( iCheck != INDEX_NONE )
         {
@@ -937,9 +953,9 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         const EInventorySet NewSet =
             iBest != INDEX_NONE     ? BestSet
         :   iHighest != INDEX_NONE  ? HighestSet
-        :   INV_NoSet
+        :   INVS_NoSet
         ;
-        if( NewSet != INV_NoSet && ( NewSet != CurrentSet || Pawn.iWeapon==INDEX_NONE )  )
+        if( NewSet != INVS_NoSet && ( NewSet != CurrentSet || Pawn.iWeapon==INDEX_NONE )  )
         {
             Actor.SelectInventorySet(NewSet,FALSE,FALSE);
         }
@@ -972,7 +988,7 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         BOOL WeaponSelected = FALSE;
         for( int Which = FAction::WeaponSet10; !WeaponSelected && Which >= FAction::WeaponSet1; --Which )
         {
-            const EInventorySet Set = EInventorySet( Which-FAction::WeaponSet1 + INV_WeaponSet1 );
+            const EInventorySet Set = EInventorySet( Which-FAction::WeaponSet1 + INVS_WeaponSet1 );
             const FAction::TAction Action = FAction::TAction(Which);
             if( IsActivated(Actions[Action])  )
             {
@@ -1069,12 +1085,12 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
     //---------------------------------------
     //               Jump
     //---------------------------------------
-    const BOOL IsJumping = Pawn.bGravity && IsActivated(Actions[FAction::Jump]);
-    if( !Pawn.bCannotMove )
+    BOOL IsJumping = FALSE;
+    if( IsActivated(Actions[FAction::Jump]) )
     {
-        if( IsJumping )
+        if( !Pawn.bCannotMove && Pawn.bGravity && !Pawn.bIsSwimming )
         {
-            //tba
+            IsJumping = TRUE;
         }
     }
 
@@ -1092,14 +1108,14 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
     const BOOL Zoom = !Pawn.bCannotTurn && FAction::CheckStatus( Actions[FAction::Zoom], FAction::IsActiveStatus );
     if( Zoom )
     {
-        if( Actor.CameraStatus.FOVAngle > 0.3 * GDefaults.FOV)
+        if( Pawn.FovAngle > 0.3 * GDefaults.Fov)
         {
-            Actor.CameraStatus.FOVAngle = Max(Actor.CameraStatus.FOVAngle-4,0.3 * GDefaults.FOV);
+            Pawn.FovAngle = Max(Pawn.FovAngle-4,0.3 * GDefaults.Fov);
         }
     }
-    else if( Actor.CameraStatus.FOVAngle < GDefaults.FOV )
+    else if( Pawn.FovAngle < GDefaults.Fov )
     {
-        Actor.CameraStatus.FOVAngle = Min(Actor.CameraStatus.FOVAngle+4,GDefaults.FOV);
+        Pawn.FovAngle = Min(Pawn.FovAngle+4,GDefaults.Fov);
     }
 
     //---------------------------------------
@@ -1109,7 +1125,7 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
     {
         if( FAction::CheckStatus( Actions[FAction::LookStraight], FAction::IsActiveStatus ) )
         {
-            Pawn.TargetPitch = LevelPitch; // Return player to level pitch.
+            Pawn.TargetRot.Pitch = LevelPitch; // Return player to level pitch.
         }
     }
 
@@ -1170,22 +1186,23 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
     //
     // Adjust view for stairs/inclines
     //
+    const FLOAT CaneDistance = CANE_DISTANCE_FACTOR*Pawn.CollisionRadius;
     FVector CanePoint = Pawn.Location; 
-    CanePoint.AddYawed(CANE_LENGTH,0,Pawn.ViewRot.Yaw);
-    CanePoint.Z += 10.0; // This prevents unstability during angled view of stairs.
+    CanePoint.AddYawed(CaneDistance,0,Pawn.ViewRot.Yaw);
+    CanePoint.Z += Pawn.CollisionRadius*1.20; // This prevents unstability during angled view of stairs.
     BOOL LookUpStair = FALSE;
     BOOL LookDownStair = FALSE;
     INDEX iHitActor;
     if 
     (
             GPreferences.ViewFollowsIncline
-        &&  (Model.LineClass (&Pawn.Location,&CanePoint) 
-        &&  (Model.ZCollision(&Pawn.Location,&Floor,&iHitActor)!=MAXWORD))
+        &&  (Model.LineClass (Pawn.Location,CanePoint,0) 
+        &&  (Model.ZCollision(Pawn.Location,Floor,iHitActor,0)!=INDEX_NONE))
     )
     {
         INDEX        iFloorNode;
         FVector        CaneFloor;
-        iFloorNode=Model.ZCollision(&CanePoint,&CaneFloor,&iHitActor);
+        iFloorNode=Model.ZCollision(CanePoint,CaneFloor,iHitActor,0);
         if( iFloorNode != INDEX_NONE )
         {
             FBspNode * FloorNode = &Model.BspNodes [iFloorNode];
@@ -1196,7 +1213,7 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
                 FVector * FloorNormal = &Model.FVectors [FloorPoly->vNormal];
                 if( FloorNormal->Z > 0.707 ) // Upward angle of floor normal >= 45 degrees?
                 {
-                    FLOAT Slope = (Floor.Z - CaneFloor.Z)/CANE_LENGTH; // Slope of view.
+                    FLOAT Slope = (Floor.Z - CaneFloor.Z)/CaneDistance; // Slope of view.
                     if( (Slope > +MIN_STAIR_SLOPE) && (Slope <= +MAX_STAIR_SLOPE) ) 
                     {
                         LookUpStair = TRUE;
@@ -1215,48 +1232,53 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
     }
     else if( LookUpStair )
     {
-        Pawn.TargetPitch = PLAYER_STAIR_UP_PITCH;
+        Pawn.TargetRot.Pitch = PLAYER_STAIR_UP_PITCH;
         Pawn.bLookingAlongStair = TRUE;
+        Pawn.LookTimer = PlayerAutoLevelDelay;
     }
     else if( LookDownStair )
     {
-        Pawn.TargetPitch = PLAYER_STAIR_DOWN_PITCH;
+        Pawn.TargetRot.Pitch = PLAYER_STAIR_DOWN_PITCH;
         Pawn.bLookingAlongStair = TRUE;
+        Pawn.LookTimer = PlayerAutoLevelDelay;
     }
     else if( Pawn.bLookingAlongStair )
     {
-        // No longer looking up/down stairs - level the view.
-        Pawn.TargetPitch = 0;
-        Pawn.bLookingAlongStair = FALSE;
+        if( Pawn.LookTimer > 0 )
+        {
+            Pawn.LookTimer--;
+        }
+        else
+        {
+            // No longer looking up/down stairs - level the view.
+            Pawn.TargetRot.Pitch = 0;
+            Pawn.bLookingAlongStair = FALSE;
+        }
     }
 
-    //if (Pawn.Velocity.Z != 0.0) TargetPitch = (SWORD)(8192.0*(Pawn.Velocity.Z/MAX_FALLING_Z_SPEED));
-    //
     // Update yaw rotation:
-    //
-    if (OurSgn(Pawn.YawSpeed)!=OurSgn(YawAccel)) Pawn.YawSpeed = 0;
-    Pawn.YawSpeed += YawAccel;
-    //
-    if (OurAbs(Pawn.YawSpeed) > MaxYawSpeed) Pawn.YawSpeed = OurSgn (Pawn.YawSpeed) * MaxYawSpeed;
-    Pawn.ViewRot.Yaw += Pawn.YawSpeed;
-
-    const TSignedAngle TargetPitch = SignedAngle(Pawn.TargetPitch);
-    const TSignedAngle ExpectedPitch = SignedAngle(Pawn.ViewRot.Pitch+Pawn.PitchSpeed);
-    const int Change = int(TargetPitch) - int(ExpectedPitch);
-    if( OurAbs(Change) <= PLAYER_PITCH_ZERO )
     {
-        Pawn.ViewRot.Pitch = Pawn.TargetPitch;        
-        Pawn.PitchSpeed = 0;
+        Pawn.RotSpeed.Yaw = Pawn.RotSpeed.Yaw * 3 / 4; // Damp current speed
+        Pawn.RotSpeed.Yaw += YawAccel;
+        Pawn.ViewRot.Yaw  += Pawn.RotSpeed.Yaw;
+    }
+
+    const TSignedAngle TargetRotPitch = SignedAngle(Pawn.TargetRot.Pitch);
+    const TSignedAngle ExpectedPitch = SignedAngle(Pawn.ViewRot.Pitch+Pawn.RotSpeed.Pitch);
+    const int Change = int(TargetRotPitch) - int(ExpectedPitch);
+    if( PlayerChoosesPitch || Abs(Change) <= PLAYER_PITCH_ZERO )
+    {
+        Pawn.ViewRot.Pitch = Pawn.TargetRot.Pitch;        
+        Pawn.RotSpeed.Pitch = 0;
     }
     else
     {
-        Pawn.PitchSpeed += Change/PitchAccelerationRatio;
+        Pawn.RotSpeed.Pitch += Change/PitchAccelerationRatio;
     }    
 
     const TSignedAngle PreviousPitch = SignedAngle(Pawn.ViewRot.Pitch);
     // Add in the pitch motion:
-    if (OurAbs(Pawn.PitchSpeed) > MaxPitchSpeed) Pawn.PitchSpeed = OurSgn (Pawn.PitchSpeed) * MaxPitchSpeed;
-    Pawn.ViewRot.Pitch = Pawn.ViewRot.Pitch + Pawn.PitchSpeed;
+    Pawn.ViewRot.Pitch += Pawn.RotSpeed.Pitch;
     if( Pawn.bLimitRotation )
     {
         LimitPitch( Pawn.ViewRot.Pitch );
@@ -1264,174 +1286,215 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
 
     if
     ( 
-        OurAbs(Pawn.ViewRot.Pitch-Pawn.TargetPitch) <= PLAYER_PITCH_ZERO 
-    ||  OurSgn(SignedAngle(Pawn.ViewRot.Pitch)-SignedAngle(Pawn.TargetPitch)) != OurSgn(PreviousPitch-SignedAngle(Pawn.TargetPitch)) // Did we overshoot?
+        Abs(Pawn.ViewRot.Pitch-Pawn.TargetRot.Pitch) <= PLAYER_PITCH_ZERO 
+    ||  Sgn(SignedAngle(Pawn.ViewRot.Pitch)-SignedAngle(Pawn.TargetRot.Pitch)) != Sgn(PreviousPitch-SignedAngle(Pawn.TargetRot.Pitch)) // Did we overshoot?
     )
     {
-        Pawn.ViewRot.Pitch = Pawn.TargetPitch;        
-        Pawn.PitchSpeed = 0; 
+        Pawn.ViewRot.Pitch = Pawn.TargetRot.Pitch;        
+        Pawn.RotSpeed.Pitch = 0; 
     }
     else
     {
-        Pawn.PitchSpeed = Pawn.PitchSpeed * 3 / 4; // Damp the pitch speed
+        Pawn.RotSpeed.Pitch = Pawn.RotSpeed.Pitch * 3 / 4; // Damp the pitch speed
     }
 
-//tbd:[obsolete due to new rotation handling]    Pawn.ViewRot.Yaw  += AnalogYawSpeed;
     //
     // Now move with collision
     //
     //tbi? Performance:
     FVector Acceleration = GMath.ZeroVector;
-
-//tba?    const int AccelerationPitchFactor = 1000; //tbm
-//tba?    int ForwardAccelerationPitchAdjustment = 0;
-
-//tba?    if( ForwardAcceleration != 0 )
-//tba?    {
-//tba?        // Pitch the view a little forward when accelerating forward
-//tba?        // (as the player leans into a run) or a little backward when
-//tba?        // accelerating backward (as the player leans back to stop).
-//tba?        ForwardAccelerationPitchAdjustment = -ForwardAcceleration * AccelerationPitchFactor;
-//tba?    }
-
-    Acceleration.AddYawed
-    ( 
-        ForwardAcceleration
-    ,   RightwardAcceleration
-    ,   Pawn.ViewRot.Yaw 
-    );
-    Acceleration.Z += UpwardAcceleration; //tbi: This should be relative to the pawn's orientation.    
     FVector AnalogAcceleration = GMath.ZeroVector;
-    AnalogAcceleration.AddYawed
-    (
-        ForwardAnalogAcceleration
-    ,   RightwardAnalogAcceleration
-    ,   Pawn.ViewRot.Yaw
-    );
-    AnalogAcceleration.Z += UpwardAnalogAcceleration; //tbi: This should be relative to the pawn's orientation.    
 
-
-    // Update pawn's velocity
-    // We do this even though the pawn might be falling, and he really shouldn't
-    // be able to change direction or speed.
+    if( Pawn.bIsSwimming || !Pawn.bGravity )
     {
+        // Motion includes direction that view is pitched...
+        FVector ViewVector = Pawn.ViewRot.Vector();
+        Acceleration += ViewVector * ForwardAcceleration;
+        AnalogAcceleration += ViewVector * ForwardAnalogAcceleration;
+        Acceleration.AddYawed
+        ( 
+            0
+        ,   RightwardAcceleration
+        ,   Pawn.ViewRot.Yaw 
+        );
+        AnalogAcceleration.AddYawed
+        (
+            0
+        ,   RightwardAnalogAcceleration
+        ,   Pawn.ViewRot.Yaw
+        );
+    }
+    else
+    {
+        Acceleration.AddYawed
+        ( 
+            ForwardAcceleration
+        ,   RightwardAcceleration
+        ,   Pawn.ViewRot.Yaw 
+        );
+        AnalogAcceleration.AddYawed
+        (
+            ForwardAnalogAcceleration
+        ,   RightwardAnalogAcceleration
+        ,   Pawn.ViewRot.Yaw
+        );
+    }
+    Acceleration.Z += UpwardAcceleration;
+    AnalogAcceleration.Z += UpwardAnalogAcceleration;
 
-        Pawn.Velocity += Acceleration;
-        Pawn.Velocity += AnalogAcceleration;
+    Acceleration *= ControlFactor;
+    AnalogAcceleration *= ControlFactor;
+    Acceleration += AnalogAcceleration;
 
-        //------------------------------------------------------------------------
-        //     Adjust impulse towards target speeds, if needed
-        //------------------------------------------------------------------------
-        if ( TargetForwardSpeed != 0 || TargetRightwardSpeed != 0 || TargetUpwardSpeed != 0 )
+    Pawn.Velocity += Acceleration; // <===== Here we update the pawn's velocity
+
+    //------------------------------------------------------------------------
+    //     Adjust impulse towards target speeds, if needed
+    //------------------------------------------------------------------------
+    if ( TargetForwardSpeed != 0 || TargetRightwardSpeed != 0 || TargetUpwardSpeed != 0 )
+    {
+        // We have a target speed - a speed which we are trying to achieve, as opposed
+        // to simple impulsive accelerations. But these targets are relative to the
+        // direction the pawn is oriented, so we need to know the current velocity
+        // of the pawn relative to its orientation.
+
+        //tbi: Is this too inefficient?...
+        FCoords Coords = GMath.CameraViewCoords;
+        Coords.DeTransformByRotation( Pawn.ViewRot );
+        FVector CurrentSpeeds = Pawn.Velocity;
+        CurrentSpeeds.TransformVector( Coords ); // Speeds along line of view.
+        // This is a little weird, but CurrentSpeeds now has the following
+        // components:
+        const FLOAT CurrentForwardSpeed   =  CurrentSpeeds.Z;
+        const FLOAT CurrentRightwardSpeed =  CurrentSpeeds.X;
+        const FLOAT CurrentUpwardSpeed    = -CurrentSpeeds.Y;
+
+        FLOAT ForwardAdjustment   = 0.0;
+        FLOAT RightwardAdjustment = 0.0;
+        FLOAT UpwardAdjustment    = 0.0;
+
+        if( TargetForwardSpeed != 0 ) // (0 means there is no target)
         {
-            // We have a target speed - a speed which we are trying to achieve, as opposed
-            // to simple impulsive accelerations. But these targets are relative to the
-            // direction the pawn is oriented, so we need to know the current velocity
-            // of the pawn relative to its orientation.
-
-            //tbi: Is this too inefficient?...
-            FCoords Coords = GMath.CameraViewCoords;
-            Coords.DeTransformByRotation( Pawn.ViewRot );
-            FVector CurrentSpeeds = Pawn.Velocity;
-            CurrentSpeeds.TransformVector( Coords ); // Speeds along line of view.
-            // This is a little weird, but CurrentSpeeds now has the following
-            // components:
-            const FLOAT CurrentForwardSpeed   =  CurrentSpeeds.Z;
-            const FLOAT CurrentRightwardSpeed =  CurrentSpeeds.X;
-            const FLOAT CurrentUpwardSpeed    = -CurrentSpeeds.Y;
-
-            FLOAT ForwardAdjustment   = 0.0;
-            FLOAT RightwardAdjustment = 0.0;
-            FLOAT UpwardAdjustment    = 0.0;
-
-            if( TargetForwardSpeed != 0 ) // (0 means there is no target)
+            const FLOAT Difference = TargetForwardSpeed - CurrentForwardSpeed;
+            if( Difference > 0 ) // Do we need to speed up towards the target?
             {
-                const FLOAT Difference = TargetForwardSpeed - CurrentForwardSpeed;
-                if( Difference > 0 ) // Do we need to speed up towards the target?
-                {
-                    ForwardAdjustment += Min(2.0*DefaultForwardAcceleration,Difference);    
-                }
-                else if( Difference < 0 ) // Do we need to slow down towards the target?
-                {
-                    ForwardAdjustment -= Min(2.0*DefaultForwardAcceleration,-Difference);    
-                }
+                ForwardAdjustment += Min(2.0*DefaultForwardAcceleration,Difference);    
             }
-            if( TargetRightwardSpeed != 0 ) // (0 means there is no target)
+            else if( Difference < 0 ) // Do we need to slow down towards the target?
             {
-                const FLOAT Difference = TargetRightwardSpeed - CurrentRightwardSpeed;
-                if( Difference > 0 ) // Do we need to speed up towards the target?
-                {
-                    RightwardAdjustment += Min(2.0*DefaultRightwardAcceleration,Difference);    
-                }
-                else if( Difference < 0 ) // Do we need to slow down towards the target?
-                {
-                    RightwardAdjustment -= Min(2.0*DefaultRightwardAcceleration,-Difference);    
-                }
-            }
-            Pawn.Velocity.AddYawed( ForwardAdjustment, RightwardAdjustment, Pawn.ViewRot.Yaw );
-            //tba: UpwardAdjustment
-
-        }
-
-        //------------------------------------------------------------------------
-        // Adjust the velocity back towards MaxSpeed or towards Pawn.DesiredSpeed
-        //------------------------------------------------------------------------
-        if( Pawn.DesiredSpeed != 0 && MaxSpeed > Pawn.DesiredSpeed )
-        {
-            MaxSpeed = Pawn.DesiredSpeed;
-        }
-        //tbi: We must consider his .Z speed, and take care in limiting the
-        // X- and Y- speeds of a falling object, otherwise, the large Z
-        // speed will dominate the total speed and force reduction of the
-        // X- and Y- speeds. This is okay for an upward speed, but not for
-        // a downward speed.
-        FLOAT Speed = Pawn.Velocity.Size2D();
-        if( Speed > MaxSpeed )
-        {
-            FLOAT SlowDownFactor = Max( MaxSpeed / Speed, VelocityDamping );
-            Pawn.Velocity.X *= SlowDownFactor;
-            Pawn.Velocity.Y *= SlowDownFactor;
-            Speed *= SlowDownFactor;
-        }
-        if( Pawn.DesiredSpeed == 0 )
-        {
-        }
-        else if( Speed > Pawn.DesiredSpeed )
-        {
-            const FLOAT SlowDownFactor = Max( Pawn.DesiredSpeed / Speed, VelocityDamping );
-            Pawn.Velocity.X *= SlowDownFactor;
-            Pawn.Velocity.Y *= SlowDownFactor;
-            Speed *= SlowDownFactor;
-        }
-        else // Speed < Pawn.DesiredSpeed
-        {
-            const FLOAT SpeedUpFactor = Min( Pawn.DesiredSpeed / Speed, 1.1 );
-            Pawn.Velocity.X *= SpeedUpFactor;
-            Pawn.Velocity.Y *= SpeedUpFactor;
-            Speed *= SpeedUpFactor;
-        }
-
-        if( Speed < StopThresholdSpeed )
-        {
-            const FLOAT SlowDownFactor = 0;
-            Pawn.Velocity.X *= SlowDownFactor;
-            Pawn.Velocity.Y *= SlowDownFactor;
-            Speed *= SlowDownFactor;
-        }
-
-   
-        // Use the current speed to determine if the view should be leveled:
-        if( !PlayerChoosesPitch && !Pawn.bLookingAlongStair && Speed > NormalSpeed/2.0)
-        {
-            if( Speed > 1.0 )
-            {
-                Pawn.TargetPitch = 0;
+                ForwardAdjustment -= Min(2.0*DefaultForwardAcceleration,-Difference);    
             }
         }
+        if( TargetRightwardSpeed != 0 ) // (0 means there is no target)
+        {
+            const FLOAT Difference = TargetRightwardSpeed - CurrentRightwardSpeed;
+            if( Difference > 0 ) // Do we need to speed up towards the target?
+            {
+                RightwardAdjustment += Min(2.0*DefaultRightwardAcceleration,Difference);    
+            }
+            else if( Difference < 0 ) // Do we need to slow down towards the target?
+            {
+                RightwardAdjustment -= Min(2.0*DefaultRightwardAcceleration,-Difference);    
+            }
+        }
+        ForwardAdjustment *= ControlFactor;
+        RightwardAdjustment *= ControlFactor;
+        Pawn.Velocity.AddYawed( ForwardAdjustment, RightwardAdjustment, Pawn.ViewRot.Yaw );
+        if( TargetUpwardSpeed != 0 ) // (0 means there is no target)
+        {
+            const FLOAT Difference = TargetUpwardSpeed - CurrentUpwardSpeed;
+            if( Difference > 0 ) // Do we need to speed up towards the target?
+            {
+                UpwardAdjustment += Min(2.0*DefaultUpwardAcceleration,Difference);    
+            }
+            else if( Difference < 0 ) // Do we need to slow down towards the target?
+            {
+                UpwardAdjustment -= Min(2.0*DefaultUpwardAcceleration,-Difference);    
+            }
+            UpwardAdjustment *= ControlFactor;
+            Pawn.Velocity.Z += UpwardAdjustment;
+        }
+
     }
 
+    //------------------------------------------------------------------------
+    // Adjust the velocity back towards MaxSpeed or towards Pawn.DesiredSpeed
+    //------------------------------------------------------------------------
+    if( Pawn.DesiredSpeed != 0 && MaxSpeed > Pawn.DesiredSpeed )
+    {
+        MaxSpeed = Pawn.DesiredSpeed;
+    }
+    //tbi: We must consider his .Z speed, and take care in limiting the
+    // X- and Y- speeds of a falling object, otherwise, the large Z
+    // speed will dominate the total speed and force reduction of the
+    // X- and Y- speeds. This is okay for an upward speed, but not for
+    // a downward speed.
+    FVector TestVelocity = Pawn.Velocity;
+    FVector VelocityAdjustment;
+    if( Pawn.bGravity )
+    {
+        //todo: Explain
+        VelocityAdjustment = GMath.ZeroVector;
+        VelocityAdjustment.Z = Pawn.Velocity.Z;
+    }
+    else
+    {
+        VelocityAdjustment = Gravity;
+        VelocityAdjustment *= 1.0 - VelocityDamping; // Estimate of velocity due to gravity
+    }
+    TestVelocity -= VelocityAdjustment;
+    Pawn.Velocity -= TestVelocity;
+    FLOAT Speed = TestVelocity.Size();
+    if( TRUE ) //todo: Not sure if this will be needed
+    {
+        if( Speed > MaxSpeed )
+        {
+            FLOAT SlowDownFactor = Max( MaxSpeed / Speed, 0.9 );
+
+            TestVelocity.X *= SlowDownFactor;
+            TestVelocity.Y *= SlowDownFactor;
+            Speed *= SlowDownFactor;
+        }
+    }
+    if( Pawn.DesiredSpeed == 0 || Pawn.DesiredSpeed == MaxSpeed )
+    {
+    }
+    else if( Speed > Pawn.DesiredSpeed )
+    {
+        const FLOAT SlowDownFactor = Max( Pawn.DesiredSpeed / Speed, VelocityDamping );
+        TestVelocity.X *= SlowDownFactor;
+        TestVelocity.Y *= SlowDownFactor;
+        Speed *= SlowDownFactor;
+    }
+    else // Speed < Pawn.DesiredSpeed
+    {
+        const FLOAT SpeedUpFactor = Min( Pawn.DesiredSpeed / Speed, 1.1 );
+        TestVelocity.X *= SpeedUpFactor;
+        TestVelocity.Y *= SpeedUpFactor;
+        Speed *= SpeedUpFactor;
+    }
+    Pawn.Velocity += TestVelocity;
+
+    if( Speed < StopThresholdSpeed )
+    {
+        const FLOAT SlowDownFactor = 0;
+        Pawn.Velocity.X *= SlowDownFactor;
+        Pawn.Velocity.Y *= SlowDownFactor;
+        Speed *= SlowDownFactor;
+    }
+
+
+    // Use the current speed to determine if the view should be leveled:
+    if( !PlayerChoosesPitch && !Pawn.bLookingAlongStair && Speed > NormalSpeed/2.0)
+    {
+        if( Speed > 1.0 )
+        {
+            Pawn.TargetRot.Pitch = 0;
+        }
+    }
+    
     FLOAT FallingVelocity = Pawn.Velocity.Z;
-    if (Model.PointClass (&Pawn.Location,NULL) != 0)
+    if (Model.PointClass (Pawn.Location,NULL,0) != 0)
     {
         INDEX iCollisionNode;
 		INDEX iHitActor;
@@ -1439,25 +1502,34 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
 		// Here we add new logic to handle message dispatching when players
 		// move on and off of moving brushes.
 
-        iCollisionNode = Model.ZCollision(&Pawn.Location,&Floor,&iHitActor);
-        if (Pawn.bGravity && iCollisionNode != MAXWORD) // Don't fall if standing on air
+        iCollisionNode = Model.ZCollision(Pawn.Location,Floor,iHitActor,0);
+        if (Pawn.bGravity && iCollisionNode != INDEX_NONE) // Don't fall if standing on air
         {
             FBspNode * FloorNode    = &Model.BspNodes [iCollisionNode];
             FBspSurf * FloorPoly    = &Model.BspSurfs [FloorNode->iSurf];
             FVector  * FloorNormal  = &Model.FVectors [FloorPoly->vNormal];
             //
-            if ((FloorNormal->Z < RAMP_MAX_Z_NORM) && (FloorNormal->Z > RAMP_MIN_Z_NORM)) // Ramp
-                {
+            if
+            (
+                !Pawn.bIsSwimming
+            &&  FloorNormal->Z < RAMP_MAX_Z_NORM  // Ramp?
+            &&  FloorNormal->Z > RAMP_MIN_Z_NORM  // Ramp?
+            )
+            {
                 Pawn.Velocity.X += 0.30 * (FloorNormal->X - 0.10) / FloorNormal->Z;
                 Pawn.Velocity.Y += 0.30 * (FloorNormal->Y - 0.10) / FloorNormal->Z;
-                }
+            }
             DZ = Pawn.Location.Z - Floor.Z - Pawn.CollisionHeight; // +0.0 means exactly on floor
             if ((DZ <= MAX_SMOOTH_STAIR_DIST) && (Pawn.Velocity.Z <= 0.0)  )
             {                        
                 // Standing on ground (may be climbing or descending stairs):
                 if (IsJumping)            
                 {
-                    Pawn.Velocity.Z = +40.0;
+                    Pawn.Velocity.Z = +30.0;
+                    if( GCheat->ShowPawnPhysics )
+                    {
+                        debugf( LOG_Info, "%s jumps: velocity.z=%2.2f", Pawn.Class->Name, Pawn.Velocity.Z );
+                    }
                 }
                 else
                 {
@@ -1470,7 +1542,7 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
             {
                 // Falling:
                 Pawn.Velocity += Gravity;
-                Pawn.Velocity *= 0.92; 
+                //todo: [Delete, we now use JumpDamping] Pawn.Velocity *= 0.92; 
                 FallingVelocity = Pawn.Velocity.Z;
 				// Detach from moving floor if we're falling but not jumping
 				if (!IsJumping)
@@ -1504,28 +1576,31 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
 			Level.SendMessage(Actor.iFloor,ACTOR_SteppedOn, &Actor.iMe);
 			//bug ("Moved onto floor");
 		}
-		//!!TIM - END CHANGES
 
         if (Pawn.bGravity && Pawn.Velocity.Z < -MAX_FALLING_Z_SPEED)
-            {
+        {
             Pawn.Velocity.Z = -MAX_FALLING_Z_SPEED; // Drag
+            if( Pawn.bIsSwimming )
+            {
+                Pawn.Velocity.Z *= Pawn.WaterSinkRate;
             }
-        //debugf(LOG_Info, " %p:%s [%3f %3f %3f]", &Actor, Actor.Class->Name,Actor.Location.X,Actor.Location.Y, Actor.Location.Z );
+        }
+
         Level.MoveActor(iActor,&Pawn.Velocity);
-        //debugf(LOG_Info, "    ==> %p:%s [3f %3f %3f]", &Actor, Actor.Class->Name,Actor.Location.X,Actor.Location.Y, Actor.Location.Z );
         //
         // Keep player from falling on her butt (where bounding sphere is resting
         // on floor and line is dangling in midair):
         //
-        iCollisionNode = Model.ZCollision(&Pawn.Location,&Floor,&iHitActor);
-        if( Pawn.bGravity  && ( iCollisionNode != MAXWORD))
+        iCollisionNode = Model.ZCollision(Pawn.Location,Floor,iHitActor,0);
+        if( Pawn.bGravity && !Pawn.bIsSwimming && ( iCollisionNode != INDEX_NONE))
         {
             const BOOL WasOnSurface = Pawn.bIsOnSurface;
             DZ = Pawn.Location.Z - Floor.Z - Pawn.CollisionHeight; // +0.0 means exactly on floor
             if (DZ > MAX_SMOOTH_STAIR_DIST)
             {
-                MoveVector = Level.GetZoneGravityAcceleration(iActor);
-                Level.MoveActor(iActor,&MoveVector);
+                //? FVector             MoveVector;
+                //? MoveVector = Level.GetZoneGravityAcceleration(iActor);
+                //? Level.MoveActor(iActor,&MoveVector);
                 Pawn.bIsOnSurface = FALSE;
             }
             else
@@ -1551,6 +1626,10 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
             if( !WasOnSurface && Pawn.bIsOnSurface )
             {
                 // The pawn just landed - check to see how far it fell.
+                //todo: It would be better to use the speed of impact!
+                // But currently the player's terminal velocity is fairly
+                // small, so we can't differentiate a large fall from a small
+                // one using velocity alone.
                 const FLOAT FallDistance = Pawn.LastNonFallZ - Pawn.Location.Z;
                 const FLOAT SafeDistance = 700;
                 if( FallDistance > SafeDistance )
@@ -1560,6 +1639,22 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
                     HitInfo.Damage[DMT_Basic] = (FallDistance-SafeDistance)/50;
                     Actor.Send_Hit(HitInfo);
                 }
+                if( GCheat->ShowPawnPhysics )
+                {
+                    const FVector Movement = Pawn.Location - LastPointOnSurface;
+                    debugf
+                    ( 
+                        LOG_Info
+                    ,   "%s Surface-surface movement: dXY=%2.2f dZ=%2.2f"
+                    ,   Pawn.Class->Name
+                    ,   Movement.Size2D()
+                    ,   Movement.Z
+                    );
+                }
+            }
+            if( Pawn.bIsOnSurface )
+            {
+                LastPointOnSurface = Pawn.Location;
             }
         }
     }
@@ -1576,10 +1671,13 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
         (GPreferences.StillViewBobs ? STILL_BOB_HEIGHT : 0 )
     +   (GPreferences.MovingViewBobs ? PLAYER_WALK_BOB_HEIGHT : 0 )
          * Pawn.Velocity.Size()
-    ) / Pawn.NormalSpeed
-    ;
+    ) / RunSpeed;
+    if( Pawn.bIsSwimming )
+    {
+        BobAmplitude *= 1.30;
+    }
     Pawn.Bob   = (IsCrouching?PLAYER_CROUCH_HEIGHT:0.0) +
-        OurMin(BobAmplitude,(FLOAT)PLAYER_MAX_BOB_HEIGHT) *
+        Min(BobAmplitude,(FLOAT)PLAYER_MAX_BOB_HEIGHT) *
         GMath.CosTab(((WORD)(65536.0 * PLAYER_BOB_PER_SEC * (FLOAT)GServer.Ticks/(FLOAT)GServer.Rate)));
     //
     // Final eyeheight computation: Combine components, smoothly move to destination,
@@ -1591,14 +1689,8 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
     // roll when cornering.
     //
     FVector AdjustedVelocity = Pawn.Velocity + AnalogAcceleration;
-    //tbd: [obsolete] SWORD   AdjustedYawSpeed = Pawn.YawSpeed + AnalogYawSpeed;
-    //
-    // Update pitch:
-    //
-    //TargetPitch += 128.0*AdjustedVelocity.GetYawedNormal(Pawn.ViewRot.Yaw); /* Annoying */
-    //
+
     // Update roll:
-    //
     static FLOAT RollFactor = 1.2;
     if( GCheat->Adjustment == FCheat::AdjustPlayerViewRoll )
     {
@@ -1617,12 +1709,12 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
             );
         }
         Pawn.ViewRot.Roll += ((SWORD)Pawn.DrawRot.Roll - (SWORD)Pawn.ViewRot.Roll)/PLAYER_ROLL_SNAPBACK_RATIO;
-        if (OurAbs((SWORD)Pawn.ViewRot.Roll)<PLAYER_ROLL_ZERO) Pawn.ViewRot.Roll = 0;
+        if (Abs((SWORD)Pawn.ViewRot.Roll)<PLAYER_ROLL_ZERO) Pawn.ViewRot.Roll = 0;
         Pawn.EyeHeight -= DZ * EYEHEIGHT_DECELERATION_CF;
         if (Pawn.EyeHeight < -Pawn.CollisionRadius*0.80) Pawn.EyeHeight = -Pawn.CollisionRadius*0.80;
         if (Pawn.EyeHeight > +Pawn.CollisionRadius*0.80) Pawn.EyeHeight = +Pawn.CollisionRadius*0.80;
     }
-    if( !Pawn.bGravity || Pawn.bIsOnSurface )
+    if( !Pawn.bGravity || Pawn.bIsSwimming || Pawn.bIsOnSurface )
     {
         //tbi: This is duplicated here and in APawn::Process
         Pawn.LastNonFallZ = Pawn.Location.Z;
@@ -1630,6 +1722,46 @@ int FGame::PlayerTick(INDEX iActor, void *Params)
 
     ShowPlayerStat(Pawn);
 
+    if( GCheat->ShowPawnPhysics ) 
+    {
+        char Message[100];
+        // Show changes in speed...
+        {
+            static char LastMessage[100];
+
+            const FLOAT Speed = Pawn.Velocity.Size();
+            const FLOAT XYSpeed = Pawn.Velocity.Size2D();
+            sprintf
+            (
+                Message
+            ,   "%s speed: %2.1f XY-Speed: %2.1f MaxSpeed: %2.1f"
+            ,   Pawn.Class->Name
+            ,   Speed
+            ,   XYSpeed
+            ,   MaxSpeed 
+            );
+            if( strcmp(Message,LastMessage) != 0 )
+            {
+                debug( LOG_Info, Message );
+                strcpy( LastMessage, Message );
+            }
+        }
+        if( !Pawn.bIsOnSurface && Pawn.bGravity && !Pawn.bIsSwimming )
+        {
+            // Check for apex of a jump (when velocity changes from >= 0 to < 0).
+            if( OriginalVelocityZ >= 0 && Pawn.Velocity.Z < 0 )
+            {
+                const FLOAT Height = OriginalZ - LastPointOnSurface.Z;
+                debugf
+                ( 
+                    LOG_Info
+                ,   "%s jumped: %2.1f high"
+                ,   Pawn.Class->Name
+                ,   Height
+                );
+            }
+        } 
+    }
     return ProcessDone; // Successfully processed message
     UNGUARD("playerTick");
 }

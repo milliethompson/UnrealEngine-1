@@ -7,29 +7,26 @@ Compiled with Visual C++ 4.0.
 Description:
     Refer to the associated header file.
 
-* N O T E *
-    todo: This is to be moved to the Windows project!
-
 Revision history:
     * 06/04/96: Created by Mark
 ==============================================================================*/
 
+#include "StdAfx.h"
 #include "UnInputP.h"
 #include <windows.h>
 #include "UnChecks.h"
-#include "unaction.h" //tbd!
 
 #define ShowSwitchChanges   0 // 1 to show each switch change, 0 otherwise.
 #define ShowMovements       0 // 1 to show each movement, 0 otherwise.
 #define ShowMovementRanges  0 // 1 to show each movement, 0 otherwise.
 #define ShowJoystickChanges 0 // 1 to show each change in joystick state, 0 otherwise.
 
-#define Debugging 0 
+#define InputDebugging 0 
 
 static const int MaxHatPosition = 35900; // Maximum position of hat switch
 
-#if Debugging
-    static void __cdecl Debug(const char * Message, ...)
+#if InputDebugging
+    static void CDECL Debug(const char * Message, ...)
     {
         char Text[1000];
         va_list ArgumentList;
@@ -39,18 +36,18 @@ static const int MaxHatPosition = 35900; // Maximum position of hat switch
         debugf(LOG_INFO,Text);
     }
 #else
-    static inline void __cdecl Debug(const char * Message, ...)
+    static inline void CDECL Debug(const char * Message, ...)
     {
     }
 #endif
 
 
-static const int MouseHalfRangeX = 320; 
-static const int MouseHalfRangeY = 200; 
+//todo: [Delete] static const int MouseHalfRangeX = 320; 
+//todo: [Delete] static const int MouseHalfRangeY = 200; 
+
+FPlatformInput GPlatformInput;
 
 #define arrayCount_(Array) ( sizeof(Array) / sizeof((Array)[0]) )
-
-FPlatformInput::TSwitch FPlatformInput::WindowsKeySwitches[256];
 
 struct TDeviceInfo
 {
@@ -271,22 +268,22 @@ static const TSwitchInfo SwitchesInfo[FPlatformInput::SwitchCount] =
     #undef JOY2    
 };
 
-FPlatformInput::TDevice FPlatformInput::Device(TSwitch Switch)
+FPlatformInput::TDevice FPlatformInput::Device(TSwitch Switch) const
 {
     return SwitchesInfo[Switch].Device;
 }
 
-BOOL FPlatformInput::IsTypingKey(TSwitch Switch)
+BOOL FPlatformInput::IsTypingKey(TSwitch Switch) const
 {
     return SwitchesInfo[Switch].IsTypingKey;
 }
 
-const char * FPlatformInput::Abbreviation(TSwitch Switch)
+const char * FPlatformInput::Abbreviation(TSwitch Switch) const
 {
     return SwitchesInfo[Switch].Abbreviation;
 }
 
-const char * FPlatformInput::Description(TSwitch Switch)
+const char * FPlatformInput::Description(TSwitch Switch) const
 {
     return SwitchesInfo[Switch].Description;
 }
@@ -357,37 +354,37 @@ static const TMoveInfo MovesInfo[FPlatformInput::MovementCount] =
     #undef D       
 };
 
-FPlatformInput::TDevice FPlatformInput::Device(TMovement Movement)
+FPlatformInput::TDevice FPlatformInput::Device(TMovement Movement) const
 {
     return MovesInfo[Movement].Device;
 }
 
-const char * FPlatformInput::Abbreviation(TMovement Movement)
+const char * FPlatformInput::Abbreviation(TMovement Movement) const
 {
     return MovesInfo[Movement].Abbreviation;
 }
 
-const char * FPlatformInput::Description(TMovement Movement)
+const char * FPlatformInput::Description(TMovement Movement) const
 {
     return MovesInfo[Movement].Description;
 }
 
-const char * FPlatformInput::NeutralDescription(TMovement Movement)
+const char * FPlatformInput::NeutralDescription(TMovement Movement) const
 {
     return MovesInfo[Movement].NeutralDescription;
 }
 
-FPlatformInput::TMovement FPlatformInput::OppositeMovement(TMovement Movement)
+FPlatformInput::TMovement FPlatformInput::OppositeMovement(TMovement Movement) const
 {
     return MovesInfo[Movement].OppositeMovement;
 }
 
-BOOL FPlatformInput::IsPositive(TMovement Movement)
+BOOL FPlatformInput::IsPositive(TMovement Movement) const
 {
     return MovesInfo[Movement].IsPositive;
 }
 
-FPlatformInput::TMovementKind FPlatformInput::DefaultMovementKind(TMovement Movement)
+FPlatformInput::TMovementKind FPlatformInput::DefaultMovementKind(TMovement Movement) const
 {
     return MovesInfo[Movement].DefaultKind;
 }
@@ -408,7 +405,7 @@ static const char * const DeviceNames[FPlatformInput::DeviceCount] =
 //----------------------------------------------------------------------------
 //                 The textual name for a device.
 //----------------------------------------------------------------------------
-const char * FPlatformInput::DeviceName(TDevice Device)
+const char * FPlatformInput::DeviceName(TDevice Device) const
 {
     return DeviceNames[Device];
 }
@@ -431,12 +428,12 @@ static const char * const MovementKindDescriptions[FPlatformInput::MovementKindC
 ,   "Change"          // DifferentialMovementKind    
 };
 
-const char * FPlatformInput::Abbreviation(TMovementKind MovementKind)
+const char * FPlatformInput::Abbreviation(TMovementKind MovementKind) const
 {
     return MovementKindAbbreviations[MovementKind];
 }
 
-const char * FPlatformInput::Description(TMovementKind MovementKind)
+const char * FPlatformInput::Description(TMovementKind MovementKind) const
 {
     return MovementKindDescriptions[MovementKind];
 }
@@ -508,11 +505,11 @@ WindowsKeyMappings[] =
     #undef I
 };
 
-static void PrepareWindowsKeyMappings()
+static void PrepareWindowsKeyMappings(FPlatformInput & Input)
 {
     for( int Which = 0; Which < arrayCount_(WindowsKeyMappings); ++Which )
     {
-        FPlatformInput::WindowsKeySwitches
+        Input.WindowsKeySwitches
         [ 
             WindowsKeyMappings[Which].VK_Value 
         ] 
@@ -573,15 +570,14 @@ static int VirtualKey(char C)
     return Key==-1 ? 0 : Key & 0xff;
 }
 
-static void PrepareAsciiMappings()
+static void PrepareAsciiMappings(FPlatformInput & Input)
 {
     for( int Which = 0; Which < arrayCount_(AsciiMappings); ++Which )
     {
         const int Key = VirtualKey( AsciiMappings[Which].Ascii );
         if( Key != 0 )
         {
-            FPlatformInput::WindowsKeySwitches[Key]
-                = FPlatformInput::TSwitch(AsciiMappings[Which].Switch);
+            Input.WindowsKeySwitches[Key] = FPlatformInput::TSwitch(AsciiMappings[Which].Switch);
         }
     }
     for( Which = '0'; Which <= '9'; ++Which )
@@ -589,8 +585,7 @@ static void PrepareAsciiMappings()
         const int Key = VirtualKey( Which );
         if( Key != 0 )
         {
-            FPlatformInput::WindowsKeySwitches[Key]
-                = FPlatformInput::TSwitch( FPlatformInput::S_0 + (Which - int('0')) );
+            Input.WindowsKeySwitches[Key] = FPlatformInput::TSwitch( FPlatformInput::S_0 + (Which - int('0')) );
         }
     }
     for( Which = 'a'; Which <= 'z'; ++Which )
@@ -598,8 +593,7 @@ static void PrepareAsciiMappings()
         const int Key = VirtualKey( Which );
         if( Key != 0 )
         {
-            FPlatformInput::WindowsKeySwitches[Key]
-                = FPlatformInput::TSwitch( FPlatformInput::S_A + (Which - int('a')) );
+            Input.WindowsKeySwitches[Key] = FPlatformInput::TSwitch( FPlatformInput::S_A + (Which - int('a')) );
         }
     }
     for( Which = 'A'; Which <= 'Z'; ++Which )
@@ -607,18 +601,9 @@ static void PrepareAsciiMappings()
         const int Key = VirtualKey( Which );
         if( Key != 0 )
         {
-            FPlatformInput::WindowsKeySwitches[Key]
-                = FPlatformInput::TSwitch( FPlatformInput::S_A + (Which - int('A')) );
+            Input.WindowsKeySwitches[Key] = FPlatformInput::TSwitch( FPlatformInput::S_A + (Which - int('A')) );
         }
     }
-}
-
-//----------------------------------------------------------------------------
-//                    Constructor
-//----------------------------------------------------------------------------
-FPlatformInput::FPlatformInput()
-{
-    DeviceInfo = 0;
 }
 
 //----------------------------------------------------------------------------
@@ -645,8 +630,8 @@ void FPlatformInput::Initialize()
             appError( "Bad witch array" );
         }
     }
-    PrepareWindowsKeyMappings();
-    PrepareAsciiMappings();
+    PrepareWindowsKeyMappings(*this);
+    PrepareAsciiMappings(*this);
     DeviceInfo = appMallocArray( DeviceCount, TDeviceInfo, "Input devices" );
     TDeviceInfo * Devices = GetDeviceInfo(*this);
     for( int Device_ = 0; Device_ < DeviceCount; Device_++ )
@@ -668,17 +653,23 @@ void FPlatformInput::Initialize()
 //----------------------------------------------------------------------------
 void FPlatformInput::Reset()
 {
+    for( int Switch_ = 0; Switch_ < SwitchCount; Switch_++ )
+    {
+        const FPlatformInput::TSwitch Switch = FPlatformInput::TSwitch(Switch_);
+        Switches[Switch].Empty(FALSE); // Clear the switch, but leave toggles on.
+    }
+    memset( SwitchPressTimes, 0, sizeof(SwitchPressTimes) );
 }
 
 //----------------------------------------------------------------------------
-//                    Finalize
+//                    Exit
 //----------------------------------------------------------------------------
-void FPlatformInput::Finalize()
+void FPlatformInput::Exit()
 {
     GUARD;
     appFree( GetDeviceInfo(*this) );
     DeviceInfo = 0;
-    UNGUARD( "FPlatformInput::Finalize" );
+    UNGUARD( "FPlatformInput::Exit" );
 }
 
 //----------------------------------------------------------------------------
@@ -832,25 +823,25 @@ static BOOL CheckJoystick
             // We start out with axis 1 (X) positive/negative movements (P/N):
             FPlatformInput::TMovement P = WhichJoystick==1 ? FPlatformInput::M_J1XP : FPlatformInput::M_J2XP; 
             FPlatformInput::TMovement N = FPlatformInput::TMovement(P+1);
-            Input.SetMovementRange( P, N, FLOAT(C.wXmin), FLOAT(C.wXmax) );
+            Input.SetMovementRange( P, FLOAT(C.wXmin), FLOAT(C.wXmax) );
             // Axis 2 (Y):
             P = FPlatformInput::TMovement(P+2); N = FPlatformInput::TMovement(N+2);
-            Input.SetMovementRange( P, N, FLOAT(C.wYmin), FLOAT(C.wYmax) );
+            Input.SetMovementRange( P, FLOAT(C.wYmin), FLOAT(C.wYmax) );
             // Axis 3 (Z):
             P = FPlatformInput::TMovement(P+2); N = FPlatformInput::TMovement(N+2);
             if( C.wCaps & JOYCAPS_HASZ )
             {
-                Input.SetMovementRange( P, N, FLOAT(C.wZmin), FLOAT(C.wZmax) );
+                Input.SetMovementRange( P, FLOAT(C.wZmin), FLOAT(C.wZmax) );
             }
             // Axis 4 (R):
             P = FPlatformInput::TMovement(P+2); N = FPlatformInput::TMovement(N+2);
             if( C.wCaps & JOYCAPS_HASR )
             {
-                Input.SetMovementRange( P, N, FLOAT(C.wRmin), FLOAT(C.wRmax) );
+                Input.SetMovementRange( P, FLOAT(C.wRmin), FLOAT(C.wRmax) );
             }
             // Hat switch:
             P = FPlatformInput::TMovement(P+2); N = FPlatformInput::TMovement(N+2);
-            Input.SetMovementRange( P, N, 0, FLOAT(MaxHatPosition) );
+            Input.SetMovementRange( P, 0, FLOAT(MaxHatPosition) );
         }
         else if( Result == MMSYSERR_NODRIVER )
         {
@@ -1119,33 +1110,33 @@ static void GatherJoystickInput
             ; 
             // Negative movement:
             FPlatformInput::TMovement N = FPlatformInput::TMovement(P+1);
-            Input.NoteMovement( P, N, FLOAT(State.dwXpos) );
+            Input.NotePosition( P, FLOAT(State.dwXpos) );
             // Axis 2 (Y):
             P = FPlatformInput::TMovement(P+2); N = FPlatformInput::TMovement(N+2);
-            Input.NoteMovement( P, N, FLOAT(State.dwYpos) );
+            Input.NotePosition( P, FLOAT(State.dwYpos) );
             // Axis 3 (Z):
             P = FPlatformInput::TMovement(P+2); N = FPlatformInput::TMovement(N+2);
             if( C.wCaps&JOYCAPS_HASZ )
             {
-                Input.NoteMovement( P, N, FLOAT(State.dwZpos) );
+                Input.NotePosition( P, FLOAT(State.dwZpos) );
             }
             // Axis 4 (R):
             P = FPlatformInput::TMovement(P+2); N = FPlatformInput::TMovement(N+2);
             if( C.wCaps&JOYCAPS_HASR )
             {
-                Input.NoteMovement( P, N, FLOAT(State.dwRpos) );
+                Input.NotePosition( P, FLOAT(State.dwRpos) );
             }
             // Axis 5 (U):
             P = FPlatformInput::TMovement(P+2); N = FPlatformInput::TMovement(N+2);
             if( C.wCaps&JOYCAPS_HASU )
             {
-                Input.NoteMovement( P, N, FLOAT(State.dwUpos) );
+                Input.NotePosition( P, FLOAT(State.dwUpos) );
             }
             // Axis 6 (V):
             P = FPlatformInput::TMovement(P+2); N = FPlatformInput::TMovement(N+2);
             if( C.wCaps&JOYCAPS_HASV )
             {
-                Input.NoteMovement( P, N, FLOAT(State.dwVpos) );
+                Input.NotePosition( P, FLOAT(State.dwVpos) );
             }
             // Hat switch:
             // If centered, convert this to backwards.
@@ -1153,7 +1144,7 @@ static void GatherJoystickInput
             if( C.wCaps&JOYCAPS_HASPOV )
             {
                 const DWORD HatValue = State.dwPOV == JOY_POVCENTERED ? JOY_POVBACKWARD : State.dwPOV;
-                Input.NoteMovement( P, N, FLOAT(HatValue) );
+                Input.NotePosition( P, FLOAT(HatValue) );
             }
         }
         // Update the buttons:
@@ -1270,15 +1261,6 @@ static void GatherJoystickInput
                 FPlatformInput::TSwitch( FPlatformInput::S_J1HatSE + JoystickSelector )
             ,   HatValue >= F && HatValue <= H
             ); 
-            if( FALSE )//tbd: debugging stuff
-            {
-                static int Last = -2;
-                if( Last != int(HatValue) )
-                {
-                    debugf( LOG_Info, "Hat: %i", int(HatValue) );
-                    Last = int(HatValue);
-                }
-            }
         }
     }
 }
@@ -1373,10 +1355,11 @@ void FPlatformInput::TSwitchState::Empty(BOOL ResetToggles)
 //----------------------------------------------------------------------------
 //                      Press a switch
 //----------------------------------------------------------------------------
-void FPlatformInput::Press(TSwitch Switch)
+BOOL FPlatformInput::Press(TSwitch Switch)
 {
     TSwitchState & State = Switches[Switch];
-    if( Switch != 0 && !State.IsOn )
+    const BOOL Changed = !State.IsOn;
+    if( Switch != 0 && Changed )
     {
         // The switch was not on, and is now pressed.
 
@@ -1399,15 +1382,17 @@ void FPlatformInput::Press(TSwitch Switch)
             }
         }
     }
+    return Changed;
 }
 
 //----------------------------------------------------------------------------
 //                      Double-press a switch
 //----------------------------------------------------------------------------
-void FPlatformInput::DoublePress(TSwitch Switch)
+BOOL FPlatformInput::DoublePress(TSwitch Switch)
 {
     TSwitchState & State = Switches[Switch];
-    if( Switch != 0 && !State.IsOn )
+    const BOOL Changed = !State.IsOn && !State.IsDouble;
+    if( Switch != 0 && Changed )
     {
         State.Changed           = TRUE;
         State.IsOn              = TRUE;
@@ -1421,15 +1406,17 @@ void FPlatformInput::DoublePress(TSwitch Switch)
             debugf( LOG_Info, "+%s*2%s", Abbreviation(Switch), State.IsDoubleToggledOn ? "[T]" : "" );
         }
     }
+    return Changed;
 }
 
 //----------------------------------------------------------------------------
 //                      Release a switch.
 //----------------------------------------------------------------------------
-void FPlatformInput::Release(TSwitch Switch)
+BOOL FPlatformInput::Release(TSwitch Switch)
 {
     TSwitchState & State = Switches[Switch];
-    if( Switch != 0 && State.IsOn )
+    const BOOL Changed = State.IsOn;
+    if( Switch != 0 && Changed )
     {
         State.Changed           = TRUE  ;
         State.IsOn              = FALSE ;
@@ -1439,6 +1426,7 @@ void FPlatformInput::Release(TSwitch Switch)
             debugf( LOG_Info, "-%s", Abbreviation(Switch) );
         }
     }
+    return Changed;
 }
 
 //----------------------------------------------------------------------------
@@ -1465,16 +1453,17 @@ void FPlatformInput::SetDefaultMovementInfo()
 void FPlatformInput::SetMovementRange
 (
     TMovement       PositiveMovement
-,   TMovement       NegativeMovement
 ,   FLOAT           MinValue
 ,   FLOAT           MaxValue
 )
 {
     TMovementInfo & PositiveInfo = MovementsInfo[PositiveMovement];
+    const TMovement NegativeMovement = OppositeMovement(PositiveMovement);
     TMovementInfo & NegativeInfo = MovementsInfo[NegativeMovement];
 
     PositiveInfo.MiddlePosition = (MinValue+MaxValue)/2.0;
 
+    #if 0 //todo: [Delete]
     if( IsMouseMovement(PositiveMovement) ) //tbd?
     {
         // We pretend all mouse movements have the same range. This
@@ -1489,6 +1478,7 @@ void FPlatformInput::SetMovementRange
         }
     }
     else
+    #endif
     {
         PositiveInfo.HalfRange = MaxValue-PositiveInfo.MiddlePosition;
     }
@@ -1510,24 +1500,44 @@ void FPlatformInput::SetMovementRange
 }
 
 //----------------------------------------------------------------------------
-//                         NoteMovement
+//                         NotePosition
 //----------------------------------------------------------------------------
-void FPlatformInput::NoteMovement
+void FPlatformInput::NotePosition
 (
     TMovement       PositiveMovement    // The movement for position motion.
-,   TMovement       NegativeMovement    // The movement for negative motion.
 ,   FLOAT           Value               // The current absolute position.
 )
 {
-    
+    const TMovement NegativeMovement = OppositeMovement(PositiveMovement);
     // We update both the positive and negative movement information with
     // the position. Later, when the movement is interpreted, we will sort out
     // the positiveness/negativeness.
     NewPosition[NegativeMovement] = Value;
     NewPosition[PositiveMovement] = Value;
-    if( ShowMovements && ( IsMouseMovement(PositiveMovement) || (GServer.Ticks&0x1f)==0 ) )
+    if( ShowMovements && (GServer.Ticks&0x1f)==0 )
     {
-        debugf( LOG_Info, "NoteMovement - %s: %3.2f", Abbreviation(PositiveMovement), Value );
+        debugf( LOG_Info, "NotePosition - %s: %3.2f", Abbreviation(PositiveMovement), Value );
+    }
+}
+
+//----------------------------------------------------------------------------
+//                         NoteChange
+//----------------------------------------------------------------------------
+void FPlatformInput::NoteChange
+(
+    TMovement       PositiveMovement    // The movement for position motion.
+,   FLOAT           Change              // The change in position.
+)
+{
+    const TMovement NegativeMovement = OppositeMovement(PositiveMovement);
+    // We update both the positive and negative movement information with
+    // the position. Later, when the movement is interpreted, we will sort out
+    // the positiveness/negativeness.
+    NewPosition[NegativeMovement] += Change;
+    NewPosition[PositiveMovement] += Change;
+    if( ShowMovements )
+    {
+        debugf( LOG_Info, "NoteChange - %s: %3.2f", Abbreviation(PositiveMovement), Change );
     }
 }
 
@@ -1593,17 +1603,6 @@ const
                 }
                 if( Magnitude > 1.0 ) { Magnitude = 1.0; }
                 else if( Magnitude < 0 ) { Magnitude = 0; }
-                if( FALSE && MovementIsActive ) //tbd:
-                {
-                    //tbe: Fit a quadratic into interval [a,1] and we get this:
-                    // y = (x*x - 2*x + a)/(a-1):
-                    const FLOAT A = 0.2;
-                    if( Magnitude >= A )
-                    {
-                        Magnitude = (Magnitude*Magnitude - 2*Magnitude + A)/(A-1);
-                    }
-                    //tbd:Magnitude = sqrt(Magnitude); //tbi? Performance?
-                }
                 break;
             }
             case DifferentialMovementKind:
@@ -1623,19 +1622,8 @@ const
                     Magnitude = -(NormalizedValue+Threshold)/AliveZone*Info.Sensitivity.Speed;
                     if( ShowMovements ) debugf(LOG_Info,"Differential %s: Change: %6.4f->%6.4f in [%3.2f+-%3.2f]", Abbreviation(Movement), Change, Magnitude, Info.MiddlePosition, Info.HalfRange );
                 }
-                if( Magnitude > 1.0 ) { Magnitude = 1.0; }
-                else if( Magnitude < 0 ) { Magnitude = 0; }
-                if( FALSE && MovementIsActive ) //tbd:
-                {
-                    //tbe: Fit a quadratic into interval [a,1] and we get this:
-                    // y = (x*x - 2*x + a)/(a-1):
-                    const FLOAT A = 0.2;
-                    if( Magnitude >= A )
-                    {
-                        Magnitude = (Magnitude*Magnitude - 2*Magnitude + A)/(A-1);
-                    }
-                    //tbd: Magnitude = sqrt(Magnitude); //tbi? Performance?
-                }
+                // We don't limit differential movements to 1.0 (useful for large mouse movements)
+                if( Magnitude < 0 ) { Magnitude = 0; }
                 if( MovementIsActive && ShowMovements ) 
                 {
                     debugf
@@ -1656,13 +1644,3 @@ const
     }
 }
 
-#if 0 //tbd:
-void FPlatformInput::ResetMouse(FLOAT X, FLOAT Y)
-{
-    const FLOAT dX = NewMouseX() - OldMouseX();
-    const FLOAT dY = NewMouseY() - OldMouseY();
-    SetOldMouse( X, Y );
-    SetNewMouse( X+dX, Y+dY );
-    debugf( LOG_Info, "ResetMouse: Old(%3.1f,%3.1f) New(%3.1f,%3.1f)", OldMouseX(), OldMouseY(), NewMouseX(), NewMouseY() );
-}
-#endif

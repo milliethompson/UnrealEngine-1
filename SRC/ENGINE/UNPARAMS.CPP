@@ -37,14 +37,14 @@ int UNREAL_API GetBYTE (const char *Stream, const char *Match,BYTE *Value)
 //
 // Get a signed byte (-128 to 127)
 //
-int UNREAL_API GetSBYTE (const char *Stream, const char *Match,SBYTE *Value)
+int UNREAL_API GetCHAR (const char *Stream, const char *Match,CHAR *Value)
 	{
 	GUARD;
 	const char *Temp=mystrstr(Stream,Match);
 	if (Temp==NULL) return 0; // didn't match
-	*Value=(SBYTE)atoi(Temp+strlen(Match));
+	*Value=(CHAR)atoi(Temp+strlen(Match));
 	return 1;
-	UNGUARD("GetSBYTE");
+	UNGUARD("GetCHAR");
 	};
 
 //
@@ -298,6 +298,7 @@ int UNREAL_API GetSTRING (const char *Stream, const char *Match,char *Value,int 
 			Temp=strchr(Value,' ' ); if (Temp) *Temp=0;
 			Temp=strchr(Value,'\r'); if (Temp) *Temp=0;
 			Temp=strchr(Value,'\n'); if (Temp) *Temp=0;
+			Temp=strchr(Value,'\t'); if (Temp) *Temp=0;
 			};
 		return 1;
 		}

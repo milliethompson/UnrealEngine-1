@@ -11,127 +11,69 @@
 #include "Unreal.h"
 #include "UnRender.h"
 
-#define DIFFUSION_DITHER        0 /* Diffusion dither textures when rendering in 256-color */
-#define BLUR_TEXTURES_ON_IMPORT 1 /* Blur textures while importing them */
+#define BLUR_TEXTURES_ON_IMPORT 0 /* Blur textures while importing them */
 
 /*-----------------------------------------------------------------------------
 	Texture dithering
 -----------------------------------------------------------------------------*/
 
 //
-// Diffusion-dither a single line of a texture:
+// Diffusion-dither a single line of a texture.
+// That's a lie.
+// What we really do is just perform a lookup table palette conversion.
 //
 static int GRedError, GGreenError, GBlueError;
-void inline Disperse (BYTE *Src, BYTE *Dest,int Direction,int USize,FColor *Colors,FPalettePrecalc *Precalc,
-	int FixDiffusionC,int Masked)
+void inline Disperse (BYTE *Src, BYTE *Dest,int Direction,int USize,FColor *Colors,
+	int Masked)
 	{
 	GUARD;
 	//
-	#if !DIFFUSION_DITHER
-		//
-		// No diffusion dithering version:
-		//
-		#ifdef ASM
-		__asm
-			{
-			push	ebp
-			mov		edi,[Dest]
-			mov		esi,[Src]
-			mov		edx,[Colors]
-			mov		ecx,[Direction]
-			xor		eax,eax
-			mov		ebp,[USize]
-			;
-			RemapLoop:
-			;
-			mov		al,[esi]							; eax = *Src
-			add		esi,ecx								; Src += Direction
-			;
-			mov		bl,[edx + eax*4]FColor.RemapIndex	; bl = Colors[*Src].RemapIndex
-			xor		eax,eax								; Zero eax
-			;
-			mov		[edi],bl							; *Dest = Colors[*Src].RemapIndex
-			add		edi,ecx								; Dest += Direction
-			;
-			dec		ebp
-			jg		RemapLoop
-			;
-			pop		ebp
-			};
-		#else
-		while (USize-- > 0)
-			{
-			*Dest = Colors[*Src].RemapIndex;
-			Src		+= Direction;
-			Dest	+= Direction;
-			};
-		#endif
-	#else
-		//
-		// Diffusion dithering version:
-		//
-		// This is a bit too slow for realtime in C, but if it were hand-optimized in
-		// assembly, it would be plenty fast.  The algorithm is efficient.  However,
-		// as diffusion dithering only trades discretization artifacts for random color 
-		// artifacts, it is currently disabled.
-		//
-		INT		*Squares		= &GGfx.Squares[256];
-		FColor	*DefaultColors	= &GGfx.DefaultColors[0];
-		while (USize-- > 0)
-			{
-			int iColor = *Src;
-			if (iColor || !Masked)
-				{
-				FColor *ThisColor	= &Colors[iColor];
-				int DesiredRed		= ThisColor->Red	+ GRedError;
-				int DesiredGreen	= ThisColor->Green	+ GGreenError;
-				int DesiredBlue		= ThisColor->Blue	+ GBlueError;
-				//
-				int iBestColor		= Precalc[iColor].Nearest[0];
-				FColor *Color		= &DefaultColors[iBestColor];
-				int BestDelta		=
-					Squares[DesiredRed		- Color->Red	] +
-					Squares[DesiredGreen	- Color->Green	] +
-					Squares[DesiredBlue		- Color->Blue	];
-				for (int i=1; i<FPalettePrecalc::NUM_NEAREST; i++)
-					{
-					int iTest		= Precalc[iColor].Nearest[i];
-					Color			= &DefaultColors[iTest];
-					int Delta		=
-						Squares[DesiredRed		- Color->Red	] +
-						Squares[DesiredGreen	- Color->Green	] +
-						Squares[DesiredBlue		- Color->Blue	];
-					if (Delta<BestDelta)
-						{
-						iBestColor	= iTest;
-						BestDelta	= Delta;
-						};
-					};
-				*Dest		= iBestColor;
-				Color		= &GGfx.DefaultColors[iBestColor];
-				GRedError	= ((DesiredRed	- Color->Red	)	* FixDiffusionC) >> 6;
-				GGreenError	= ((DesiredGreen- Color->Green	)	* FixDiffusionC) >> 6;
-				GBlueError	= ((DesiredBlue	- Color->Blue	)	* FixDiffusionC) >> 6;
-				}
-			else *Dest = 0;
-			//
-			Src		+= Direction;
-			Dest	+= Direction;
-			};
-	#endif
+#if ASM
+	__asm
+		{
+		push	ebp
+		mov		edi,[Dest]
+		mov		esi,[Src]
+		mov		edx,[Colors]
+		mov		ecx,[Direction]
+		xor		eax,eax
+		mov		ebp,[USize]
+		;
+		RemapLoop:
+		;
+		mov		al,[esi]							; eax = *Src
+		add		esi,ecx								; Src += Direction
+		;
+		mov		bl,[edx + eax*4]FColor.RemapIndex	; bl = Colors[*Src].RemapIndex
+		xor		eax,eax								; Zero eax
+		;
+		mov		[edi],bl							; *Dest = Colors[*Src].RemapIndex
+		add		edi,ecx								; Dest += Direction
+		;
+		dec		ebp
+		jg		RemapLoop
+		;
+		pop		ebp
+		};
+#else
+	while (USize-- > 0)
+		{
+		*Dest = Colors[*Src].RemapIndex;
+		Src		+= Direction;
+		Dest	+= Direction;
+		};
+#endif
 	UNGUARD("Disperse");
 	};
 
 //
 // Remap a texture using diffusion dithering.
 //
-void DiffusionDither(BYTE *Src, BYTE *Dest, UPalette *Palette,int USize,int VSize,
-	int FixDiffusionC,int Masked)
+UNREAL_API void DiffusionDither(BYTE *Src, BYTE *Dest, UPalette *Palette,int USize,int VSize,int Masked)
 	{
 	GUARD;
 	if (!Palette) appError("No palette");
 	FColor			*Colors		= Palette->GetData();
-	FPalettePrecalc	*Precalc	= (FPalettePrecalc *)&Colors[256];
 	int				V;
 	//
 	if (Palette != GGfx.DefaultPalette)
@@ -141,10 +83,10 @@ void DiffusionDither(BYTE *Src, BYTE *Dest, UPalette *Palette,int USize,int VSiz
 			{
 			if (V&1) GApp->StatusUpdate ("Remapping",V,VSize);
 			//
-			Disperse(Src,Dest,1,USize,Colors,Precalc,FixDiffusionC,Masked);
+			Disperse(Src,Dest,1,USize,Colors,Masked);
 			Dest += USize; Src += USize;
 			//
-			Disperse(Src+USize-1,Dest+USize-1,-1,USize,Colors,Precalc,FixDiffusionC,Masked);
+			Disperse(Src+USize-1,Dest+USize-1,-1,USize,Colors,Masked);
 			Dest += USize; Src += USize;
 			};
 		}
@@ -213,11 +155,11 @@ void UTexture::Register(FResourceType *Type)
 	strcpy (Type->Descr,"Texture");
 	UNGUARD("UTexture::Register");
 	};
-void UTexture::InitHeader(void)
+void UTexture::InitHeader()
 	{
 	GUARD;
 	//
-	Class			= GClasses.TextureRes;
+	Class			= NULL;
 	Palette			= NULL;
 	Microtexture	= NULL;
 	FireParams		= NULL;
@@ -226,13 +168,11 @@ void UTexture::InitHeader(void)
 	//
 	DiffuseC		= 1.0;
 	SpecularC		= 0.0;
-	PalDiffusionC	= 0.5;
 	FrictionC		= 0.5;
 	//
 	FootstepSound	= NULL;
 	HitSound		= NULL;
 	PolyFlags		= 0;
-	bNoTile			= 0;
 	//
 	USize			= 0;
 	VSize			= 0;
@@ -250,19 +190,19 @@ void UTexture::InitHeader(void)
 	//
 	UNGUARD("UTexture::InitHeader");
 	};
-void UTexture::InitData(void)
+void UTexture::InitData()
 	{
 	GUARD;
 	mymemset (Data,0,DataSize);
 	UNGUARD("UTexture::InitData");
 	};
-int UTexture::QuerySize(void)
+int UTexture::QuerySize()
 	{
 	GUARD;
 	return DataSize;
 	UNGUARD("UTexture::QuerySize");
 	};
-int UTexture::QueryMinSize(void)
+int UTexture::QueryMinSize()
 	{
 	GUARD;
 	return QuerySize();
@@ -282,10 +222,16 @@ const char *UTexture::Import(const char *Buffer, const char *BufferEnd,const cha
 	if (PCX->Manufacturer != 10) return NULL; // Unknown format
 	if ((PCX->BitsPerPixel!=8) || (PCX->NumPlanes!=1)) return NULL; // Bad format, must have 8 bits per pixel, 1 plane
 	//
-	// Set texture properties, assume stuff was validated in RMSG_IMPORTSIZE.
+	// Set texture properties.
 	//
 	USize		= PCX->XMax + 1 - PCX->XMin;
 	VSize		= PCX->YMax + 1 - PCX->YMin;
+	//
+	bUntiled = (
+		(USize != (INT)FNextPowerOfTwo(USize))
+	||	(VSize != (INT)FNextPowerOfTwo(VSize))
+	||	(USize>1024) || (VSize>1024));
+	//
 	UBits		= FLogTwo(USize);
 	VBits		= FLogTwo(VSize);
 	DataSize	= USize * VSize;
@@ -306,16 +252,10 @@ const char *UTexture::Import(const char *Buffer, const char *BufferEnd,const cha
 			{
 			RunLength = Color & 0x3f;
 			Color     = *Buffer++;
-			mymemset (DestPtr,Color,OurMin(RunLength,(int)(DestEnd - DestPtr)));
+			mymemset (DestPtr,Color,Min(RunLength,(int)(DestEnd - DestPtr)));
 			DestPtr  += RunLength;
 			}
 		else *DestPtr++ = Color;
-		};
-	if ((USize != (INT)FNextPowerOfTwo(USize)) ||
-		(VSize != (INT)FNextPowerOfTwo(VSize)) ||
-		(USize>1024) || (VSize>1024))
-		{
-		bNoTile = 1;
 		};
 	MipOfs[0] = 0;
 	return BufferEnd;
@@ -402,6 +342,15 @@ void UTexture::QueryHeaderReferences(FResourceCallback &Callback)
 	//
 	UNGUARD("UTexture::QueryHeaderReferences");
 	};
+void UTexture::Flip()
+	{
+	GUARD;
+	//
+	UResource::Flip();
+	//todo:
+	//
+	UNGUARD("UTexture::Flip");
+	};
 AUTOREGISTER_RESOURCE(RES_Texture,UTexture,0xB2D90876,0xCCD211cf,0x91360000,0xC028B992);
 
 //
@@ -452,7 +401,7 @@ void UTexture::Remap (UPalette *SourcePalette, UPalette *DestPalette)
 //
 // Rearrange a texture's colors to fit the additive-lighting palette
 //
-void UTexture::Fixup (void)
+void UTexture::Fixup()
 	{
 	GUARD;
 	BYTE Remap[UPalette::NUM_PAL_COLORS];
@@ -492,46 +441,49 @@ void UTexture::Fixup (void)
 //
 //   If Flags|TL_Renderable, makes the texture hardware-renderable if 3D hardware is active.
 //
-void UTexture::Lock(ITexture *TextureInfo,ICamera *Camera,int Mip,int Flags)
-	{
-	GUARD;
-	//
-	TextureInfo->Texture = this;
-	TextureInfo->Palette = Palette ? Palette : GGfx.DefaultPalette;
-	//
-	if (Mip>=0)	TextureInfo->Mip = Mip; // Get a particular mipmap
-	else		TextureInfo->Mip = 0;	// Get all mipmaps
-	//
-	// Get base texture pointer:
-	//
+void UTexture::Lock( ITexture &TextureInfo,ICamera *Camera,int Mip,int Flags )
+{
+	guard(UTexture::Lock);
+
+	TextureInfo.Texture = this;
+	TextureInfo.Palette = Palette ? Palette : GGfx.DefaultPalette;
+
+	if (Mip>=0)	TextureInfo.Mip = Mip;	// Get a particular mipmap.
+	else		TextureInfo.Mip = 0;	// Get all mipmaps.
+
+	// Get base texture pointer.
 	if (Flags & TL_Remapped)
-		{
-		// If in 256-color mode, return data remapped to 256 colors:
-		TextureInfo->Data = GetOriginalData(&TextureInfo->Mip,&TextureInfo->USize,&TextureInfo->VSize);
-		}
+	{
+		// If in 256-color mode, return data remapped to 256 colors.
+		TextureInfo.Data = GetOriginalData(&TextureInfo.Mip,&TextureInfo.USize,&TextureInfo.VSize);
+		TextureInfo.CacheItem = NULL;
+	}
 	else
-		{
-		TextureInfo->Data = GetData(&TextureInfo->Mip,Camera->ColorBytes,&TextureInfo->USize,&TextureInfo->VSize);
-		};
-	//
-	// Get colors:
-	//
-	TextureInfo->Colors = &TextureInfo->Palette->Element(0);
-	//
-	UNGUARD("UTexture::Lock");
-	};
+	{
+		// Return data as-is.
+		TextureInfo.Data = GetData(TextureInfo,&TextureInfo.Mip,Camera->ColorBytes,&TextureInfo.USize,&TextureInfo.VSize);
+	}
+
+	// Get colors.
+	TextureInfo.Colors = &TextureInfo.Palette->Element(0);
+
+	unguard;
+}
 
 //
 // Unlock a texture.
 //
-void UTexture::Unlock(ITexture *TextureInfo)
-	{
-	GUARD;
-	//
+void UTexture::Unlock( ITexture &TextureInfo )
+{
+	guard(UTexture::Unlock);
+
+	// Unlock the cache item.
+	if( TextureInfo.CacheItem != NULL )
+		TextureInfo.CacheItem->Unlock();
+
 	// Does nothing yet.
-	//
-	UNGUARD("UTexture::Unlock");
-	};
+	unguard;
+}
 
 /*---------------------------------------------------------------------------------------
 	UTexture mipmap generation
@@ -553,11 +505,12 @@ void UTexture::CreateMips(int FullMips)
 	INT			ThisUSize,ThisVSize,HalfUSize,HalfVSize,U,V,X,Y,UAnd,VAnd,Red,Green,Blue,MipLevel,ThisSize,i,n;
 	static const int BoxC[4][4] =
 		{
-		{ 1, 2, 2, 1},
-		{ 2,13,11, 2},
-		{ 2,10, 9, 2},
-		{ 1, 2, 2, 1}
+		{ 5, 8, 5, 0},
+		{ 8,12, 8, 0},
+		{ 5, 8, 5, 0},
+		{ 0, 0, 0, 0}
 		};
+	const int BoxCSize=3;
 	enum {BOX_SHIFT = 6};
 	enum {BOX_SUM   = 64};
 	//
@@ -648,7 +601,7 @@ void UTexture::CreateMips(int FullMips)
 				if (U&1) GApp->StatusUpdate ("Creating mipmap",U,HalfUSize);
 				//
 				Red=0; Green=0; Blue=0;
-				for (X=0; X<4; X++) for (Y=0; Y<4; Y++)
+				for (X=0; X<BoxCSize; X++) for (Y=0; Y<BoxCSize; Y++)
 					{
 					SourceColor = &Colors[SourceTex[((V*2+Y-1)&VAnd)*ThisUSize + ((U*2+X-1)&UAnd)]];
 					Red   += BoxC[X][Y]*(int)SourceColor->Red;
@@ -670,12 +623,12 @@ void UTexture::CreateMips(int FullMips)
 				//
 				n = 0;
 				Red=0; Green=0; Blue=0;
-				for (X=0; X<4; X++) for (Y=0; Y<4; Y++)
+				for (X=0; X<BoxCSize; X++) for (Y=0; Y<BoxCSize; Y++)
 					{
 					B = SourceTex[((V*2+Y-1)&VAnd)*ThisUSize + ((U*2+X-1)&UAnd)];
 					if (B)
 						{
-						n += BoxC[X][Y];
+						n     += BoxC[X][Y];
 						SourceColor = &Colors[B];
 						Red   += BoxC[X][Y]*(int)SourceColor->Red;
 						Green += BoxC[X][Y]*(int)SourceColor->Green;
@@ -701,210 +654,228 @@ void UTexture::CreateMips(int FullMips)
 	};
 
 /*---------------------------------------------------------------------------------------
-	UPalette implementation
+	UPalette implementation.
 ---------------------------------------------------------------------------------------*/
 
 //
 // Resource functions:
 //
 void UPalette::Register(FResourceType *Type)
-	{
-	GUARD;
+{
+	guard(UPalette::Register);
 	Type->HeaderSize = sizeof (UPalette);
 	Type->RecordSize = sizeof (FColor);
 	Type->Version    = 1;
 	Type->TypeFlags  = RTF_ScriptReferencable;
 	strcpy (Type->Descr,"Palette");
-	UNGUARD("UPalette::Register");
-	};
-void UPalette::InitData(void)
-	{
-	GUARD;
+	unguard;
+}
+void UPalette::InitData()
+{
+	guard(UPalette::InitData);
 	mymemset (Data,0,QuerySize());
-	UNGUARD("UPalette::InitData");
-	};
-int UPalette::QuerySize(void)
-	{
-	GUARD;
-	return NUM_PAL_COLORS * (sizeof (FColor) + sizeof (FPalettePrecalc));
-	UNGUARD("UPalette::QuerySize");
-	};
-int UPalette::QueryMinSize(void)
-	{
-	GUARD;
+	unguard;
+}
+int UPalette::QuerySize()
+{
+	guard(UPalette::QuerySize);
+	return NUM_PAL_COLORS * sizeof (FColor);
+	unguard;
+}
+int UPalette::QueryMinSize()
+{
+	guard(UPalette::QueryMinSize);
 	return QuerySize();
-	UNGUARD("UPalette::QueryMinSize");
-	};
+	unguard;
+}
 const char *UPalette::Import(const char *Buffer, const char *BufferEnd,const char *FileType)
-	{
-	GUARD;
+{
+	guard(UPalette::Import);
+
 	FPCXFileHeader	*PCX		 = (FPCXFileHeader *)Buffer;
 	BYTE			*PCXPalette  = (BYTE *)(BufferEnd - NUM_PAL_COLORS * 3);
 	int				BufferLength = (int)(BufferEnd-Buffer);
-	//
-	// Validate stuff in header:
-	//
-	if (BufferLength < sizeof(FPCXFileHeader)) return NULL; // Doesn't contain valid header and palette
-	if (PCX->Manufacturer != 10) return NULL; // Unknown format
-	if ((PCX->BitsPerPixel!=8) || (PCX->NumPlanes!=1)) return NULL; // Bad format, must have 8 bits per pixel, 1 plane
-	//
+
+	// Validate stuff in header.
+
+	if (BufferLength < sizeof(FPCXFileHeader))
+		return NULL; // Doesn't contain valid header and palette.
+	
+	if (PCX->Manufacturer != 10) 
+		return NULL; // Unknown format.
+	
+	if ((PCX->BitsPerPixel!=8) || (PCX->NumPlanes!=1))
+		return NULL; // Bad format, must have 8 bits per pixel, 1 plane
+
 	Realloc();
 	FColor *Colors = GetData();
 	for (int i=0; i<NUM_PAL_COLORS; i++)
-		{
+	{
 		Colors[i].Red	= *PCXPalette++;
 		Colors[i].Green	= *PCXPalette++;
 		Colors[i].Blue	= *PCXPalette++;
-		Colors[i].Flags	= 0;
-		};
-	BuildBrightnessTable();
+	}
+	BuildPaletteRemapIndex(0);
 	return BufferEnd;
-	UNGUARD("UPalette::Import");
-	};
+	unguard;
+}
+void UPalette::Flip()
+{
+	guard(UPalette::Flip);
+
+	UDatabase::Flip();
+	//todo:
+
+	unguard;
+}
 AUTOREGISTER_RESOURCE(RES_Palette,UPalette,0xB2D90877,0xCCD211cf,0x91360000,0xC028B992);
 
 //
 // Find closest palette color matching a given RGB value:
 //
-BYTE UPalette::BestMatch (FColor Color,int SystemPalette)
-	{
-	GUARD;
+BYTE UPalette::BestMatch( FColor Color,int SystemPalette )
+{
+	guard(UPalette::BestMatch);
+
 	FColor		*Colors = GetData();
 	FColor		*ColorPtr;
 	int 		Delta,BestDelta,BestColor,TestColor;
-	//
+
 	BestDelta  		= MAXINT;
 	BestColor  		= FIRSTCOLOR;
-	//
+
 	int First,Last;
-	//
+
 	if (SystemPalette)	{First=FIRSTCOLOR; Last=LASTCOLOR;}
 	else				{First=1; Last=NUM_PAL_COLORS;};
-	//   
+
 	ColorPtr = &Colors [First];
-	for (TestColor=First; TestColor<Last; TestColor++)
-		{
+	for( TestColor=First; TestColor<Last; TestColor++ )
+	{
 		Delta =
-			(
-			OurSquare((int)ColorPtr->Red   - (int)Color.Red)   +
-			OurSquare((int)ColorPtr->Green - (int)Color.Green) +
-			OurSquare((int)ColorPtr->Blue  - (int)Color.Blue)
-			);
-		if (Delta < BestDelta)
-			{
+		(
+			Square((int)ColorPtr->Red   - (int)Color.Red)   +
+			Square((int)ColorPtr->Green - (int)Color.Green) +
+			Square((int)ColorPtr->Blue  - (int)Color.Blue)
+		);
+		if( Delta < BestDelta )
+		{
 			BestColor = TestColor;
 			BestDelta = Delta;
-			};
+		}
 		ColorPtr++;
-		};
+	}
 	return BestColor;
-	UNGUARD("UPalette::BestMatch");
-	};
+	unguard;
+}
 
 //
 // Find closest palette color matching a given RGB value that
 // lies within a particular one of the 8 palette ranges:
 //
-BYTE UPalette::BestMatchInRange(FColor MatchColor, BYTE RangeColor)
-	{
-	GUARD;
+BYTE UPalette::BestMatchInRange( FColor MatchColor, BYTE RangeColor )
+{
+	guard(UPalette::BestMatchInRange);
+
 	FColor		*Colors = GetData();
 	FColor		*ColorPtr;
 	int 		Delta,BestDelta,BestColor,TestColor;
-	//
+
 	RangeColor		= RangeColor & 7;
 	ColorPtr		= &Colors[FIRSTCOLOR];
 	BestDelta  		= MAXSWORD;
 	BestColor  		= FIRSTCOLOR;
-	//
-	for (TestColor=FIRSTCOLOR; TestColor<LASTCOLOR; TestColor++)
+
+	for( TestColor=FIRSTCOLOR; TestColor<LASTCOLOR; TestColor++ )
+	{
+		if( RangeColor == (TestColor&7) )
 		{
-		if (RangeColor == (TestColor&7))
-			{
 			Delta =
-				OurSquare((int)ColorPtr->Red   - (int)MatchColor.Red)   +
-				OurSquare((int)ColorPtr->Green - (int)MatchColor.Green) +
-				OurSquare((int)ColorPtr->Blue  - (int)MatchColor.Blue);
-			if (Delta < BestDelta)
-				{
+				Square((int)ColorPtr->Red   - (int)MatchColor.Red)   +
+				Square((int)ColorPtr->Green - (int)MatchColor.Green) +
+				Square((int)ColorPtr->Blue  - (int)MatchColor.Blue);
+			if( Delta < BestDelta )
+			{
 				BestColor = TestColor;
 				BestDelta = Delta;
-				};
-			};
+			}
+		}
 		ColorPtr++;
-		};
+	}
 	return BestColor;
-	UNGUARD("UPalette::BestMatchInRange");
-	};
+	unguard;
+}
 
-void UPalette::Smooth (void)
-	{
-	GUARD;
+//
+// Smooth out a ramp palette by averaging adjacent colors.
+//
+void UPalette::Smooth()
+{
+	guard(UPalette::Smooth);
+
 	FColor *Colors = GetData();
 	FColor *C1=&Colors[0], *C2=&Colors[1];
-	//
-	for (int i=1; i<256; i++)
-		{
+
+	for( int i=1; i<256; i++ )
+	{
 		C2->Red   = ((int)C1->Red   + (int)C2->Red  )>>1;
 		C2->Green = ((int)C1->Green + (int)C2->Green)>>1;
 		C2->Blue  = ((int)C1->Blue  + (int)C2->Blue )>>1;
-		//
+
 		C1++;
 		C2++;
-		};
-	UNGUARD("UPalette::Smooth");
-	};
+	}
+	unguard;
+}
 
-void UPalette::BuildBrightnessTable (void)
+//
+// Return a pointer to a cached color depth-specific palette.
+// Size of returned array is Camera->ColorBytes.
+//
+RAINBOW_PTR UPalette::GetColorDepthPalette( FCacheItem *&Item, UTexture *DestTexture )
+{
+	guard(UPalette::GetColorDepthPalette);
+
+	int CacheID = MakeCacheID(CID_ColorDepthPalette,Index,DestTexture->ColorBytes);
+	RAINBOW_PTR	Result	= GCache.Get(CacheID,Item);
+
+	if( !Result.PtrBYTE )
 	{
-	GUARD;
-	FColor			*Colors		= GetData();
-	FPalettePrecalc	*Precalc	= (FPalettePrecalc *)&Colors[256];
-	//
-	for (int i=0; i<256; i++)
+		Result		= GCache.Create(CacheID,Item,256 * DestTexture->ColorBytes);
+		FColor *Src = &Element(0);
+		if( DestTexture->ColorBytes==1 )
+		{			
+			for( int i=0; i<256; i++ )
+				Result.PtrBYTE[i] = (Src++)->RemapIndex;
+		}
+		else if( (DestTexture->ColorBytes==2) && (DestTexture->CameraCaps & CC_RGB565) )
 		{
-		if (!(i&7)) GApp->StatusUpdate("Precalculating",i,256);
-		//
-		int ThisBrightness    = Colors[i].Brightness();
-		Precalc[i].Brightness = ThisBrightness;
-		Precalc[i].RemapIndex = 0;
-		//
-		if (GGfx.DefaultColors) // Skip when importing first palette
-			{
-			//
-			// Precalculate nearest colors to aid fast diffusion ditherer:
-			//
-			BYTE Available[256];
-			mymemset (Available,1,256);
-			for (int j=0; j<FPalettePrecalc::NUM_NEAREST; j++)
-				{
-				int BestColor = 0;
-				int BestDelta = 768;
-				for (int k=FIRSTCOLOR; k<LASTCOLOR; k++)
-					{
-					int Delta = OurAbs(GGfx.DefaultColors[k].Brightness() - ThisBrightness);
-					//int Delta = 
-					//	OurAbs((int)GGfx.DefaultColors[k].Red   - (int)Element(i).Red)   +
-					//	OurAbs((int)GGfx.DefaultColors[k].Green - (int)Element(i).Green) +
-					//	OurAbs((int)GGfx.DefaultColors[k].Blue  - (int)Element(i).Blue);
-					if ((Delta<BestDelta) && Available[k])
-						{
-						BestColor = k;
-						BestDelta = Delta;
-						};
-					};
-				Available [BestColor]	= 0;
-				Precalc[i].Nearest[j]	= BestColor;
-				};
-			};
-		};
-	UNGUARD("UPalette::BuildBrightnessTable");
-	};
+			for( int i=0; i<256; i++ )
+				Result.PtrWORD[i] = (Src++)->HiColor565();
+		}
+		else if( DestTexture->ColorBytes==2 )
+		{
+			for( int i=0; i<256; i++ )
+				Result.PtrWORD[i] = (Src++)->HiColor555();
+		}
+		else if( DestTexture->ColorBytes==4 )
+		{
+			for( int i=0; i<256; i++ )
+				Result.PtrDWORD[i] = (Src++)->TrueColor();
+		}
+		else
+		{
+			appError( "Invalid ColorBytes" );
+		}
+	}
+	return Result;
+	unguard;
+}
 
 //
 // Build the palette remap index
 //
-void UPalette::BuildPaletteRemapIndex(int Masked)
+void UPalette::BuildPaletteRemapIndex( int Masked )
 	{
 	GUARD;
 	//
@@ -929,7 +900,7 @@ void UPalette::BuildPaletteRemapIndex(int Masked)
 // If it is, deletes this palette and returns the existing one.
 // If not, returns this palette.
 //
-UPalette *UPalette::ReplaceWithExisting(void)
+UPalette *UPalette::ReplaceWithExisting()
 	{
 	GUARD;
 	//

@@ -8,6 +8,7 @@
 		* Created by Tim Sweeney
 =============================================================================*/
 
+#pragma warning (disable : 4201) /* nonstandard extension used : nameless struct/union */
 #include <windows.h>
 #include <windowsx.h>
 #include "DPlay.h"
@@ -79,7 +80,7 @@ int NDirectPlayDriver::Init(char *ParamBuffer,char *Error)
 //
 // Shut down the driver, closing any connections that may be open.
 //
-void NDirectPlayDriver::Exit(void)
+void NDirectPlayDriver::Exit()
 	{
 	GUARD;
 	debug(LOG_Net,"DirectPlay Exit");
@@ -205,7 +206,7 @@ int NDirectPlayDriver::Exec(const char *Cmd,FOutputDevice *Out)
 //
 // DirectPlay task tick.
 //
-void NDirectPlayDriver::TaskTick(void)
+void NDirectPlayDriver::TaskTick()
 	{
 	GUARD;
 	//
@@ -215,7 +216,7 @@ void NDirectPlayDriver::TaskTick(void)
 //
 // DirectPlay task exit.
 //
-void NDirectPlayDriver::TaskExit(void)
+void NDirectPlayDriver::TaskExit()
 	{
 	GUARD;
 	//
@@ -275,7 +276,7 @@ void NDirectPlaySocket::SendPacket(NPacket *PacketToSend)
 // than or equal to the global maximum, MAX_PACKET_SIZE.
 //
 //
-int NDirectPlaySocket::MaxPacketSize(void)
+int NDirectPlaySocket::MaxPacketSize()
 	{
 	GUARD;
 	AssertInitialized();
@@ -288,7 +289,7 @@ int NDirectPlaySocket::MaxPacketSize(void)
 //
 // Process a timer tick for this socket:
 //
-void NDirectPlaySocket::Tick(void)
+void NDirectPlaySocket::Tick()
 	{
 	GUARD;
 	AssertInitialized();
@@ -319,7 +320,7 @@ void NDirectPlaySocket::Init(NDriver *CreatingDriver)
 //
 // Shut down this socket.  Removes socket from driver's socket list.
 //
-void NDirectPlaySocket::Delete(void)
+void NDirectPlaySocket::Delete()
 	{
 	GUARD;
 	AssertInitialized();

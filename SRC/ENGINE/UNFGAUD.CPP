@@ -25,6 +25,8 @@ ADBG:  Define this symbol to enable extra
 
 /********************************* INCLUDES ********************************/
 
+#pragma warning (disable : 4201) /* nonstandard extension used : nameless struct/union */
+
 #include <stdlib.h>		/* For min()/max() */
 #include <Windows.h>		/* For GetTickCount(), and required for Galaxy.h */
 #include "Unreal.h"		/* Unreal headers (includes "UnFGAud.h") */
@@ -106,7 +108,7 @@ static unsigned long	num_ticks = 0L;
 ** Returns:
 **	NONE
 */
-void __cdecl
+void CDECL
 plog(char *msg)
 {
 	if (msg[0] != '\0' && msg[strlen(msg) - 1] != '\n')
@@ -145,6 +147,16 @@ FGlobalAudio::Init(int MakeActive)
 	SoundEngLogDetail(1);
 	plog("FGlobalAudio::Init()\n");
 
+    // Stuff added by Mark: to be checked by Ammon...
+    // Comment from Ammon:  This looks reasonable to me
+    {
+        //todo: Clean-up - these strings are both here and in unconfig.cpp...
+        MusicVolumeSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "MusicVolume", 42 ) );        
+        SfxVolumeSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "SoundVolume", 127 ) );        
+        DirectSoundFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "UseDirectSound", TRUE ) );
+        FilterFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "EnableFilter", TRUE ) );
+    }
+
 	/* Initialize sound engine. */
 	if (!SoundEngGlobalInit(MakeActive))
 	{
@@ -152,15 +164,6 @@ FGlobalAudio::Init(int MakeActive)
 		return 0;
 	}
 	SpecifySong(1);
-
-    // Stuff added by Mark: to be checked by Ammon...
-    {
-        //todo: Clean-up - these strings are both here and in unconfig.cpp...
-        MusicVolumeSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "MusicVolume", 42 ) );        
-        SfxVolumeSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "SoundVolume", 127 ) );        
-        DirectSoundFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "UseDirectSound", TRUE ) );
-        //todo: Sampling rate? (New profile string must be added to unconfig.cpp)
-    }
 
 	return 1;
 	UNGUARD("FGlobalAudio::Init");
@@ -197,7 +200,13 @@ FGlobalAudio::Exit(void)
 ** called between subsequent calls to this function.
 **
 ** Parameters:
-**	To be determined
+**	Value		Meaning
+**	-----		-------
+**	MaxIndeces	Maximum # of actors in the level
+**			that is beginning play.  This may
+**			be used to determine the maximum
+**			# of entities that may attempt to
+**			play sounds.
 **
 ** Returns:
 **	Value	Meaning
@@ -206,7 +215,6 @@ FGlobalAudio::Exit(void)
 **	0	Error occured.
 */
 int
-//FGlobalAudio::InitLevel(ULevel *Level)
 FGlobalAudio::InitLevel(int MaxIndices)
 {
 	GUARD;
@@ -290,13 +298,13 @@ FGlobalAudio::ExitLevel(void)
 ** of the sound system.
 **
 ** Parameters:
-**	To be determined
+**	NONE
 **
 ** Returns:
 **	NONE
 */
 void
-FGlobalAudio::Tick(ILevel *Level)
+FGlobalAudio::Tick(void)
 {
 	GUARD;
 
@@ -363,7 +371,9 @@ FGlobalAudio::SetOrigin(const FVector *Where, const FRotation *Angles)
 **		in calls to SfxStop(), etc.
 */
 INT
-FGlobalAudio::PlaySfxOrigined(const FVector *Source, USound *usnd, const FLOAT SoundRadius)
+FGlobalAudio::PlaySfxOrigined(const FVector *Source, USound *usnd,
+					const FLOAT SoundRadius,
+					const FLOAT fScale)
 {
 	GUARD;
 	INT	pid;
@@ -381,6 +391,8 @@ FGlobalAudio::PlaySfxOrigined(const FVector *Source, USound *usnd, const FLOAT S
 				Source->X,	/* World location */
 				Source->Y,
 				Source->Z);
+	SoundEngSoundSetRadius(pid, SoundRadius);
+	SoundEngSoundScaleVolume(pid, fScale);
 
 	return pid;
 
@@ -414,7 +426,8 @@ FGlobalAudio::PlaySfxOrigined(const FVector *Source, USound *usnd, const FLOAT S
 */
 INT
 FGlobalAudio::PlaySfxLocated(const FVector *Source, USound *usnd,
-				const INT iActor, const FLOAT SoundRadius)
+				const INT iActor, const FLOAT SoundRadius,
+				const FLOAT fScale)
 {
 	GUARD;
 	INT	pid;
@@ -432,6 +445,8 @@ FGlobalAudio::PlaySfxLocated(const FVector *Source, USound *usnd,
 				Source->X,	/* World location */
 				Source->Y,
 				Source->Z);
+	SoundEngSoundSetRadius(pid, SoundRadius);
+	SoundEngSoundScaleVolume(pid, fScale);
 
 	return pid;
 
@@ -540,12 +555,14 @@ FGlobalAudio::SfxStopActor(const INT iActor)
 **	NONE
 */
 void
-FGlobalAudio::SfxMoveActor(const INT iActor, const FVector *Where)
+FGlobalAudio::SfxMoveActor(const INT iActor, const FVector *Where,
+			const FLOAT fScale)
 {
 	SoundEngActorMove(iActor,
 			Where->X,
 			Where->Y,
-			Where->Z);
+			Where->Z,
+			fScale);
 } /* End FGlobalAudio::SfxMoveActor() */
 
 /*
@@ -692,6 +709,103 @@ FGlobalAudio::DirectSoundFlagSet(INT val)
 } /* End FGlobalAudio::DirectSoundFlagSet() */
 
 /*
+** FGlobalAudio::FilterFlagGet:
+** Retrieves the current setting of the sound system's
+** filter enable flag.
+**
+** Parameters:
+**	NONE
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	1	Filtering is enabled.
+**	0	Filtering is not enabled.
+*/
+INT
+FGlobalAudio::FilterFlagGet(void)
+{
+	GUARD;
+
+	return SoundEngFilterFlagGet();
+
+	UNGUARD("FGlobalAudio::FilterFlagGet");
+} /* End FGlobalAudio::FilterFlagGet() */
+
+/*
+** FGlobalAudio::FilterFlagSet:
+** Changes the sound system's filter enable flag.  The change
+** will not take effect until ::Init() is called.
+**
+** Parameters:
+**	Name	Description
+**	----	-----------
+**	val	New enable setting.
+**		0 means don't use filter.
+**		Other means use filter.
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	any	Previous setting of filter flag.
+*/
+INT
+FGlobalAudio::FilterFlagSet(INT val)
+{
+	GUARD;
+
+	return SoundEngFilterFlagSet(val);
+
+	UNGUARD("FGlobalAudio::FilterFlagSet");
+} /* End FGlobalAudio::FilterFlagSet() */
+
+/*
+** FGlobalAudio::MixingRateSet:
+** Changes the current audio driver mixing rate in Hertz.
+**
+** Parameters:
+**	Name	Description
+**	----	-----------
+**	val	New mixing rate in Hertz.
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	any	Prior setting of audio driver mixing rate in Hertz.
+*/
+INT
+FGlobalAudio::MixingRateSet(INT val)
+{
+	GUARD;
+
+	return SoundEngMixingRateSet(val);
+
+	UNGUARD("FGlobalAudio::MixingRateSet");
+} /* End FGlobalAudio::MixingRateSet() */
+
+/*
+** FGlobalAudio::MixingRateGet:
+** Retrieves the current audio driver mixing rate in Hertz.
+**
+** Parameters:
+**	NONE
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	any	Current audio driver mixing rate in Hertz.
+*/
+INT
+FGlobalAudio::MixingRateGet(void)
+{
+	GUARD;
+
+	return SoundEngMixingRateGet();
+
+	UNGUARD("FGlobalAudio::MixingRateSet");
+} /* End FGlobalAudio::MixingRateGet() */
+
+/*
 ** FGlobalAudio::Pause:
 ** Pauses the sound output (by calling Galaxy's StopOutput(), if
 ** Galaxy is running).
@@ -763,6 +877,66 @@ FGlobalAudio::SpecifySong(int iSong)
 
 	UNGUARD("FGlobalAudio::SpecifySong");
 } /* End FGlobalAudio::SpecifySong() */
+
+/*******************************************************************
+                      Unreal console handler
+*******************************************************************/
+
+/*
+** FGlobalAudio::Exec:
+** Handles commands from the Unreal game console.
+**
+** Parameters:
+**	Name	Description
+**	----	-----------
+**	Cmd	Command line typed by the user.
+**	Out	Where the console output goes.
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	1	Command was parsed here.
+**	0	Command was not parsed here.
+*/
+int
+FGlobalAudio::Exec(const char *Cmd,FOutputDevice *Out)
+{
+	GUARD;
+	const char *Str = Cmd;
+	char stmp[80];
+	char stmp2[80];
+
+	if (GetCMD(&Str, "AUDIOLOG"))
+	{
+		/*
+		** Specify debug level for sound engine.
+		*/
+		if (GetSTRING(Str, "LEVEL=", stmp, 80))
+		{
+			SoundEngLogDetail(atoi(stmp));
+			sprintf(stmp2, "Sound system debug level specified:  %d", atoi(stmp));
+			Out->Log(stmp2);
+		}
+		else
+		{
+			SoundEngLogDetail(1);
+			Out->Log("Sound system debug level reset");
+		}
+		return 1;
+	}
+	else if (GetCMD(&Str, "HELP"))
+	{
+		Out->Log("   AUDIOLOG LEVEL=n - Specify sound system log detail level, where 'n' is 1 to 5");
+		return 0;
+	}
+	else
+	{
+		return 0;
+	}
+	return 0;
+
+	UNGUARD("FGlobalAudio::Exec");
+} /* End FGlobalAudio::Exec() */
 
 /*
 =============================================================================

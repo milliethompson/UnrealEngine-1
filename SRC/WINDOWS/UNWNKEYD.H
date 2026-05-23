@@ -1,5 +1,17 @@
-// UnWnKeyD.h : header file
-//
+/*============================================================================
+UnWnKeyD.h: Keyboard input selection dialog
+Used by: Anyone who wants the user to select a keyboard key
+
+Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
+
+Description:
+    This defines the class used to present a small dialog asking the
+    user to select a key (by pressing it).
+
+Revision history:
+    * xx/xx/96, Created by Mark
+============================================================================*/
 
 /////////////////////////////////////////////////////////////////////////////
 // CDialogKeySelect dialog

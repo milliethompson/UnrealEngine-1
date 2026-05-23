@@ -6,7 +6,7 @@ Begin VB.Form frmSoundFXBrowser
    ClientLeft      =   6825
    ClientTop       =   2775
    ClientWidth     =   2445
-   Height          =   6300
+   Height          =   6255
    Icon            =   "BrSound.frx":0000
    Left            =   6765
    LinkTopic       =   "Form2"
@@ -15,7 +15,7 @@ Begin VB.Form frmSoundFXBrowser
    ScaleHeight     =   5895
    ScaleWidth      =   2445
    ShowInTaskbar   =   0   'False
-   Top             =   2430
+   Top             =   2475
    Width           =   2565
    Begin VB.PictureBox SoundsHolder 
       Height          =   5055
@@ -305,7 +305,7 @@ Private Sub SoundRefresh_Click()
     Do
         ' Get next audio family in families list
         stmp = Ed.Server.GetProp("Audio", "QueryFam")
-        If (stmp <> "" And stmp <> "All") Then
+        If (stmp <> "" And stmp <> AllString) Then
             ' Add family name to browser outline control
             SoundsOutline.List(index) = stmp
             SoundsOutline.Indent(index) = 1
@@ -325,7 +325,7 @@ Private Sub SoundRefresh_Click()
 
     
     ' Tell Ed that we want a list of all sound resources
-'    Ed.Server.Exec "RESOURCE QUERY TYPE=Sound"
+'    Ed.Server.Exec "RES QUERY TYPE=Sound"
     
     ' Loop through the list of sound resources
 '    i = 0
@@ -427,7 +427,16 @@ End Sub
 
 
 Private Sub SoundTest_Click()
+    Dim resname As String
+    
+    ' For debugging
     Ed.Server.Exec "AUDIO TESTBUTTONCLICKED"
+    
+    ' get name of currently selected sound resource
+    resname = CurrentResource()
+    If (resname = "") Then Exit Sub
+    '
+    Ed.Server.Exec "AUDIO TEST NAME=" & Quotes(resname)
 End Sub
 
 ' Determine which family is currently hilited in

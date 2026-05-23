@@ -19,7 +19,6 @@ Revision history:
 */
 
 #include "UnGame.h"
-#include "UnChecks.h"
 
 //----------------------------------------------------------------------------
 //                           A single animation sequence.
@@ -38,8 +37,8 @@ public:
     FLOAT           Rate        ; // The rate of animation. Added to Frame each tick.
     EActorMessage   Message :16 ; // The parameterless message to send at the end of the animation.
 
-    void CopyTo(ARoot & Actor) const; // Copy the animation information to an actor. This starts Actor using this animation.
-    void CopyFrom(const ARoot & Actor); // Copy the current animation of Actor into *this.
+    void CopyTo(AActor & Actor) const; // Copy the animation information to an actor. This starts Actor using this animation.
+    void CopyFrom(const AActor & Actor); // Copy the current animation of Actor into *this.
     void Make(TSequence Sequence, BYTE First, BYTE Last) // Make a standard, repeating, normal speed animation.
     {
         this->Sequence  = Sequence  ;
@@ -58,8 +57,8 @@ class AIAnimations
 {
 public:
     enum { MaxCount = 8 }; // Maximum number of animations.
-    void MoveNextTo(ARoot & Actor); // Make Actor start using the next animation and remove it from the list.
-    void GetFirstFrom(ARoot & Actor); // Copy the animation in Actor to the front of the list.
+    void MoveNextTo(AActor & Actor); // Make Actor start using the next animation and remove it from the list.
+    void GetFirstFrom(AActor & Actor); // Copy the animation in Actor to the front of the list.
     int Count() const { return State.Count; }
     AIAnimation & First() // The first animation.
     {

@@ -31,27 +31,27 @@ class F3DCIF
 	{
 	public:
 	C3D_EC  (WINAPI *GetInfo)(PC3D_3DCIFINFO p3DCIFInfo);
-	C3D_HRC (WINAPI *ContextCreate)(void);
-	C3D_EC  (WINAPI *Init)(void);
-	C3D_EC  (WINAPI *Term)(void);
+	C3D_HRC (WINAPI *ContextCreate)();
+	C3D_EC  (WINAPI *Init)();
+	C3D_EC  (WINAPI *Term)();
 	C3D_EC  (WINAPI *ContextDestroy)(C3D_HRC hRC);
 	C3D_EC  (WINAPI *ContextSetState)(C3D_HRC hRC,C3D_ERSID eRStateID, C3D_PRSDATA pRStateData);
 	C3D_EC  (WINAPI *RenderBegin)(C3D_HRC hRC);
-	C3D_EC  (WINAPI *RenderEnd)(void);
+	C3D_EC  (WINAPI *RenderEnd)();
 	C3D_EC  (WINAPI *TextureReg)(C3D_PTMAP ptmapToReg,C3D_PHTX phtmap);
 	C3D_EC  (WINAPI *TextureUnreg)(C3D_HTX htxToUnreg);
 	C3D_EC  (WINAPI *RenderPrimStrip)(C3D_VSTRIP vStrip,C3D_UINT32 u32NumVert);
 	//
 	HINSTANCE hModule;
 	FARPROC *Find(char *Name);
-	int Associate(void);
+	int Associate();
 	} ATI3DCIF;
 
 //
 // Try to import all of ATI's functions from ATI's DLL.
 // Returns 1 if success, 0 if failure.
 //
-int F3DCIF::Associate(void)
+int F3DCIF::Associate()
 	{
 	hModule = LoadLibrary("ATI3DCIF.DLL");
 	if (!hModule) return 0;
@@ -104,9 +104,9 @@ class FRageRenderDevice : public FRenderDevice
 	//
 	// Standard FRenderDevice functions:
 	//
-	void Init3D(void);
-	void Exit3D(void);
-	void Flush3D(void);
+	void Init3D();
+	void Exit3D();
+	void Flush3D();
 	//
 	void Lock(ICamera *Camera);
 	void Unlock(ICamera *Camera);
@@ -141,7 +141,7 @@ FRageRenderDevice GRage;
 //
 // Initializes the ATI Rage device.  Can't fail.
 //
-void FRageRenderDevice::Init3D(void)
+void FRageRenderDevice::Init3D()
 	{
 	GUARD;
 	//
@@ -183,7 +183,7 @@ void FRageRenderDevice::Init3D(void)
 //
 // Shut down the ATI Rage device.
 //
-void FRageRenderDevice::Exit3D(void)
+void FRageRenderDevice::Exit3D()
 	{
 	GUARD;
 	//
@@ -210,7 +210,7 @@ void FRageRenderDevice::Exit3D(void)
 //
 // Flush all cached data.
 //
-void FRageRenderDevice::Flush3D(void)
+void FRageRenderDevice::Flush3D()
 	{
 	GUARD;
 	//
@@ -383,7 +383,7 @@ C3D_HTX FRageRenderDevice::RegisterTexture(UTexture *Texture)
 	// Determine the maximum log2 dimension for mipmapping:
 	//
 	BYTE *Surface  = (BYTE *)CachedTexture->ddsd.lpSurface;
-	int MaxLog2 = FLogTwo(OurMax(Texture->USize,Texture->VSize));
+	int MaxLog2 = FLogTwo(Max(Texture->USize,Texture->VSize));
 	for (int i=0; i < MaxLog2; i++)
 		{
 		CachedTexture->TMap.apvLevels[i] = Surface;
@@ -705,7 +705,7 @@ void FRageRenderDevice::DrawPolyF(ICamera *Camera,FTransform *Pts,int NumPts,FCo
 -----------------------------------------------------------------------------*/
 
 FRageRenderDevice GRageRenDev;
-FRenderDevice *FindRenderDevice(void)
+FRenderDevice *FindRenderDevice()
 	{
 	if (ATI3DCIF.Associate()) return &GRageRenDev;
 	else return NULL;

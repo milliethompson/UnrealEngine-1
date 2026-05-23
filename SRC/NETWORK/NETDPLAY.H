@@ -25,7 +25,7 @@ class NDirectPlayDriver : public NDriver
 	// NDriver interface:
 	//
 	int Init(char *ParamBuffer,char *ErrorMessage);
-	void Exit(void);
+	void Exit();
 	int Exec(const char *Cmd,FOutputDevice *Out);
 	int CanHandleURL(char *ServerURL);
 	NSocket *ServerAcceptConnection(int ServerID);
@@ -35,8 +35,8 @@ class NDirectPlayDriver : public NDriver
 	//
 	// FTask interface:
 	//
-	void TaskTick(void);
-	void TaskExit(void);
+	void TaskTick();
+	void TaskExit();
 	char *TaskStatus(char *Name,char *Desc);
 	//
 	// Custom variables:
@@ -70,9 +70,9 @@ class NDirectPlaySocket : public NSocket
 	//
 	int GetPacket (NPacket *PacketToGet);
 	void SendPacket (NPacket *PacketToSend);
-	int MaxPacketSize(void);
-	void Tick(void);
-	void Delete(void);
+	int MaxPacketSize();
+	void Tick();
+	void Delete();
 	//
 	private:
 	void Init(NDriver *CreatingDriver);

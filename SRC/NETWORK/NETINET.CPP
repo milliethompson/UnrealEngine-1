@@ -8,6 +8,7 @@
 		* Created by Tim Sweeney
 =============================================================================*/
 
+#pragma warning (disable : 4201) /* nonstandard extension used : nameless struct/union */
 #include <windows.h>
 #include <windowsx.h>
 #include "UnBuild.h"
@@ -34,7 +35,7 @@ union
 //
 // Windows sockets errors
 //
-char *wsaError(void)
+char *wsaError()
 	{
 	switch (WSAGetLastError())
 		{
@@ -199,6 +200,7 @@ int NInternetDriver::Init(char *ParamBuffer,char *ErrorMessage)
 		Exit(); 
 		return 0;
 		};
+    debugf(LOG_Init, "gethostname(): %s", HostName );
 	HostAddr.D=0;
 	hGetHostByName = WSAAsyncGetHostByName(hWndAsyncResults,WM_WSA_GetHostByName,HostName,(char *)&GHostEnt,sizeof(GHostEnt));
 	if (!hGetHostByName)
@@ -262,7 +264,7 @@ int NInternetDriver::Init(char *ParamBuffer,char *ErrorMessage)
 	UNGUARD("NInternetDriver::Init");
 	};
 
-void NInternetDriver::Exit(void)
+void NInternetDriver::Exit()
 	{
 	GUARD;
 	AssertInitialized();
@@ -287,7 +289,7 @@ void NInternetDriver::Exit(void)
 	UNGUARD("NInternetDriver::Exit");
 	};
 
-void NInternetDriver::TaskExit(void)
+void NInternetDriver::TaskExit()
 	{
 	GUARD;
 	//
@@ -305,7 +307,7 @@ char *NInternetDriver::TaskStatus(char *Name, char *Desc)
 	UNGUARD("NInternetDriver::TaskStatus");
 	};
 
-void NInternetDriver::TaskTick(void)
+void NInternetDriver::TaskTick()
 	{
 	GUARD;
 	AssertInitialized();

@@ -3,8 +3,8 @@ Begin VB.Form frmRebuilder
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Rebuilder"
    ClientHeight    =   6375
-   ClientLeft      =   5670
-   ClientTop       =   3915
+   ClientLeft      =   5835
+   ClientTop       =   3225
    ClientWidth     =   3855
    BeginProperty Font 
       name            =   "MS Sans Serif"
@@ -19,14 +19,14 @@ Begin VB.Form frmRebuilder
    Height          =   6735
    HelpContextID   =   118
    Icon            =   "Rebuild.frx":0000
-   Left            =   5610
+   Left            =   5775
    LinkTopic       =   "Form4"
    MaxButton       =   0   'False
    MinButton       =   0   'False
    ScaleHeight     =   6375
    ScaleWidth      =   3855
    ShowInTaskbar   =   0   'False
-   Top             =   3615
+   Top             =   2925
    Width           =   3975
    Begin VB.CommandButton UpdStats 
       Appearance      =   0  'Flat
@@ -96,7 +96,7 @@ Begin VB.Form frmRebuilder
       _ExtentX        =   6588
       _ExtentY        =   10186
       _StockProps     =   15
-      Caption         =   "BSP  "
+      Caption         =   "Lighting  "
       ForeColor       =   0
       BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
          name            =   "MS Sans Serif"
@@ -108,7 +108,7 @@ Begin VB.Form frmRebuilder
          strikethrough   =   0   'False
       EndProperty
       TabsPerRow      =   3
-      Tab             =   1
+      Tab             =   2
       TabOrientation  =   0
       Tabs            =   3
       Style           =   1
@@ -118,18 +118,18 @@ Begin VB.Form frmRebuilder
       TabCaption(0)   =   "Geometry  "
       Tab(0).ControlCount=   2
       Tab(0).ControlEnabled=   0   'False
-      Tab(0).Control(0)=   "Frame8"
-      Tab(0).Control(1)=   "AutoBSP"
+      Tab(0).Control(0)=   "AutoBSP"
+      Tab(0).Control(1)=   "Frame8"
       TabCaption(1)   =   "BSP  "
       Tab(1).ControlCount=   4
-      Tab(1).ControlEnabled=   -1  'True
+      Tab(1).ControlEnabled=   0   'False
       Tab(1).Control(0)=   "Frame4"
       Tab(1).Control(1)=   "Frame1"
       Tab(1).Control(2)=   "Frame3"
       Tab(1).Control(3)=   "AutoLights"
       TabCaption(2)   =   "Lighting  "
       Tab(2).ControlCount=   2
-      Tab(2).ControlEnabled=   0   'False
+      Tab(2).ControlEnabled=   -1  'True
       Tab(2).Control(0)=   "Frame6"
       Tab(2).Control(1)=   "Frame5"
       Begin VB.CheckBox AutoLights 
@@ -144,7 +144,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   255
-         Left            =   720
+         Left            =   -74280
          TabIndex        =   71
          Top             =   5340
          Value           =   1  'Checked
@@ -162,7 +162,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   975
-         Left            =   120
+         Left            =   -74880
          TabIndex        =   65
          Top             =   4320
          Width           =   3495
@@ -215,7 +215,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   1935
-         Left            =   120
+         Left            =   -74880
          TabIndex        =   61
          Top             =   2280
          Width           =   3495
@@ -352,7 +352,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   1695
-         Left            =   120
+         Left            =   -74880
          TabIndex        =   35
          Top             =   480
          Width           =   3495
@@ -1259,7 +1259,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   2175
-         Left            =   -74880
+         Left            =   120
          TabIndex        =   6
          Top             =   480
          Width           =   3375
@@ -1535,12 +1535,12 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   1095
-         Left            =   -74880
+         Left            =   120
          TabIndex        =   4
          Top             =   2760
          Width           =   3375
          Begin VB.CheckBox LightSel 
-            Caption         =   "Apply selected lights only"
+            Caption         =   "Apply selected lights and lights in selected zone descriptors only."
             BeginProperty Font 
                name            =   "MS Sans Serif"
                charset         =   0
@@ -1550,10 +1550,10 @@ Begin VB.Form frmRebuilder
                italic          =   0   'False
                strikethrough   =   0   'False
             EndProperty
-            Height          =   255
+            Height          =   375
             Left            =   240
             TabIndex        =   5
-            Top             =   360
+            Top             =   420
             Width           =   2775
          End
       End

@@ -25,8 +25,6 @@ public:
     typedef enum
     {
         NoSection       = 0 // Always 0.
-    ,   InputSection        // Section describing input devices, thresholds, and so on.
-    ,   ActionSection       // Section describing player game-play actions
     ,   PreferencesSection  // Section describing player preferences.
     ,   AudioSection        // Section describing audio properties.
     ,   SectionCount        // Number of sections, including NoSection.
@@ -43,14 +41,26 @@ public:
     TSection Section(const char * Text);
 
     void Initialize();
-    void Finalize();
+    void Exit();
 
     // Get a particular value from an initialization file:
     // Returns 0 if not found or if the value is empty.
     // Otherwise, free the returned string when it is no longer needed.
+//todo: Delete
     char * Get
     (
         TSection        Section         // Get from this section.
+    ,   const char *    Key             // Get the value for this key.
+    ,   const char *    FileName = 0    // 0 means use the default file name
+    );
+
+    // Get a particular value from an initialization file:
+    // Returns 0 if not found or if the value is empty.
+    // Otherwise, free the returned string when it is no longer needed.
+//todo: Delete
+    static char * GetValue
+    (
+        const char *    Section         // Get from this section.
     ,   const char *    Key             // Get the value for this key.
     ,   const char *    FileName = 0    // 0 means use the default file name
     );
@@ -77,9 +87,18 @@ public:
     
     // Get all the profile files for a particular section, in "Key=Value" strings.
     // Free the returned list when it is no longer needed.
+//todo: Delete
     static FKeyValues::TStringList GetSection
     (
         TSection        Section         // Get from this section.
+    ,   const char *    FileName = 0    // 0 means use the default file name
+    );
+    
+    // Get all the profile files for a particular section, in "Key=Value" strings.
+    // Caller must free the returned list when it is no longer needed.
+    static FKeyValues::TStringList GetSection
+    (
+        const char *    Section         // Get from this section.
     ,   const char *    FileName = 0    // 0 means use the default file name
     );
 

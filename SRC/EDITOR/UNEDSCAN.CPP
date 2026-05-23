@@ -18,19 +18,19 @@
 // Set up scanner to look at current pixels.  Called immediately before drawing each
 // and every element of the screen (Bsp node, lines, etc).
 //
-void FScan::PreScan (void)
+void FScan::PreScan()
 	{
 	int i,j,Ofs;
-	int X1   = OurMax (0,X - EDSCAN_RADIUS);
-	int Y1   = OurMax (0,Y - EDSCAN_RADIUS);
-	int XL   = OurMin (X + EDSCAN_RADIUS, Camera->SXR -1) - X1;
-	int YL   = OurMin (Y + EDSCAN_RADIUS, Camera->SYR -1) - Y1;
+	int X1   = Max (0,X - EDSCAN_RADIUS);
+	int Y1   = Max (0,Y - EDSCAN_RADIUS);
+	int XL   = Min (X + EDSCAN_RADIUS, Camera->SXR -1) - X1;
+	int YL   = Min (Y + EDSCAN_RADIUS, Camera->SYR -1) - Y1;
 	//
 	if (Camera->ColorBytes==1)
 		{
 		for (i=0; i <= XL; i++) for (j=0; j <= YL; j++)
 			{
-			Ofs = i + X1 + (j + Y1) * Camera->SXStride;
+			Ofs = i + X1 + (j + Y1) * Camera->Stride;
 			Pixels[i][j] = Camera->Screen [Ofs];
 			Camera->Screen [Ofs] = EDSCAN_IGNORE;
 			};
@@ -39,7 +39,7 @@ void FScan::PreScan (void)
 		{
 		for (i=0; i <= XL; i++) for (j=0; j <= YL; j++)
 			{
-			Ofs = (i + X1 + (j + Y1) * Camera->SXStride) << 1;
+			Ofs = (i + X1 + (j + Y1) * Camera->Stride) << 1;
 			Pixels[i][j] = *(WORD *)&Camera->Screen [Ofs];
 			*(WORD *)&Camera->Screen [Ofs] = (WORD)EDSCAN_IGNORE;
 			};
@@ -48,7 +48,7 @@ void FScan::PreScan (void)
 		{
 		for (i=0; i <= XL; i++) for (j=0; j <= YL; j++)
 			{
-			Ofs = (i + X1 + (j + Y1) * Camera->SXStride) << 2;
+			Ofs = (i + X1 + (j + Y1) * Camera->Stride) << 2;
 			Pixels[i][j] = *(DWORD *)&Camera->Screen [Ofs];
 			*(DWORD *)&Camera->Screen [Ofs] = (DWORD)EDSCAN_IGNORE;
 			};
@@ -63,16 +63,16 @@ void FScan::PostScan (EEdScan ScanType,
 	int NewIndex, int NewA, int NewB, FVector *NewV)
 	{
 	int i,j,Ofs;
-	int X1   = OurMax (0,X - EDSCAN_RADIUS);
-	int Y1   = OurMax (0,Y - EDSCAN_RADIUS);
-	int XL   = OurMin (X + EDSCAN_RADIUS, Camera->SXR -1) - X1;
-	int YL   = OurMin (Y + EDSCAN_RADIUS, Camera->SYR -1) - Y1;
+	int X1   = Max (0,X - EDSCAN_RADIUS);
+	int Y1   = Max (0,Y - EDSCAN_RADIUS);
+	int XL   = Min (X + EDSCAN_RADIUS, Camera->SXR -1) - X1;
+	int YL   = Min (Y + EDSCAN_RADIUS, Camera->SYR -1) - Y1;
 	//
 	if (Camera->ColorBytes==1)
 		{
 		for (i=0; i <= XL; i++) for (j=0; j <= YL; j++)
 			{
-			Ofs = i + X1 + (j + Y1) * Camera->SXStride;
+			Ofs = i + X1 + (j + Y1) * Camera->Stride;
 			if (Camera->Screen [Ofs] != EDSCAN_IGNORE)
 				{
 				Type   		= ScanType;
@@ -88,7 +88,7 @@ void FScan::PostScan (EEdScan ScanType,
 		{
 		for (i=0; i <= XL; i++) for (j=0; j <= YL; j++)
 			{
-			Ofs = (i + X1 + (j + Y1) * Camera->SXStride) << 1;
+			Ofs = (i + X1 + (j + Y1) * Camera->Stride) << 1;
 			if (*(WORD *)&Camera->Screen [Ofs] != (DWORD)EDSCAN_IGNORE)
 				{
 				Type   		= ScanType;
@@ -104,7 +104,7 @@ void FScan::PostScan (EEdScan ScanType,
 		{
 		for (i=0; i <= XL; i++) for (j=0; j <= YL; j++)
 			{
-			Ofs = (i + X1 + (j + Y1) * Camera->SXStride) << 2;
+			Ofs = (i + X1 + (j + Y1) * Camera->Stride) << 2;
 			if (*(DWORD *)&Camera->Screen [Ofs] != (DWORD)EDSCAN_IGNORE)
 				{
 				Type   		= ScanType;
@@ -129,7 +129,7 @@ void FScan::Init(ICamera *NewCamera)
 	B      = 0;
 	};
 
-void FScan::Exit(void)
+void FScan::Exit()
 	{
 	Active = 0;
 	};

@@ -16,6 +16,8 @@ Revision history:
 
 static const BOOL Debugging = FALSE; // TRUE to enable debugging, FALSE otherwise.
 
+static const int MaxSectionLength = 32000; // Maximum length of text in a profile section.
+
 static inline void __cdecl Debug(const char * Message, ...)
 {
     if( Debugging )
@@ -43,91 +45,6 @@ static void Debug( const char * Intro, FKeyValues::TStringList List )
         }
     }
 }
-
-#if 0 //tbd:
-//----------------------------------------------------------------------------
-//                Make a pair out of text in the form Key=Value
-//----------------------------------------------------------------------------
-void FKeyValue::TPair::Make(const char * Pair)
-{
-    Free();
-    PairText = FParse::MakeString(Pair);
-    Debug( "TPair::Make(%s)", Pair );
-}
-
-//----------------------------------------------------------------------------
-//                Make a pair out of Key and Value
-//----------------------------------------------------------------------------
-void FKeyValue::TPair::Make(const char * Key, const char * Value)
-{
-    const char Length = 
-        ( Key==0 ? 0 : strlen(Key) )
-    +   1                            // For separating '='
-    +   ( Value==0 ? 0 : strlen(Value) )
-    ;
-    char * Pair = FParse::MakeString(Length);
-    Pair[0] = 0;
-    if( Key != 0 ) { strcat(Pair,Key); }
-    strcat(Pair,"=");
-    if( Value != 0 ) { strcat(Pair,Value); }
-    Make(Pair);
-    FParse::FreeString(Pair);
-}
-
-//----------------------------------------------------------------------------
-//                Make room for a new pair-list
-//----------------------------------------------------------------------------
-void FKeyValue::TPairs::MakeRoomFor(int PairLength)
-{
-    const int ApproximateUnusedSpace = Space==0 ? 0 : Space - Next;
-    if( ApproximateUnusedSpace <= PairLength + 20 ) // +20 for laziness and robustness
-    {
-        const int AdditionalSpace = OurMax(PairLength,400);
-        const int NewSpace = Space + AdditionalSpace + 20; // +20 for nulls and general laziness and robustness.
-        char * NewString = FParse::MakeString(NewSpace);
-        if( Space > 0 )
-        {
-            memmove( NewString, PairsText, Space );
-        }
-        else 
-        {
-            Next = 0;
-            // Double-null-terminate the list:
-            NewString[Next] = 0;
-            NewString[Next+1] = 0;
-        }
-        Free(); // Delete old pair.
-        Space = NewSpace;
-        PairsText = NewString;
-    }
-}
-
-//----------------------------------------------------------------------------
-//                Add a key-value pair to the list
-//----------------------------------------------------------------------------
-void FKeyValue::TPairs::Add(const TPair & Pair)
-{
-    if( Pair() != 0 )
-    {
-        const int PairLength = strlen(Pair());
-        MakeRoomFor( PairLength );
-        memmove( &PairsText[Next], Pair(), PairLength+1 ); // +1 to grab trailing null.
-        Next += PairLength+1; // Next now points beyond trailing null just added.
-        PairsText[Next] = 0; // Double-null-terminate the list.
-        Debug( "TPairs::Add(%s)", Pair() );
-    }
-}
-
-//----------------------------------------------------------------------------
-//                Add a key-value pair to the list
-//----------------------------------------------------------------------------
-void FKeyValue::TPairs::Add(const char * Key, const char * Value)
-{
-    TPair Pair;
-    Pair.Make(Key,Value);
-    Add( Pair );
-}
-#endif 
 
 //----------------------------------------------------------------------------
 //        What are the current values for the given keys? 
@@ -246,19 +163,6 @@ FKeyValues::TStringList FKeyValues::Pairs() const
     return Pairs;
 }
 
-#if 0 //tbd:
-//----------------------------------------------------------------------------
-//                   Returns a new empty list.
-//----------------------------------------------------------------------------
-FKeyValues::TStringList FKeyValues::TStringList::New()
-{
-    TStringList List;
-    List.Strings = FParse::MakeString(2);
-    memmove(List.Strings, "\0\0", 2 ); // Empty list has 2 null terminators.
-    return List;
-}
-#endif
-
 //----------------------------------------------------------------------------
 //    Return a pointer to the next string in the list, or 0 if none.
 //----------------------------------------------------------------------------
@@ -326,4 +230,42 @@ void FKeyValues::TStringList::Add(TStringList List)
 {
     GUARD;
     UNGUARD( "TStringList::Add" );
+}
+
+//----------------------------------------------------------------------------
+//                  Section name
+//----------------------------------------------------------------------------
+const char * FKeyValues::SectionName() const
+{
+    return 0;
+}
+
+//----------------------------------------------------------------------------
+//       Interpret a set of pairs from a profile file
+//----------------------------------------------------------------------------
+BOOL FKeyValues::LoadValues(const char * Section, const char * FileName)
+{
+    TStringList List;
+    List.Strings = FParse::MakeString(MaxSectionLength);
+    if( Section == 0 )
+    {
+        Section = SectionName();
+    }
+    GApp->GetProfileSection( Section, List.Strings, MaxSectionLength, FileName );
+    const BOOL Succeeded = SetValues(List);
+    List.Free();    
+    return Succeeded;
+}
+
+//----------------------------------------------------------------------------
+//       Save the key-value pairs to a profile file
+//----------------------------------------------------------------------------
+void FKeyValues::SaveValues(const char * Section, const char * FileName)
+{
+    TStringList List = Pairs();
+    if( Section == 0 )
+    {
+        Section = SectionName();
+    }
+    GApp->PutProfileSection( Section, List.Strings, FileName );
 }
