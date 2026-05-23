@@ -1,0 +1,52 @@
+/*=============================================================================
+	UnWn.odl: type library source for Unreal
+	Used by: Windows console
+
+	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Compiled with Visual C++ 4.0 using Tabs=4, Calling method=__fastcall
+
+	Revision history:
+		* Created by Tim Sweeney
+=============================================================================*/
+
+//
+// This file will be processed by the Make Type Library (mktyplib) tool to
+// produce the type library (unreal.tlb).
+//
+[ uuid(D0EB88E1-2016-11CF-98C0-0000C06958A7), version(1.0), helpstring ("Unreal Engine") ]
+library Unreal
+	{
+	importlib("stdole32.tlb");
+
+	/////////////////////
+	// IUnrealEdServer //
+	/////////////////////
+
+	[ uuid(D0EB88E6-2016-11CF-98C0-0000C06958A7) ]
+	dispinterface IUnrealEdServer
+		{
+		properties:
+			//{{AFX_ODL_PROP(CUnrealEdServer)
+			//}}AFX_ODL_PROP
+		methods:
+			//{{AFX_ODL_METHOD(CUnrealEdServer)
+			[id(1), helpstring("Execute a world editor command.")] void Exec(BSTR Cmd);
+			[id(2), helpstring("Execute a slow command.")] void SlowExec(BSTR Cmd);
+			[id(3), helpstring("Get a world editor property.")] BSTR GetProp(BSTR Topic, BSTR Item);
+			[id(4), helpstring("Set a world editor property.")] void SetProp(BSTR Topic, BSTR Item, BSTR NewValue);
+			[id(5), helpstring("Enable all windows.")] void Enable();
+			[id(6), helpstring("Disable all windows. Must call before opening a modal dialog box")] void Disable();
+			[id(7), helpstring("Initialize Unreal")] void Init(long hWndMain, long hWndEdCallback);
+			//}}AFX_ODL_METHOD
+		};
+	[ uuid(F936C3A7-1FF8-11CF-98C0-0000C06958A7) ]
+	coclass UnrealEdServer
+		{
+		[default] dispinterface IUnrealEdServer;
+		};
+	//{{AFX_APPEND_ODL}}
+	};
+
+/*-----------------------------------------------------------------------------
+   The End
+-----------------------------------------------------------------------------*/
