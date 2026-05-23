@@ -17,7 +17,7 @@ Begin VB.Form frmParSolLinearStair
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   5700
+   Height          =   5655
    HelpContextID   =   152
    Icon            =   "PsLStair.frx":0000
    Left            =   6630
@@ -26,7 +26,7 @@ Begin VB.Form frmParSolLinearStair
    ScaleHeight     =   5295
    ScaleWidth      =   2490
    ShowInTaskbar   =   0   'False
-   Top             =   765
+   Top             =   810
    Width           =   2610
    Begin VB.TextBox FirstStep 
       BeginProperty Font 
@@ -867,11 +867,6 @@ Private Sub Command2_Click()
     Hide
 End Sub
 
-Private Sub FirstStep_GotFocus()
-    SelectAll FirstStep
-End Sub
-
-
 Private Sub Form_Load()
     Call Ed.SetOnTop(Me, "BuildStair", TOP_NORMAL)
 End Sub
@@ -880,43 +875,11 @@ Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
 End Sub
 
-Private Sub Group_GotFocus()
-    SelectAll Group
-End Sub
-
-
 Private Sub Help_Click()
     ToolHelp (152)
 End Sub
-
-Private Sub NumSteps_GotFocus()
-    SelectAll NumSteps
-End Sub
-
-
-Private Sub StepHeight_GotFocus()
-    SelectAll StepHeight
-End Sub
-
-
-Private Sub StepLength_GotFocus()
-    SelectAll StepLength
-End Sub
-
-
-Private Sub StepWidth_GotFocus()
-    SelectAll StepWidth
-End Sub
-
 
 Private Sub Trigger_Change()
     Build_Click
 End Sub
 
-
-Public Sub SelectAll(txtBox As TextBox)
-
-    txtBox.SelStart = 0
-    txtBox.SelLength = Len(txtBox.Text)
-
-End Sub

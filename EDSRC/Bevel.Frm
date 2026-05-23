@@ -2,17 +2,17 @@ VERSION 4.00
 Begin VB.Form frmBevel 
    Caption         =   "Bevel"
    ClientHeight    =   1935
-   ClientLeft      =   7275
-   ClientTop       =   5145
+   ClientLeft      =   6480
+   ClientTop       =   6135
    ClientWidth     =   4080
-   Height          =   2340
+   Height          =   2295
    Icon            =   "Bevel.frx":0000
-   Left            =   7215
+   Left            =   6420
    LinkTopic       =   "Form1"
    ScaleHeight     =   1935
    ScaleWidth      =   4080
    ShowInTaskbar   =   0   'False
-   Top             =   4800
+   Top             =   5835
    Width           =   4200
    Begin VB.TextBox txtCapHeight 
       BackColor       =   &H00FFFFFF&
@@ -351,32 +351,6 @@ Dim ct As Integer
     Brush.NumPolys = N
     Call SendBrush(Ed.Server, 0)
 
-End Sub
-
-
-Public Sub SelectAll(txtBox As TextBox)
-    
-    txtBox.SelStart = 0
-    txtBox.SelLength = Len(txtBox.Text)
-
-End Sub
-
-Private Sub Form_Load()
-
-End Sub
-
-Private Sub txtCapHeight_GotFocus()
-    SelectAll txtCapHeight
-End Sub
-
-
-Private Sub txtDepth_GotFocus()
-    SelectAll txtDepth
-End Sub
-
-
-Private Sub txtGroupName_GotFocus()
-    SelectAll txtGroupName
 End Sub
 
 

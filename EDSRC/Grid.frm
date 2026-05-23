@@ -17,7 +17,7 @@ Begin VB.Form frmGrid
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   2400
+   Height          =   2355
    HelpContextID   =   111
    Icon            =   "Grid.frx":0000
    Left            =   1245
@@ -26,7 +26,7 @@ Begin VB.Form frmGrid
    ScaleHeight     =   1995
    ScaleWidth      =   6855
    ShowInTaskbar   =   0   'False
-   Top             =   3345
+   Top             =   3390
    Width           =   6975
    Begin VB.CommandButton Command3 
       Appearance      =   0  'Flat
@@ -546,10 +546,6 @@ End Sub
 
 Private Sub Form_Load()
     Call Ed.SetOnTop(Me, "GridSettings", TOP_PANEL)
-End Sub
-
-Private Sub Frame1_DragDrop(Source As Control, X As Single, Y As Single)
-
 End Sub
 
 Private Sub G1_Click()

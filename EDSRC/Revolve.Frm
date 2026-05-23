@@ -16,7 +16,7 @@ Begin VB.Form frmRevolve
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   2280
+   Height          =   2235
    HelpContextID   =   110
    Icon            =   "Revolve.frx":0000
    Left            =   1470
@@ -25,7 +25,7 @@ Begin VB.Form frmRevolve
    ScaleHeight     =   1875
    ScaleWidth      =   4620
    ShowInTaskbar   =   0   'False
-   Top             =   3870
+   Top             =   3915
    Width           =   4740
    Begin VB.CommandButton btnLoft 
       Appearance      =   0  'Flat
@@ -747,29 +747,6 @@ End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
-End Sub
-
-
-
-Public Sub SelectAll(txtBox As TextBox)
-
-    txtBox.SelStart = 0
-    txtBox.SelLength = Len(txtBox.Text)
-
-End Sub
-
-Private Sub txtCycle_GotFocus()
-    SelectAll txtCycle
-End Sub
-
-
-Private Sub txtGroupName_GotFocus()
-    SelectAll txtGroupName
-End Sub
-
-
-Private Sub txtNumSteps_GotFocus()
-    SelectAll txtNumSteps
 End Sub
 
 

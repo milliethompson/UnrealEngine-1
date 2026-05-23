@@ -4,7 +4,7 @@ Begin VB.Form frmMapToolbar
    Caption         =   "Map Toolbar"
    ClientHeight    =   3345
    ClientLeft      =   3030
-   ClientTop       =   6765
+   ClientTop       =   9780
    ClientWidth     =   5025
    ControlBox      =   0   'False
    BeginProperty Font 
@@ -17,7 +17,7 @@ Begin VB.Form frmMapToolbar
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   3750
+   Height          =   3705
    HelpContextID   =   114
    Icon            =   "MapCon.frx":0000
    Left            =   2970
@@ -27,7 +27,7 @@ Begin VB.Form frmMapToolbar
    ScaleHeight     =   3345
    ScaleWidth      =   5025
    ShowInTaskbar   =   0   'False
-   Top             =   6420
+   Top             =   9480
    Width           =   5145
    Begin VB.Frame Frame8 
       Caption         =   "Selected Brushes"

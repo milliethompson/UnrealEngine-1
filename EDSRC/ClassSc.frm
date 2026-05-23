@@ -2,17 +2,17 @@ VERSION 4.00
 Begin VB.Form frmScriptEd 
    Caption         =   "Class Script Editor"
    ClientHeight    =   7725
-   ClientLeft      =   6570
-   ClientTop       =   5955
+   ClientLeft      =   7620
+   ClientTop       =   7005
    ClientWidth     =   7935
-   Height          =   8415
+   Height          =   8370
    Icon            =   "ClassSc.frx":0000
-   Left            =   6510
+   Left            =   7560
    LinkTopic       =   "Form1"
    ScaleHeight     =   7725
    ScaleWidth      =   7935
    ShowInTaskbar   =   0   'False
-   Top             =   5325
+   Top             =   6420
    Width           =   8055
    Begin VB.TextBox EditBox 
       BeginProperty Font 

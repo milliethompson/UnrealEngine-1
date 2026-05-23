@@ -17,7 +17,7 @@ Begin VB.Form frmParSolSphere
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H00C0C0C0&
-   Height          =   5880
+   Height          =   5835
    HelpContextID   =   154
    Icon            =   "PsSphere.frx":0000
    Left            =   3000
@@ -26,7 +26,7 @@ Begin VB.Form frmParSolSphere
    ScaleHeight     =   5475
    ScaleWidth      =   2640
    ShowInTaskbar   =   0   'False
-   Top             =   2940
+   Top             =   2985
    Width           =   2760
    Begin Threed.SSPanel SSPanel1 
       Height          =   2175
@@ -139,7 +139,6 @@ Begin VB.Form frmParSolSphere
       Left            =   720
       TabIndex        =   8
       Top             =   2400
-      Value           =   -1  'True
       Width           =   735
    End
    Begin VB.OptionButton IsHollow 
@@ -157,6 +156,7 @@ Begin VB.Form frmParSolSphere
       Left            =   1560
       TabIndex        =   9
       Top             =   2400
+      Value           =   -1  'True
       Width           =   855
    End
    Begin VB.TextBox Group 
@@ -673,19 +673,9 @@ Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
 End Sub
 
-Private Sub Group_GotFocus()
-    SelectAll Group
-End Sub
-
-
 Private Sub Help_Click()
     ToolHelp (154)
 End Sub
-
-Private Sub InnerRadius_GotFocus()
-    SelectAll InnerRadius
-End Sub
-
 
 Private Sub IsHollow_Click()
     DrawLines (0)
@@ -703,19 +693,9 @@ Private Sub Label8_Click()
     DrawLines (2)
 End Sub
 
-Private Sub OuterRadius_GotFocus()
-    SelectAll OuterRadius
-End Sub
-
-
 Private Sub RadialStripes_Change()
     DrawLines (1)
 End Sub
-
-Private Sub RadialStripes_GotFocus()
-    SelectAll RadialStripes
-End Sub
-
 
 Private Sub Trigger_Change()
     Build_Click
@@ -724,17 +704,4 @@ End Sub
 Private Sub VerticalStripes_Change()
     DrawLines (2)
 End Sub
-
-
-Public Sub SelectAll(txtBox As TextBox)
-
-    txtBox.SelStart = 0
-    txtBox.SelLength = Len(txtBox.Text)
-
-End Sub
-
-Private Sub VerticalStripes_GotFocus()
-    SelectAll VerticalStripes
-End Sub
-
 

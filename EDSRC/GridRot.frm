@@ -17,7 +17,7 @@ Begin VB.Form frmRotGrid
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   3000
+   Height          =   2955
    HelpContextID   =   112
    Icon            =   "GridRot.frx":0000
    Left            =   3465
@@ -26,7 +26,7 @@ Begin VB.Form frmRotGrid
    ScaleHeight     =   2595
    ScaleWidth      =   4350
    ShowInTaskbar   =   0   'False
-   Top             =   2160
+   Top             =   2205
    Width           =   4470
    Begin VB.Frame Frame1 
       Caption         =   "Size"
@@ -331,10 +331,6 @@ End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
-End Sub
-
-Private Sub Frame1_DragDrop(Source As Control, X As Single, Y As Single)
-
 End Sub
 
 Private Sub G1_Click()

@@ -5,13 +5,13 @@ Begin VB.Form frmScriptFind
    ClientLeft      =   6300
    ClientTop       =   1470
    ClientWidth     =   5505
-   Height          =   2520
+   Height          =   2475
    Icon            =   "ScrFind.frx":0000
    Left            =   6240
    LinkTopic       =   "Form2"
    ScaleHeight     =   2115
    ScaleWidth      =   5505
-   Top             =   1125
+   Top             =   1170
    Width           =   5625
    Begin VB.CommandButton DoReplace 
       Caption         =   "&Replace"
@@ -168,10 +168,6 @@ End Sub
 Private Sub FindText_GotFocus()
     FindText.SelStart = 0
     FindText.SelLength = Len(FindText.Text)
-End Sub
-
-Private Sub Label1_Click()
-
 End Sub
 
 Private Sub ReplaceText_GotFocus()

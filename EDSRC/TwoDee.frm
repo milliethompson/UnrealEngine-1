@@ -4,7 +4,7 @@ Begin VB.Form frmTwoDee
    BackColor       =   &H00000000&
    Caption         =   "2D Editor"
    ClientHeight    =   5430
-   ClientLeft      =   3810
+   ClientLeft      =   3645
    ClientTop       =   2835
    ClientWidth     =   7515
    BeginProperty Font 
@@ -19,7 +19,7 @@ Begin VB.Form frmTwoDee
    ForeColor       =   &H80000008&
    Height          =   6120
    HelpContextID   =   127
-   Left            =   3750
+   Left            =   3585
    LinkTopic       =   "Form4"
    ScaleHeight     =   5424.373
    ScaleMode       =   0  'User

@@ -6,7 +6,7 @@ Begin VB.Form frmBrushBrowser
    ClientLeft      =   8505
    ClientTop       =   5280
    ClientWidth     =   2415
-   Height          =   6870
+   Height          =   6825
    Icon            =   "BrBrush.frx":0000
    Left            =   8445
    LinkTopic       =   "Form2"
@@ -15,7 +15,7 @@ Begin VB.Form frmBrushBrowser
    ScaleHeight     =   6465
    ScaleWidth      =   2415
    ShowInTaskbar   =   0   'False
-   Top             =   4935
+   Top             =   4980
    Width           =   2535
    Begin Threed.SSPanel SSPanel1 
       Align           =   2  'Align Bottom

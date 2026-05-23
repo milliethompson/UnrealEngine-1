@@ -5,14 +5,14 @@ Begin VB.Form Form1
    ClientLeft      =   3450
    ClientTop       =   2250
    ClientWidth     =   8835
-   Height          =   5760
+   Height          =   5715
    Icon            =   "UnDebug.frx":0000
    Left            =   3390
    LinkTopic       =   "Form1"
    ScaleHeight     =   5355
    ScaleWidth      =   8835
    ShowInTaskbar   =   0   'False
-   Top             =   1905
+   Top             =   1950
    Width           =   8955
    Begin VB.CommandButton Command6 
       Caption         =   "&Actor Properties"

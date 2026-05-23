@@ -3,8 +3,8 @@ Begin VB.Form frmParSolCone
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Build a Cone/Spire"
    ClientHeight    =   6795
-   ClientLeft      =   8415
-   ClientTop       =   1500
+   ClientLeft      =   8970
+   ClientTop       =   1335
    ClientWidth     =   2850
    ControlBox      =   0   'False
    BeginProperty Font 
@@ -19,13 +19,13 @@ Begin VB.Form frmParSolCone
    ForeColor       =   &H80000008&
    Height          =   7200
    HelpContextID   =   150
-   Left            =   8355
+   Left            =   8910
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    ScaleHeight     =   6795
    ScaleWidth      =   2850
    ShowInTaskbar   =   0   'False
-   Top             =   1155
+   Top             =   990
    Width           =   2970
    Begin VB.CheckBox chkAlignSide 
       Caption         =   "Align to Side"
@@ -347,6 +347,7 @@ Begin VB.Form frmParSolCone
       Left            =   1920
       TabIndex        =   10
       Top             =   2760
+      Value           =   -1  'True
       Width           =   975
    End
    Begin VB.OptionButton optHollow 
@@ -381,7 +382,6 @@ Begin VB.Form frmParSolCone
       Left            =   120
       TabIndex        =   8
       Top             =   2760
-      Value           =   -1  'True
       Width           =   735
    End
    Begin VB.CommandButton Command3 
@@ -1131,13 +1131,6 @@ Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
 End Sub
 
-Private Sub Group_GotFocus()
-
-    SelectAll Group
-
-End Sub
-
-
 Private Sub optCapped_Click()
     DrawLines
 End Sub
@@ -1153,47 +1146,4 @@ End Sub
 Private Sub Trigger_Change()
     Build_Click
 End Sub
-
-Private Sub txtCapHeight_GotFocus()
-
-    SelectAll txtCapHeight
-
-End Sub
-
-
-Private Sub txtHeight_GotFocus()
-
-    SelectAll txtHeight
-
-End Sub
-
-
-
-Public Sub SelectAll(txtBox As TextBox)
-
-    txtBox.SelStart = 0
-    txtBox.SelLength = Len(txtBox.Text)
-
-End Sub
-
-Private Sub txtInnerRadius_GotFocus()
-
-    SelectAll txtInnerRadius
-    
-End Sub
-
-
-Private Sub txtOuterRadius_GotFocus()
-
-    SelectAll txtOuterRadius
-
-End Sub
-
-
-Private Sub txtSides_GotFocus()
-
-    SelectAll txtSides
-
-End Sub
-
 

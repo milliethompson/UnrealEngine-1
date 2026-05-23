@@ -2,17 +2,17 @@ VERSION 4.00
 Begin VB.Form frmNewTex 
    Caption         =   "Create a new texture"
    ClientHeight    =   2715
-   ClientLeft      =   4515
-   ClientTop       =   6750
+   ClientLeft      =   4695
+   ClientTop       =   9135
    ClientWidth     =   4245
-   Height          =   3120
+   Height          =   3075
    Icon            =   "NewTex.frx":0000
-   Left            =   4455
+   Left            =   4635
    LinkTopic       =   "Form1"
    ScaleHeight     =   2715
    ScaleWidth      =   4245
    ShowInTaskbar   =   0   'False
-   Top             =   6405
+   Top             =   8835
    Width           =   4365
    Begin VB.Frame Frame2 
       Caption         =   "Size"
@@ -138,7 +138,6 @@ End
 Attribute VB_Name = "frmNewTex"
 Attribute VB_Creatable = False
 Attribute VB_Exposed = False
-
 Private Sub Cancel_Click()
     GResult = 0
     Unload Me
@@ -150,10 +149,6 @@ End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
-End Sub
-
-Private Sub Frame1_DragDrop(Source As Control, X As Single, Y As Single)
-
 End Sub
 
 Private Sub Ok_Click()

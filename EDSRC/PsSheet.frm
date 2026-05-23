@@ -3,8 +3,8 @@ Begin VB.Form frmPsSheet
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Build a Sheet"
    ClientHeight    =   3915
-   ClientLeft      =   6855
-   ClientTop       =   2685
+   ClientLeft      =   4920
+   ClientTop       =   3870
    ClientWidth     =   2280
    BeginProperty Font 
       name            =   "MS Sans Serif"
@@ -16,16 +16,16 @@ Begin VB.Form frmPsSheet
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   4320
+   Height          =   4275
    HelpContextID   =   330
    Icon            =   "PsSheet.frx":0000
-   Left            =   6795
+   Left            =   4860
    LinkTopic       =   "Form8"
    MaxButton       =   0   'False
    ScaleHeight     =   3915
    ScaleWidth      =   2280
    ShowInTaskbar   =   0   'False
-   Top             =   2340
+   Top             =   3570
    Width           =   2400
    Begin VB.OptionButton SheetFloor 
       Caption         =   "Floor/Ceiling"
@@ -323,21 +323,6 @@ Private Sub Form_Unload(Cancel As Integer)
 End Sub
 
 
-Private Sub SheetGroup_GotFocus()
-    SelectAll SheetGroup
-End Sub
-
-
-Private Sub SheetU_GotFocus()
-    SelectAll SheetU
-End Sub
-
-
-Private Sub SheetV_GotFocus()
-    SelectAll SheetV
-End Sub
-
-
 Private Sub Trigger_Change()
     SheetBuild_Click
 End Sub
@@ -373,10 +358,3 @@ Private Sub SheetBuild_Click()
     Call Ed.StatusText("Built a Sheet")
 End Sub
 
-
-Public Sub SelectAll(txtBox As TextBox)
-
-    txtBox.SelStart = 0
-    txtBox.SelLength = Len(txtBox.Text)
-
-End Sub

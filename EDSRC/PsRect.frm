@@ -3,8 +3,8 @@ Begin VB.Form frmParSolRect
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Build a Rectangle"
    ClientHeight    =   4395
-   ClientLeft      =   8985
-   ClientTop       =   1905
+   ClientLeft      =   6465
+   ClientTop       =   4395
    ClientWidth     =   2490
    ControlBox      =   0   'False
    BeginProperty Font 
@@ -17,16 +17,16 @@ Begin VB.Form frmParSolRect
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H00C0C0C0&
-   Height          =   4800
+   Height          =   4755
    HelpContextID   =   153
    Icon            =   "PsRect.frx":0000
-   Left            =   8925
+   Left            =   6405
    LinkTopic       =   "Form5"
    MaxButton       =   0   'False
    ScaleHeight     =   4395
    ScaleWidth      =   2490
    ShowInTaskbar   =   0   'False
-   Top             =   1560
+   Top             =   4095
    Width           =   2610
    Begin Threed.SSPanel SSPanel1 
       Height          =   1455
@@ -139,7 +139,6 @@ Begin VB.Form frmParSolRect
       Left            =   1680
       TabIndex        =   8
       Top             =   1080
-      Value           =   -1  'True
       Width           =   735
    End
    Begin VB.OptionButton IsHollow 
@@ -157,6 +156,7 @@ Begin VB.Form frmParSolRect
       Left            =   1680
       TabIndex        =   9
       Top             =   1320
+      Value           =   -1  'True
       Width           =   855
    End
    Begin VB.TextBox Group 
@@ -511,39 +511,7 @@ Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
 End Sub
 
-Private Sub Group_GotFocus()
-    SelectAll Group
-End Sub
-
-
-Private Sub RBreadth_GotFocus()
-    SelectAll RBreadth
-End Sub
-
-
-Private Sub RHeight_GotFocus()
-    SelectAll RHeight
-End Sub
-
-
-Private Sub RThickness_GotFocus()
-    SelectAll RThickness
-End Sub
-
-
-Private Sub RWidth_GotFocus()
-    SelectAll RWidth
-End Sub
-
-
 Private Sub Trigger_Change()
     Build_Click
 End Sub
 
-
-Public Sub SelectAll(txtBox As TextBox)
-
-    txtBox.SelStart = 0
-    txtBox.SelLength = Len(txtBox.Text)
-
-End Sub

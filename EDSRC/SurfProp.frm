@@ -3,8 +3,8 @@ Begin VB.Form frmSurfaceProps
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Surface Properties"
    ClientHeight    =   2595
-   ClientLeft      =   6900
-   ClientTop       =   6720
+   ClientLeft      =   7020
+   ClientTop       =   7470
    ClientWidth     =   6360
    BeginProperty Font 
       name            =   "Arial"
@@ -19,13 +19,13 @@ Begin VB.Form frmSurfaceProps
    Height          =   3000
    HelpContextID   =   124
    Icon            =   "SurfProp.frx":0000
-   Left            =   6840
+   Left            =   6960
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    ScaleHeight     =   2595
    ScaleWidth      =   6360
    ShowInTaskbar   =   0   'False
-   Top             =   6375
+   Top             =   7125
    Width           =   6480
    Begin VB.CommandButton Help 
       Caption         =   "&Help"
@@ -93,7 +93,7 @@ Begin VB.Form frmSurfaceProps
       _ExtentX        =   9340
       _ExtentY        =   4260
       _StockProps     =   15
-      Caption         =   "Editor"
+      Caption         =   "Rotate "
       BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
          name            =   "Arial"
          charset         =   0
@@ -104,7 +104,7 @@ Begin VB.Form frmSurfaceProps
          strikethrough   =   0   'False
       EndProperty
       TabsPerRow      =   6
-      Tab             =   5
+      Tab             =   1
       TabOrientation  =   0
       Tabs            =   6
       Style           =   1
@@ -117,7 +117,7 @@ Begin VB.Form frmSurfaceProps
       Tab(0).Control(0)=   "PolyFlagsHolder"
       TabCaption(1)   =   "Rotate "
       Tab(1).ControlCount=   1
-      Tab(1).ControlEnabled=   0   'False
+      Tab(1).ControlEnabled=   -1  'True
       Tab(1).Control(0)=   "Frame6"
       TabCaption(2)   =   "Pan "
       Tab(2).ControlCount=   3
@@ -144,14 +144,14 @@ Begin VB.Form frmSurfaceProps
       TabCaption(4)   =   "Scale"
       Tab(4).ControlCount=   2
       Tab(4).ControlEnabled=   0   'False
-      Tab(4).Control(0)=   "Frame2"
-      Tab(4).Control(1)=   "Frame5"
+      Tab(4).Control(0)=   "Frame5"
+      Tab(4).Control(1)=   "Frame2"
       TabCaption(5)   =   "Editor"
       Tab(5).ControlCount=   3
-      Tab(5).ControlEnabled=   -1  'True
-      Tab(5).Control(0)=   "Label2"
+      Tab(5).ControlEnabled=   0   'False
+      Tab(5).Control(0)=   "Frame8"
       Tab(5).Control(1)=   "Frame7"
-      Tab(5).Control(2)=   "Frame8"
+      Tab(5).Control(2)=   "Label2"
       Begin VB.PictureBox PolyFlagsHolder 
          BorderStyle     =   0  'None
          Height          =   1995
@@ -478,7 +478,7 @@ Begin VB.Form frmSurfaceProps
             strikethrough   =   0   'False
          EndProperty
          Height          =   975
-         Left            =   3360
+         Left            =   -71640
          TabIndex        =   19
          Top             =   480
          Width           =   1695
@@ -528,7 +528,7 @@ Begin VB.Form frmSurfaceProps
             strikethrough   =   0   'False
          EndProperty
          Height          =   975
-         Left            =   480
+         Left            =   -74520
          TabIndex        =   18
          Top             =   480
          Width           =   2535
@@ -613,7 +613,7 @@ Begin VB.Form frmSurfaceProps
             strikethrough   =   0   'False
          EndProperty
          Height          =   1095
-         Left            =   -74400
+         Left            =   600
          TabIndex        =   16
          Top             =   600
          Width           =   4095
@@ -1053,7 +1053,7 @@ Begin VB.Form frmSurfaceProps
             strikethrough   =   0   'False
          EndProperty
          Height          =   255
-         Left            =   240
+         Left            =   -74760
          TabIndex        =   17
          Top             =   1560
          Width           =   4935
@@ -1114,11 +1114,6 @@ Private Sub Close_Click()
     Hide
 End Sub
 
-Private Sub ColumnTexels_GotFocus()
-    SelectAll ColumnTexels
-End Sub
-
-
 Private Sub Form_Unload(Cancel As Integer)
     Unload PolyFlagsForm
     Set PolyFlagsForm = Nothing
@@ -1126,11 +1121,6 @@ Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
     GPolyPropsAction = 1
 End Sub
-
-Private Sub ItemName_GotFocus()
-    SelectAll ItemName
-End Sub
-
 
 Private Sub ResetAll_Click()
     Ed.Server.Exec "POLY TEXPAN RESET"
@@ -1159,16 +1149,6 @@ End Sub
 Private Sub RotMD_Click()
     Ed.Server.Exec "POLY TEXMULT UU=0.5 VV=0.5 UV=-0.5 VU=0.5"
 End Sub
-
-Private Sub U_GotFocus()
-    SelectAll U
-End Sub
-
-
-Private Sub V_GotFocus()
-    SelectAll V
-End Sub
-
 
 Private Sub WallColumn_Click()
     Dim Temp As Double
@@ -1310,11 +1290,4 @@ End Sub
 
 Private Sub Unalign_Click()
     Ed.Server.Exec "POLY TEXALIGN DEFAULT"
-End Sub
-
-Public Sub SelectAll(txtBox As TextBox)
-
-    txtBox.SelStart = 0
-    txtBox.SelLength = Len(txtBox.Text)
-
 End Sub

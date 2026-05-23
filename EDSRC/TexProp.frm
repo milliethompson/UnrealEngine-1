@@ -7,7 +7,7 @@ Begin VB.Form frmTexProp
    ClientTop       =   3945
    ClientWidth     =   5745
    ForeColor       =   &H80000008&
-   Height          =   4995
+   Height          =   4950
    HelpContextID   =   123
    Icon            =   "TexProp.frx":0000
    Left            =   3570
@@ -17,7 +17,7 @@ Begin VB.Form frmTexProp
    ScaleHeight     =   4590
    ScaleWidth      =   5745
    ShowInTaskbar   =   0   'False
-   Top             =   3600
+   Top             =   3645
    Width           =   5865
    Begin VB.PictureBox TexView 
       BeginProperty Font 

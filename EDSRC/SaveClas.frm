@@ -2,17 +2,17 @@ VERSION 4.00
 Begin VB.Form frmSaveClass 
    Caption         =   "Save Actor Classes"
    ClientHeight    =   2535
-   ClientLeft      =   2910
-   ClientTop       =   8160
+   ClientLeft      =   2820
+   ClientTop       =   10140
    ClientWidth     =   5220
-   Height          =   2940
+   Height          =   2895
    Icon            =   "SaveClas.frx":0000
-   Left            =   2850
+   Left            =   2760
    LinkTopic       =   "Form1"
    ScaleHeight     =   2535
    ScaleWidth      =   5220
    ShowInTaskbar   =   0   'False
-   Top             =   7815
+   Top             =   9840
    Width           =   5340
    Begin VB.Frame Frame2 
       Caption         =   "File Type"

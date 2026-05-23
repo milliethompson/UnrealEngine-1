@@ -2,16 +2,16 @@ VERSION 4.00
 Begin VB.Form frmSoundImportDlg 
    Caption         =   "Import a sound"
    ClientHeight    =   2145
-   ClientLeft      =   6315
-   ClientTop       =   8460
+   ClientLeft      =   6285
+   ClientTop       =   10755
    ClientWidth     =   4935
    Height          =   2550
    Icon            =   "ImprtSnd.frx":0000
-   Left            =   6255
+   Left            =   6225
    LinkTopic       =   "Form2"
    ScaleHeight     =   2145
    ScaleWidth      =   4935
-   Top             =   8115
+   Top             =   10410
    Width           =   5055
    Begin VB.CommandButton Cancel 
       BackColor       =   &H00C0C0C0&

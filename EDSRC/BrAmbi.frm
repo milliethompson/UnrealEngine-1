@@ -6,7 +6,7 @@ Begin VB.Form frmAmbientBrowser
    ClientLeft      =   6975
    ClientTop       =   2850
    ClientWidth     =   2445
-   Height          =   6870
+   Height          =   6825
    Icon            =   "BrAmbi.frx":0000
    Left            =   6915
    LinkTopic       =   "Form2"
@@ -15,7 +15,7 @@ Begin VB.Form frmAmbientBrowser
    ScaleHeight     =   6465
    ScaleWidth      =   2445
    ShowInTaskbar   =   0   'False
-   Top             =   2505
+   Top             =   2550
    Width           =   2565
    Begin Threed.SSPanel SSPanel1 
       Align           =   2  'Align Bottom

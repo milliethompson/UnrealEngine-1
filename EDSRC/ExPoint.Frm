@@ -5,14 +5,14 @@ Begin VB.Form frmExPoint
    ClientLeft      =   6180
    ClientTop       =   6690
    ClientWidth     =   4095
-   Height          =   2325
+   Height          =   2280
    Icon            =   "ExPoint.frx":0000
    Left            =   6120
    LinkTopic       =   "Form1"
    ScaleHeight     =   1920
    ScaleWidth      =   4095
    ShowInTaskbar   =   0   'False
-   Top             =   6345
+   Top             =   6390
    Width           =   4215
    Begin VB.CommandButton btnLoft 
       Appearance      =   0  'Flat
@@ -111,7 +111,6 @@ End
 Attribute VB_Name = "frmExPoint"
 Attribute VB_Creatable = False
 Attribute VB_Exposed = False
-
 Private Sub btnCancel_Click()
     btnCancel.Default = True
     Hide
@@ -265,11 +264,6 @@ Dim ct As Integer
     Brush.NumPolys = N
     Call SendBrush(Ed.Server, 0)
 
-
-End Sub
-
-
-Private Sub Form_Load()
 
 End Sub
 

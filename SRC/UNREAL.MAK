@@ -1,4 +1,4 @@
-# Microsoft Developer Studio Generated NMAKE File, Format Version 4.00
+# Microsoft Developer Studio Generated NMAKE File, Format Version 4.20
 # ** DO NOT EDIT **
 
 # TARGTYPE "Win32 (x86) Application" 0x0101
@@ -21,7 +21,7 @@ CFG=Render - Win32 Debug
 !MESSAGE You can specify a configuration when running NMAKE on this makefile
 !MESSAGE by defining the macro CFG on the command line.  For example:
 !MESSAGE 
-!MESSAGE NMAKE /f "UNREAL.MAK" CFG="Render - Win32 Debug"
+!MESSAGE NMAKE /f "Unreal.mak" CFG="Render - Win32 Debug"
 !MESSAGE 
 !MESSAGE Possible choices for configuration are:
 !MESSAGE 
@@ -68,53 +68,53 @@ NULL=nul
 OUTDIR=.\Lib
 INTDIR=.\Engine\Release
 
-ALL : "$(OUTDIR)\UnEngine.dll"
+ALL : "..\System\UnEngine.dll"
 
 CLEAN : 
+	-@erase "$(INTDIR)\Engine.res"
+	-@erase "$(INTDIR)\UnAction.obj"
+	-@erase "$(INTDIR)\UnActLst.obj"
+	-@erase "$(INTDIR)\UnCache.obj"
+	-@erase "$(INTDIR)\UnCamera.obj"
+	-@erase "$(INTDIR)\UnCamMgr.obj"
+	-@erase "$(INTDIR)\UnCheat.obj"
+	-@erase "$(INTDIR)\UnChecks.obj"
+	-@erase "$(INTDIR)\UnClass.obj"
+	-@erase "$(INTDIR)\UnClsPrp.obj"
+	-@erase "$(INTDIR)\UnConfig.obj"
+	-@erase "$(INTDIR)\UnDeflts.obj"
+	-@erase "$(INTDIR)\UnDynBSP.obj"
+	-@erase "$(INTDIR)\UnEngine.obj"
+	-@erase "$(INTDIR)\UnFGAud.obj"
+	-@erase "$(INTDIR)\UnFile.obj"
+	-@erase "$(INTDIR)\UnFPoly.obj"
+	-@erase "$(INTDIR)\UnGfx.obj"
+	-@erase "$(INTDIR)\UnInput.obj"
+	-@erase "$(INTDIR)\UnInputP.obj"
+	-@erase "$(INTDIR)\UnKeyVal.obj"
+	-@erase "$(INTDIR)\UnLevAct.obj"
+	-@erase "$(INTDIR)\UnLevel.obj"
+	-@erase "$(INTDIR)\UnLevTic.obj"
+	-@erase "$(INTDIR)\UnMath.obj"
+	-@erase "$(INTDIR)\UnMem.obj"
+	-@erase "$(INTDIR)\UnMesh.obj"
+	-@erase "$(INTDIR)\UnModel.obj"
+	-@erase "$(INTDIR)\UnOutDev.obj"
+	-@erase "$(INTDIR)\UnParams.obj"
+	-@erase "$(INTDIR)\UnParse.obj"
+	-@erase "$(INTDIR)\UnPhys.obj"
+	-@erase "$(INTDIR)\UnPrefer.obj"
+	-@erase "$(INTDIR)\UnRes.obj"
+	-@erase "$(INTDIR)\UnScript.obj"
+	-@erase "$(INTDIR)\UnScrRTL.obj"
+	-@erase "$(INTDIR)\UnServer.obj"
+	-@erase "$(INTDIR)\UnSound.obj"
+	-@erase "$(INTDIR)\UnTex.obj"
+	-@erase "$(INTDIR)\UnTopics.obj"
+	-@erase "$(OUTDIR)\UnEngine.exp"
+	-@erase "$(OUTDIR)\UnEngine.lib"
 	-@erase "..\System\UnEngine.dll"
-	-@erase ".\Engine\Release\UnServer.obj"
-	-@erase ".\Engine\Release\UnCamMgr.obj"
-	-@erase ".\Engine\Release\UnKeyVal.obj"
-	-@erase ".\Engine\Release\UnAction.obj"
-	-@erase ".\Engine\Release\UnClass.obj"
-	-@erase ".\Engine\Release\UnParse.obj"
-	-@erase ".\Engine\Release\UnModel.obj"
-	-@erase ".\Engine\Release\UnCache.obj"
-	-@erase ".\Engine\Release\UnCheat.obj"
-	-@erase ".\Engine\Release\UnConfig.obj"
-	-@erase ".\Engine\Release\UnLevel.obj"
-	-@erase ".\Engine\Release\UnActLst.obj"
-	-@erase ".\Engine\Release\UnSound.obj"
-	-@erase ".\Engine\Release\UnChecks.obj"
-	-@erase ".\Engine\Release\UnInput.obj"
-	-@erase ".\Engine\Release\UnParams.obj"
-	-@erase ".\Engine\Release\UnEngine.obj"
-	-@erase ".\Engine\Release\UnPrefer.obj"
-	-@erase ".\Engine\Release\UnDeflts.obj"
-	-@erase ".\Engine\Release\UnMesh.obj"
-	-@erase ".\Engine\Release\UnLevAct.obj"
-	-@erase ".\Engine\Release\UnInputP.obj"
-	-@erase ".\Engine\Release\UnTex.obj"
-	-@erase ".\Engine\Release\UnFGAud.obj"
-	-@erase ".\Engine\Release\UnScrRTL.obj"
-	-@erase ".\Engine\Release\UnGfx.obj"
-	-@erase ".\Engine\Release\UnCamera.obj"
-	-@erase ".\Engine\Release\UnRes.obj"
-	-@erase ".\Engine\Release\UnFile.obj"
-	-@erase ".\Engine\Release\UnClsPrp.obj"
-	-@erase ".\Engine\Release\UnScript.obj"
-	-@erase ".\Engine\Release\UnLevTic.obj"
-	-@erase ".\Engine\Release\UnMath.obj"
-	-@erase ".\Engine\Release\UnMem.obj"
-	-@erase ".\Engine\Release\UnOutDev.obj"
-	-@erase ".\Engine\Release\UnPhys.obj"
-	-@erase ".\Engine\Release\UnTopics.obj"
-	-@erase ".\Engine\Release\UnDynBSP.obj"
-	-@erase ".\Engine\Release\UnFPoly.obj"
-	-@erase ".\Engine\Release\Engine.res"
 	-@erase "..\System\UnEngine.ilk"
-	-@erase ".\Lib\UnEngine.lib"
-	-@erase ".\Lib\UnEngine.exp"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -129,7 +129,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /O2 /Ob2 /I "Inc" /D "ASM" /D\
  "COMPILING_ENGINE" /D "RELEASE" /D "NDEBUG" /D "WIN32" /D "_WINDOWS"\
  /Fp"$(INTDIR)/Engine.pch" /YX"Unreal.h" /Fo"$(INTDIR)/" /QIfdiv- /GM /c 
 CPP_OBJS=.\Engine\Release/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -161,7 +161,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/Engine.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /machine:I386
 # ADD LINK32 Lib\SoundEng.lib winmm.lib kernel32.lib user32.lib gdi32.lib /nologo /base:0x1200000 /subsystem:windows /dll /incremental:yes /machine:I386 /nodefaultlib:"LIBC" /out:"..\System\UnEngine.dll"
@@ -170,48 +171,48 @@ LINK32_FLAGS=Lib\SoundEng.lib winmm.lib kernel32.lib user32.lib gdi32.lib\
  /pdb:"$(OUTDIR)/UnEngine.pdb" /machine:I386 /nodefaultlib:"LIBC"\
  /out:"..\System\UnEngine.dll" /implib:"$(OUTDIR)/UnEngine.lib" 
 LINK32_OBJS= \
-	"$(INTDIR)/UnServer.obj" \
-	"$(INTDIR)/UnCamMgr.obj" \
-	"$(INTDIR)/UnKeyVal.obj" \
-	"$(INTDIR)/UnAction.obj" \
-	"$(INTDIR)/UnClass.obj" \
-	"$(INTDIR)/UnParse.obj" \
-	"$(INTDIR)/UnModel.obj" \
-	"$(INTDIR)/UnCache.obj" \
-	"$(INTDIR)/UnCheat.obj" \
-	"$(INTDIR)/UnConfig.obj" \
-	"$(INTDIR)/UnLevel.obj" \
-	"$(INTDIR)/UnActLst.obj" \
-	"$(INTDIR)/UnSound.obj" \
-	"$(INTDIR)/UnChecks.obj" \
-	"$(INTDIR)/UnInput.obj" \
-	"$(INTDIR)/UnParams.obj" \
-	"$(INTDIR)/UnEngine.obj" \
-	"$(INTDIR)/UnPrefer.obj" \
-	"$(INTDIR)/UnDeflts.obj" \
-	"$(INTDIR)/UnMesh.obj" \
-	"$(INTDIR)/UnLevAct.obj" \
-	"$(INTDIR)/UnInputP.obj" \
-	"$(INTDIR)/UnTex.obj" \
-	"$(INTDIR)/UnFGAud.obj" \
-	"$(INTDIR)/UnScrRTL.obj" \
-	"$(INTDIR)/UnGfx.obj" \
-	"$(INTDIR)/UnCamera.obj" \
-	"$(INTDIR)/UnRes.obj" \
-	"$(INTDIR)/UnFile.obj" \
-	"$(INTDIR)/UnClsPrp.obj" \
-	"$(INTDIR)/UnScript.obj" \
-	"$(INTDIR)/UnLevTic.obj" \
-	"$(INTDIR)/UnMath.obj" \
-	"$(INTDIR)/UnMem.obj" \
-	"$(INTDIR)/UnOutDev.obj" \
-	"$(INTDIR)/UnPhys.obj" \
-	"$(INTDIR)/UnTopics.obj" \
-	"$(INTDIR)/UnDynBSP.obj" \
-	"$(INTDIR)/UnFPoly.obj" \
-	"$(INTDIR)/Engine.res"
+	"$(INTDIR)\Engine.res" \
+	"$(INTDIR)\UnAction.obj" \
+	"$(INTDIR)\UnActLst.obj" \
+	"$(INTDIR)\UnCache.obj" \
+	"$(INTDIR)\UnCamera.obj" \
+	"$(INTDIR)\UnCamMgr.obj" \
+	"$(INTDIR)\UnCheat.obj" \
+	"$(INTDIR)\UnChecks.obj" \
+	"$(INTDIR)\UnClass.obj" \
+	"$(INTDIR)\UnClsPrp.obj" \
+	"$(INTDIR)\UnConfig.obj" \
+	"$(INTDIR)\UnDeflts.obj" \
+	"$(INTDIR)\UnDynBSP.obj" \
+	"$(INTDIR)\UnEngine.obj" \
+	"$(INTDIR)\UnFGAud.obj" \
+	"$(INTDIR)\UnFile.obj" \
+	"$(INTDIR)\UnFPoly.obj" \
+	"$(INTDIR)\UnGfx.obj" \
+	"$(INTDIR)\UnInput.obj" \
+	"$(INTDIR)\UnInputP.obj" \
+	"$(INTDIR)\UnKeyVal.obj" \
+	"$(INTDIR)\UnLevAct.obj" \
+	"$(INTDIR)\UnLevel.obj" \
+	"$(INTDIR)\UnLevTic.obj" \
+	"$(INTDIR)\UnMath.obj" \
+	"$(INTDIR)\UnMem.obj" \
+	"$(INTDIR)\UnMesh.obj" \
+	"$(INTDIR)\UnModel.obj" \
+	"$(INTDIR)\UnOutDev.obj" \
+	"$(INTDIR)\UnParams.obj" \
+	"$(INTDIR)\UnParse.obj" \
+	"$(INTDIR)\UnPhys.obj" \
+	"$(INTDIR)\UnPrefer.obj" \
+	"$(INTDIR)\UnRes.obj" \
+	"$(INTDIR)\UnScript.obj" \
+	"$(INTDIR)\UnScrRTL.obj" \
+	"$(INTDIR)\UnServer.obj" \
+	"$(INTDIR)\UnSound.obj" \
+	"$(INTDIR)\UnTex.obj" \
+	"$(INTDIR)\UnTopics.obj"
 
-"$(OUTDIR)\UnEngine.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\UnEngine.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -231,55 +232,55 @@ LINK32_OBJS= \
 OUTDIR=.\Lib
 INTDIR=.\Engine\Debug
 
-ALL : "$(OUTDIR)\dEngine.dll"
+ALL : "..\System\dEngine.dll"
 
 CLEAN : 
-	-@erase ".\Engine\Debug\vc40.pdb"
+	-@erase "$(INTDIR)\Engine.res"
+	-@erase "$(INTDIR)\UnAction.obj"
+	-@erase "$(INTDIR)\UnActLst.obj"
+	-@erase "$(INTDIR)\UnCache.obj"
+	-@erase "$(INTDIR)\UnCamera.obj"
+	-@erase "$(INTDIR)\UnCamMgr.obj"
+	-@erase "$(INTDIR)\UnCheat.obj"
+	-@erase "$(INTDIR)\UnChecks.obj"
+	-@erase "$(INTDIR)\UnClass.obj"
+	-@erase "$(INTDIR)\UnClsPrp.obj"
+	-@erase "$(INTDIR)\UnConfig.obj"
+	-@erase "$(INTDIR)\UnDeflts.obj"
+	-@erase "$(INTDIR)\UnDynBSP.obj"
+	-@erase "$(INTDIR)\UnEngine.obj"
+	-@erase "$(INTDIR)\UnFGAud.obj"
+	-@erase "$(INTDIR)\UnFile.obj"
+	-@erase "$(INTDIR)\UnFPoly.obj"
+	-@erase "$(INTDIR)\UnGfx.obj"
+	-@erase "$(INTDIR)\UnInput.obj"
+	-@erase "$(INTDIR)\UnInputP.obj"
+	-@erase "$(INTDIR)\UnKeyVal.obj"
+	-@erase "$(INTDIR)\UnLevAct.obj"
+	-@erase "$(INTDIR)\UnLevel.obj"
+	-@erase "$(INTDIR)\UnLevTic.obj"
+	-@erase "$(INTDIR)\UnMath.obj"
+	-@erase "$(INTDIR)\UnMem.obj"
+	-@erase "$(INTDIR)\UnMesh.obj"
+	-@erase "$(INTDIR)\UnModel.obj"
+	-@erase "$(INTDIR)\UnOutDev.obj"
+	-@erase "$(INTDIR)\UnParams.obj"
+	-@erase "$(INTDIR)\UnParse.obj"
+	-@erase "$(INTDIR)\UnPhys.obj"
+	-@erase "$(INTDIR)\UnPrefer.obj"
+	-@erase "$(INTDIR)\UnRes.obj"
+	-@erase "$(INTDIR)\UnScript.obj"
+	-@erase "$(INTDIR)\UnScrRTL.obj"
+	-@erase "$(INTDIR)\UnServer.obj"
+	-@erase "$(INTDIR)\UnSound.obj"
+	-@erase "$(INTDIR)\UnTex.obj"
+	-@erase "$(INTDIR)\UnTopics.obj"
+	-@erase "$(INTDIR)\vc40.pdb"
+	-@erase "$(OUTDIR)\dEngine.exp"
+	-@erase "$(OUTDIR)\dEngine.lib"
+	-@erase "$(OUTDIR)\dEngine.pdb"
 	-@erase "..\System\dEngine.dll"
-	-@erase ".\Engine\Debug\UnCache.obj"
-	-@erase ".\Engine\Debug\UnCheat.obj"
-	-@erase ".\Engine\Debug\UnMath.obj"
-	-@erase ".\Engine\Debug\UnEngine.obj"
-	-@erase ".\Engine\Debug\UnOutDev.obj"
-	-@erase ".\Engine\Debug\UnTopics.obj"
-	-@erase ".\Engine\Debug\UnPhys.obj"
-	-@erase ".\Engine\Debug\UnCamMgr.obj"
-	-@erase ".\Engine\Debug\UnAction.obj"
-	-@erase ".\Engine\Debug\UnPrefer.obj"
-	-@erase ".\Engine\Debug\UnLevAct.obj"
-	-@erase ".\Engine\Debug\UnInputP.obj"
-	-@erase ".\Engine\Debug\UnScrRTL.obj"
-	-@erase ".\Engine\Debug\UnCamera.obj"
-	-@erase ".\Engine\Debug\UnClass.obj"
-	-@erase ".\Engine\Debug\UnParse.obj"
-	-@erase ".\Engine\Debug\UnTex.obj"
-	-@erase ".\Engine\Debug\UnConfig.obj"
-	-@erase ".\Engine\Debug\UnModel.obj"
-	-@erase ".\Engine\Debug\UnClsPrp.obj"
-	-@erase ".\Engine\Debug\UnScript.obj"
-	-@erase ".\Engine\Debug\UnLevTic.obj"
-	-@erase ".\Engine\Debug\UnActLst.obj"
-	-@erase ".\Engine\Debug\UnGfx.obj"
-	-@erase ".\Engine\Debug\UnRes.obj"
-	-@erase ".\Engine\Debug\UnDynBSP.obj"
-	-@erase ".\Engine\Debug\UnFGAud.obj"
-	-@erase ".\Engine\Debug\UnFile.obj"
-	-@erase ".\Engine\Debug\UnServer.obj"
-	-@erase ".\Engine\Debug\UnLevel.obj"
-	-@erase ".\Engine\Debug\UnKeyVal.obj"
-	-@erase ".\Engine\Debug\UnSound.obj"
-	-@erase ".\Engine\Debug\UnMem.obj"
-	-@erase ".\Engine\Debug\UnInput.obj"
-	-@erase ".\Engine\Debug\UnDeflts.obj"
-	-@erase ".\Engine\Debug\UnMesh.obj"
-	-@erase ".\Engine\Debug\UnFPoly.obj"
-	-@erase ".\Engine\Debug\UnChecks.obj"
-	-@erase ".\Engine\Debug\UnParams.obj"
-	-@erase ".\Engine\Debug\Engine.res"
 	-@erase "..\System\dEngine.ilk"
-	-@erase ".\Lib\dEngine.lib"
-	-@erase ".\Lib\dEngine.exp"
-	-@erase ".\Lib\dEngine.pdb"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -295,7 +296,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /Zi /Od /Gf /Gy /I "Inc" /D "ASM" /D\
  /Fp"$(INTDIR)/Engine.pch" /YX"Unreal.h" /Fo"$(INTDIR)/" /Fd"$(INTDIR)/"\
  /QIfdiv- /GM /c 
 CPP_OBJS=.\Engine\Debug/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -327,7 +328,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/Engine.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /debug /machine:I386
 # ADD LINK32 Lib\SoundEng.lib winmm.lib kernel32.lib user32.lib gdi32.lib /nologo /base:0x1200000 /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"LIBC" /out:"..\System\dEngine.dll"
@@ -336,48 +338,48 @@ LINK32_FLAGS=Lib\SoundEng.lib winmm.lib kernel32.lib user32.lib gdi32.lib\
  /pdb:"$(OUTDIR)/dEngine.pdb" /debug /machine:I386 /nodefaultlib:"LIBC"\
  /out:"..\System\dEngine.dll" /implib:"$(OUTDIR)/dEngine.lib" 
 LINK32_OBJS= \
-	"$(INTDIR)/UnCache.obj" \
-	"$(INTDIR)/UnCheat.obj" \
-	"$(INTDIR)/UnMath.obj" \
-	"$(INTDIR)/UnEngine.obj" \
-	"$(INTDIR)/UnOutDev.obj" \
-	"$(INTDIR)/UnTopics.obj" \
-	"$(INTDIR)/UnPhys.obj" \
-	"$(INTDIR)/UnCamMgr.obj" \
-	"$(INTDIR)/UnAction.obj" \
-	"$(INTDIR)/UnPrefer.obj" \
-	"$(INTDIR)/UnLevAct.obj" \
-	"$(INTDIR)/UnInputP.obj" \
-	"$(INTDIR)/UnScrRTL.obj" \
-	"$(INTDIR)/UnCamera.obj" \
-	"$(INTDIR)/UnClass.obj" \
-	"$(INTDIR)/UnParse.obj" \
-	"$(INTDIR)/UnTex.obj" \
-	"$(INTDIR)/UnConfig.obj" \
-	"$(INTDIR)/UnModel.obj" \
-	"$(INTDIR)/UnClsPrp.obj" \
-	"$(INTDIR)/UnScript.obj" \
-	"$(INTDIR)/UnLevTic.obj" \
-	"$(INTDIR)/UnActLst.obj" \
-	"$(INTDIR)/UnGfx.obj" \
-	"$(INTDIR)/UnRes.obj" \
-	"$(INTDIR)/UnDynBSP.obj" \
-	"$(INTDIR)/UnFGAud.obj" \
-	"$(INTDIR)/UnFile.obj" \
-	"$(INTDIR)/UnServer.obj" \
-	"$(INTDIR)/UnLevel.obj" \
-	"$(INTDIR)/UnKeyVal.obj" \
-	"$(INTDIR)/UnSound.obj" \
-	"$(INTDIR)/UnMem.obj" \
-	"$(INTDIR)/UnInput.obj" \
-	"$(INTDIR)/UnDeflts.obj" \
-	"$(INTDIR)/UnMesh.obj" \
-	"$(INTDIR)/UnFPoly.obj" \
-	"$(INTDIR)/UnChecks.obj" \
-	"$(INTDIR)/UnParams.obj" \
-	"$(INTDIR)/Engine.res"
+	"$(INTDIR)\Engine.res" \
+	"$(INTDIR)\UnAction.obj" \
+	"$(INTDIR)\UnActLst.obj" \
+	"$(INTDIR)\UnCache.obj" \
+	"$(INTDIR)\UnCamera.obj" \
+	"$(INTDIR)\UnCamMgr.obj" \
+	"$(INTDIR)\UnCheat.obj" \
+	"$(INTDIR)\UnChecks.obj" \
+	"$(INTDIR)\UnClass.obj" \
+	"$(INTDIR)\UnClsPrp.obj" \
+	"$(INTDIR)\UnConfig.obj" \
+	"$(INTDIR)\UnDeflts.obj" \
+	"$(INTDIR)\UnDynBSP.obj" \
+	"$(INTDIR)\UnEngine.obj" \
+	"$(INTDIR)\UnFGAud.obj" \
+	"$(INTDIR)\UnFile.obj" \
+	"$(INTDIR)\UnFPoly.obj" \
+	"$(INTDIR)\UnGfx.obj" \
+	"$(INTDIR)\UnInput.obj" \
+	"$(INTDIR)\UnInputP.obj" \
+	"$(INTDIR)\UnKeyVal.obj" \
+	"$(INTDIR)\UnLevAct.obj" \
+	"$(INTDIR)\UnLevel.obj" \
+	"$(INTDIR)\UnLevTic.obj" \
+	"$(INTDIR)\UnMath.obj" \
+	"$(INTDIR)\UnMem.obj" \
+	"$(INTDIR)\UnMesh.obj" \
+	"$(INTDIR)\UnModel.obj" \
+	"$(INTDIR)\UnOutDev.obj" \
+	"$(INTDIR)\UnParams.obj" \
+	"$(INTDIR)\UnParse.obj" \
+	"$(INTDIR)\UnPhys.obj" \
+	"$(INTDIR)\UnPrefer.obj" \
+	"$(INTDIR)\UnRes.obj" \
+	"$(INTDIR)\UnScript.obj" \
+	"$(INTDIR)\UnScrRTL.obj" \
+	"$(INTDIR)\UnServer.obj" \
+	"$(INTDIR)\UnSound.obj" \
+	"$(INTDIR)\UnTex.obj" \
+	"$(INTDIR)\UnTopics.obj"
 
-"$(OUTDIR)\dEngine.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\dEngine.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -397,34 +399,34 @@ LINK32_OBJS= \
 OUTDIR=.\Lib
 INTDIR=.\Game\Release
 
-ALL : "$(OUTDIR)\UnGame.dll"
+ALL : "..\System\UnGame.dll"
 
 CLEAN : 
+	-@erase "$(INTDIR)\AiAnimat.obj"
+	-@erase "$(INTDIR)\Game.res"
+	-@erase "$(INTDIR)\UnActPro.obj"
+	-@erase "$(INTDIR)\UnCon.obj"
+	-@erase "$(INTDIR)\UnDecora.obj"
+	-@erase "$(INTDIR)\UnExplos.obj"
+	-@erase "$(INTDIR)\UnFActor.obj"
+	-@erase "$(INTDIR)\UnGame.obj"
+	-@erase "$(INTDIR)\UnGCheat.obj"
+	-@erase "$(INTDIR)\UnInv.obj"
+	-@erase "$(INTDIR)\UnKeyPts.obj"
+	-@erase "$(INTDIR)\UnMover.obj"
+	-@erase "$(INTDIR)\UnPawn.obj"
+	-@erase "$(INTDIR)\UnPawns.obj"
+	-@erase "$(INTDIR)\UnPlayer.obj"
+	-@erase "$(INTDIR)\UnPyro.obj"
+	-@erase "$(INTDIR)\UnRandom.obj"
+	-@erase "$(INTDIR)\UnRoot.obj"
+	-@erase "$(INTDIR)\UnThings.obj"
+	-@erase "$(INTDIR)\UnTrig.obj"
+	-@erase "$(INTDIR)\UnWeapon.obj"
+	-@erase "$(OUTDIR)\UnGame.exp"
+	-@erase "$(OUTDIR)\UnGame.lib"
 	-@erase "..\System\UnGame.dll"
-	-@erase ".\Game\Release\UnRandom.obj"
-	-@erase ".\Game\Release\UnWeapon.obj"
-	-@erase ".\Game\Release\UnFActor.obj"
-	-@erase ".\Game\Release\UnKeyPts.obj"
-	-@erase ".\Game\Release\UnPlayer.obj"
-	-@erase ".\Game\Release\UnTrig.obj"
-	-@erase ".\Game\Release\UnPawn.obj"
-	-@erase ".\Game\Release\UnPawns.obj"
-	-@erase ".\Game\Release\UnMover.obj"
-	-@erase ".\Game\Release\AiAnimat.obj"
-	-@erase ".\Game\Release\UnThings.obj"
-	-@erase ".\Game\Release\UnActPro.obj"
-	-@erase ".\Game\Release\UnInv.obj"
-	-@erase ".\Game\Release\UnCon.obj"
-	-@erase ".\Game\Release\UnGame.obj"
-	-@erase ".\Game\Release\UnDecora.obj"
-	-@erase ".\Game\Release\UnRoot.obj"
-	-@erase ".\Game\Release\UnGCheat.obj"
-	-@erase ".\Game\Release\UnPyro.obj"
-	-@erase ".\Game\Release\UnExplos.obj"
-	-@erase ".\Game\Release\Game.res"
 	-@erase "..\System\UnGame.ilk"
-	-@erase ".\Lib\UnGame.lib"
-	-@erase ".\Lib\UnGame.exp"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -439,7 +441,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /O2 /Ob2 /I "Inc" /D "ASM" /D\
  "COMPILING_GAME" /D "RELEASE" /D "NDEBUG" /D "WIN32" /D "_WINDOWS"\
  /Fp"$(INTDIR)/Game.pch" /YX"Unreal.h" /Fo"$(INTDIR)/" /QIfdiv- /GM /c 
 CPP_OBJS=.\Game\Release/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -471,7 +473,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/Game.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /machine:I386
 # ADD LINK32 Lib\UnEngine.lib Lib\UnRender.lib /nologo /base:0x13000000 /subsystem:windows /dll /incremental:yes /machine:I386 /out:"..\System\UnGame.dll"
@@ -480,29 +483,29 @@ LINK32_FLAGS=Lib\UnEngine.lib Lib\UnRender.lib /nologo /base:0x13000000\
  /subsystem:windows /dll /incremental:yes /pdb:"$(OUTDIR)/UnGame.pdb"\
  /machine:I386 /out:"..\System\UnGame.dll" /implib:"$(OUTDIR)/UnGame.lib" 
 LINK32_OBJS= \
-	"$(INTDIR)/UnRandom.obj" \
-	"$(INTDIR)/UnWeapon.obj" \
-	"$(INTDIR)/UnFActor.obj" \
-	"$(INTDIR)/UnKeyPts.obj" \
-	"$(INTDIR)/UnPlayer.obj" \
-	"$(INTDIR)/UnTrig.obj" \
-	"$(INTDIR)/UnPawn.obj" \
-	"$(INTDIR)/UnPawns.obj" \
-	"$(INTDIR)/UnMover.obj" \
-	"$(INTDIR)/AiAnimat.obj" \
-	"$(INTDIR)/UnThings.obj" \
-	"$(INTDIR)/UnActPro.obj" \
-	"$(INTDIR)/UnInv.obj" \
-	"$(INTDIR)/UnCon.obj" \
-	"$(INTDIR)/UnGame.obj" \
-	"$(INTDIR)/UnDecora.obj" \
-	"$(INTDIR)/UnRoot.obj" \
-	"$(INTDIR)/UnGCheat.obj" \
-	"$(INTDIR)/UnPyro.obj" \
-	"$(INTDIR)/UnExplos.obj" \
-	"$(INTDIR)/Game.res"
+	"$(INTDIR)\AiAnimat.obj" \
+	"$(INTDIR)\Game.res" \
+	"$(INTDIR)\UnActPro.obj" \
+	"$(INTDIR)\UnCon.obj" \
+	"$(INTDIR)\UnDecora.obj" \
+	"$(INTDIR)\UnExplos.obj" \
+	"$(INTDIR)\UnFActor.obj" \
+	"$(INTDIR)\UnGame.obj" \
+	"$(INTDIR)\UnGCheat.obj" \
+	"$(INTDIR)\UnInv.obj" \
+	"$(INTDIR)\UnKeyPts.obj" \
+	"$(INTDIR)\UnMover.obj" \
+	"$(INTDIR)\UnPawn.obj" \
+	"$(INTDIR)\UnPawns.obj" \
+	"$(INTDIR)\UnPlayer.obj" \
+	"$(INTDIR)\UnPyro.obj" \
+	"$(INTDIR)\UnRandom.obj" \
+	"$(INTDIR)\UnRoot.obj" \
+	"$(INTDIR)\UnThings.obj" \
+	"$(INTDIR)\UnTrig.obj" \
+	"$(INTDIR)\UnWeapon.obj"
 
-"$(OUTDIR)\UnGame.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\UnGame.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -522,36 +525,36 @@ LINK32_OBJS= \
 OUTDIR=.\Lib
 INTDIR=.\Game\Debug
 
-ALL : "$(OUTDIR)\dGame.dll"
+ALL : "..\System\dGame.dll"
 
 CLEAN : 
-	-@erase ".\Game\Debug\vc40.pdb"
+	-@erase "$(INTDIR)\AiAnimat.obj"
+	-@erase "$(INTDIR)\Game.res"
+	-@erase "$(INTDIR)\UnActPro.obj"
+	-@erase "$(INTDIR)\UnCon.obj"
+	-@erase "$(INTDIR)\UnDecora.obj"
+	-@erase "$(INTDIR)\UnExplos.obj"
+	-@erase "$(INTDIR)\UnFActor.obj"
+	-@erase "$(INTDIR)\UnGame.obj"
+	-@erase "$(INTDIR)\UnGCheat.obj"
+	-@erase "$(INTDIR)\UnInv.obj"
+	-@erase "$(INTDIR)\UnKeyPts.obj"
+	-@erase "$(INTDIR)\UnMover.obj"
+	-@erase "$(INTDIR)\UnPawn.obj"
+	-@erase "$(INTDIR)\UnPawns.obj"
+	-@erase "$(INTDIR)\UnPlayer.obj"
+	-@erase "$(INTDIR)\UnPyro.obj"
+	-@erase "$(INTDIR)\UnRandom.obj"
+	-@erase "$(INTDIR)\UnRoot.obj"
+	-@erase "$(INTDIR)\UnThings.obj"
+	-@erase "$(INTDIR)\UnTrig.obj"
+	-@erase "$(INTDIR)\UnWeapon.obj"
+	-@erase "$(INTDIR)\vc40.pdb"
+	-@erase "$(OUTDIR)\dGame.exp"
+	-@erase "$(OUTDIR)\dGame.lib"
+	-@erase "$(OUTDIR)\dGame.pdb"
 	-@erase "..\System\dGame.dll"
-	-@erase ".\Game\Debug\UnRoot.obj"
-	-@erase ".\Game\Debug\AiAnimat.obj"
-	-@erase ".\Game\Debug\UnPawns.obj"
-	-@erase ".\Game\Debug\UnRandom.obj"
-	-@erase ".\Game\Debug\UnThings.obj"
-	-@erase ".\Game\Debug\UnMover.obj"
-	-@erase ".\Game\Debug\UnActPro.obj"
-	-@erase ".\Game\Debug\UnDecora.obj"
-	-@erase ".\Game\Debug\UnTrig.obj"
-	-@erase ".\Game\Debug\UnCon.obj"
-	-@erase ".\Game\Debug\UnGCheat.obj"
-	-@erase ".\Game\Debug\UnExplos.obj"
-	-@erase ".\Game\Debug\UnPawn.obj"
-	-@erase ".\Game\Debug\UnPyro.obj"
-	-@erase ".\Game\Debug\UnWeapon.obj"
-	-@erase ".\Game\Debug\UnFActor.obj"
-	-@erase ".\Game\Debug\UnKeyPts.obj"
-	-@erase ".\Game\Debug\UnPlayer.obj"
-	-@erase ".\Game\Debug\UnInv.obj"
-	-@erase ".\Game\Debug\UnGame.obj"
-	-@erase ".\Game\Debug\Game.res"
 	-@erase "..\System\dGame.ilk"
-	-@erase ".\Lib\dGame.lib"
-	-@erase ".\Lib\dGame.exp"
-	-@erase ".\Lib\dGame.pdb"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -566,7 +569,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /Zi /Od /Gf /Gy /I "Inc" /D "ASM" /D\
  "COMPILING_GAME" /D "WIN32" /D "_WINDOWS" /D "_DEBUG" /Fp"$(INTDIR)/Game.pch"\
  /YX"Unreal.h" /Fo"$(INTDIR)/" /Fd"$(INTDIR)/" /QIfdiv- /GM /c 
 CPP_OBJS=.\Game\Debug/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -598,7 +601,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/Game.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /debug /machine:I386
 # ADD LINK32 Lib\dEngine.lib Lib\dRender.lib /nologo /base:0x13000000 /subsystem:windows /dll /debug /machine:I386 /out:"..\System\dGame.dll"
@@ -606,29 +610,29 @@ LINK32_FLAGS=Lib\dEngine.lib Lib\dRender.lib /nologo /base:0x13000000\
  /subsystem:windows /dll /incremental:yes /pdb:"$(OUTDIR)/dGame.pdb" /debug\
  /machine:I386 /out:"..\System\dGame.dll" /implib:"$(OUTDIR)/dGame.lib" 
 LINK32_OBJS= \
-	"$(INTDIR)/UnRoot.obj" \
-	"$(INTDIR)/AiAnimat.obj" \
-	"$(INTDIR)/UnPawns.obj" \
-	"$(INTDIR)/UnRandom.obj" \
-	"$(INTDIR)/UnThings.obj" \
-	"$(INTDIR)/UnMover.obj" \
-	"$(INTDIR)/UnActPro.obj" \
-	"$(INTDIR)/UnDecora.obj" \
-	"$(INTDIR)/UnTrig.obj" \
-	"$(INTDIR)/UnCon.obj" \
-	"$(INTDIR)/UnGCheat.obj" \
-	"$(INTDIR)/UnExplos.obj" \
-	"$(INTDIR)/UnPawn.obj" \
-	"$(INTDIR)/UnPyro.obj" \
-	"$(INTDIR)/UnWeapon.obj" \
-	"$(INTDIR)/UnFActor.obj" \
-	"$(INTDIR)/UnKeyPts.obj" \
-	"$(INTDIR)/UnPlayer.obj" \
-	"$(INTDIR)/UnInv.obj" \
-	"$(INTDIR)/UnGame.obj" \
-	"$(INTDIR)/Game.res"
+	"$(INTDIR)\AiAnimat.obj" \
+	"$(INTDIR)\Game.res" \
+	"$(INTDIR)\UnActPro.obj" \
+	"$(INTDIR)\UnCon.obj" \
+	"$(INTDIR)\UnDecora.obj" \
+	"$(INTDIR)\UnExplos.obj" \
+	"$(INTDIR)\UnFActor.obj" \
+	"$(INTDIR)\UnGame.obj" \
+	"$(INTDIR)\UnGCheat.obj" \
+	"$(INTDIR)\UnInv.obj" \
+	"$(INTDIR)\UnKeyPts.obj" \
+	"$(INTDIR)\UnMover.obj" \
+	"$(INTDIR)\UnPawn.obj" \
+	"$(INTDIR)\UnPawns.obj" \
+	"$(INTDIR)\UnPlayer.obj" \
+	"$(INTDIR)\UnPyro.obj" \
+	"$(INTDIR)\UnRandom.obj" \
+	"$(INTDIR)\UnRoot.obj" \
+	"$(INTDIR)\UnThings.obj" \
+	"$(INTDIR)\UnTrig.obj" \
+	"$(INTDIR)\UnWeapon.obj"
 
-"$(OUTDIR)\dGame.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\dGame.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -648,34 +652,34 @@ LINK32_OBJS= \
 OUTDIR=.\Lib
 INTDIR=.\Windows\Release
 
-ALL : "$(OUTDIR)\UnServer.exe" ".\System\UnWn.tlb"
+ALL : "..\System\UnServer.exe" ".\System\UnWn.tlb"
 
 CLEAN : 
-	-@erase ".\System\UnWn.tlb"
+	-@erase "$(INTDIR)\StdAfx.obj"
+	-@erase "$(INTDIR)\UnPlatfm.obj"
+	-@erase "$(INTDIR)\UnPswd.obj"
+	-@erase "$(INTDIR)\UnRage.obj"
+	-@erase "$(INTDIR)\UnRenDev.obj"
+	-@erase "$(INTDIR)\UnTask.obj"
+	-@erase "$(INTDIR)\UnWn.obj"
+	-@erase "$(INTDIR)\UnWn.pch"
+	-@erase "$(INTDIR)\UnWn.res"
+	-@erase "$(INTDIR)\UnWnAcCD.obj"
+	-@erase "$(INTDIR)\UnWnActD.obj"
+	-@erase "$(INTDIR)\UnWnAudD.obj"
+	-@erase "$(INTDIR)\UnWnCam.obj"
+	-@erase "$(INTDIR)\UnWnDevD.obj"
+	-@erase "$(INTDIR)\UnWnDlg.obj"
+	-@erase "$(INTDIR)\UnWnEdSv.obj"
+	-@erase "$(INTDIR)\UnWnKeyD.obj"
+	-@erase "$(INTDIR)\UnWnPref.obj"
+	-@erase "$(INTDIR)\UnWnProp.obj"
+	-@erase "$(INTDIR)\UnWnSenD.obj"
+	-@erase "$(INTDIR)\UnWnSerD.obj"
+	-@erase "$(INTDIR)\UnWnTime.obj"
 	-@erase "..\System\UnServer.exe"
-	-@erase ".\Windows\Release\UnWnEdSv.obj"
-	-@erase ".\Windows\Release\UnWn.pch"
-	-@erase ".\Windows\Release\UnWnAudD.obj"
-	-@erase ".\Windows\Release\UnWnSerD.obj"
-	-@erase ".\Windows\Release\UnRage.obj"
-	-@erase ".\Windows\Release\UnPswd.obj"
-	-@erase ".\Windows\Release\UnWnDevD.obj"
-	-@erase ".\Windows\Release\UnPlatfm.obj"
-	-@erase ".\Windows\Release\UnWnSenD.obj"
-	-@erase ".\Windows\Release\UnWnKeyD.obj"
-	-@erase ".\Windows\Release\UnWn.obj"
-	-@erase ".\Windows\Release\UnWnProp.obj"
-	-@erase ".\Windows\Release\UnWnTime.obj"
-	-@erase ".\Windows\Release\UnWnPref.obj"
-	-@erase ".\Windows\Release\StdAfx.obj"
-	-@erase ".\Windows\Release\UnWnAcCD.obj"
-	-@erase ".\Windows\Release\UnTask.obj"
-	-@erase ".\Windows\Release\UnWnActD.obj"
-	-@erase ".\Windows\Release\UnRenDev.obj"
-	-@erase ".\Windows\Release\UnWnDlg.obj"
-	-@erase ".\Windows\Release\UnWnCam.obj"
-	-@erase ".\Windows\Release\UnWn.res"
 	-@erase "..\System\UnServer.ilk"
+	-@erase ".\System\UnWn.tlb"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -691,7 +695,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /O2 /Ob2 /I "Inc" /D "ASM" /D\
  "_AFXDLL" /Fp"$(INTDIR)/UnWn.pch" /Yu"StdAfx.h" /Fo"$(INTDIR)/" /QIfdiv- /GM\
  /GM /c 
 CPP_OBJS=.\Windows\Release/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -723,7 +727,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/UnWn.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 /nologo /subsystem:windows /machine:I386
 # ADD LINK32 Lib\UnRender.lib Lib\UnNet.lib Lib\UnEngine.lib Lib\UnEditor.lib Lib\UnGame.lib winmm.lib /nologo /base:0x410000 /subsystem:windows /incremental:yes /machine:I386 /out:"..\System\UnServer.exe"
@@ -733,29 +738,29 @@ LINK32_FLAGS=Lib\UnRender.lib Lib\UnNet.lib Lib\UnEngine.lib Lib\UnEditor.lib\
  /incremental:yes /pdb:"$(OUTDIR)/UnServer.pdb" /machine:I386\
  /out:"..\System\UnServer.exe" 
 LINK32_OBJS= \
-	"$(INTDIR)/UnWnEdSv.obj" \
-	"$(INTDIR)/UnWnAudD.obj" \
-	"$(INTDIR)/UnWnSerD.obj" \
-	"$(INTDIR)/UnRage.obj" \
-	"$(INTDIR)/UnPswd.obj" \
-	"$(INTDIR)/UnWnDevD.obj" \
-	"$(INTDIR)/UnPlatfm.obj" \
-	"$(INTDIR)/UnWnSenD.obj" \
-	"$(INTDIR)/UnWnKeyD.obj" \
-	"$(INTDIR)/UnWn.obj" \
-	"$(INTDIR)/UnWnProp.obj" \
-	"$(INTDIR)/UnWnTime.obj" \
-	"$(INTDIR)/UnWnPref.obj" \
-	"$(INTDIR)/StdAfx.obj" \
-	"$(INTDIR)/UnWnAcCD.obj" \
-	"$(INTDIR)/UnTask.obj" \
-	"$(INTDIR)/UnWnActD.obj" \
-	"$(INTDIR)/UnRenDev.obj" \
-	"$(INTDIR)/UnWnDlg.obj" \
-	"$(INTDIR)/UnWnCam.obj" \
-	"$(INTDIR)/UnWn.res"
+	"$(INTDIR)\StdAfx.obj" \
+	"$(INTDIR)\UnPlatfm.obj" \
+	"$(INTDIR)\UnPswd.obj" \
+	"$(INTDIR)\UnRage.obj" \
+	"$(INTDIR)\UnRenDev.obj" \
+	"$(INTDIR)\UnTask.obj" \
+	"$(INTDIR)\UnWn.obj" \
+	"$(INTDIR)\UnWn.res" \
+	"$(INTDIR)\UnWnAcCD.obj" \
+	"$(INTDIR)\UnWnActD.obj" \
+	"$(INTDIR)\UnWnAudD.obj" \
+	"$(INTDIR)\UnWnCam.obj" \
+	"$(INTDIR)\UnWnDevD.obj" \
+	"$(INTDIR)\UnWnDlg.obj" \
+	"$(INTDIR)\UnWnEdSv.obj" \
+	"$(INTDIR)\UnWnKeyD.obj" \
+	"$(INTDIR)\UnWnPref.obj" \
+	"$(INTDIR)\UnWnProp.obj" \
+	"$(INTDIR)\UnWnSenD.obj" \
+	"$(INTDIR)\UnWnSerD.obj" \
+	"$(INTDIR)\UnWnTime.obj"
 
-"$(OUTDIR)\UnServer.exe" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\UnServer.exe" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -775,36 +780,36 @@ LINK32_OBJS= \
 OUTDIR=.\Lib
 INTDIR=.\Windows\Debug
 
-ALL : "$(OUTDIR)\dServer.exe" ".\System\UnWn.tlb"
+ALL : "..\System\dServer.exe" ".\System\UnWn.tlb"
 
 CLEAN : 
-	-@erase ".\Windows\Debug\vc40.pdb"
-	-@erase ".\Windows\Debug\UnWn.pch"
-	-@erase ".\System\UnWn.tlb"
+	-@erase "$(INTDIR)\StdAfx.obj"
+	-@erase "$(INTDIR)\UnPlatfm.obj"
+	-@erase "$(INTDIR)\UnPswd.obj"
+	-@erase "$(INTDIR)\UnRage.obj"
+	-@erase "$(INTDIR)\UnRenDev.obj"
+	-@erase "$(INTDIR)\UnTask.obj"
+	-@erase "$(INTDIR)\UnWn.obj"
+	-@erase "$(INTDIR)\UnWn.pch"
+	-@erase "$(INTDIR)\UnWn.res"
+	-@erase "$(INTDIR)\UnWnAcCD.obj"
+	-@erase "$(INTDIR)\UnWnActD.obj"
+	-@erase "$(INTDIR)\UnWnAudD.obj"
+	-@erase "$(INTDIR)\UnWnCam.obj"
+	-@erase "$(INTDIR)\UnWnDevD.obj"
+	-@erase "$(INTDIR)\UnWnDlg.obj"
+	-@erase "$(INTDIR)\UnWnEdSv.obj"
+	-@erase "$(INTDIR)\UnWnKeyD.obj"
+	-@erase "$(INTDIR)\UnWnPref.obj"
+	-@erase "$(INTDIR)\UnWnProp.obj"
+	-@erase "$(INTDIR)\UnWnSenD.obj"
+	-@erase "$(INTDIR)\UnWnSerD.obj"
+	-@erase "$(INTDIR)\UnWnTime.obj"
+	-@erase "$(INTDIR)\vc40.pdb"
+	-@erase "$(OUTDIR)\dServer.pdb"
 	-@erase "..\System\dServer.exe"
-	-@erase ".\Windows\Debug\UnWnDlg.obj"
-	-@erase ".\Windows\Debug\UnWnCam.obj"
-	-@erase ".\Windows\Debug\UnTask.obj"
-	-@erase ".\Windows\Debug\UnWnActD.obj"
-	-@erase ".\Windows\Debug\UnRenDev.obj"
-	-@erase ".\Windows\Debug\UnWnEdSv.obj"
-	-@erase ".\Windows\Debug\UnWnAudD.obj"
-	-@erase ".\Windows\Debug\UnWnSerD.obj"
-	-@erase ".\Windows\Debug\UnRage.obj"
-	-@erase ".\Windows\Debug\UnPswd.obj"
-	-@erase ".\Windows\Debug\UnWnDevD.obj"
-	-@erase ".\Windows\Debug\UnPlatfm.obj"
-	-@erase ".\Windows\Debug\UnWnSenD.obj"
-	-@erase ".\Windows\Debug\UnWnKeyD.obj"
-	-@erase ".\Windows\Debug\UnWnProp.obj"
-	-@erase ".\Windows\Debug\UnWnTime.obj"
-	-@erase ".\Windows\Debug\UnWnPref.obj"
-	-@erase ".\Windows\Debug\StdAfx.obj"
-	-@erase ".\Windows\Debug\UnWnAcCD.obj"
-	-@erase ".\Windows\Debug\UnWn.obj"
-	-@erase ".\Windows\Debug\UnWn.res"
 	-@erase "..\System\dServer.ilk"
-	-@erase ".\Lib\dServer.pdb"
+	-@erase ".\System\UnWn.tlb"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -820,7 +825,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /Zi /Od /Gf /Gy /I "Inc" /D "ASM" /D\
  /Fp"$(INTDIR)/UnWn.pch" /Yu"StdAfx.h" /Fo"$(INTDIR)/" /Fd"$(INTDIR)/" /QIfdiv-\
  /GM /c 
 CPP_OBJS=.\Windows\Debug/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -852,7 +857,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/UnWn.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 /nologo /subsystem:windows /debug /machine:I386
 # ADD LINK32 Lib\dRender.lib Lib\dNet.lib Lib\dEngine.lib Lib\dEditor.lib Lib\dGame.lib winmm.lib /nologo /base:0x410000 /subsystem:windows /debug /machine:I386 /nodefaultlib:"MSVCRT" /out:"..\System\dServer.exe"
@@ -862,29 +868,29 @@ LINK32_FLAGS=Lib\dRender.lib Lib\dNet.lib Lib\dEngine.lib Lib\dEditor.lib\
  /incremental:yes /pdb:"$(OUTDIR)/dServer.pdb" /debug /machine:I386\
  /nodefaultlib:"MSVCRT" /out:"..\System\dServer.exe" 
 LINK32_OBJS= \
-	"$(INTDIR)/UnWnDlg.obj" \
-	"$(INTDIR)/UnWnCam.obj" \
-	"$(INTDIR)/UnTask.obj" \
-	"$(INTDIR)/UnWnActD.obj" \
-	"$(INTDIR)/UnRenDev.obj" \
-	"$(INTDIR)/UnWnEdSv.obj" \
-	"$(INTDIR)/UnWnAudD.obj" \
-	"$(INTDIR)/UnWnSerD.obj" \
-	"$(INTDIR)/UnRage.obj" \
-	"$(INTDIR)/UnPswd.obj" \
-	"$(INTDIR)/UnWnDevD.obj" \
-	"$(INTDIR)/UnPlatfm.obj" \
-	"$(INTDIR)/UnWnSenD.obj" \
-	"$(INTDIR)/UnWnKeyD.obj" \
-	"$(INTDIR)/UnWnProp.obj" \
-	"$(INTDIR)/UnWnTime.obj" \
-	"$(INTDIR)/UnWnPref.obj" \
-	"$(INTDIR)/StdAfx.obj" \
-	"$(INTDIR)/UnWnAcCD.obj" \
-	"$(INTDIR)/UnWn.obj" \
-	"$(INTDIR)/UnWn.res"
+	"$(INTDIR)\StdAfx.obj" \
+	"$(INTDIR)\UnPlatfm.obj" \
+	"$(INTDIR)\UnPswd.obj" \
+	"$(INTDIR)\UnRage.obj" \
+	"$(INTDIR)\UnRenDev.obj" \
+	"$(INTDIR)\UnTask.obj" \
+	"$(INTDIR)\UnWn.obj" \
+	"$(INTDIR)\UnWn.res" \
+	"$(INTDIR)\UnWnAcCD.obj" \
+	"$(INTDIR)\UnWnActD.obj" \
+	"$(INTDIR)\UnWnAudD.obj" \
+	"$(INTDIR)\UnWnCam.obj" \
+	"$(INTDIR)\UnWnDevD.obj" \
+	"$(INTDIR)\UnWnDlg.obj" \
+	"$(INTDIR)\UnWnEdSv.obj" \
+	"$(INTDIR)\UnWnKeyD.obj" \
+	"$(INTDIR)\UnWnPref.obj" \
+	"$(INTDIR)\UnWnProp.obj" \
+	"$(INTDIR)\UnWnSenD.obj" \
+	"$(INTDIR)\UnWnSerD.obj" \
+	"$(INTDIR)\UnWnTime.obj"
 
-"$(OUTDIR)\dServer.exe" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\dServer.exe" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -933,25 +939,25 @@ CLEAN :
 OUTDIR=.\Lib
 INTDIR=.\Network\Release
 
-ALL : "$(OUTDIR)\UnNet.dll" ".\Lib\Network.bsc"
+ALL : "..\System\UnNet.dll" "$(OUTDIR)\Network.bsc"
 
 CLEAN : 
-	-@erase ".\Lib\Network.bsc"
-	-@erase ".\Network\Release\NetWin.sbr"
-	-@erase ".\Network\Release\NetMain.sbr"
-	-@erase ".\Network\Release\NetDPlay.sbr"
-	-@erase ".\Network\Release\NetINet.sbr"
-	-@erase ".\Network\Release\NetTeln.sbr"
+	-@erase "$(INTDIR)\NetDPlay.obj"
+	-@erase "$(INTDIR)\NetDPlay.sbr"
+	-@erase "$(INTDIR)\NetINet.obj"
+	-@erase "$(INTDIR)\NetINet.sbr"
+	-@erase "$(INTDIR)\NetMain.obj"
+	-@erase "$(INTDIR)\NetMain.sbr"
+	-@erase "$(INTDIR)\NetTeln.obj"
+	-@erase "$(INTDIR)\NetTeln.sbr"
+	-@erase "$(INTDIR)\NetWin.obj"
+	-@erase "$(INTDIR)\NetWin.sbr"
+	-@erase "$(INTDIR)\Network.res"
+	-@erase "$(OUTDIR)\Network.bsc"
+	-@erase "$(OUTDIR)\UnNet.exp"
+	-@erase "$(OUTDIR)\UnNet.lib"
 	-@erase "..\System\UnNet.dll"
-	-@erase ".\Network\Release\NetWin.obj"
-	-@erase ".\Network\Release\NetMain.obj"
-	-@erase ".\Network\Release\NetDPlay.obj"
-	-@erase ".\Network\Release\NetINet.obj"
-	-@erase ".\Network\Release\NetTeln.obj"
-	-@erase ".\Network\Release\Network.res"
 	-@erase "..\System\UnNet.ilk"
-	-@erase ".\Lib\UnNet.lib"
-	-@erase ".\Lib\UnNet.exp"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -999,13 +1005,13 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/Network.bsc" 
 BSC32_SBRS= \
-	"$(INTDIR)/NetWin.sbr" \
-	"$(INTDIR)/NetMain.sbr" \
-	"$(INTDIR)/NetDPlay.sbr" \
-	"$(INTDIR)/NetINet.sbr" \
-	"$(INTDIR)/NetTeln.sbr"
+	"$(INTDIR)\NetDPlay.sbr" \
+	"$(INTDIR)\NetINet.sbr" \
+	"$(INTDIR)\NetMain.sbr" \
+	"$(INTDIR)\NetTeln.sbr" \
+	"$(INTDIR)\NetWin.sbr"
 
-".\Lib\Network.bsc" : "$(OUTDIR)" $(BSC32_SBRS)
+"$(OUTDIR)\Network.bsc" : "$(OUTDIR)" $(BSC32_SBRS)
     $(BSC32) @<<
   $(BSC32_FLAGS) $(BSC32_SBRS)
 <<
@@ -1018,14 +1024,14 @@ LINK32_FLAGS=Lib\UnEngine.lib kernel32.lib user32.lib gdi32.lib wsock32.lib\
  /pdb:"$(OUTDIR)/UnNet.pdb" /machine:I386 /out:"..\System\UnNet.dll"\
  /implib:"$(OUTDIR)/UnNet.lib" 
 LINK32_OBJS= \
-	"$(INTDIR)/NetWin.obj" \
-	"$(INTDIR)/NetMain.obj" \
-	"$(INTDIR)/NetDPlay.obj" \
-	"$(INTDIR)/NetINet.obj" \
-	"$(INTDIR)/NetTeln.obj" \
-	"$(INTDIR)/Network.res"
+	"$(INTDIR)\NetDPlay.obj" \
+	"$(INTDIR)\NetINet.obj" \
+	"$(INTDIR)\NetMain.obj" \
+	"$(INTDIR)\NetTeln.obj" \
+	"$(INTDIR)\NetWin.obj" \
+	"$(INTDIR)\Network.res"
 
-"$(OUTDIR)\UnNet.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\UnNet.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -1045,21 +1051,21 @@ LINK32_OBJS= \
 OUTDIR=.\Lib
 INTDIR=.\Network\Debug
 
-ALL : "$(OUTDIR)\dNet.dll"
+ALL : "..\System\dNet.dll"
 
 CLEAN : 
-	-@erase ".\Network\Debug\vc40.pdb"
+	-@erase "$(INTDIR)\NetDPlay.obj"
+	-@erase "$(INTDIR)\NetINet.obj"
+	-@erase "$(INTDIR)\NetMain.obj"
+	-@erase "$(INTDIR)\NetTeln.obj"
+	-@erase "$(INTDIR)\NetWin.obj"
+	-@erase "$(INTDIR)\Network.res"
+	-@erase "$(INTDIR)\vc40.pdb"
+	-@erase "$(OUTDIR)\dNet.exp"
+	-@erase "$(OUTDIR)\dNet.lib"
+	-@erase "$(OUTDIR)\dNet.pdb"
 	-@erase "..\System\dNet.dll"
-	-@erase ".\Network\Debug\NetDPlay.obj"
-	-@erase ".\Network\Debug\NetTeln.obj"
-	-@erase ".\Network\Debug\NetMain.obj"
-	-@erase ".\Network\Debug\NetINet.obj"
-	-@erase ".\Network\Debug\NetWin.obj"
-	-@erase ".\Network\Debug\Network.res"
 	-@erase "..\System\dNet.ilk"
-	-@erase ".\Lib\dNet.lib"
-	-@erase ".\Lib\dNet.exp"
-	-@erase ".\Lib\dNet.pdb"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -1075,7 +1081,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /Zi /Od /Gf /Gy /I "Inc" /D "ASM" /D\
  /Fp"$(INTDIR)/Network.pch" /YX"windows.h" /Fo"$(INTDIR)/" /Fd"$(INTDIR)/"\
  /QIfdiv- /GM /c 
 CPP_OBJS=.\Network\Debug/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -1107,7 +1113,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/Network.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /debug /machine:I386
 # ADD LINK32 Lib\dEngine.lib kernel32.lib user32.lib gdi32.lib wsock32.lib /nologo /base:0x14000000 /subsystem:windows /dll /debug /machine:I386 /out:"..\System\dNet.dll"
@@ -1116,14 +1123,14 @@ LINK32_FLAGS=Lib\dEngine.lib kernel32.lib user32.lib gdi32.lib wsock32.lib\
  /pdb:"$(OUTDIR)/dNet.pdb" /debug /machine:I386 /out:"..\System\dNet.dll"\
  /implib:"$(OUTDIR)/dNet.lib" 
 LINK32_OBJS= \
-	"$(INTDIR)/NetDPlay.obj" \
-	"$(INTDIR)/NetTeln.obj" \
-	"$(INTDIR)/NetMain.obj" \
-	"$(INTDIR)/NetINet.obj" \
-	"$(INTDIR)/NetWin.obj" \
-	"$(INTDIR)/Network.res"
+	"$(INTDIR)\NetDPlay.obj" \
+	"$(INTDIR)\NetINet.obj" \
+	"$(INTDIR)\NetMain.obj" \
+	"$(INTDIR)\NetTeln.obj" \
+	"$(INTDIR)\NetWin.obj" \
+	"$(INTDIR)\Network.res"
 
-"$(OUTDIR)\dNet.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\dNet.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -1143,27 +1150,27 @@ LINK32_OBJS= \
 OUTDIR=.\Lib
 INTDIR=.\Editor\Release
 
-ALL : "$(OUTDIR)\UnEditor.dll"
+ALL : "..\System\UnEditor.dll"
 
 CLEAN : 
+	-@erase "$(INTDIR)\UnBsp.obj"
+	-@erase "$(INTDIR)\UnEdAct.obj"
+	-@erase "$(INTDIR)\UnEdCam.obj"
+	-@erase "$(INTDIR)\UnEdCnst.obj"
+	-@erase "$(INTDIR)\UnEdCsg.obj"
+	-@erase "$(INTDIR)\UnEditor.obj"
+	-@erase "$(INTDIR)\UnEditor.res"
+	-@erase "$(INTDIR)\UnEdScan.obj"
+	-@erase "$(INTDIR)\UnEdSrv.obj"
+	-@erase "$(INTDIR)\UnEdTran.obj"
+	-@erase "$(INTDIR)\UnMeshEd.obj"
+	-@erase "$(INTDIR)\UnShadow.obj"
+	-@erase "$(INTDIR)\UnTexEd.obj"
+	-@erase "$(INTDIR)\UnZone.obj"
+	-@erase "$(OUTDIR)\UnEditor.exp"
+	-@erase "$(OUTDIR)\UnEditor.lib"
 	-@erase "..\System\UnEditor.dll"
-	-@erase ".\Editor\Release\UnEdScan.obj"
-	-@erase ".\Editor\Release\UnEdSrv.obj"
-	-@erase ".\Editor\Release\UnEdAct.obj"
-	-@erase ".\Editor\Release\UnEdTran.obj"
-	-@erase ".\Editor\Release\UnMeshEd.obj"
-	-@erase ".\Editor\Release\UnEditor.obj"
-	-@erase ".\Editor\Release\UnEdCam.obj"
-	-@erase ".\Editor\Release\UnEdCnst.obj"
-	-@erase ".\Editor\Release\UnZone.obj"
-	-@erase ".\Editor\Release\UnEdCsg.obj"
-	-@erase ".\Editor\Release\UnTexEd.obj"
-	-@erase ".\Editor\Release\UnBsp.obj"
-	-@erase ".\Editor\Release\UnShadow.obj"
-	-@erase ".\Editor\Release\UnEditor.res"
 	-@erase "..\System\UnEditor.ilk"
-	-@erase ".\Lib\UnEditor.lib"
-	-@erase ".\Lib\UnEditor.exp"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -1178,7 +1185,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /O2 /Ob2 /I "Inc" /D "ASM" /D "WIN32" /D\
  "NDEBUG" /D "_WINDOWS" /D "COMPILING_EDITOR" /Fp"$(INTDIR)/UnrealEd.pch" /YX\
  /Fo"$(INTDIR)/" /QIfdiv- /QIfdiv- /GM /c 
 CPP_OBJS=.\Editor\Release/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -1210,7 +1217,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/UnrealEd.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /machine:I386
 # ADD LINK32 Lib\UnEngine.lib Lib\UnRender.lib /nologo /base:0x11000000 /subsystem:windows /dll /incremental:yes /machine:I386 /out:"..\System\UnEditor.dll"
@@ -1218,22 +1226,22 @@ LINK32_FLAGS=Lib\UnEngine.lib Lib\UnRender.lib /nologo /base:0x11000000\
  /subsystem:windows /dll /incremental:yes /pdb:"$(OUTDIR)/UnEditor.pdb"\
  /machine:I386 /out:"..\System\UnEditor.dll" /implib:"$(OUTDIR)/UnEditor.lib" 
 LINK32_OBJS= \
-	"$(INTDIR)/UnEdScan.obj" \
-	"$(INTDIR)/UnEdSrv.obj" \
-	"$(INTDIR)/UnEdAct.obj" \
-	"$(INTDIR)/UnEdTran.obj" \
-	"$(INTDIR)/UnMeshEd.obj" \
-	"$(INTDIR)/UnEditor.obj" \
-	"$(INTDIR)/UnEdCam.obj" \
-	"$(INTDIR)/UnEdCnst.obj" \
-	"$(INTDIR)/UnZone.obj" \
-	"$(INTDIR)/UnEdCsg.obj" \
-	"$(INTDIR)/UnTexEd.obj" \
-	"$(INTDIR)/UnBsp.obj" \
-	"$(INTDIR)/UnShadow.obj" \
-	"$(INTDIR)/UnEditor.res"
+	"$(INTDIR)\UnBsp.obj" \
+	"$(INTDIR)\UnEdAct.obj" \
+	"$(INTDIR)\UnEdCam.obj" \
+	"$(INTDIR)\UnEdCnst.obj" \
+	"$(INTDIR)\UnEdCsg.obj" \
+	"$(INTDIR)\UnEditor.obj" \
+	"$(INTDIR)\UnEditor.res" \
+	"$(INTDIR)\UnEdScan.obj" \
+	"$(INTDIR)\UnEdSrv.obj" \
+	"$(INTDIR)\UnEdTran.obj" \
+	"$(INTDIR)\UnMeshEd.obj" \
+	"$(INTDIR)\UnShadow.obj" \
+	"$(INTDIR)\UnTexEd.obj" \
+	"$(INTDIR)\UnZone.obj"
 
-"$(OUTDIR)\UnEditor.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\UnEditor.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -1253,29 +1261,29 @@ LINK32_OBJS= \
 OUTDIR=.\Lib
 INTDIR=.\Editor\Debug
 
-ALL : "$(OUTDIR)\dEditor.dll"
+ALL : "..\System\dEditor.dll"
 
 CLEAN : 
-	-@erase ".\Editor\Debug\vc40.pdb"
+	-@erase "$(INTDIR)\UnBsp.obj"
+	-@erase "$(INTDIR)\UnEdAct.obj"
+	-@erase "$(INTDIR)\UnEdCam.obj"
+	-@erase "$(INTDIR)\UnEdCnst.obj"
+	-@erase "$(INTDIR)\UnEdCsg.obj"
+	-@erase "$(INTDIR)\UnEditor.obj"
+	-@erase "$(INTDIR)\UnEditor.res"
+	-@erase "$(INTDIR)\UnEdScan.obj"
+	-@erase "$(INTDIR)\UnEdSrv.obj"
+	-@erase "$(INTDIR)\UnEdTran.obj"
+	-@erase "$(INTDIR)\UnMeshEd.obj"
+	-@erase "$(INTDIR)\UnShadow.obj"
+	-@erase "$(INTDIR)\UnTexEd.obj"
+	-@erase "$(INTDIR)\UnZone.obj"
+	-@erase "$(INTDIR)\vc40.pdb"
+	-@erase "$(OUTDIR)\dEditor.exp"
+	-@erase "$(OUTDIR)\dEditor.lib"
+	-@erase "$(OUTDIR)\dEditor.pdb"
 	-@erase "..\System\dEditor.dll"
-	-@erase ".\Editor\Debug\UnEdCam.obj"
-	-@erase ".\Editor\Debug\UnEdTran.obj"
-	-@erase ".\Editor\Debug\UnZone.obj"
-	-@erase ".\Editor\Debug\UnEdCsg.obj"
-	-@erase ".\Editor\Debug\UnTexEd.obj"
-	-@erase ".\Editor\Debug\UnEdCnst.obj"
-	-@erase ".\Editor\Debug\UnEdScan.obj"
-	-@erase ".\Editor\Debug\UnEdSrv.obj"
-	-@erase ".\Editor\Debug\UnMeshEd.obj"
-	-@erase ".\Editor\Debug\UnEditor.obj"
-	-@erase ".\Editor\Debug\UnShadow.obj"
-	-@erase ".\Editor\Debug\UnBsp.obj"
-	-@erase ".\Editor\Debug\UnEdAct.obj"
-	-@erase ".\Editor\Debug\UnEditor.res"
 	-@erase "..\System\dEditor.ilk"
-	-@erase ".\Lib\dEditor.lib"
-	-@erase ".\Lib\dEditor.exp"
-	-@erase ".\Lib\dEditor.pdb"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -1291,7 +1299,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /Zi /Od /Gf /Gy /I "Inc" /D "ASM" /D\
  /Fp"$(INTDIR)/UnrealEd.pch" /YX"Unreal.h" /Fo"$(INTDIR)/" /Fd"$(INTDIR)/"\
  /QIfdiv- /GM /c 
 CPP_OBJS=.\Editor\Debug/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -1323,7 +1331,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/UnrealEd.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /debug /machine:I386
 # ADD LINK32 Lib\dEngine.lib Lib\dRender.lib /nologo /base:0x11000000 /subsystem:windows /dll /debug /machine:I386 /out:"..\System\dEditor.dll"
@@ -1331,22 +1340,22 @@ LINK32_FLAGS=Lib\dEngine.lib Lib\dRender.lib /nologo /base:0x11000000\
  /subsystem:windows /dll /incremental:yes /pdb:"$(OUTDIR)/dEditor.pdb" /debug\
  /machine:I386 /out:"..\System\dEditor.dll" /implib:"$(OUTDIR)/dEditor.lib" 
 LINK32_OBJS= \
-	"$(INTDIR)/UnEdCam.obj" \
-	"$(INTDIR)/UnEdTran.obj" \
-	"$(INTDIR)/UnZone.obj" \
-	"$(INTDIR)/UnEdCsg.obj" \
-	"$(INTDIR)/UnTexEd.obj" \
-	"$(INTDIR)/UnEdCnst.obj" \
-	"$(INTDIR)/UnEdScan.obj" \
-	"$(INTDIR)/UnEdSrv.obj" \
-	"$(INTDIR)/UnMeshEd.obj" \
-	"$(INTDIR)/UnEditor.obj" \
-	"$(INTDIR)/UnShadow.obj" \
-	"$(INTDIR)/UnBsp.obj" \
-	"$(INTDIR)/UnEdAct.obj" \
-	"$(INTDIR)/UnEditor.res"
+	"$(INTDIR)\UnBsp.obj" \
+	"$(INTDIR)\UnEdAct.obj" \
+	"$(INTDIR)\UnEdCam.obj" \
+	"$(INTDIR)\UnEdCnst.obj" \
+	"$(INTDIR)\UnEdCsg.obj" \
+	"$(INTDIR)\UnEditor.obj" \
+	"$(INTDIR)\UnEditor.res" \
+	"$(INTDIR)\UnEdScan.obj" \
+	"$(INTDIR)\UnEdSrv.obj" \
+	"$(INTDIR)\UnEdTran.obj" \
+	"$(INTDIR)\UnMeshEd.obj" \
+	"$(INTDIR)\UnShadow.obj" \
+	"$(INTDIR)\UnTexEd.obj" \
+	"$(INTDIR)\UnZone.obj"
 
-"$(OUTDIR)\dEditor.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\dEditor.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -1366,26 +1375,26 @@ LINK32_OBJS= \
 OUTDIR=.\Lib
 INTDIR=.\Render\Release
 
-ALL : "$(OUTDIR)\UnRender.dll"
+ALL : "..\System\UnRender.dll"
 
 CLEAN : 
+	-@erase "$(INTDIR)\Render.res"
+	-@erase "$(INTDIR)\UnBlast.obj"
+	-@erase "$(INTDIR)\UnBlastC.obj"
+	-@erase "$(INTDIR)\UnEdRend.obj"
+	-@erase "$(INTDIR)\UnLight.obj"
+	-@erase "$(INTDIR)\UnMiscC.obj"
+	-@erase "$(INTDIR)\UnRaster.obj"
+	-@erase "$(INTDIR)\UnRender.obj"
+	-@erase "$(INTDIR)\UnSpan.obj"
+	-@erase "$(INTDIR)\UnSprite.obj"
+	-@erase "$(INTDIR)\UnTest.obj"
+	-@erase "$(INTDIR)\UnTmap.obj"
+	-@erase "$(INTDIR)\UnTMapC.obj"
+	-@erase "$(OUTDIR)\UnRender.exp"
+	-@erase "$(OUTDIR)\UnRender.lib"
 	-@erase "..\System\UnRender.dll"
-	-@erase ".\Render\Release\UnSprite.obj"
-	-@erase ".\Render\Release\UnSpan.obj"
-	-@erase ".\Render\Release\UnLight.obj"
-	-@erase ".\Render\Release\UnRaster.obj"
-	-@erase ".\Render\Release\UnTMapC.obj"
-	-@erase ".\Render\Release\UnTest.obj"
-	-@erase ".\Render\Release\UnEdRend.obj"
-	-@erase ".\Render\Release\UnRender.obj"
-	-@erase ".\Render\Release\UnBlastC.obj"
-	-@erase ".\Render\Release\UnMiscC.obj"
-	-@erase ".\Render\Release\Render.res"
-	-@erase ".\Render\Release\UnTmap.obj"
-	-@erase ".\Render\Release\UnBlast.obj"
 	-@erase "..\System\UnRender.ilk"
-	-@erase ".\Lib\UnRender.lib"
-	-@erase ".\Lib\UnRender.exp"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -1401,7 +1410,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /O2 /Ob2 /I "Inc" /D "ASM" /D\
  /Fp"$(INTDIR)/Render.pch" /YX"Unreal.h" /Fo"$(INTDIR)/" /QIfdiv- /QIfdiv- /GM\
  /GM /c 
 CPP_OBJS=.\Render\Release/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -1433,7 +1442,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/Render.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /machine:I386
 # ADD LINK32 Lib\UnEngine.lib kernel32.lib user32.lib gdi32.lib /nologo /base:0x15000000 /subsystem:windows /dll /incremental:yes /machine:I386 /out:"..\System\UnRender.dll"
@@ -1442,21 +1452,21 @@ LINK32_FLAGS=Lib\UnEngine.lib kernel32.lib user32.lib gdi32.lib /nologo\
  /pdb:"$(OUTDIR)/UnRender.pdb" /machine:I386 /out:"..\System\UnRender.dll"\
  /implib:"$(OUTDIR)/UnRender.lib" 
 LINK32_OBJS= \
-	"$(INTDIR)/UnSprite.obj" \
-	"$(INTDIR)/UnSpan.obj" \
-	"$(INTDIR)/UnLight.obj" \
-	"$(INTDIR)/UnRaster.obj" \
-	"$(INTDIR)/UnTMapC.obj" \
-	"$(INTDIR)/UnTest.obj" \
-	"$(INTDIR)/UnEdRend.obj" \
-	"$(INTDIR)/UnRender.obj" \
-	"$(INTDIR)/UnBlastC.obj" \
-	"$(INTDIR)/UnMiscC.obj" \
-	"$(INTDIR)/UnTmap.obj" \
-	"$(INTDIR)/UnBlast.obj" \
-	"$(INTDIR)/Render.res"
+	"$(INTDIR)\Render.res" \
+	"$(INTDIR)\UnBlast.obj" \
+	"$(INTDIR)\UnBlastC.obj" \
+	"$(INTDIR)\UnEdRend.obj" \
+	"$(INTDIR)\UnLight.obj" \
+	"$(INTDIR)\UnMiscC.obj" \
+	"$(INTDIR)\UnRaster.obj" \
+	"$(INTDIR)\UnRender.obj" \
+	"$(INTDIR)\UnSpan.obj" \
+	"$(INTDIR)\UnSprite.obj" \
+	"$(INTDIR)\UnTest.obj" \
+	"$(INTDIR)\UnTmap.obj" \
+	"$(INTDIR)\UnTMapC.obj"
 
-"$(OUTDIR)\UnRender.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\UnRender.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -1476,28 +1486,28 @@ LINK32_OBJS= \
 OUTDIR=.\Lib
 INTDIR=.\Render\Debug
 
-ALL : "$(OUTDIR)\dRender.dll"
+ALL : "..\System\dRender.dll"
 
 CLEAN : 
-	-@erase ".\Render\Debug\vc40.pdb"
+	-@erase "$(INTDIR)\Render.res"
+	-@erase "$(INTDIR)\UnBlast.obj"
+	-@erase "$(INTDIR)\UnBlastC.obj"
+	-@erase "$(INTDIR)\UnEdRend.obj"
+	-@erase "$(INTDIR)\UnLight.obj"
+	-@erase "$(INTDIR)\UnMiscC.obj"
+	-@erase "$(INTDIR)\UnRaster.obj"
+	-@erase "$(INTDIR)\UnRender.obj"
+	-@erase "$(INTDIR)\UnSpan.obj"
+	-@erase "$(INTDIR)\UnSprite.obj"
+	-@erase "$(INTDIR)\UnTest.obj"
+	-@erase "$(INTDIR)\UnTmapA.obj"
+	-@erase "$(INTDIR)\UnTMapC.obj"
+	-@erase "$(INTDIR)\vc40.pdb"
+	-@erase "$(OUTDIR)\dRender.exp"
+	-@erase "$(OUTDIR)\dRender.lib"
+	-@erase "$(OUTDIR)\dRender.pdb"
 	-@erase "..\System\dRender.dll"
-	-@erase ".\Render\Debug\UnBlastC.obj"
-	-@erase ".\Render\Debug\UnMiscC.obj"
-	-@erase ".\Render\Debug\UnTest.obj"
-	-@erase ".\Render\Debug\UnRaster.obj"
-	-@erase ".\Render\Debug\UnLight.obj"
-	-@erase ".\Render\Debug\UnEdRend.obj"
-	-@erase ".\Render\Debug\UnTMapC.obj"
-	-@erase ".\Render\Debug\UnSprite.obj"
-	-@erase ".\Render\Debug\UnSpan.obj"
-	-@erase ".\Render\Debug\UnRender.obj"
-	-@erase ".\Render\Debug\Render.res"
-	-@erase ".\Render\Debug\UnTmapA.obj"
-	-@erase ".\Render\Debug\UnBlast.obj"
 	-@erase "..\System\dRender.ilk"
-	-@erase ".\Lib\dRender.lib"
-	-@erase ".\Lib\dRender.exp"
-	-@erase ".\Lib\dRender.pdb"
 
 "$(OUTDIR)" :
     if not exist "$(OUTDIR)/$(NULL)" mkdir "$(OUTDIR)"
@@ -1513,7 +1523,7 @@ CPP_PROJ=/nologo /G5 /MD /W3 /WX /GX /Zi /Od /Gf /Gy /I "Inc" /D "ASM" /D\
  /Fp"$(INTDIR)/Render.pch" /YX"Unreal.h" /Fo"$(INTDIR)/" /Fd"$(INTDIR)/"\
  /QIfdiv- /GM /c 
 CPP_OBJS=.\Render\Debug/
-CPP_SBRS=
+CPP_SBRS=.\.
 
 .c{$(CPP_OBJS)}.obj:
    $(CPP) $(CPP_PROJ) $<  
@@ -1545,7 +1555,8 @@ BSC32=bscmake.exe
 # ADD BASE BSC32 /nologo
 # ADD BSC32 /nologo
 BSC32_FLAGS=/nologo /o"$(OUTDIR)/Render.bsc" 
-BSC32_SBRS=
+BSC32_SBRS= \
+	
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /debug /machine:I386
 # ADD LINK32 Lib\dEngine.lib kernel32.lib user32.lib gdi32.lib /nologo /base:0x15000000 /subsystem:windows /dll /debug /machine:I386 /out:"..\System\dRender.dll"
@@ -1554,21 +1565,21 @@ LINK32_FLAGS=Lib\dEngine.lib kernel32.lib user32.lib gdi32.lib /nologo\
  /pdb:"$(OUTDIR)/dRender.pdb" /debug /machine:I386 /out:"..\System\dRender.dll"\
  /implib:"$(OUTDIR)/dRender.lib" 
 LINK32_OBJS= \
-	"$(INTDIR)/UnBlastC.obj" \
-	"$(INTDIR)/UnMiscC.obj" \
-	"$(INTDIR)/UnTest.obj" \
-	"$(INTDIR)/UnRaster.obj" \
-	"$(INTDIR)/UnLight.obj" \
-	"$(INTDIR)/UnEdRend.obj" \
-	"$(INTDIR)/UnTMapC.obj" \
-	"$(INTDIR)/UnSprite.obj" \
-	"$(INTDIR)/UnSpan.obj" \
-	"$(INTDIR)/UnRender.obj" \
-	"$(INTDIR)/UnTmapA.obj" \
-	"$(INTDIR)/UnBlast.obj" \
-	"$(INTDIR)/Render.res"
+	"$(INTDIR)\Render.res" \
+	"$(INTDIR)\UnBlast.obj" \
+	"$(INTDIR)\UnBlastC.obj" \
+	"$(INTDIR)\UnEdRend.obj" \
+	"$(INTDIR)\UnLight.obj" \
+	"$(INTDIR)\UnMiscC.obj" \
+	"$(INTDIR)\UnRaster.obj" \
+	"$(INTDIR)\UnRender.obj" \
+	"$(INTDIR)\UnSpan.obj" \
+	"$(INTDIR)\UnSprite.obj" \
+	"$(INTDIR)\UnTest.obj" \
+	"$(INTDIR)\UnTmapA.obj" \
+	"$(INTDIR)\UnTMapC.obj"
 
-"$(OUTDIR)\dRender.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
+"..\System\dRender.dll" : "$(OUTDIR)" $(DEF_FILE) $(LINK32_OBJS)
     $(LINK32) @<<
   $(LINK32_FLAGS) $(LINK32_OBJS)
 <<
@@ -3367,7 +3378,7 @@ DEP_CPP_UNACTP=\
 
 SOURCE=.\Game\UnCon.cpp
 DEP_CPP_UNCON_=\
-	".\GAME\UNCON.H"\
+	".\Game\UnCon.h"\
 	".\Game\UnFactor.h"\
 	".\Game\UnGame.h"\
 	".\Inc\AIAnimat.h"\
@@ -3420,7 +3431,7 @@ DEP_CPP_UNCON_=\
 
 SOURCE=.\Game\UnGame.cpp
 DEP_CPP_UNGAM=\
-	".\GAME\UNCON.H"\
+	".\Game\UnCon.h"\
 	".\Game\UnFactor.h"\
 	".\Game\UnGame.h"\
 	".\Inc\AIAnimat.h"\
@@ -4212,52 +4223,6 @@ SOURCE=".\Doc\!ReadMe.txt"
 # Begin Source File
 
 SOURCE=.\Windows\UnWnTime.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWNT=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\Inc\Unreal.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	
-NODEP_CPP_UNWNT=\
-	".\Windows\UnPort.h"\
-	
-
-"$(INTDIR)\UnWnTime.obj" : $(SOURCE) $(DEP_CPP_UNWNT) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWNT=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -4285,79 +4250,22 @@ DEP_CPP_UNWNT=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
 	
 
 "$(INTDIR)\UnWnTime.obj" : $(SOURCE) $(DEP_CPP_UNWNT) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnPlatfm.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNPLAT=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\Inc\Unreal.h"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\WINDOWS\UNPSWD.H"\
-	".\Inc\Net.h"\
-	".\Inc\UnInput.h"\
-	".\Inc\unaction.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\DDraw1.h"\
-	".\Inc\UnInputP.h"\
-	".\Inc\UnKeyVal.h"\
-	".\Inc\UnParse.h"\
-	
-NODEP_CPP_UNPLAT=\
-	".\Windows\UnPort.h"\
-	
-
-"$(INTDIR)\UnPlatfm.obj" : $(SOURCE) $(DEP_CPP_UNPLAT) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNPLAT=\
 	".\Inc\DDraw1.h"\
 	".\Inc\Net.h"\
@@ -4392,62 +4300,38 @@ DEP_CPP_UNPLAT=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNPSWD.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnPswd.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnCam.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
 	
 
 "$(INTDIR)\UnPlatfm.obj" : $(SOURCE) $(DEP_CPP_UNPLAT) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnPswd.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
 DEP_CPP_UNPSW=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNPSWD.H"\
-	".\Inc\UnPort.h"\
 	".\Inc\UnPlatfm.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Inc\UnPort.h"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnPswd.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
 	
 
 "$(INTDIR)\UnPswd.obj" : $(SOURCE) $(DEP_CPP_UNPSW) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
-DEP_CPP_UNPSW=\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNPSWD.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	
-
-"$(INTDIR)\UnPswd.obj" : $(SOURCE) $(DEP_CPP_UNPSW) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ENDIF 
 
 # End Source File
 ################################################################################
@@ -4455,40 +4339,40 @@ DEP_CPP_UNPSW=\
 
 SOURCE=.\Windows\UnRage.cpp
 DEP_CPP_UNRAG=\
-	".\WINDOWS\STDAFX.H"\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnRaster.h"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\Inc\UnRenDev.h"\
-	".\WINDOWS\ATI3DCIF.H"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
+	".\Inc\DDraw1.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\UnRaster.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRender.h"\
+	".\Inc\UnRenDev.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
 	".\Inc\UnSpan.h"\
-	".\Inc\DDraw1.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
+	".\Windows\Ati3dCif.h"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWnCam.h"\
 	
 NODEP_CPP_UNRAG=\
 	".\Windows\afxdos.h"\
@@ -4505,53 +4389,6 @@ NODEP_CPP_UNRAG=\
 # Begin Source File
 
 SOURCE=.\Windows\UnRenDev.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNREN=\
-	".\WINDOWS\STDAFX.H"\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnRaster.h"\
-	".\Inc\UnRenDev.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\UnSpan.h"\
-	
-NODEP_CPP_UNREN=\
-	".\Windows\UnPort.h"\
-	
-
-"$(INTDIR)\UnRenDev.obj" : $(SOURCE) $(DEP_CPP_UNREN) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNREN=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -4583,69 +4420,19 @@ DEP_CPP_UNREN=\
 	".\Inc\UnSpan.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
+	".\Windows\StdAfx.h"\
 	
 
 "$(INTDIR)\UnRenDev.obj" : $(SOURCE) $(DEP_CPP_UNREN) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnTask.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNTAS=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\Inc\Unreal.h"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\DDraw1.h"\
-	
-NODEP_CPP_UNTAS=\
-	".\Windows\UnPort.h"\
-	
-
-"$(INTDIR)\UnTask.obj" : $(SOURCE) $(DEP_CPP_UNTAS) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNTAS=\
 	".\Inc\DDraw1.h"\
 	".\Inc\UnActor.h"\
@@ -4674,75 +4461,23 @@ DEP_CPP_UNTAS=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnCam.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
 	
 
 "$(INTDIR)\UnTask.obj" : $(SOURCE) $(DEP_CPP_UNTAS) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWn.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWN_=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\Inc\Unreal.h"\
-	".\Inc\Net.h"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\Inc\UnConfig.h"\
-	".\WINDOWS\UNWNPROP.H"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\DDraw1.h"\
-	".\Inc\UnKeyVal.h"\
-	".\Inc\UnParse.h"\
-	
-
-"$(INTDIR)\UnWn.obj" : $(SOURCE) $(DEP_CPP_UNWN_) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWN_=\
 	".\Inc\DDraw1.h"\
 	".\Inc\Net.h"\
@@ -4775,79 +4510,24 @@ DEP_CPP_UNWN_=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\WINDOWS\UNWNPROP.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnCam.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
+	".\Windows\UnWnProp.h"\
 	
 
 "$(INTDIR)\UnWn.obj" : $(SOURCE) $(DEP_CPP_UNWN_) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnCam.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWNC=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\Inc\Unreal.h"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\Inc\UnRenDev.h"\
-	".\Inc\DMouse.h"\
-	".\Inc\UnInput.h"\
-	".\Inc\UnConfig.h"\
-	".\Inc\unaction.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\DDraw1.h"\
-	".\Inc\UnInputP.h"\
-	".\Inc\UnKeyVal.h"\
-	".\Inc\UnParse.h"\
-	
-
-"$(INTDIR)\UnWnCam.obj" : $(SOURCE) $(DEP_CPP_UNWNC) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWNC=\
 	".\Inc\DDraw1.h"\
 	".\Inc\DMouse.h"\
@@ -4884,73 +4564,23 @@ DEP_CPP_UNWNC=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnCam.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
 	
 
 "$(INTDIR)\UnWnCam.obj" : $(SOURCE) $(DEP_CPP_UNWNC) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnDlg.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWND=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\Inc\Unreal.h"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\DDraw1.h"\
-	
-NODEP_CPP_UNWND=\
-	".\Windows\UnPort.h"\
-	
-
-"$(INTDIR)\UnWnDlg.obj" : $(SOURCE) $(DEP_CPP_UNWND) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWND=\
 	".\Inc\DDraw1.h"\
 	".\Inc\UnActor.h"\
@@ -4979,71 +4609,23 @@ DEP_CPP_UNWND=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNCAM.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnCam.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
 	
 
 "$(INTDIR)\UnWnDlg.obj" : $(SOURCE) $(DEP_CPP_UNWND) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnEdSv.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWNE=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\Inc\Unreal.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	
-NODEP_CPP_UNWNE=\
-	".\Windows\UnPort.h"\
-	
-
-"$(INTDIR)\UnWnEdSv.obj" : $(SOURCE) $(DEP_CPP_UNWNE) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWNE=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -5071,32 +4653,30 @@ DEP_CPP_UNWNE=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
 	
 
 "$(INTDIR)\UnWnEdSv.obj" : $(SOURCE) $(DEP_CPP_UNWNE) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\StdAfx.cpp
+DEP_CPP_STDAF=\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Windows\StdAfx.h"\
+	
 
 !IF  "$(CFG)" == "Windows - Win32 Release"
 
-DEP_CPP_STDAF=\
-	".\WINDOWS\STDAFX.H"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	
 # ADD CPP /Yc
 
 BuildCmds= \
@@ -5114,11 +4694,6 @@ BuildCmds= \
 
 !ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
 
-DEP_CPP_STDAF=\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\STDAFX.H"\
-	
 # ADD CPP /Yc
 
 BuildCmds= \
@@ -5194,7 +4769,7 @@ SOURCE=.\Windows\UnWn.odl
 
 # ADD MTL /tlb "System/UnWn.tlb"
 
-"$(OUTDIR)\UnWn.tlb" : $(SOURCE) "$(OUTDIR)"
+".\System\UnWn.tlb" : $(SOURCE) "$(OUTDIR)"
    $(MTL) /nologo /D "NDEBUG" /tlb "System/UnWn.tlb" /win32 $(SOURCE)
 
 
@@ -5202,7 +4777,7 @@ SOURCE=.\Windows\UnWn.odl
 
 # ADD MTL /tlb "System/UnWn.tlb"
 
-"$(OUTDIR)\UnWn.tlb" : $(SOURCE) "$(OUTDIR)"
+".\System\UnWn.tlb" : $(SOURCE) "$(OUTDIR)"
    $(MTL) /nologo /D "_DEBUG" /tlb "System/UnWn.tlb" /win32 $(SOURCE)
 
 
@@ -5213,58 +4788,6 @@ SOURCE=.\Windows\UnWn.odl
 # Begin Source File
 
 SOURCE=.\Windows\UnWnActD.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWNA=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNACTD.H"\
-	".\WINDOWS\UNWNACCD.H"\
-	".\WINDOWS\UNWNKEYD.H"\
-	".\Inc\Unreal.h"\
-	".\Inc\unaction.h"\
-	".\Inc\UnConfig.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\UnInput.h"\
-	".\Inc\UnInputP.h"\
-	".\Inc\UnKeyVal.h"\
-	".\Inc\UnParse.h"\
-	
-
-"$(INTDIR)\UnWnActD.obj" : $(SOURCE) $(DEP_CPP_UNWNA) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWNA=\
 	".\Inc\unaction.h"\
 	".\Inc\UnActor.h"\
@@ -5298,78 +4821,25 @@ DEP_CPP_UNWNA=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNACCD.H"\
-	".\WINDOWS\UNWNACTD.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\WINDOWS\UNWNKEYD.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnAccD.h"\
+	".\Windows\UnWnActD.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
+	".\Windows\UnWnKeyD.h"\
 	
 
 "$(INTDIR)\UnWnActD.obj" : $(SOURCE) $(DEP_CPP_UNWNA) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnDevD.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWNDE=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNDEVD.H"\
-	".\Inc\UnInput.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\Unreal.h"\
-	".\Inc\UnInputP.h"\
-	".\Inc\UnKeyVal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\UnParse.h"\
-	
-NODEP_CPP_UNWNDE=\
-	".\Windows\UnPort.h"\
-	
-
-"$(INTDIR)\UnWnDevD.obj" : $(SOURCE) $(DEP_CPP_UNWNDE) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWNDE=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -5401,73 +4871,23 @@ DEP_CPP_UNWNDE=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNDEVD.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnDevD.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
 	
 
 "$(INTDIR)\UnWnDevD.obj" : $(SOURCE) $(DEP_CPP_UNWNDE) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnPref.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWNP=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNPREF.H"\
-	".\Inc\UnPrefer.h"\
-	".\Inc\UnConfig.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\Unreal.h"\
-	".\Inc\UnKeyVal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\UnParse.h"\
-	
-
-"$(INTDIR)\UnWnPref.obj" : $(SOURCE) $(DEP_CPP_UNWNP) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWNP=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -5499,74 +4919,23 @@ DEP_CPP_UNWNP=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\WINDOWS\UNWNPREF.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
+	".\Windows\UnWnPref.h"\
 	
 
 "$(INTDIR)\UnWnPref.obj" : $(SOURCE) $(DEP_CPP_UNWNP) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnSenD.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWNS=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNSEND.H"\
-	".\Inc\Unreal.h"\
-	".\Inc\UnInput.h"\
-	".\Inc\UnConfig.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\UnInputP.h"\
-	".\Inc\UnKeyVal.h"\
-	".\Inc\UnParse.h"\
-	
-
-"$(INTDIR)\UnWnSenD.obj" : $(SOURCE) $(DEP_CPP_UNWNS) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWNS=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -5599,114 +4968,43 @@ DEP_CPP_UNWNS=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\WINDOWS\UNWNSEND.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
+	".\Windows\UnWnSend.h"\
 	
 
 "$(INTDIR)\UnWnSenD.obj" : $(SOURCE) $(DEP_CPP_UNWNS) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnSerD.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
 DEP_CPP_UNWNSE=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNSERD.H"\
-	".\Inc\UnPort.h"\
 	".\Inc\UnPlatfm.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Inc\UnPort.h"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
+	".\Windows\UnWnSerD.h"\
 	
 
 "$(INTDIR)\UnWnSerD.obj" : $(SOURCE) $(DEP_CPP_UNWNSE) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
-DEP_CPP_UNWNSE=\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\WINDOWS\UNWNSERD.H"\
-	
-
-"$(INTDIR)\UnWnSerD.obj" : $(SOURCE) $(DEP_CPP_UNWNSE) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnAudD.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWNAU=\
-	".\WINDOWS\STDAFX.H"\
-	".\Inc\Unreal.h"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNAUDD.H"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	
-NODEP_CPP_UNWNAU=\
-	".\Windows\UnPort.h"\
-	
-
-"$(INTDIR)\UnWnAudD.obj" : $(SOURCE) $(DEP_CPP_UNWNAU) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWNAU=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -5734,72 +5032,23 @@ DEP_CPP_UNWNAU=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNAUDD.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnAudD.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
 	
 
 "$(INTDIR)\UnWnAudD.obj" : $(SOURCE) $(DEP_CPP_UNWNAU) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnKeyD.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWNK=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNKEYD.H"\
-	".\Inc\Unreal.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	
-NODEP_CPP_UNWNK=\
-	".\Windows\UnPort.h"\
-	
-
-"$(INTDIR)\UnWnKeyD.obj" : $(SOURCE) $(DEP_CPP_UNWNK) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWNK=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -5827,82 +5076,23 @@ DEP_CPP_UNWNK=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\WINDOWS\UNWNKEYD.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
+	".\Windows\UnWnKeyD.h"\
 	
 
 "$(INTDIR)\UnWnKeyD.obj" : $(SOURCE) $(DEP_CPP_UNWNK) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnProp.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
-DEP_CPP_UNWNPR=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNPROP.H"\
-	".\WINDOWS\UNWNPREF.H"\
-	".\WINDOWS\UNWNACTD.H"\
-	".\WINDOWS\UNWNSEND.H"\
-	".\WINDOWS\UNWNDEVD.H"\
-	".\WINDOWS\UNWNAUDD.H"\
-	".\WINDOWS\UNWNSERD.H"\
-	".\Inc\UnConfig.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\Inc\UnPrefer.h"\
-	".\Inc\Unreal.h"\
-	".\Inc\UnKeyVal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\UnParse.h"\
-	".\Inc\unaction.h"\
-	".\Inc\UnInput.h"\
-	".\Inc\UnInputP.h"\
-	
-
-"$(INTDIR)\UnWnProp.obj" : $(SOURCE) $(DEP_CPP_UNWNPR) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
 DEP_CPP_UNWNPR=\
 	".\Inc\unaction.h"\
 	".\Inc\UnActor.h"\
@@ -5937,67 +5127,43 @@ DEP_CPP_UNWNPR=\
 	".\Inc\UnSound.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNACTD.H"\
-	".\WINDOWS\UNWNAUDD.H"\
-	".\WINDOWS\UNWNDEVD.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	".\WINDOWS\UNWNPREF.H"\
-	".\WINDOWS\UNWNPROP.H"\
-	".\WINDOWS\UNWNSEND.H"\
-	".\WINDOWS\UNWNSERD.H"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnActD.h"\
+	".\Windows\UnWnAudD.h"\
+	".\Windows\UnWnDevD.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
+	".\Windows\UnWnPref.h"\
+	".\Windows\UnWnProp.h"\
+	".\Windows\UnWnSend.h"\
+	".\Windows\UnWnSerD.h"\
 	
 
 "$(INTDIR)\UnWnProp.obj" : $(SOURCE) $(DEP_CPP_UNWNPR) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Windows\UnWnAcCD.cpp
-
-!IF  "$(CFG)" == "Windows - Win32 Release"
-
 DEP_CPP_UNWNAC=\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNACCD.H"\
-	".\Inc\UnPort.h"\
 	".\Inc\UnPlatfm.h"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
+	".\Inc\UnPort.h"\
+	".\Windows\StdAfx.h"\
+	".\Windows\UnWn.h"\
+	".\Windows\UnWnAccD.h"\
+	".\Windows\UnWnDlg.h"\
+	".\Windows\UnWnEdSv.h"\
 	
 
 "$(INTDIR)\UnWnAcCD.obj" : $(SOURCE) $(DEP_CPP_UNWNAC) "$(INTDIR)"\
  "$(INTDIR)\UnWn.pch"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
-
-DEP_CPP_UNWNAC=\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnPort.h"\
-	".\WINDOWS\STDAFX.H"\
-	".\WINDOWS\UNWN.H"\
-	".\WINDOWS\UNWNACCD.H"\
-	".\WINDOWS\UNWNDLG.H"\
-	".\WINDOWS\UNWNEDSV.H"\
-	
-
-"$(INTDIR)\UnWnAcCD.obj" : $(SOURCE) $(DEP_CPP_UNWNAC) "$(INTDIR)"\
- "$(INTDIR)\UnWn.pch"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ENDIF 
 
 # End Source File
 # End Target
@@ -6008,8 +5174,8 @@ DEP_CPP_UNWNAC=\
 
 !IF  "$(CFG)" == "Documentation - Win32 Release"
 
-"$(OUTDIR)\Doc.exe" : 
-   CD F:\Projects\EMISSARY\PROG\SRC\Doc
+".\Doc\Doc.exe" : 
+   CD U:\Unreal\Src\Doc
    NMAKE /f Doc.mak
 
 !ENDIF 
@@ -6082,13 +5248,12 @@ SOURCE=.\Doc\Actions.txt
 
 SOURCE=.\Network\NetMain.cpp
 DEP_CPP_NETMA=\
-	".\Network\DPlay.h"\
 	".\Inc\Net.h"\
-	".\Windows\..\Network\NetPrv.h"\
-	".\Network\NetINet.h"\
-	".\Network\NetDPlay.h"\
 	".\Inc\UnPlatfm.h"\
 	".\Inc\UnPort.h"\
+	".\Network\NetDPlay.h"\
+	".\Network\NetINet.h"\
+	".\Windows\..\Network\NetPrv.h"\
 	
 
 !IF  "$(CFG)" == "Network - Win32 Release"
@@ -6155,12 +5320,11 @@ BuildCmds= \
 
 SOURCE=.\Network\NetDPlay.cpp
 DEP_CPP_NETDP=\
-	".\Network\DPlay.h"\
 	".\Inc\Net.h"\
-	".\Windows\..\Network\NetPrv.h"\
-	".\Network\NetDPlay.h"\
 	".\Inc\UnPlatfm.h"\
 	".\Inc\UnPort.h"\
+	".\Network\NetDPlay.h"\
+	".\Windows\..\Network\NetPrv.h"\
 	
 
 !IF  "$(CFG)" == "Network - Win32 Release"
@@ -6339,78 +5503,38 @@ DEP_RSC_UNEDI=\
 # Begin Source File
 
 SOURCE=.\Editor\UnZone.cpp
-
-!IF  "$(CFG)" == "Editor - Win32 Release"
-
 DEP_CPP_UNZON=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnZone.obj" : $(SOURCE) $(DEP_CPP_UNZON) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ELSEIF  "$(CFG)" == "Editor - Win32 Debug"
-
-DEP_CPP_UNZON=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	
-
-"$(INTDIR)\UnZone.obj" : $(SOURCE) $(DEP_CPP_UNZON) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ENDIF 
 
 # End Source File
 ################################################################################
@@ -6418,32 +5542,32 @@ DEP_CPP_UNZON=\
 
 SOURCE=.\Editor\UnEdAct.cpp
 DEP_CPP_UNEDA=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnEdAct.obj" : $(SOURCE) $(DEP_CPP_UNEDA) "$(INTDIR)"
@@ -6456,32 +5580,32 @@ DEP_CPP_UNEDA=\
 
 SOURCE=.\Editor\UnEdCsg.cpp
 DEP_CPP_UNEDC=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnEdCsg.obj" : $(SOURCE) $(DEP_CPP_UNEDC) "$(INTDIR)"
@@ -6494,32 +5618,32 @@ DEP_CPP_UNEDC=\
 
 SOURCE=.\Editor\UnBsp.cpp
 DEP_CPP_UNBSP=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnBsp.obj" : $(SOURCE) $(DEP_CPP_UNBSP) "$(INTDIR)"
@@ -6532,32 +5656,32 @@ DEP_CPP_UNBSP=\
 
 SOURCE=.\Editor\UnEdCnst.cpp
 DEP_CPP_UNEDCN=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnEdCnst.obj" : $(SOURCE) $(DEP_CPP_UNEDCN) "$(INTDIR)"
@@ -6570,34 +5694,34 @@ DEP_CPP_UNEDCN=\
 
 SOURCE=.\Editor\UnEdSrv.cpp
 DEP_CPP_UNEDS=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRender.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
 	".\Inc\UnSpan.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnEdSrv.obj" : $(SOURCE) $(DEP_CPP_UNEDS) "$(INTDIR)"
@@ -6610,32 +5734,32 @@ DEP_CPP_UNEDS=\
 
 SOURCE=.\Editor\UnEdTran.cpp
 DEP_CPP_UNEDT=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnEdTran.obj" : $(SOURCE) $(DEP_CPP_UNEDT) "$(INTDIR)"
@@ -6647,84 +5771,41 @@ DEP_CPP_UNEDT=\
 # Begin Source File
 
 SOURCE=.\Editor\UnShadow.cpp
-
-!IF  "$(CFG)" == "Editor - Win32 Release"
-
 DEP_CPP_UNSHA=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnDynBsp.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
+	".\Inc\UnDynBsp.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRender.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
 	".\Inc\UnSpan.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnShadow.obj" : $(SOURCE) $(DEP_CPP_UNSHA) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ELSEIF  "$(CFG)" == "Editor - Win32 Debug"
-
-DEP_CPP_UNSHA=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnDynBsp.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\UnSpan.h"\
-	
-
-"$(INTDIR)\UnShadow.obj" : $(SOURCE) $(DEP_CPP_UNSHA) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ENDIF 
 
 # End Source File
 ################################################################################
@@ -6732,32 +5813,32 @@ DEP_CPP_UNSHA=\
 
 SOURCE=.\Editor\UnEditor.cpp
 DEP_CPP_UNEDIT=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnEditor.obj" : $(SOURCE) $(DEP_CPP_UNEDIT) "$(INTDIR)"
@@ -6770,32 +5851,32 @@ DEP_CPP_UNEDIT=\
 
 SOURCE=.\Editor\UnEdScan.cpp
 DEP_CPP_UNEDSC=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnEdScan.obj" : $(SOURCE) $(DEP_CPP_UNEDSC) "$(INTDIR)"
@@ -6808,34 +5889,34 @@ DEP_CPP_UNEDSC=\
 
 SOURCE=.\Editor\UnEdCam.cpp
 DEP_CPP_UNEDCA=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRender.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
 	".\Inc\UnSpan.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnEdCam.obj" : $(SOURCE) $(DEP_CPP_UNEDCA) "$(INTDIR)"
@@ -6847,82 +5928,40 @@ DEP_CPP_UNEDCA=\
 # Begin Source File
 
 SOURCE=.\Editor\UnMeshEd.cpp
-
-!IF  "$(CFG)" == "Editor - Win32 Release"
-
 DEP_CPP_UNMESH=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRender.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
 	".\Inc\UnSpan.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnMeshEd.obj" : $(SOURCE) $(DEP_CPP_UNMESH) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ELSEIF  "$(CFG)" == "Editor - Win32 Debug"
-
-DEP_CPP_UNMESH=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
-	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
-	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
-	".\Inc\UnEditor.h"\
-	".\Inc\UnEdTran.h"\
-	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
-	".\Inc\UnSpan.h"\
-	
-
-"$(INTDIR)\UnMeshEd.obj" : $(SOURCE) $(DEP_CPP_UNMESH) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ENDIF 
 
 # End Source File
 ################################################################################
@@ -6930,32 +5969,32 @@ DEP_CPP_UNMESH=\
 
 SOURCE=.\Editor\UnTexEd.cpp
 DEP_CPP_UNTEXE=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
 	".\Inc\UnActor.h"\
-	".\Inc\UnLevel.h"\
+	".\Inc\UnArray.h"\
+	".\Inc\UnBuild.h"\
+	".\Inc\UnCache.h"\
 	".\Inc\UnCamera.h"\
-	".\Inc\UnFGAud.h"\
-	".\Inc\UnSound.h"\
-	".\Inc\UnGfx.h"\
-	".\Inc\UnServer.h"\
 	".\Inc\UnDeflts.h"\
-	".\Inc\UnEngine.h"\
-	".\Inc\UnVGame.h"\
 	".\Inc\UnEditor.h"\
 	".\Inc\UnEdTran.h"\
+	".\Inc\UnEngine.h"\
+	".\Inc\UnFGAud.h"\
+	".\Inc\UnFile.h"\
+	".\Inc\UnGfx.h"\
+	".\Inc\UnLevel.h"\
+	".\Inc\UnMath.h"\
+	".\Inc\UnMem.h"\
 	".\Inc\UnMsgs.h"\
-	".\Inc\UnArray.h"\
+	".\Inc\UnParams.h"\
+	".\Inc\UnPlatfm.h"\
+	".\Inc\UnPort.h"\
+	".\Inc\Unreal.h"\
+	".\Inc\UnRes.h"\
+	".\Inc\UnResTyp.h"\
+	".\Inc\UnServer.h"\
+	".\Inc\UnSound.h"\
+	".\Inc\UnTopics.h"\
+	".\Inc\UnVGame.h"\
 	
 
 "$(INTDIR)\UnTexEd.obj" : $(SOURCE) $(DEP_CPP_UNTEXE) "$(INTDIR)"
@@ -6992,33 +6031,6 @@ SOURCE=".\Doc\!ReadMe.txt"
 # Begin Source File
 
 SOURCE=.\Render\UnTMapC.cpp
-
-!IF  "$(CFG)" == "Render - Win32 Release"
-
-DEP_CPP_UNTMA=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnSpan.h"\
-	
-
-"$(INTDIR)\UnTMapC.obj" : $(SOURCE) $(DEP_CPP_UNTMA) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Render - Win32 Debug"
-
 DEP_CPP_UNTMA=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -7053,44 +6065,12 @@ DEP_CPP_UNTMA=\
 "$(INTDIR)\UnTMapC.obj" : $(SOURCE) $(DEP_CPP_UNTMA) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Render\UnEdRend.cpp
-
-!IF  "$(CFG)" == "Render - Win32 Release"
-
-DEP_CPP_UNEDR=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnRaster.h"\
-	".\RENDER\UNLINE1.CPP"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnSpan.h"\
-	".\RENDER\UNLINE.CPP"\
-	
-
-"$(INTDIR)\UnEdRend.obj" : $(SOURCE) $(DEP_CPP_UNEDR) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Render - Win32 Debug"
-
 DEP_CPP_UNEDR=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -7121,49 +6101,19 @@ DEP_CPP_UNEDR=\
 	".\Inc\UnSpan.h"\
 	".\Inc\UnTopics.h"\
 	".\Inc\UnVGame.h"\
-	".\RENDER\UNLINE.CPP"\
-	".\RENDER\UNLINE1.CPP"\
+	".\Render\UnLine.cpp"\
+	".\Render\UnLine1.cpp"\
 	
 
 "$(INTDIR)\UnEdRend.obj" : $(SOURCE) $(DEP_CPP_UNEDR) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Render\UnRaster.cpp
-
-!IF  "$(CFG)" == "Render - Win32 Release"
-
-DEP_CPP_UNRAS=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnRaster.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnSpan.h"\
-	
-
-"$(INTDIR)\UnRaster.obj" : $(SOURCE) $(DEP_CPP_UNRAS) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Render - Win32 Debug"
-
 DEP_CPP_UNRAS=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -7199,43 +6149,12 @@ DEP_CPP_UNRAS=\
 "$(INTDIR)\UnRaster.obj" : $(SOURCE) $(DEP_CPP_UNRAS) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Render\UnRender.cpp
-
-!IF  "$(CFG)" == "Render - Win32 Release"
-
-DEP_CPP_UNREND=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnRaster.h"\
-	".\Inc\UnRenDev.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnSpan.h"\
-	
-
-"$(INTDIR)\UnRender.obj" : $(SOURCE) $(DEP_CPP_UNREND) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Render - Win32 Debug"
-
 DEP_CPP_UNREND=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -7272,42 +6191,12 @@ DEP_CPP_UNREND=\
 "$(INTDIR)\UnRender.obj" : $(SOURCE) $(DEP_CPP_UNREND) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Render\UnSpan.cpp
-
-!IF  "$(CFG)" == "Render - Win32 Release"
-
-DEP_CPP_UNSPA=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnRaster.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnSpan.h"\
-	
-
-"$(INTDIR)\UnSpan.obj" : $(SOURCE) $(DEP_CPP_UNSPA) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Render - Win32 Debug"
-
 DEP_CPP_UNSPA=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -7343,42 +6232,12 @@ DEP_CPP_UNSPA=\
 "$(INTDIR)\UnSpan.obj" : $(SOURCE) $(DEP_CPP_UNSPA) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Render\UnSprite.cpp
-
-!IF  "$(CFG)" == "Render - Win32 Release"
-
-DEP_CPP_UNSPR=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnRaster.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnSpan.h"\
-	
-
-"$(INTDIR)\UnSprite.obj" : $(SOURCE) $(DEP_CPP_UNSPR) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Render - Win32 Debug"
-
 DEP_CPP_UNSPR=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -7414,8 +6273,6 @@ DEP_CPP_UNSPR=\
 "$(INTDIR)\UnSprite.obj" : $(SOURCE) $(DEP_CPP_UNSPR) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
@@ -7536,33 +6393,6 @@ InputPath=.\Render\UnBlast.asm
 # Begin Source File
 
 SOURCE=.\Render\UnLight.cpp
-
-!IF  "$(CFG)" == "Render - Win32 Release"
-
-DEP_CPP_UNLIG=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnSpan.h"\
-	
-
-"$(INTDIR)\UnLight.obj" : $(SOURCE) $(DEP_CPP_UNLIG) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Render - Win32 Debug"
-
 DEP_CPP_UNLIG=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -7597,42 +6427,12 @@ DEP_CPP_UNLIG=\
 "$(INTDIR)\UnLight.obj" : $(SOURCE) $(DEP_CPP_UNLIG) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Render\UnBlastC.cpp
-
-!IF  "$(CFG)" == "Render - Win32 Release"
-
-DEP_CPP_UNBLA=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\Root.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnSpan.h"\
-	
-
-"$(INTDIR)\UnBlastC.obj" : $(SOURCE) $(DEP_CPP_UNBLA) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Render - Win32 Debug"
-
 DEP_CPP_UNBLA=\
 	".\Inc\Root.h"\
 	".\Inc\UnActor.h"\
@@ -7668,41 +6468,12 @@ DEP_CPP_UNBLA=\
 "$(INTDIR)\UnBlastC.obj" : $(SOURCE) $(DEP_CPP_UNBLA) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 ################################################################################
 # Begin Source File
 
 SOURCE=.\Render\UnTest.cpp
-
-!IF  "$(CFG)" == "Render - Win32 Release"
-
-DEP_CPP_UNTES=\
-	".\Inc\Unreal.h"\
-	".\Inc\UnRender.h"\
-	".\Inc\UnBuild.h"\
-	".\Inc\UnPort.h"\
-	".\Inc\UnPlatfm.h"\
-	".\Inc\UnFile.h"\
-	".\Inc\UnMath.h"\
-	".\Inc\UnParams.h"\
-	".\Inc\UnCache.h"\
-	".\Inc\UnMem.h"\
-	".\Inc\UnResTyp.h"\
-	".\Inc\UnRes.h"\
-	".\Inc\UnTopics.h"\
-	".\Inc\UnActor.h"\
-	".\Inc\UnSpan.h"\
-	
-
-"$(INTDIR)\UnTest.obj" : $(SOURCE) $(DEP_CPP_UNTES) "$(INTDIR)"
-   $(CPP) $(CPP_PROJ) $(SOURCE)
-
-
-!ELSEIF  "$(CFG)" == "Render - Win32 Debug"
-
 DEP_CPP_UNTES=\
 	".\Inc\UnActor.h"\
 	".\Inc\UnArray.h"\
@@ -7737,8 +6508,6 @@ DEP_CPP_UNTES=\
 "$(INTDIR)\UnTest.obj" : $(SOURCE) $(DEP_CPP_UNTES) "$(INTDIR)"
    $(CPP) $(CPP_PROJ) $(SOURCE)
 
-
-!ENDIF 
 
 # End Source File
 # End Target

@@ -16,7 +16,7 @@ Begin VB.Form frmRebuilder
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H00808080&
-   Height          =   6780
+   Height          =   6735
    HelpContextID   =   118
    Icon            =   "Rebuild.frx":0000
    Left            =   5610
@@ -26,7 +26,7 @@ Begin VB.Form frmRebuilder
    ScaleHeight     =   6375
    ScaleWidth      =   3855
    ShowInTaskbar   =   0   'False
-   Top             =   3570
+   Top             =   3615
    Width           =   3975
    Begin VB.CommandButton UpdStats 
       Appearance      =   0  'Flat
@@ -96,7 +96,7 @@ Begin VB.Form frmRebuilder
       _ExtentX        =   6588
       _ExtentY        =   10186
       _StockProps     =   15
-      Caption         =   "Lighting  "
+      Caption         =   "BSP  "
       ForeColor       =   0
       BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
          name            =   "MS Sans Serif"
@@ -108,7 +108,7 @@ Begin VB.Form frmRebuilder
          strikethrough   =   0   'False
       EndProperty
       TabsPerRow      =   3
-      Tab             =   2
+      Tab             =   1
       TabOrientation  =   0
       Tabs            =   3
       Style           =   1
@@ -122,14 +122,14 @@ Begin VB.Form frmRebuilder
       Tab(0).Control(1)=   "AutoBSP"
       TabCaption(1)   =   "BSP  "
       Tab(1).ControlCount=   4
-      Tab(1).ControlEnabled=   0   'False
-      Tab(1).Control(0)=   "AutoLights"
-      Tab(1).Control(1)=   "Frame3"
-      Tab(1).Control(2)=   "Frame1"
-      Tab(1).Control(3)=   "Frame4"
+      Tab(1).ControlEnabled=   -1  'True
+      Tab(1).Control(0)=   "Frame4"
+      Tab(1).Control(1)=   "Frame1"
+      Tab(1).Control(2)=   "Frame3"
+      Tab(1).Control(3)=   "AutoLights"
       TabCaption(2)   =   "Lighting  "
       Tab(2).ControlCount=   2
-      Tab(2).ControlEnabled=   -1  'True
+      Tab(2).ControlEnabled=   0   'False
       Tab(2).Control(0)=   "Frame6"
       Tab(2).Control(1)=   "Frame5"
       Begin VB.CheckBox AutoLights 
@@ -144,7 +144,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   255
-         Left            =   -74280
+         Left            =   720
          TabIndex        =   71
          Top             =   5340
          Value           =   1  'Checked
@@ -162,7 +162,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   975
-         Left            =   -74880
+         Left            =   120
          TabIndex        =   65
          Top             =   4320
          Width           =   3495
@@ -215,7 +215,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   1935
-         Left            =   -74880
+         Left            =   120
          TabIndex        =   61
          Top             =   2280
          Width           =   3495
@@ -352,7 +352,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   1695
-         Left            =   -74880
+         Left            =   120
          TabIndex        =   35
          Top             =   480
          Width           =   3495
@@ -1259,7 +1259,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   2175
-         Left            =   120
+         Left            =   -74880
          TabIndex        =   6
          Top             =   480
          Width           =   3375
@@ -1535,7 +1535,7 @@ Begin VB.Form frmRebuilder
             strikethrough   =   0   'False
          EndProperty
          Height          =   1095
-         Left            =   120
+         Left            =   -74880
          TabIndex        =   4
          Top             =   2760
          Width           =   3375

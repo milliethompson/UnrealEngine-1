@@ -3,8 +3,8 @@ Begin VB.Form frmParSolTube
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Build a Tube/Cyllinder"
    ClientHeight    =   5400
-   ClientLeft      =   7425
-   ClientTop       =   2010
+   ClientLeft      =   7695
+   ClientTop       =   2790
    ClientWidth     =   2295
    ControlBox      =   0   'False
    BeginProperty Font 
@@ -19,14 +19,14 @@ Begin VB.Form frmParSolTube
    ForeColor       =   &H80000008&
    Height          =   5805
    HelpContextID   =   156
-   Left            =   7365
+   Left            =   7635
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
    MinButton       =   0   'False
    ScaleHeight     =   5400
    ScaleWidth      =   2295
    ShowInTaskbar   =   0   'False
-   Top             =   1665
+   Top             =   2445
    Width           =   2415
    Begin VB.CheckBox chkAlignSide 
       Caption         =   "Align to Side"
@@ -175,7 +175,6 @@ Begin VB.Form frmParSolTube
       Left            =   120
       TabIndex        =   7
       Top             =   1800
-      Value           =   -1  'True
       Width           =   735
    End
    Begin VB.OptionButton optHollow 
@@ -193,6 +192,7 @@ Begin VB.Form frmParSolTube
       Left            =   1080
       TabIndex        =   9
       Top             =   1800
+      Value           =   -1  'True
       Width           =   855
    End
    Begin VB.CommandButton Build 
@@ -241,6 +241,15 @@ Begin VB.Form frmParSolTube
       _ExtentY        =   2778
       _StockProps     =   15
       BackColor       =   12632256
+      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         name            =   "MS Sans Serif"
+         charset         =   0
+         weight          =   700
+         size            =   8.25
+         underline       =   0   'False
+         italic          =   0   'False
+         strikethrough   =   0   'False
+      EndProperty
       BevelInner      =   1
       Begin VB.Line Line1 
          BorderColor     =   &H0000FFFF&
@@ -325,6 +334,15 @@ Begin VB.Form frmParSolTube
       Appearance      =   0  'Flat
       BackColor       =   &H80000005&
       Caption         =   "Trigger"
+      BeginProperty Font 
+         name            =   "MS Sans Serif"
+         charset         =   0
+         weight          =   700
+         size            =   8.25
+         underline       =   0   'False
+         italic          =   0   'False
+         strikethrough   =   0   'False
+      EndProperty
       ForeColor       =   &H80000008&
       Height          =   252
       Left            =   1560
@@ -829,37 +847,4 @@ End Sub
 Private Sub Trigger_Change()
     Build_Click
 End Sub
-
-
-Public Sub SelectAll(txtBox As TextBox)
-
-    txtBox.SelStart = 0
-    txtBox.SelLength = Len(txtBox.Text)
-
-End Sub
-
-Private Sub txtGroup_GotFocus()
-    SelectAll txtGroup
-End Sub
-
-
-Private Sub txtInnerRadius_GotFocus()
-    SelectAll txtInnerRadius
-End Sub
-
-
-Private Sub txtOuterRadius_GotFocus()
-    SelectAll txtOuterRadius
-End Sub
-
-
-Private Sub txtSides_GotFocus()
-    SelectAll txtSides
-End Sub
-
-
-Private Sub txtTubeHeight_GotFocus()
-    SelectAll txtTubeHeight
-End Sub
-
 

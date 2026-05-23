@@ -16,7 +16,7 @@ Begin VB.Form frmLevel
       strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   4440
+   Height          =   4395
    HelpContextID   =   117
    Icon            =   "Level.frx":0000
    Left            =   2430
@@ -24,7 +24,7 @@ Begin VB.Form frmLevel
    ScaleHeight     =   4035
    ScaleWidth      =   7455
    ShowInTaskbar   =   0   'False
-   Top             =   5985
+   Top             =   6030
    Width           =   7575
    Begin VB.CommandButton Command6 
       Caption         =   "&View Links..."
@@ -542,11 +542,6 @@ End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
-End Sub
-
-
-Private Sub SSTab2_DblClick()
-
 End Sub
 
 
