@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnTmap.cpp: Unreal span texture mapping subsytem.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
@@ -43,13 +43,11 @@ struct FPolySpanTextureInfo : public FPolySpanTextureInfoBase
 	FDitherSet	*DitherSet;
 	INT			AndMask;
 	RAINBOW_PTR	TextureData;
-	RAINBOW_PTR	ShaderData;
 	RAINBOW_PTR	BlenderData;
 
 	// Valid while locked.
-	UTexture	*Texture;
-	FCacheItem	*PaletteCacheItem;
-	ITexture	TextureInfo;
+	UTexture	 *Texture;
+	FTextureInfo TextureInfo;
 
 	// Drawing functions.
 	void DrawFlat_8P	(QWORD Start,QWORD Inc,RAINBOW_PTR Dest,INT Pixels,INT Line);
@@ -76,17 +74,18 @@ struct FPolySpanTextureInfo : public FPolySpanTextureInfoBase
 // Span texture mapper definition.
 //warning: Mirrored in UnRender.inc.
 //
-struct FGlobalSpanTextureMapper : public FGlobalSpanTextureMapperBase
+class FGlobalSpanTextureMapper : public FGlobalSpanTextureMapperBase
 {
+public:
 	// FGlobalSpanTextureMapperBase overrides.
 	FPolySpanTextureInfoBase *SetupForPoly
-		(
-		ICamera			&Camera,
+	(
+		UCamera			*Camera,
 		UTexture		*ThisTexture,
-		AZoneDescriptor	*ZoneDescriptor,
+		AZoneInfo		*ZoneInfo,
 		DWORD			ThesePolyFlags,
 		DWORD			NotPolyFlags
-		);
+	);
 	void FinishPoly(FPolySpanTextureInfoBase *Info);
 };
 
@@ -136,30 +135,30 @@ const FPolySpanTextureInfoBase::DRAW_SPAN
 //
 FPolySpanTextureInfoBase*
 FGlobalSpanTextureMapper::SetupForPoly
-	(
-	ICamera			&Camera,
-	UTexture		*ThisTexture,
-	AZoneDescriptor	*ZoneDescriptor,
-	DWORD			ThesePolyFlags,
-	DWORD			NotPolyFlags
-	)
+(
+	UCamera		*Camera,
+	UTexture	*ThisTexture,
+	AZoneInfo	*ZoneInfo,
+	DWORD		ThesePolyFlags,
+	DWORD		NotPolyFlags
+)
 {
 	guard(FGlobalSpanTextureMapper::SetupForPoly);
 
 	// Get some memory for the resulting setup info.
 	FPolySpanTextureInfo* Info;
-	Info		= (FPolySpanTextureInfo *)GMem.Get(sizeof(FPolySpanTextureInfo));
+	Info = new(GMem)FPolySpanTextureInfo;
 
 	// Make sure the texture is valid.
 	Info->Texture = ThisTexture ? ThisTexture : GGfx.DefaultTexture;
 
 	// Figure out the texture mipmapping level.
-	int OurMipLevel = 0, USize, VSize;
-	Info->TextureData.PtrBYTE = Info->Texture->GetData(Info->TextureInfo,&OurMipLevel,Camera.ColorBytes,&USize,&VSize);
+	Info->Texture->Lock( Info->TextureInfo, Camera->Texture, TL_RenderRamp );
+	Info->TextureData.PtrBYTE = Info->TextureInfo.Mips[0]->Data;
 
 	// Set up tiling.
-	Info->AndMask = GRender.Extra3 ? 0 : ((VSize-1) + ((USize-1) << (32-Info->Texture->UBits)));
-	Info->VMask   = (QWORD)(VSize-1) << Info->Texture->UBits;
+	Info->AndMask = GRender.Extra3 ? 0 : ((Info->TextureInfo.Mips[0]->VSize-1) + ((Info->TextureInfo.Mips[0]->USize-1) << (32-Info->Texture->UBits)));
+	Info->VMask   = (QWORD)(Info->TextureInfo.Mips[0]->VSize-1) << Info->Texture->UBits;
 	Info->UBits   = Info->Texture->UBits;
 	Info->VBits	  = Info->Texture->VBits;
 
@@ -168,45 +167,24 @@ FGlobalSpanTextureMapper::SetupForPoly
 
 	// Set up dithering.
 	FDitherTable *DitherBase;
-	if (GRender.DoDither && !(PolyFlags & PF_NoSmooth )) DitherBase = &GDither256;
+	if (GRender.DoDither && !(PolyFlags & PF_NoSmooth )) DitherBase = &GDither256[GRender.TemporalIter&3];
 	else DitherBase = &GNoDither256;
 
 	Info->DitherSet = &(*DitherBase)[Info->Texture->UBits];
-
-	// Get shader.
-	if( Camera.ColorBytes == 1 )
-	{
-		Info->ShaderData = GGfx.ShadeData;
-		Info->PaletteCacheItem = NULL;
-	}
-	else
-	{
-		Info->ShaderData = GRender.GetPaletteLightingTable
-		(
-			Camera,
-			Info->Texture->Palette,
-			ZoneDescriptor,
-			NULL,
-			Info->PaletteCacheItem
-		);
-	}
-
-	// Get blender if needed.
-	Info->BlenderData.PtrBYTE = GGfx.Blender;
 
 	// Figure out special effects.
 	int DrawKind;
 	if( !(PolyFlags & PF_Transparent) )
 	{
-		if (!(PolyFlags & PF_Masked))	DrawKind = FGlobalRender::DRAWRASTER_Normal;
-		else							DrawKind = FGlobalRender::DRAWRASTER_Masked;
+		if (!(PolyFlags & PF_Masked))	DrawKind = FRender::DRAWRASTER_Normal;
+		else							DrawKind = FRender::DRAWRASTER_Masked;
 	}
-	else DrawKind = FGlobalRender::DRAWRASTER_Blended;
+	else DrawKind = FRender::DRAWRASTER_Blended;
 
 	// Get function pointer to perform span texture mapping:
 	Info->DrawFunc = 
 		(FPolySpanTextureInfoBase::DRAW_SPAN)
-		Info->DrawFuncTable[DrawKind][Camera.ColorBytes];
+		Info->DrawFuncTable[DrawKind][Camera->ColorBytes];
 
 	// Return the setup info.
 	return Info;
@@ -229,10 +207,6 @@ void FGlobalSpanTextureMapper::FinishPoly
 
 	// Unlock stuff.
 	Info->Texture->Unlock(Info->TextureInfo);
-	if( Info->PaletteCacheItem ) Info->PaletteCacheItem->Unlock();
-
-	// Release the memory pool.
-	GMem.Release(Info);
 
 	unguard;
 }
@@ -250,7 +224,7 @@ void FPolySpanTextureInfo::DrawFlat_8P
 {
 	while ( Pixels-- > 0 )
 	{
-		*Dest.PtrBYTE++ = ShaderData.PtrBYTE
+		*Dest.PtrBYTE++ = TextureInfo.Colors.PtrBYTE
 		[
 			(int)(Start&0x3f00)
 		+	(int)TextureData.PtrBYTE
@@ -268,7 +242,7 @@ void FPolySpanTextureInfo::DrawFlat_16P
 {
 	while ( Pixels-- > 0 )
 	{
-		*Dest.PtrWORD++ = ShaderData.PtrWORD
+		*Dest.PtrWORD++ = TextureInfo.Colors.PtrWORD
 		[
 			(int)(Start&0x3f00)
 		+	(int)TextureData.PtrBYTE
@@ -286,7 +260,7 @@ void FPolySpanTextureInfo::DrawFlat_32P
 {
 	while ( Pixels-- > 0 )
 	{
-		*Dest.PtrDWORD++ = ShaderData.PtrDWORD
+		*Dest.PtrDWORD++ = TextureInfo.Colors.PtrDWORD
 		[
 			(int)(Start&0x3f00)
 		+	(int)TextureData.PtrBYTE
@@ -308,7 +282,7 @@ void FPolySpanTextureInfo::DrawNormal_8P
 {
 	while ( Pixels-- > 0 )
 	{
-		*Dest.PtrBYTE++ = ShaderData.PtrBYTE
+		*Dest.PtrBYTE++ = TextureInfo.Colors.PtrBYTE
 		[
 			(int)(Start&0x3f00)
 		+	(int)TextureData.PtrBYTE
@@ -326,7 +300,7 @@ void FPolySpanTextureInfo::DrawNormal_16P
 {
 	while ( Pixels-- > 0 )
 	{
-		*Dest.PtrWORD++ = ShaderData.PtrWORD
+		*Dest.PtrWORD++ = TextureInfo.Colors.PtrWORD
 		[
 			(int)(Start&0x3f00)
 		+	(int)TextureData.PtrBYTE
@@ -344,7 +318,7 @@ void FPolySpanTextureInfo::DrawNormal_32P
 {
 	while ( Pixels-- > 0 )
 	{
-		*Dest.PtrDWORD++ = ShaderData.PtrDWORD
+		*Dest.PtrDWORD++ = TextureInfo.Colors.PtrDWORD
 		[
 			(int)(Start&0x3f00)
 		+	(int)TextureData.PtrBYTE
@@ -371,7 +345,7 @@ void FPolySpanTextureInfo::DrawMasked_8P
 			((Start >> (64-UBits))        )
 		+	((Start >> (32-UBits)) & VMask)
 		];
-		if( B ) *Dest.PtrBYTE = ShaderData.PtrBYTE
+		if( B ) *Dest.PtrBYTE = TextureInfo.Colors.PtrBYTE
 		[
 			(int)(B)
 		+	(int)(Start&0x3f00)
@@ -391,7 +365,7 @@ void FPolySpanTextureInfo::DrawMasked_16P
 			((Start >> (64-UBits))        )
 		+	((Start >> (32-UBits)) & VMask)
 		];
-		if( B ) *Dest.PtrWORD = ShaderData.PtrWORD
+		if( B ) *Dest.PtrWORD = TextureInfo.Colors.PtrWORD
 		[
 			(int)(Start&0x3f00)
 		+	(int)(B)
@@ -411,7 +385,7 @@ void FPolySpanTextureInfo::DrawMasked_32P
 			((Start >> (64-UBits))        )
 		+	((Start >> (32-UBits)) & VMask)
 		];
-		if( B ) *Dest.PtrDWORD = ShaderData.PtrDWORD
+		if( B ) *Dest.PtrDWORD = TextureInfo.Colors.PtrDWORD
 		[
 			(int)(Start&0x3f00)
 		+	(int)(B)
@@ -438,7 +412,7 @@ void FPolySpanTextureInfo::DrawBlended_8P
 		if( B ) *Dest.PtrBYTE = BlenderData.PtrBYTE
 			[
 			((int)*Dest.PtrBYTE << 8)
-		+	ShaderData.PtrBYTE
+		+	TextureInfo.Colors.PtrBYTE
 			[
 				(int)(B)
 			+	(int)(Start&0x3f00)

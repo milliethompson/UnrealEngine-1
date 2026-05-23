@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnTopics.h: Unreal information topics for Unreal/UnrealEd communication
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -28,8 +28,8 @@ public:
 	FTopicHandler *Next;
 
 	// Public functions.
-	virtual void Set (ULevel *Level, const char *Topic, const char *Item, const char *Value)=0;
-	virtual void Get (ULevel *Level, const char *Topic, const char *Item, char *Result)=0;
+	virtual void Set (ULevel *Level, const char *Item, const char *Data)=0;
+	virtual void Get (ULevel *Level, const char *Item, FOutputDevice &Out)=0;
 };
 
 /*-------------------------------------------------------------------------------
@@ -39,7 +39,7 @@ public:
 //
 // Global topic table class.  Contains all available topics.
 //
-class UNREAL_API FGlobalTopicTable
+class UNENGINE_API FGlobalTopicTable
 {
 public:
 
@@ -50,7 +50,7 @@ public:
 	void	Register(const char *TopicName,FTopicHandler *Handler);
 	void	Init	();
 	void 	Exit	();
-	void	Get		(ULevel *Level, const char *Topic, const char *Item, char *Data);
+	void	Get		(ULevel *Level, const char *Topic, const char *Item, FOutputDevice &Out);
 	void	Set		(ULevel *Level, const char *Topic, const char *Item, const char *Value);
 
 	private:
@@ -67,7 +67,7 @@ public:
 // that must be made available.
 //
 // The macro creates a bogus global variable and assigns it a value returned from
-// the resource topic class's *Name constructor, which has the effect of
+// the topic class's *Name constructor, which has the effect of
 // registering the topic primordially, before main() has been called.
 //
 #define AUTOREGISTER_TOPIC(NAME,HANDLERCLASS) \
@@ -75,8 +75,8 @@ public:
 		{\
 		public:\
 		HANDLERCLASS(char *Name){GTopics.Register(Name,this);};\
-		void Get (ULevel *Level, const char *Topic, const char *Item, char *Result);\
-		void Set (ULevel *Level, const char *Topic, const char *Item, const char *Value);\
+		void Get (ULevel *Level, const char *Item, FOutputDevice &Out);\
+		void Set (ULevel *Level, const char *Item, const char *Value);\
 		};\
 	HANDLERCLASS autoregister##HANDLERCLASS(NAME);
 
@@ -89,12 +89,12 @@ public:
 //
 #if 0
 AUTOREGISTER_TOPIC("YourTopicName",YourTopicHandler);
-void YourTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, char *Data)
+void YourTopicHandler::Get(ULevel *Level, const char *Item, FOutputDevice &Out)
 {
 	guard(YourTopicHandler::Get);
 	unguard;
 };
-void YourTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, const char *Data)
+void YourTopicHandler::Set(ULevel *Level, const char *Item, const char *Data)
 {
 	guard(YourTopicHandler::Set);
 	unguard;

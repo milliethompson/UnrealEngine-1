@@ -29,6 +29,10 @@ BEHINDVIEW / NORMALVIEW
 	[Only valid when typed in a camera console]
 	Selects the behind-the-player view or the normal view.
 
+BIND <key> "command string"
+	Binds a key, button or axis movement to an input action.
+	See Bind.mac for a list of the standard bindings.
+
 CAMERA OPEN [NAME=name] [HWND=parent_hwnd_num] [X=x_num] [Y=y_num] [XR=xres_num] [YR=yres_num]
 	[FOV=fieldofview_num] [FLAGS=bitflags_num] [REN=mode_num] [MISC1=num]
 	[MISC2=num]
@@ -86,6 +90,14 @@ DEBUG EATMEM
 DEBUG GPG
 	Crashes with a GPF.
 
+DETAIL LOW/MEDIUM/HIGH
+	Sets rendering detail level to low, medium, or high.
+	This isn't supported very thorougly, so there might not be a
+	noticeable detail/performance change.
+
+EXEC <filename>
+	Execute a macro file.
+
 EXIT
 	Shuts down and exits Unreal.
 
@@ -117,6 +129,9 @@ LINKS
 MEM
 	Displays memory usage.
 
+MEM ALL
+	Displays all allocations.
+
 PLAYERSONLY
 	Toggles updating only players (not other actors).
 
@@ -126,13 +141,17 @@ PLAYERS
 REND
 	Rendering toggles:
 	SMOOTH		- Tests weird antialiasing routine in 8-bit color only.
-	STRETCH		- Unused.
+	STRETCH		- Stretch the screen via pixel doubling.
 	LEAK		- Backfill level with red, so it's easy to see cracks in the level.
 	BILINEAR	- Toggle approximate bilinear smoothing.
 	CUTS		- Show creature cuts.
 	LATTICE		- Show texture lattice.
 	EXTRA1-4	- Toggles extra (unused rendering options).
 	T			- Toggles misc option.
+	TEMPORAL    - Toggles temporal antialiasing.
+	ANTIALIAS	- Toggles edge antialiasing.
+	SET         - Set rendering options:
+		MIPMULT=##		- Mipmap multiplier, usually 1.0.
 
 PN / PP
 	Possess the next/previoud actor.
@@ -145,11 +164,11 @@ RMODE <mode_num>
 	5 - Dynamic lighting
 	6 - Unlit
 
-RES DUMP
-	Displays a list of abandoned resources.
+OBJ DUMP
+	Displays a list of abandoned objects.
 
-RES LIST
-	Displays a list of all resources and the memory they occupy.
+OBJ LIST [TYPE=object_type]
+	Displays a list of all objects and the memory they occupy.
 	This is how you can see the amount of memory that your level takes
 	up: The first numbers represents the amount of memory actually used,
 	and the second numbers represent the amount of memory reserved for
@@ -157,23 +176,28 @@ RES LIST
 	in the final game) and the later are extremely large (that's why you
 	need to free up hundreds of megs of hard disk space to run UnrealEd).
 
-RES PURGE
-	Purges all abandoned resources.
+OBJ GARBAGE
+	Performs garbage collection and purges all abandoned objects.
 
-RES QUERY
+OBJ HASH
+	Display object name hashing statistics.
+
+OBJ QUERY
 	[Undocumented]
+
+RESETBINDINGS
+	Resets all key and axis bindings to nothing.
 
 SHOWACTORS / HIDEACTORS
 	[Only valid when typed in a camera console]
 	Turns the rendering of actors on or off.
 
+SHOWBINDINGS
+	Displays all current bindings.
+
 STATS
 	[Only valid when typed in a camera console]
 	Shows tons of statistics.
-
-STATUS [subsystem_name]
-	Displayes the status of the specified subsystem, or the status of
-	all subsystems if you don't specify a name.
 
 TASKS
 	Displays a list of running Unreal tasks.

@@ -1,0 +1,864 @@
+DeclareClass Name=Sound
+DeclareClass Name=Mesh
+DeclareClass Name=Texture
+DeclareClass Name=Class
+DeclareClass Name=Script
+DeclareClass Name=Pawn
+DeclareClass Name=Inventory
+DeclareClass Name=TentacleProjectile
+DeclareClass Name=Weapon
+DeclareClass Name=Pickup
+DeclareClass Name=PowerUp
+DeclareClass Name=AutoMag
+DeclareClass Name=QuadShot
+DeclareClass Name=FlameGun
+DeclareClass Name=Stinger
+DeclareClass Name=Ammo
+DeclareClass Name=Clip
+DeclareClass Name=Health
+DeclareClass Name=Shells
+DeclareClass Name=StingerAmmo
+DeclareClass Name=Armor
+DeclareClass Name=detect
+DeclareClass Name=heart
+DeclareClass Name=flashl
+DeclareClass Name=razor
+DeclareClass Name=eightbal
+DeclareClass Name=flamet
+DeclareClass Name=rifle
+
+Begin Class Name=Inventory
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// The inventory class, the parent class of all objects which can be
+// picked up and carried by actors.
+//=============================================================================
+class Inventory expands Actor
+	abstract
+	package(UnEngine);
+
+#exec Texture Import File=..\Graphics\S_Pickup.pcx Name=S_Pickup Palette=Palette Mips=Off Flags=2
+
+//-----------------------------------------------------------------------------
+// Information relevant to Active/Inactive state.
+var() byte            AutoSwitchPriority; // Autoswitch value, 0=never autoswitch.
+var() byte            InventoryGroup;     // The weapon/inventory set, 1-9 (0=none).
+var() bool            bActivatable;       // Whether item can be activated.
+var() bool            bRepeats;           // Whether weapon/item repeat-fires.
+
+//-----------------------------------------------------------------------------
+// Information relevant to Pickup state.
+var() sound           PickupSound;        // Sound to play when picked up.
+var() sound           RespawnSound;       // Sound to play when it respawns.
+var() string[64]      PickupMessage;      // Human readable description when picked up.
+var() float           RespawnTime;        // Respawn after this time, 0 for instant.
+var() bool            bRespawnAlone;      // Respawn in single player.
+var() bool            bRespawnNet;        // Respawn in network play.
+
+//-----------------------------------------------------------------------------
+// Player view rendering info.
+var() vector          PlayerViewOffset;   // Offset from view center.
+var() mesh            PlayerViewMesh;     // Mesh to render.
+var() float           PlayerViewScale;    // Mesh scale.
+
+//-----------------------------------------------------------------------------
+// Pickup view rendering info.
+var() mesh            PickupViewMesh;     // Mesh to render.
+var() float           PickupViewScale;    // Mesh scale.
+
+//-----------------------------------------------------------------------------
+// Status bar info.
+var() texture         StatusIcon;        // Icon used with ammo/charge/power count.
+var   int             StatusCount;       // Count to show on status bar, -1=hide.
+var   float           StatusValue;       // For expansion (brightness or whatever).
+
+//=============================================================================
+// Global functions.
+
+// Called by engine when destroyed.
+function Destroyed()
+{
+	// Remove from owner's inventory.
+	if( Pawn(Owner)!=None )
+		Pawn(Owner).DeleteInventory( Self );
+}
+
+// Setup first-person view.
+engine function InvCalcView1( vector OwnerLoc, rotation OwnerRot )
+{
+	local vector DrawOffset;
+	
+	DrawOffset = PlayerViewOffset + Pawn(Owner).EyeHeight*vect(0,0,0.1);
+	SetLocation(OwnerLoc + (DrawOffset >> OwnerRot));
+	Rotation = OwnerRot;
+}
+
+// Setup third-person view.
+engine function InvCalcView3( vector OwnerLoc, rotation OwnerRot )
+{
+	// Not yet supported.
+}
+
+// Become a pickup.
+function BecomePickup()
+{
+	Mesh          = PickupViewMesh;
+	DrawScale     = PickupViewScale;
+	bOnlyOwnerSee = false;
+	bHidden       = false;
+	SetCollision( true, false, false );
+}
+
+// Become an inventory item.
+function BecomeItem()
+{
+	Mesh          = PlayerViewMesh;
+	DrawScale     = PlayerViewScale;
+	bOnlyOwnerSee = true;
+	bHidden       = true;
+	SetCollision( false, false, false );
+}
+
+// Advanced function which lets existing items in a pawn's inventory
+// prevent the pawn from picking something up. Return true to abort pickup.
+engine function bool PreemptPickupQuery( inventory Item );
+
+// Advanced function which notifies existing items in a pawn's inventory
+// that an item is about to be picked up. Return true to cancel the
+// pickup (in this case you should destroy NewItem).
+engine function bool PickupNotify( inventory NewItem );
+
+//=============================================================================
+// Capabilities: For feeding general info to bots.
+
+engine function float InventoryCapsFloat( name Property );
+engine function string[255] InventoryCapsString( name Property );
+
+//=============================================================================
+// Firing.
+
+// Fire functions which must be implemented in child classes.
+engine function Fire( float Value );
+engine function AltFire( float Value );
+
+//=============================================================================
+// Pickup state: this inventory item is sitting on the ground.
+
+auto state Pickup
+{
+	// When touched by an actor.
+	function Touch( actor Other )
+	{
+		// If touched by a pawn, let him pick this up.
+		if( Pawn(Other)!=None && Pawn(Other).bIsPlayer )
+		{
+			// See if the pawn wants it.
+			Log( "Offer " $ Class $ " to " $ Other.Class );
+			if( Pawn(Other).PickupQuery(Self) )
+			{
+				// The pawn wants this item.
+				Pawn(Other).AddInventory(Self);//!!
+				Pawn(Other).Weapon = Weapon(Self);//!!
+				BecomeItem();
+			}
+		}
+	}
+Begin:
+	BecomePickup();
+}
+
+//=============================================================================
+// Inactive state: this inventory item is owned and inactive.
+
+state Inactive
+{
+Begin:
+}
+
+// Use this inventory item.
+engine function Use( pawn User );
+
+//=============================================================================
+// Active state: this inventory item is armed and ready to rock!
+
+state Active
+{
+Begin:
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      AutoSwitchPriority=0
+      InventoryGroup=0
+      bActivatable=False
+      bRepeats=False
+	  bMeshCurvy=False
+      PickupSound=None
+      RespawnSound=None
+      PickupMessage="Snagged an item"
+      RespawnTime=+00000.000000
+      bRespawnAlone=False
+      bRespawnNet=False
+      PlayerViewOffset=(+00000.000000,+00000.000000,+00000.000000)
+      PlayerViewMesh=None
+      PlayerViewScale=+00001.000000
+      PickupViewMesh=None
+      PickupViewScale=+00001.000000
+      StatusIcon=None
+      StatusCount=0
+      StatusValue=+00000.000000
+      bCollideActors=True
+      DrawType=DT_Mesh
+      Texture=S_Pickup
+      CollisionRadius=+00030.000000
+      CollisionHeight=+00030.000000
+      bIsItemGoal=True
+      DefaultEdCategory=Display
+   End DefaultProperties
+End Class
+
+Begin Class Name=Weapon
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Parent class of all weapons.
+//=============================================================================
+class Weapon expands Inventory
+	abstract
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// What kind of weapon this is.
+enum EWeaponType
+{
+	WEAP_Projectile, // Weapon spawns a projectile.
+	WEAP_InstantHit, // Weapon performs an instantaneous hit.
+	WEAP_Custom      // Custom weapon firing.
+};
+
+//-----------------------------------------------------------------------------
+// Weapon aiming and rendering.
+var() bool    bAutoVTarget;      // Auto-seek targets vertically.
+var() bool    bAutoHTarget;      // Auto-seek targets horizontally.
+var() float   MaxTargetRange;    // Maximum distance to target.
+var() float   SeekDamping;       // Determines auto-seek speed.
+
+//-----------------------------------------------------------------------------
+// Weapon ammo/firing information:
+// Two-element arrays here are defined for normal fire (0) and alt fire (1).
+var() byte    AmmoType;          // !!Type of ammo used.
+var() int     AmmoUsed[2];       // Count of ammo used for each discharge.
+var() byte    Discharges[2];     // Number of discharges.
+var() byte    ReloadCount;       // Amount of ammo depletion before reloading. 0 if no reloading is done.
+var() float   Noise[2];          // Amount of noise per discharge.
+var() float   RecoilForce[2];    // Recoil force per discharge.
+var() class   MuzzleFxClass[2];  // Muzzle effect.
+var() int     PickupAmmoCount;   // !!Amount of ammo initially in pick-up item.
+
+//-----------------------------------------------------------------------------
+// Weapon sounds.
+var() sound   DischargeSounds[2]; // Sound used at discharge.
+var() sound   ReloadSound;        // Sound used during reload.
+var() sound   CloseUpSound;       // Sound of close-up attack.
+
+var() Byte    CloseUpDamage;      // Basic damage caused by close-up attack.
+var() float   CloseUpStrength;    // Factors CloseUpDamage based on strength of holding actor.
+
+var float     UseTime;            // How many ticks has the weapon been in continuous use.
+var float     LastUseTime;        // The time the weapon was last used.
+
+var() class   ProjectileClass[2]; // Projectile class to spawn for normal use (0) or special use (1).
+var() float   ProjStartDist;      // Starting distance away from weapon.
+var() float   Dispersion[2];      // Dispersion cosine, 0=none, 1.0=45 degrees (instant-hit only).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bAutoVTarget=True
+      bAutoHTarget=False
+      MaxTargetRange=+04096.000000
+      SeekDamping=+00000.960000
+      AmmoType=11
+      AmmoUsed(0)=0
+      AmmoUsed(1)=0
+      Discharges(0)=0
+      Discharges(1)=0
+      ReloadCount=0
+      Noise(0)=+00000.000000
+      Noise(1)=+00000.000000
+      RecoilForce(0)=+00000.000000
+      RecoilForce(1)=+00000.000000
+      MuzzleFxClass(0)=None
+      MuzzleFxClass(1)=None
+      PickupAmmoCount=0
+      DischargeSounds(0)=None
+      DischargeSounds(1)=None
+      ReloadSound=None
+      CloseUpSound=None
+      CloseUpDamage=15
+      CloseUpStrength=+00000.000000
+      UseTime=+00000.000000
+      LastUseTime=+00000.000000
+      ProjectileClass(0)=None
+      ProjectileClass(1)=None
+      ProjStartDist=+00000.000000
+      Dispersion(0)=+00000.000000
+      Dispersion(1)=+00000.000000
+      AutoSwitchPriority=1
+      InventoryGroup=1
+      PickupMessage="You got a weapon"
+      PlayerViewOffset=(+00030.000000,+00000.000000,-00005.000000)
+      bNoSmooth=True
+   End DefaultProperties
+End Class
+
+Begin Class Name=AutoMag
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// AutoMag.
+//=============================================================================
+class AutoMag expands Weapon
+	package(UnGame);
+
+#call ..\Models\Autom.mac
+#call ..\Models\AutoHand.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      AmmoType=0
+      AmmoUsed(0)=1
+      AmmoUsed(1)=1
+      Discharges(0)=1
+      Discharges(1)=1
+      Noise(0)=+00005.000000
+      Noise(1)=+00005.000000
+      PickupAmmoCount=20
+      ProjectileClass(0)=BulletProjectile
+      ProjectileClass(1)=BulletProjectile
+      ProjStartDist=+00060.000000
+      Dispersion(1)=+00000.060000
+      InventoryGroup=2
+      PickupMessage="You got the AutoMag"
+      PlayerViewOffset=(+00030.000000,+00000.000000,-00021.750000)
+      PlayerViewMesh=AutoMag
+      PlayerViewScale=+00002.100000
+      PickupViewMesh=AutoMagPickup
+      PickupViewScale=+00000.250000
+      Mesh=AutoMagPickup
+      DrawScale=+00000.250000
+      Mass=+00000.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=QuadShot
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// QuadShot.
+//=============================================================================
+class QuadShot expands Weapon
+	package(UnGame);
+
+#call ..\Models\Quad.mac
+#call ..\Models\Quadhand.mac
+
+//=============================================================================
+// Functions.
+
+function Fire( float Value )
+{
+	if( AnimRate == 0 )
+	{
+		Spawn( TentacleProjectile );
+		PlayAnim( Fire, 0.5 );
+	}
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      AmmoType=1
+      AmmoUsed(0)=1
+      AmmoUsed(1)=1
+      Discharges(0)=1
+      Discharges(1)=4
+      ReloadCount=4
+      Noise(0)=+00010.000000
+      Noise(1)=+00010.000000
+      RecoilForce(0)=+00050.000000
+      RecoilForce(1)=+00050.000000
+      PickupAmmoCount=20
+      ProjectileClass(0)=ShellProjectile
+      ProjectileClass(1)=ShellProjectile
+      Dispersion(0)=+00000.040000
+      Dispersion(1)=+00000.080000
+      AutoSwitchPriority=2
+      InventoryGroup=3
+      PickupMessage="Grabbed the QuadShot"
+      PlayerViewOffset=(+00052.000000,+00000.000000,-00027.000000)
+      PlayerViewMesh=QuadShot
+      PlayerViewScale=+00001.590000
+      PickupViewMesh=QuadShotPickup
+      Mesh=QuadShotPickup
+      Mass=+00000.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=FlameGun
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// FlameGun.
+//=============================================================================
+class FlameGun expands Weapon
+	package(UnGame);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      AmmoType=3
+      AmmoUsed(0)=10
+      AmmoUsed(1)=20
+      Discharges(0)=1
+      Discharges(1)=1
+      Noise(0)=+00010.000000
+      Noise(1)=+00010.000000
+      RecoilForce(0)=+00200.000000
+      RecoilForce(1)=+00400.000000
+      PickupAmmoCount=100
+      ProjectileClass(0)=Fireball
+      ProjectileClass(1)=Fireball2
+      ProjStartDist=+00050.000000
+      AutoSwitchPriority=4
+      InventoryGroup=5
+      PickupMessage="You picked up a Flame Gun"
+      PlayerViewOffset=(+00040.000000,+00000.000000,-00028.000000)
+   End DefaultProperties
+End Class
+
+Begin Class Name=Stinger
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Stinger.
+//=============================================================================
+class Stinger expands Weapon
+	package(UnGame);
+
+#call ..\Models\Spikhand.mac
+#call ..\Models\Sting.mac
+
+//Dim PendingShots[5] As Byte ' Array indicating which directions are pending (see code for details)  
+//Dim PendingShotCount As Byte ' Count of shots pending in PendingShots
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      AmmoType=2
+      AmmoUsed(0)=1
+      AmmoUsed(1)=1
+      Discharges(0)=1
+      Discharges(1)=1
+      Noise(0)=+00010.000000
+      Noise(1)=+00010.000000
+      RecoilForce(0)=+00015.000000
+      RecoilForce(1)=+00015.000000
+      PickupAmmoCount=30
+      DischargeSounds(0)=NAILGUN
+      DischargeSounds(1)=NAILGUN
+      ProjectileClass(0)=StingerProjectile
+      ProjectileClass(1)=StingerProjectile
+      ProjStartDist=+00050.000000
+      AutoSwitchPriority=3
+      InventoryGroup=4
+      PickupMessage="You picked up a Stinger"
+      PlayerViewOffset=(+00027.500000,+00000.000000,-00029.000000)
+      PlayerViewMesh=Stinger
+      PlayerViewScale=+00001.700000
+      PickupViewMesh=StingerPickup
+      Mesh=StingerPickup
+   End DefaultProperties
+End Class
+
+Begin Class Name=razor
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// razor.
+//=============================================================================
+class razor expands Weapon;
+
+#exec MESH IMPORT MESH=razor ANIVFILE=..\MODELS\razor_a.3D DATAFILE=..\MODELS\razor_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=razor X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=razor SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=razor SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jrazor1 FILE=..\MODELS\razor.PCX FAMILY=!Skins PALETTE=Jrazor1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=razor MESH=razor 
+#exec MESHMAP SCALE MESHMAP=razor X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=razor NUM=1 TEXTURE=Jrazor1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Mesh=razor
+   End DefaultProperties
+End Class
+
+Begin Class Name=eightbal
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// eightbal.
+//=============================================================================
+class eightbal expands Weapon;
+
+#exec MESH IMPORT MESH=eightb ANIVFILE=..\MODELS\eightb_a.3D DATAFILE=..\MODELS\eightb_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=eightb X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=eightb SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=eightb SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jeightb1 FILE=..\MODELS\eightbal.PCX FAMILY=!Skins PALETTE=Jeightb1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=eightb MESH=eightb 
+#exec MESHMAP SCALE MESHMAP=eightb X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=eightb NUM=1 TEXTURE=Jeightb1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Mesh=eightb
+   End DefaultProperties
+End Class
+
+Begin Class Name=flamet
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// flamet.
+//=============================================================================
+class flamet expands Weapon;
+
+#exec MESH IMPORT MESH=flamet ANIVFILE=..\MODELS\flamet_a.3D DATAFILE=..\MODELS\flamet_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=flamet X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=flamet SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=flamet SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jflamet1 FILE=..\MODELS\flamet.PCX FAMILY=!Skins PALETTE=Jflamet1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=flamet MESH=flamet 
+#exec MESHMAP SCALE MESHMAP=flamet X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=flamet NUM=1 TEXTURE=Jflamet1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Mesh=flamet
+   End DefaultProperties
+End Class
+
+Begin Class Name=rifle
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// rifle.
+//=============================================================================
+class rifle expands Weapon;
+
+#exec MESH IMPORT MESH=Rifle ANIVFILE=..\MODELS\Rifle_a.3D DATAFILE=..\MODELS\Rifle_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Rifle X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=Rifle SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Rifle SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JRifle1 FILE=..\MODELS\Rifle.PCX FAMILY=!Skins PALETTE=JRifle1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Rifle MESH=Rifle
+#exec MESHMAP SCALE MESHMAP=Rifle X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=Rifle NUM=1 TEXTURE=JRifle1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Mesh=rifle
+   End DefaultProperties
+End Class
+
+Begin Class Name=Pickup
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Pickup items.
+//=============================================================================
+class Pickup expands Inventory
+	abstract
+	package(UnEngine);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+   End DefaultProperties
+End Class
+
+Begin Class Name=PowerUp
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// A general powerup item.
+//=============================================================================
+class PowerUp expands Pickup
+	abstract
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// Things to reward the player with.
+var() float   Strength;       // Strength increase.
+var() float   Stamina;        // Stamina increase.
+var() float   Health;         // Health increase.
+var() float   Armor[4];       // Indexed by EDamageType. Armor added to external armor.
+var() int     TimeLimit;      // Time limit for temporary powers.
+
+//-----------------------------------------------------------------------------
+// Temporary powers.
+var() bool    bInvisibility;  // The power of invisibility.
+var() bool    bSilence;       // The power of silence.
+var() bool    bInvincibility; // The power of invincibility.
+var() bool    bSuperStrength; // The power of super strength.
+var() bool    bSuperStamina;  // The power of super stamina.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Strength=+00000.000000
+      Stamina=+00000.000000
+      Health=+00000.000000
+      Armor(0)=+00000.000000
+      Armor(1)=+00000.000000
+      Armor(2)=+00000.000000
+      Armor(3)=+00000.000000
+      TimeLimit=0
+      bInvisibility=False
+      bSilence=False
+      bInvincibility=False
+      bSuperStrength=False
+      bSuperStamina=False
+      PickupMessage="You picked up a PowerUp"
+   End DefaultProperties
+End Class
+
+Begin Class Name=Health
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+class Health expands PowerUp 
+	package(UnGame);
+
+#call ..\Models\Health.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Health=+00030.000000
+      PickupMessage="You picked up 30 health"
+      PickupViewMesh=Health
+      PickupViewScale=+00001.500000
+      Mesh=Health
+      DrawScale=+00001.500000
+      Mass=+00000.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Armor
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Armor powerup.
+//=============================================================================
+class Armor expands PowerUp 
+	package(UnGame);
+
+#call ..\Models\Armor.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Armor(0)=+00040.000000
+      Armor(1)=+00040.000000
+      Armor(2)=+00040.000000
+      Armor(3)=+00040.000000
+      PickupMessage="Armour: +40"
+      PickupViewMesh=Armor
+      PickupViewScale=+00002.000000
+      Mesh=Armor
+      DrawScale=+00002.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=heart
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// heart.
+//=============================================================================
+class heart expands Powerup;
+
+#exec MESH IMPORT MESH=heart ANIVFILE=..\MODELS\heart_a.3D DATAFILE=..\MODELS\heart_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=heart X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=heart SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=heart SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jheart1 FILE=..\MODELS\heart.PCX FAMILY=!Skins PALETTE=Jheart1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=heart MESH=heart
+#exec MESHMAP SCALE MESHMAP=heart X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=heart NUM=1 TEXTURE=Jheart1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Mesh=heart
+   End DefaultProperties
+End Class
+
+Begin Class Name=Ammo
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Ammo.
+//=============================================================================
+class Ammo expands Pickup
+	abstract
+	package(UnEngine);
+
+//Dim AmmoCount(10) As Editable Integer ' Indexed by EAmmoType
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      PickupMessage="You picked up some ammo."
+   End DefaultProperties
+End Class
+
+Begin Class Name=Clip
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Clip.
+//=============================================================================
+class Clip expands Ammo
+	package(UnGame);
+
+#call ..\Models\Clip.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      PickupMessage="You picked up 20 bullets"
+      PickupViewMesh=Clip
+      PickupViewScale=+00003.000000
+      Mesh=Clip
+      DrawScale=+00003.000000
+      Mass=+00000.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Shells
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Shells.
+//=============================================================================
+class Shells expands Ammo
+	package(UnGame);
+
+#call ..\Models\Shells.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      PickupMessage="You picked up 15 shells"
+      PickupViewMesh=Shells
+      PickupViewScale=+00002.000000
+      Mesh=Shells
+      DrawScale=+00002.000000
+      Mass=+00000.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=StingerAmmo
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// StingerAmmo.
+//=============================================================================
+class StingerAmmo expands Ammo
+	package(UnGame);
+
+#call ..\Models\Tarypick.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      PickupMessage="You picked up 40 Stinger shots"
+      PickupViewMesh=TarydiumPickup
+      PickupViewScale=+00003.000000
+      Mesh=TarydiumPickup
+      DrawScale=+00003.000000
+      Mass=+00000.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Detector
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Motion detector
+//=============================================================================
+class Detector expands Inventory;
+#exec MESH IMPORT MESH=detect ANIVFILE=..\MODELS\detect_a.3D DATAFILE=..\MODELS\detect_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=detect X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=detect SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=detect SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jdetect1 FILE=..\MODELS\detect.PCX FAMILY=!Skins PALETTE=Jdetect1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=detect MESH=detect
+#exec MESHMAP SCALE MESHMAP=detect X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=detect NUM=1 TEXTURE=Jdetect1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Mesh=detect
+   End DefaultProperties
+End Class
+
+Begin Class Name=Flashlight
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// flashlight
+//=============================================================================
+class Flashlight expands Inventory;
+
+#exec MESH IMPORT MESH=flashl ANIVFILE=..\MODELS\flashl_a.3D DATAFILE=..\MODELS\flashl_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=flashl X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=flashl SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=flashl SEQ=Still  STARTFRAME=0  NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jflashl1 FILE=..\MODELS\flashl.PCX FAMILY=!Skins PALETTE=Jflashl1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=flashl MESH=flashl 
+#exec MESHMAP SCALE MESHMAP=flashl X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=flashl NUM=1 TEXTURE=Jflashl1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Mesh=flashl
+   End DefaultProperties
+End Class
+

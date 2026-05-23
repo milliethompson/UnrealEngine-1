@@ -1,0 +1,83 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Bind.mac: Unreal input system bindings ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Reset all bindings.
+ResetBindings
+
+; Mouse button bindings.
+Bind LButton "Axis AXIS_Forward Speed= Accl= Decel="
+;!!Bind RButton "Button BUT_Fire | Server Fire"
+Bind RButton "Button BUT_Look"
+Bind MButton "Button BUT_Look"
+
+; Mouse axis movement bindings.
+Bind MouseX   "Axis AXIS_BaseX Speed=10.0"
+Bind MouseY   "Axis AXIS_BaseY Speed=10.0"
+;!!ms mouse rolly thing
+
+; Joystick bindings.
+Bind JoyX     "Axis AXIS_BaseX"
+Bind JoyY     "Axis AXIS_BaseY"
+;!!joyz
+;!!joybuttons
+
+; Axis movements.
+Bind Up       "Axis AXIS_BaseY  Speed=+300.0"
+Bind Down     "Axis AXIS_BaseY  Speed=-300.0"
+Bind Left     "Axis AXIS_BaseX  Speed=-150.0"
+Bind Right    "Axis AXIS_BaseX  Speed=+150.0"
+Bind .        "Axis AXIS_Strafe Speed=+300.0"
+Bind ,        "Axis AXIS_Strafe Speed=-300.0"
+Bind ";"      "Axis AXIS_Strafe Speed=-200.0 | Axis AXIS_Turn Speed=+100.0"
+Bind "'"      "Axis AXIS_Strafe Speed=+200.0 | Axis AXIS_Turn Speed=-100.0"
+Bind Delete   "Axis AXIS_LookUp Speed=-100.0"
+Bind PageDown "Axis AXIS_LookUp Speed=+100.0"
+;Bind End !!snap back
+
+; Temporary stuff for testing.
+Bind R        "Axis AXIS_BaseY  Speed=+0.25"
+Bind F        "Axis AXIS_BaseY  Speed=-0.25"
+Bind T        "Server Test"
+
+; Buttons.
+Bind Ctrl     "Button BUT_Fire | Server Fire"
+Bind Alt      "Button BUT_Strafe"
+Bind Z        "Button BUT_Duck"
+Bind Home     "Button BUT_Zoom"
+Bind \        "Button BUT_LookAround"
+Bind Shift    "Button BUT_Run"
+
+; Server commands.
+Bind 1        "Server Weapon F=1"
+Bind 2        "Server Weapon F=2"
+Bind 3        "Server Weapon F=3"
+Bind 4        "Server Weapon F=4"
+Bind 5        "Server Weapon F=5"
+Bind 6        "Server Weapon F=6"
+Bind 7        "Server Weapon F=7"
+Bind 8        "Server Weapon F=8"
+Bind 9        "Server Weapon F=9"
+Bind [        "Server PrevWeapon"
+Bind ]        "Server NextWeapon"
+Bind A        "Button BUT_Jump | Server Jump"
+Bind Enter    "Button BUT_Jump | Server Jump"
+Bind Space    "Button BUT_Jump | Server Jump"
+Bind Pause    "Server Pause"
+
+; Toggles.
+Bind CapsLock "Toggle BUT_Run"
+
+; Utility keys.
+Bind F11      "Brightness"
+Bind -        "ViewDown"
+Bind =        "ViewUp"
+Bind Tab      "Type"
+
+; Cheat.
+Bind S	"Axis AXIS_UP Speed=+300.0"
+Bind Z	"Axis AXIS_UP Speed=-300.0"
+
+;;;;;;;
+; End ;
+;;;;;;;

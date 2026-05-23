@@ -1,23 +1,21 @@
 /*=============================================================================
-	UnCamera.h: Unreal camera definitions
+	UnCamera.h: Unreal camera object.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
 		* Created by Tim Sweeney
 =============================================================================*/
 
-#ifndef _INC_UNCAMERA // Prevent header from being included multiple times
+#ifndef _INC_UNCAMERA // Prevent header from being included multiple times.
 #define _INC_UNCAMERA
 
 /*-----------------------------------------------------------------------------
 	FCameraConsole.
 -----------------------------------------------------------------------------*/
 
-//
 // Console keyboard input modes.
-//
 enum EConsoleKeyState
 {
 	CK_None			= 0,		// Isn't typing anything.
@@ -25,9 +23,7 @@ enum EConsoleKeyState
 	CK_Menu			= 2,		// Doing stuff in menu; substates are active.
 };
 
-//
 // Player console information for a camera:
-//
 class FCameraConsoleBase : public FOutputDevice
 {
 public:
@@ -35,37 +31,22 @@ public:
 	// Public Functions.
 	virtual void	Init 		(UCamera *Camera)=0;
 	virtual void	Exit		()=0;
-	virtual int		Key 		(int Key)=0;
 	virtual int		IsTyping	()=0;
-	virtual void	PreRender	(class ICamera *Camera)=0;
-	virtual void	PostRender	(class ICamera *Camera,int XLeft)=0;
-	virtual void	Log			(ELogType MsgType, const char *Text)=0;
+	virtual void	PreRender	(UCamera *Camera)=0;
+	virtual void	PostRender	(UCamera *Camera,int XLeft)=0;
+	virtual void	Write		(const void *Data, int Length, ELogType MsgType = LOG_Info)=0;
 	virtual int		Exec		(const char *Cmd,FOutputDevice *Out=GApp)=0;
 	virtual void	NoteResize	()=0;
-    virtual void UpdateActionStatus() = 0;
-        // UpdateActionStatus does the following:
-        //   - gathers input from polled devices
-        //   - sets the state of player actions to reflect the current state of all actions
-        //     (the player actions can be retrieved using SetActionStatus())
-        //   - does initializations to start a new input cycle
-    virtual void SetActionStatus( PPlayerTick & PlayerActions ) = 0;
-        // Build a player action packet into PlayerActions based on the current 
-        // state of the actions (set by calling UpdateActionStatus). In addition, 
-        // the current input movements (mouse, joystick) are cleared so they will not
-        // be counted in the next call to SetActionStatus. 
-    virtual class FAction * GetActions() = 0;
-    virtual class FInput  * GetInput()   = 0;
-    virtual void PressSwitch(int Switch) = 0; // Input switch (key, button) was turned on. Switch is actually of type FInput::TSwitch.
-    virtual void ReleaseSwitch(int Switch) = 0; // Input switch (key, button) was turned off. Switch is actually of type FInput::TSwitch.
+	virtual int		Key			(int Key)=0;
+	virtual int		Process		(EInputKey iKey, EInputState State, FLOAT Delta=0.0 )=0;
+	virtual void	PostReadInput(PPlayerTick &Move,FLOAT DeltaSeconds,FOutputDevice *Out)=0;
 };
 
 /*-----------------------------------------------------------------------------
 	UCamera.
 -----------------------------------------------------------------------------*/
 
-//
-// Information for rendering the camera view (detail level settings):
-//
+// Information for rendering the camera view (detail level settings).
 enum ERenderType
 {
 	REN_None			= 0,	// Hide completely.
@@ -89,177 +70,11 @@ enum ECameraCaps
 {
 	CC_Hardware3D		= 1,	// Hardware 3D rendering.
 	CC_RGB565			= 2,	// RGB 565 format (otherwise 555).
+	CC_ColoredLight		= 4,	// Colored lighting.
+	CC_Mask				= 0xff, // Caps mask which affects cached rendering info.
 };
 
-//
-// A camera resource, which associates an actor (which defines
-// most view parameters) with a Windows window.
-//
-class UNREAL_API UCamera : public UResource, public FTask
-{
-	RESOURCE_CLASS(UCamera,BYTE,RES_Camera)
-
-	enum {MAX_CAMERA_STORED_KEYS=32};
-
-	// Screen & data info.
-	DWORD			Locked;			// 1=locked, 0=available.
-	DWORD			DataSize; 		// Size of camera data buffer (platform-dependent).
-	QWORD			LastUpdateTime;	// Time of last update.
-	UTexture		*Texture;		// Texture ID of screen.
-	ULevel			*Level;   		// Level the camera is viewing.
-	UResource		*MiscRes;		// Resource ID or name ID in modes like EM_TEXVIEW.
-	FName			MiscName;		// Used for texture browser.
-	INDEX			iActor;			// Index of actor containing location, rotation info for camera.
-
-	// Window info.
-	INT				SXR,SYR;   		// Buffer X&Y resolutions.
-	INT				ColorBytes;		// 1=256-color, 4=24-bit color.
-	INT				Caps;			// Capabilities (CC_).
-	INT				OnHold;			// 1=on hold, can't be resized.
-	INT				RedMask;		// Red bitmask (if truecolor).
-	INT				GreenMask;		// Green bitmask (if truecolor).
-	INT				BlueMask;		// Blue bitmask (if truecolor).
-	INT				AlphaMask;		// Alpha bitmask (if truecolor).
-
-	// Temporal info.
-	DWORD			Current;		// 1 if this is the current input camera.
-	DWORD			ClickFlags;		// Click flags used by move and click functions.
-
-	// Things that have an effect when the camera is first opened (pOpenCameraWindow).
-	INT				OpenX;			// Screen X location to open window at.
-	INT				OpenY;			// Screen X location to open window at.
-	DWORD			ParentWindow;	// hWnd of parent window.
-
-	// Player console.
-	FCameraConsoleBase *Console;
-
-	// Remembered actor (for ReconcileActors).
-	APawn RememberedActor;
-
-	// Platform-specific info to store with camera (hWnd, etc).
-	union
-	{
-		char Generic[256];
-#ifdef PLATFORM_CAMERA_CLASS
-		PLATFORM_CAMERA_CLASS Win;
-#endif
-	};
-
-	// Constructors.
-	UCamera(ULevel *Level);
-
-	// Resource functions.
-	void Register				(FResourceType *Type);
-	void InitHeader				();
-	void FreeData				();
-	void QueryHeaderReferences	(FResourceCallback &Callback);
-	void PreKill				();
-	void Flip					();
-
-	// Task functions.
-	void TaskTick();
-	void TaskExit();
-	char *TaskStatus(char *Name,char *Desc);
-
-	// Custom functions.
-	int		IsGame();
-	int		IsEditor();
-	inline APawn &GetActor()
-	{
-		if ( iActor==INDEX_NONE ) 
-			appError ("UCamera::GetActor: INDEX_NONE");
-		
-		APawn *Result = Level->ActorList->Element(iActor).GetPlayer();
-		
-		if( !Result ) 
-			appErrorf("UCamera::GetActor: Camera actor is %s!",Result->Class?Result->Class->Name:"NULL");
-		
-		return *Result;
-	}
-	int 	IsOrtho();
-	int		IsWire();
-	int		IsRealWire();
-	int		IsBrowser();
-	int		IsInvalidBsp();
-	int		IsRealtime();
-	int		WireMode();
-
-	int		Lock	(class ICamera *CameraInfo);
-	void	Unlock	(class ICamera *CameraInfo,int Blit);
-	int		Move  	(BYTE Buttons, SWORD Dx, SWORD Dy, int Shift, int Ctrl);
-	int		Click 	(BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl);
-	void	Draw  	(int Scan);
-	int		Key		(int Key);
-	void	Hold	();
-	void	Unhold	();
-	void	OpenWindow(DWORD ParentWindow,int Temporary);
-	void	UpdateWindow();
-	int		Exec	(const char *Cmd,FOutputDevice *Out=GApp);
-};
-
-//
-// Camera's working structure.  Locking a camera resource sets up all transformations
-// and returns this.
-//
-class UNREAL_API ICamera
-{
-public:
-
-	// Members copied directly from UCamera upon lock.
-	UCamera			*Camera;		// The camera this corresponds to.
-	UTexture		*Texture;		// Texture representing the screen.
-	INT				SXR,SYR;   		// Buffer X&Y resolutions.
-	INT				Stride;			// Stride in pixels.
-	INT				ByteStride;		// Stride in bytes = SXStride * ColorBytes.
-	INT				ColorBytes;		// 1=256-color, 4=24-bit color.
-	INT				Caps;			// Capabilities flags (CC_).
-	INDEX			iActor;			// Actor controlling the camera.
-	ILevel			Level;			// Locked level.
-
-	// Custom info.
-	BYTE			*Data;			// Pointer to data, not necessarily the screen.
-	BYTE			*RealScreen;	// Pointer to real screen of size SXStride,SYR.
-	BYTE			*Screen;		// Pointer to screen, may be offset into Realscreen.
-	APawn			*Actor;			// Actor representing camera.
-
-	// Precomputed stuff for optimization.
-	INT				FovAngle;   	// X field of view angle in degrees (normally 100).
-	INT				SXR2,SYR2;		// SXR / 2.
-	INT				FixSXR;			// FIX(SXR).
-
-	DWORD			ExtraPolyFlags;	// Additional poly flags associated with camera.
-	DWORD			ShowFlags;		// Stuff to show.
-	DWORD			RendMap;		// Way to render map.
-
-	FCoords			Coords;     	// Transformation coordinates   (World -> Screen).
-	FCoords			Uncoords;		// Detransformation coordinates (Screen -> World).
-
-	FLOAT			FSXR,FSYR;		// Floating point SXR.
-	FLOAT			FSXR15,FSYR15;	// (Floating point SXR + 1.0001)/2.0.
-	FLOAT			FSXR1,FSYR1;	// Floating point SXR-1.
-	FLOAT			FSXR2,FSYR2;	// Floating point SXR / 2.0.
-	FLOAT			FSXRM5,FSYRM5;	// Floating point SXR,SYR - 0.5.
-
-	FLOAT			Zoom;			// Zoom value, based on OrthoZoom and size.
-	FLOAT			RZoom;			// 1.0/OrthoZoom.
-	FLOAT			OrthoZoom;    	// Zoom factor for orthogonal views.
-
-	FLOAT			ProjZ;      	// Distance to projection plane, screenspace units.
-	FLOAT			RProjZ;			// 1.0/ProjZ.
-	FLOAT			ProjZRSX2;		// ProjZ / FSXR2 for easy view pyramid reject.
-	FLOAT			ProjZRSY2;		// ProjZ / FSYR2 for easy view pyramid reject.
-	FVector			ViewSides[4];	// 4 normal vectors indicating view frustrum extent lines.
-	FVector			ViewPlanes[4];	// 4 planes indicating view frustrum extent planes.
-
-	// Standard functions.
-	void	BuildCoords();
-	void	PrecomputeRenderInfo(int SXR, int SYR);
-	FVector *GetOrthoNormal();
-};
-
-//
-// ShowFlags for camera
-//
+// ShowFlags for camera.
 enum ECameraShowFlags
 {
 	SHOW_Frame     		= 0x00000001, 	// Show world bounding cube.
@@ -279,9 +94,7 @@ enum ECameraShowFlags
 	SHOW_NoCapture		= 0x00008000,	// No mouse capture.
 };
 
-//
 // Mouse buttons and commands passed to edcamDraw.
-//
 enum EMouseButtons	
 {
 	BUT_LEFT			= 0x01,		// Left mouse button.
@@ -294,33 +107,163 @@ enum EMouseButtons
 	BUT_LEFTDOUBLE		= 0x80,		// Left mouse button double click.
 };
 
+//
+// A camera object, which associates an actor (which defines
+// most view parameters) with a Windows window.
+//
+class UNENGINE_API UCamera : public UObject, public FOutputDevice
+{
+	DECLARE_CLASS(UCamera,UObject,NAME_Camera,NAME_UnEngine)
+
+	// Identification.
+	enum {BaseFlags = CLASS_Intrinsic | CLASS_Transient | CLASS_PreKill};
+	enum {GUID1=0,GUID2=0,GUID3=0,GUID4=0};
+
+	// Contants.
+	enum {MAX_CAMERA_STORED_KEYS=32};
+
+	// Screen & data info.
+	ULevel::Ptr		Level;   		// Level the camera is viewing.
+	UTexture		*Texture;		// Texture ID of screen.
+	DWORD			DataSize; 		// Size of camera data buffer (platform-dependent).
+	UObject			*MiscRes;		// Used in in modes like EM_TEXVIEW.
+	QWORD			LastUpdateTime;	// Time of last update.
+
+	// Window info.
+	INT				X,Y;   			// Buffer X & Y resolutions.
+	INT				ColorBytes;		// 1=256-color, 4=24-bit color.
+	INT				Caps;			// Capabilities (CC_).
+	INT				OnHold;			// 1=on hold, can't be resized.
+	INT				RedMask;		// Red bitmask (if truecolor).
+	INT				GreenMask;		// Green bitmask (if truecolor).
+	INT				BlueMask;		// Blue bitmask (if truecolor).
+	INT				AlphaMask;		// Alpha bitmask (if truecolor).
+
+	// Temporal info.
+	DWORD			Current;		// If this is the current input camera.
+	DWORD			ClickFlags;		// Click flags used by move and click functions.
+
+	// Things that have an effect when the camera is first opened (pOpenCameraWindow).
+	INT				OpenX;			// Screen X location to open window at.
+	INT				OpenY;			// Screen X location to open window at.
+	DWORD			ParentWindow;	// hWnd of parent window.
+
+	// Player console.
+	class FCameraConsoleBase *Console;
+
+	// Input system.
+	class FInputBase *Input;
+
+	// Remembered actor (for ReconcileActors).
+	APawn			RememberedActor;
+
+	// Lock info: Valid only while locked.
+	APawn			*Actor;			// Actor containing location, rotation info for camera.
+	INT				Stride;			// Stride in pixels.
+	INT				ByteStride;		// Stride in bytes = SXStride * ColorBytes.
+	BYTE			*RealScreen;	// Pointer to real screen of size SXStride,SYR.
+	BYTE			*Screen;		// Pointer to screen, may be offset into Realscreen.
+
+	// Precomputed stuff for optimization.
+	INT             FXB,FYB;        // Offset of top left active viewport.
+	INT				X2,Y2;			// SXR/2, SYR/2.
+	INT				FixX;			// Fix(X).
+	DWORD			ExtraPolyFlags;	// Additional poly flags associated with camera.
+	FCoords			Coords;     	// Transformation coordinates   (World -> Screen).
+	FCoords			Uncoords;		// Detransformation coordinates (Screen -> World).
+	FLOAT			FX,FY;			// Floating point X,Y.
+	FLOAT			FX15,FY15;		// (Floating point SXR + 1.0001)/2.0.
+	FLOAT			FX1,FY1;		// Floating point SXR-1.
+	FLOAT			FX2,FY2;		// Floating point SXR / 2.0.
+	FLOAT			FXM5,FYM5;		// Floating point SXR,SYR - 0.5.
+	FLOAT			Zoom;			// Zoom value, based on OrthoZoom and size.
+	FLOAT			RZoom;			// 1.0/OrthoZoom.
+	FLOAT			ProjZ;      	// Distance to projection plane, screenspace units.
+	FLOAT			RProjZ;			// 1.0/ProjZ.
+	FLOAT			ProjZRX2;		// ProjZ / FSXR2 for easy view pyramid reject.
+	FLOAT			ProjZRY2;		// ProjZ / FSYR2 for easy view pyramid reject.
+	FVector			ViewSides[4];	// 4 unit vectors indicating view frustrum extent lines.
+	FPlane			ViewPlanes[4];	// 4 planes indicating view frustrum extent planes.
+
+	// Platform-specific info to store with camera (hWnd, etc).
+	char PlatformSpecific[256];
+	class FWinCamera &Win() {return *(FWinCamera*)PlatformSpecific;}
+
+	// Constructor.
+	UCamera(ULevel *Level);
+
+	// UObject interface.
+	void InitHeader();
+	void PreKill();
+	INT Lock(DWORD LockType);
+	void Unlock(DWORD OldLockType, int Blit=0);
+	void SerializeHeader(FArchive &Ar)
+	{
+		guard(UCamera::SerializeHeader);
+		UObject::SerializeHeader(Ar);
+		Ar << Texture;
+		unguard;
+	}
+
+	// FOutputDevice interface.
+	void Write(const void *Data, int Length, ELogType MsgType=LOG_Info);
+
+	// UCamera inlines.
+	int		IsGame()		{return Level && Level->GetState()==LEVEL_UpPlay;}
+	int		IsEditor()		{return Level && Level->GetState()==LEVEL_UpEdit;}
+	int 	IsOrtho()		{return Actor && (Actor->RendMap==REN_OrthXY||Actor->RendMap==REN_OrthXZ||Actor->RendMap==REN_OrthYZ);}
+	int		IsRealWire()	{return IsOrtho() || (Actor && Actor->RendMap==REN_Wire);}
+	int		IsBrowser()		{return Actor && (Actor->RendMap==REN_TexView||Actor->RendMap==REN_TexBrowser||Actor->RendMap==REN_MeshBrowser);}
+	int		IsInvalidBsp()	{return Level && (Level->Model->ModelFlags&MF_InvalidBsp)==MF_InvalidBsp;}
+	int		IsRealtime()	{return Actor && (Actor->ShowFlags&(SHOW_RealTime | SHOW_PlayerCtrl));}
+	int		WireMode()		{return IsRealWire() ? Actor->RendMap : REN_Wire;}
+	int		IsWire();
+
+	// UCamera functions.
+	int		Process	(EInputKey iKey, EInputState State, FLOAT Delta=0.0 );
+	int		Key		(int Key);
+	int		Move  	(BYTE Buttons, SWORD Dx, SWORD Dy, int Shift, int Ctrl);
+	int		Click 	(BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl);
+	void	Draw  	(int Scan);
+	void	Hold	();
+	void	Unhold	();
+	void	OpenWindow(DWORD ParentWindow,int Temporary);
+	void	UpdateWindow();
+	int		Exec	(const char *Cmd,FOutputDevice *Out=GApp);
+	void	ExecMacro(const char *Filename,FOutputDevice *Out=GApp);
+
+	// UCamera functions valid only when rendering.
+	void	BuildCoords();
+	void	PrecomputeRenderInfo(int SXR, int SYR);
+	const FVector *GetOrthoNormal();
+
+	// Input related functions.
+	void ReadInput( PPlayerTick &Move, FLOAT DeltaSeconds, FOutputDevice *Out );
+};
+
 /*-----------------------------------------------------------------------------
-	FCameraManager.
+	FCameraManagerBase.
 -----------------------------------------------------------------------------*/
 
 //
 // Global camera manager class.  Tracks all active cameras and their
 // relationships to levels.
 //
-class UNREAL_API FCameraManager : public FTask
+class UNENGINE_API FCameraManagerBase
 {
 public:
-	TArray<UCamera>	*CameraArray;		// Array of cameras.
+	TArray<UCamera*> *CameraArray;		// Array of cameras.
 	UCamera			*FullscreenCamera;	// Current fullscreen camera, NULL=not fullscreen.
+	class FRenderDevice *RenDev;		// Rendering device.
 	int				DrawTime;			// Time consumed by draw/flip.
 
 	// Init/Exit functions.
-	FCameraManager() {Initialized=0;};
+	FCameraManagerBase() {Initialized=0;};
 	virtual void Init()=0;
 	virtual void Exit()=0;
 
-	// Task functions.
-	virtual void TaskExit()=0;
-	virtual void TaskTick()=0;
-	virtual char *TaskStatus(char *Name,char *Desc)=0;
-
 	// Platform-specific camera manager functions.
-	virtual void	SetPalette			(UPalette *Palette, UPalette *GammaPalette)=0;
+	virtual void	SetPalette			(UPalette *Palette)=0;
 	virtual void	SetModeCursor		(UCamera *Camera)=0;
 	virtual void	UpdateCameraWindow	(UCamera *Camera)=0;
 	virtual void	InitCameraWindow	(UCamera *Camera)=0;
@@ -330,14 +273,14 @@ public:
 	virtual void	EnableCameraWindows	(DWORD ShowFlags,int DoEnable)=0;
 	virtual void	EndFullscreen		()=0;
 	virtual void	Poll				()=0;
-	virtual int 	LockCameraWindow	(UCamera *Camera,ICamera *CameraInfo)=0;
-	virtual void	UnlockCameraWindow	(UCamera *Camera,ICamera *CameraInfo,int Blit)=0;
+	virtual int 	LockCameraWindow	(UCamera *Camera)=0;
+	virtual void	UnlockCameraWindow	(UCamera *Camera,int Blit)=0;
 	virtual void	ShutdownAfterError	()=0;
-	virtual void	GetStoredMove		(UCamera *Camera,FVector *Move,FFloatRotation *Rot)=0;
 	virtual void	ResetModes			()=0;
 	virtual UCamera *CurrentCamera		()=0;
 	virtual void	MakeCurrent			(UCamera *Camera)=0;
 	virtual void	MakeFullscreen		(UCamera *Camera)=0;
+	virtual void	Tick                ()=0;
 
 	// Standard functions.
 	virtual void	RedrawLevel			(ULevel *Level);

@@ -24,23 +24,30 @@ ADBG:  Define this symbol
 /********************************* INCLUDES ********************************/
 
 #pragma warning (disable : 4201) /* nonstandard extension used : nameless struct/union */
-#include <windows.h>
+//#include <windows.h>
 #include "Unreal.h"		// Unreal engine includes
-#include "SoundEng.h"	// Headers for using SoundEng.lib
+#include "UnSound.h"
+#include "UnAudio.h"		/* Declarations for using UnAudio.lib */
+#include "UfxEdit.h"	// Headers for using UfxEdit.dll
 
 /********************************* HEADERS *********************************/
 
+#if 0
 static void audioQueryFamilyForLink(void);
 static void audioQuerySoundForLink(char *FamilyName);
+#endif
 
 /********************************* CONSTANTS *******************************/
 
+#if 0
 /* Maximum number of results during query. */
 #define MAX_RESULTS	1024
 #define MAX_FAM_RESULTS	256
+#endif
 
 /********************************* VARIABLES *******************************/
 
+#if 0
 /* Used during sound queries. */
 static DWORD GCurResult = 0;
 static DWORD GNumResults = 0;
@@ -51,6 +58,10 @@ static DWORD GNumFamResults = 0;
 static DWORD GCurFamResult = 0;
 static FName *GTempFamList = NULL;
 
+/* Handle of sound being tested in UnrealEd, or -1 if not testing a sound. */
+static int iTestPID = -1;
+#endif
+
 /********************************* FUNCTIONS *******************************/
 
 /*************************************************************************
@@ -58,107 +69,51 @@ static FName *GTempFamList = NULL;
 *************************************************************************/
 
 /*
-** USound::Register:
-** Register the resource type.
-*/
-void
-USound::Register(FResourceType *Type)
-{
-	GUARD;
-#ifdef ADBG
-	debugf(LOG_Audio, "USound::Register(Type)\n");
-#endif /* ADBG */
-	Type->HeaderSize = sizeof (USound);
-	Type->RecordSize = 1;
-	Type->Version    = 1;
-	Type->TypeFlags = RTF_ScriptReferencable;
-	strcpy (Type->Descr,"Sound");
-	UNGUARD("USound::Register");
-};
-
-/*
 ** USound::InitHeader:
-** Initialize the header of the resource.
+** Initialize the header of the object.
 */
 void
 USound::InitHeader(void)
 {
-	GUARD;
+	guard(USound::InitHeader);
+
 #ifdef ADBG
 	debugf(LOG_Audio, "USound::InitHeader()\n");
 #endif /* ADBG */
 
+	/* Vital: Must call parent handler! */
+	UObject::InitHeader();
+
 	/* Zero all the variables to known states. */
 	DataSize = 0;
-	FamilyName = NAME_NONE;
+	FamilyName = NAME_None;
 	SoundID = -1;
-	mymemset(Pad, 0, sizeof(Pad));
 
-	UNGUARD("USound::InitHeader");
-};
-
-/*
-** USound::InitData:
-**   ???
-*/
-void
-USound::InitData(void)
-{
-	GUARD;
-#ifdef ADBG
-	debugf(LOG_Audio, "USound::InitData()\n");
-#endif /* ADBG */
-
-	mymemset(Data, 0, DataSize);
-
-	UNGUARD("USound::InitData");
+	unguard;
 };
 
 /*
 ** USound::QuerySize:
-** Determine size of resource.
+** Determine size of object.
 **
 ** Parameters:
 **	NONE
 **
 ** Returns:
-**	Size of resource in bytes.
+**	Size of object in bytes.
 */
 int
 USound::QuerySize(void)
 {
-	GUARD;
+	guard(USound::QuerySize);
 #ifdef ADBG
 	debugf(LOG_Audio, "USound::QuerySize()\n");
 #endif /* ADBG */
 
 	return DataSize;
 
-	UNGUARD("USound::QuerySize");
+	unguard;
 } /* End USound::QuerySize() */
-
-/*
-** USound::QueryMinSize:
-** Determine size of resource.
-**
-** Parameters:
-**	NONE
-**
-** Returns:
-**	Size of resource in bytes.
-*/
-int
-USound::QueryMinSize(void)
-{
-	GUARD;
-#ifdef ADBG
-	debugf(LOG_Audio, "USound::QueryMinSize()\n");
-#endif /* ADBG */
-
-	return QuerySize();
-
-	UNGUARD("USound::QueryMinSize");
-} /* End USound::QueryMinSize() */
 
 /*
 ** USound::Import:
@@ -167,11 +122,11 @@ USound::QueryMinSize(void)
 ** Parameters:
 **	Name		Description
 **	----		-----------
-**	Buffer		Pointer to data containing resource to
+**	Buffer		Pointer to data containing object to
 **			be imported.
-**	BufferEnd	Pointer to first byte following resource
+**	BufferEnd	Pointer to first byte following object
 **			to be imported.
-**	FileType	???
+**	FileType	Extension of the file, i.e. "WAV".
 **
 ** Returns:
 **	Value	Meaning
@@ -182,27 +137,29 @@ USound::QueryMinSize(void)
 const char *
 USound::Import(const char *Buffer, const char *BufferEnd,const char *FileType)
 {
-	GUARD;
+	guard(USound::Import);
 
 #ifdef ADBG
 	debugf(LOG_Audio, "USound::Import(Buffer, BufferEnd, FileType)\n");
 #endif /* ADBG */
 
-	/* If resource is a WAV, turn it into a one-shot UFX */
+	/* If object is a WAV, turn it into a one-shot UFX */
 	/* NOT CODED YET */
 
-	/* Determine size of resource in bytes. */
+	/* Determine size of object in bytes. */
 	DataSize = (int)(BufferEnd - Buffer);
 
-	/* Make space for resource. */
+	/* Make space for object. */
 	Realloc();
 
 	/* Copy import buffer to our data buffer. */
-	memcpy(Data, Buffer, DataSize);
+	Lock(LOCK_ReadWrite);
+	memcpy(GetData(), Buffer, DataSize);
+	Unlock(LOCK_ReadWrite);
 
 	return BufferEnd;
 
-	UNGUARD("USound::Import");
+	unguard;
 } /* End USound::Import() */
 
 /*
@@ -212,10 +169,10 @@ USound::Import(const char *Buffer, const char *BufferEnd,const char *FileType)
 ** Parameters:
 **	Name		Description
 **	----		-----------
-**	Buffer		Pointer to data containing resource to
+**	Buffer		Pointer to data containing object to
 **			be imported.
 **	FileType	Type of file, i.e. WAV
-**	Ident		???
+**	Ident		Not applicable (text files only).
 **
 ** Returns:
 **	Value	Meaning
@@ -225,73 +182,48 @@ USound::Import(const char *Buffer, const char *BufferEnd,const char *FileType)
 char *
 USound::Export(char *Buffer, const char *FileType, int Indent)
 {
-	GUARD;
+	guard(USound::Export);
 
 #ifdef ADBG
 	debugf(LOG_Audio, "USound::Export(Buffer, BufferEnd, FileType)\n");
 #endif /* ADBG */
 
 	/* Copy from our data buffer to export buffer. */
-	memcpy(Buffer, Data, DataSize);
+	Lock(LOCK_ReadWrite);
+	memcpy(Buffer, GetData(), DataSize);
+	Unlock(LOCK_ReadWrite);
 
 	return Buffer + DataSize;
 
-	UNGUARD("USound::Export");
+	unguard;
 } /* End USound::Export() */
 
 /*
-** USound::QueryHeaderReferences:
-**   ???
+** USound::SerializeData:
+**   Serialize the sound effect's data.
 */
 void
-USound::QueryHeaderReferences(FResourceCallback &Callback)
+USound::SerializeData( FArchive &Ar )
 {
-	GUARD;
+	guard(USound::SerializeData);
 #ifdef ADBG
-	debugf(LOG_Audio, "USound::QueryHeaderReferences(&Callback)\n");
+	debugf(LOG_Audio, "USound::SerializeData(&Callback)\n");
 #endif /* ADBG */
 
-	Callback.Name(this, &FamilyName, 0);
+	Lock(LOCK_ReadWrite);
+	Ar.Serialize(GetData(), DataSize);
+	Unlock(LOCK_ReadWrite);
 
-	UNGUARD("USound::QueryHeaderReferences");
-} /* End USound::QueryHeaderReferences() */
+	unguard;
+} /* End USound::SerializeData() */
 
-/*
-** USound::QueryDataReferences:
-**   ???
-*/
-void
-USound::QueryDataReferences(FResourceCallback &Callback)
-{
-	GUARD;
-#ifdef ADBG
-	debugf(LOG_Audio, "USound::QueryDataReferences(&Callback)\n");
-#endif /* ADBG */
-
-	// Doesn't reference any other resources
-
-	UNGUARD("USound::QueryDataReferences");
-} /* End USound::QueryDataReferences() */
-
-/*
-** USound::Flip:
-**   Use ToHost() templates to perform optional byte order conversion.
-*/
-void
-USound::Flip()
-{
-	GUARD;
-	UResource::Flip();
-	//todo:
-	UNGUARD("USound::Flip");
-} /* End USound::Flip() */
-
-AUTOREGISTER_RESOURCE(RES_Sound,USound,0xB2D90875,0xCCD211cf,0x91360000,0xC028B992);
+IMPLEMENT_CLASS(USound);
 
 /*************************************************************************
                       Unreal editor hooks for audio
 *************************************************************************/
 
+#if 0
 /*---------------------------------------------------------------------------
 	Audio command link
 ---------------------------------------------------------------------------*/
@@ -312,9 +244,9 @@ AUTOREGISTER_RESOURCE(RES_Sound,USound,0xB2D90875,0xCCD211cf,0x91360000,0xC028B9
 **	NONE
 */
 void
-UNREAL_API AudioCmdLine(const char *Str)
+UNENGINE_API AudioCmdLine(const char *Str)
 {
-	GUARD;
+	guard(AudioCmdLine);
 
 	char TempStr[256];
 
@@ -329,13 +261,13 @@ UNREAL_API AudioCmdLine(const char *Str)
 		char Fname[80];
 
 		/*
-		** Load the specified audio resources file
+		** Load the specified audio Unrealfile file
 		** into memory.
 		*/
 		if (GetSTRING(Str,"FILE=",Fname,80))
 		{
-			/* Add the specified resource file. */
-			GRes.AddFile(Fname);
+			/* Add the specified Unrealfile. */
+			GObj.AddFile(Fname);
 		}
 	}
 	else if (GetCMD(&Str, "SAVEFAMILY"))
@@ -344,55 +276,55 @@ UNREAL_API AudioCmdLine(const char *Str)
 		char	TempFname[80];		/* Filename. */
 
 		/*
-		** Save the specified audio resources
+		** Save the specified audio objects
 		** to a file.
 		*/
 		if (GetCMD(&Str,"(All)") && GetSTRING(Str,"FILE=",TempFname,79))
 		{
 			/*
-			** Save all sound resources to specified file.
+			** Save all sound objects to specified file.
 			*/
 
-			USound * Sound;		/* Temporary sound resource. */
+			USound * Sound;		/* Temporary sound object. */
 
-			GRes.UntagAll();
-			FOR_ALL_TYPED_RES(Sound,RES_Sound,USound)
+			GObj.UntagAll();
+			FOR_ALL_TYPED_OBJECTS(Sound,USound)
 			{
 				if (!Sound->FamilyName.IsNone())
 				{
 					Sound->Flags |= RF_TagExp;
 				}
 			}
-			END_FOR_ALL_TYPED_RES;
-			GRes.SaveDependentTagged(TempFname, 0);
+			END_FOR_ALL_TYPED_OBJECTS;
+			GObj.SaveDependentTagged(TempFname, 0);
 		}
 		else if ((GetSTRING(Str,"FILE=",TempFname,79)) &&
 			GetNAME(Str,"FAMILY=",&Name))
 		{
 			/*
-			** Save sound resources from specified family
+			** Save sound objects from specified family
 			** to specified file.
 			*/
 
-			GRes.UntagAll();
-			if (GRes.TagAllReferencingName(Name, RES_Sound) == 0)
+			GObj.UntagAll();
+			if (GObj.TagAllReferencingName(Name, RES_Sound) == 0)
 			{
 				debug(LOG_Audio,
 					"AUDIO SAVEFAMILY:  Unknown family specified");
 			}
 			else
 			{
-				GRes.SaveDependentTagged(TempFname, 0);
+				GObj.SaveDependentTagged(TempFname, 0);
 			}
 		}
 	}
 	else if (GetCMD(&Str, "IMPORT"))
 	{
 		char	TempFName[256];		/* Filename. */
-		char	TempName[256];		/* Name of resource. */
+		char	TempName[256];		/* Name of object. */
 
 		/*
-		** Import a WAV file as a new resource.
+		** Import a WAV file as a new object.
 		*/
 
 		/* Get parameters from command line. */
@@ -407,22 +339,22 @@ UNREAL_API AudioCmdLine(const char *Str)
 			return;
 		}
 
-		/* Create the sound resource. */
+		/* Create the sound object. */
 		USound *Sound = new(TempName, TempFName, IMPORT_Replace)USound;
 		if (Sound == NULL)
 		{
-			debugf(LOG_Audio, "AUDIO IMPORT:  Failed creating new resource!\n");
+			debugf(LOG_Audio, "AUDIO IMPORT:  Failed creating new object!\n");
 			return;
 		}
 
 		GetNAME(Str, "FAMILY=", &Sound->FamilyName);
-		debugf(LOG_Audio, "AUDIO IMPORT:  Sound resource created.\n");
+		debugf(LOG_Audio, "AUDIO IMPORT:  Sound object created.\n");
 	}
 #if 0
 	else if (GetCMD(&Str, "EXPORT"))
 	{
 		/*
-		** Export a sound resource to a WAV file.
+		** Export a sound object to a WAV file.
 		*/
 		/* Not coded yet */
 	}
@@ -430,13 +362,12 @@ UNREAL_API AudioCmdLine(const char *Str)
 	else if (GetCMD(&Str, "TEST"))
 	{
 		/*
-		** Plays a sound resource.  This happens
+		** Plays a sound object.  This happens
 		** when the user presses the "test sound"
 		** button in the Unreal editor.
 		*/
-		char		TempName[256];	/* Name of resource. */
-		USound *	Sound;		/* Ptr to resource. */
-		INT		pid;		/* Playback ID of sound. */
+		char		TempName[256];	/* Name of object. */
+		USound *	Sound;		/* Ptr to object. */
 
 		if (!GetSTRING(Str, "NAME=", TempName, 256))
 		{
@@ -447,28 +378,71 @@ UNREAL_API AudioCmdLine(const char *Str)
 		Sound = NULL;
 		if (!GetUSound(Str, "NAME=", &Sound))
 		{
-			debugf(LOG_Audio, "AUDIO TEST:  Specified sound not found in resource list!\n");
+			debugf(LOG_Audio, "AUDIO TEST:  Specified sound not found in object list!\n");
 			return;
 		}
 
 		/* Play the specified sound effect. */
-		GAudio.Init(TRUE);
-		GAudio.InitLevel(4096);
-		pid = GAudio.PlaySfxPrimitive(Sound);
-		MessageBox((HWND)NULL, "Testing Playback", TempName, MB_OK);
-		GAudio.SfxStop(pid);
-		GAudio.ExitLevel();
-		GAudio.Exit();
+		if (iTestPID == -1)
+		{
+#if 1
+			GAudio.SpecifySong(NULL);
+			GAudio.Restart();
+#else
+			GAudio.ExitLevel();
+			GAudio.Exit();
+			GAudio.Init(1);
+			GAudio.InitLevel(GRes.GetMaxRes());
+#endif
+			iTestPID = GAudio.PlaySfxPrimitive(Sound);
+			debugf(LOG_Audio, "AUDIO TEST:  Name==\"%s\" PID==%d\n", TempName, iTestPID);
+		}
 	}
-	else if (GetCMD(&Str, "KILL"))
+	else if (GetCMD(&Str, "TESTOFF"))
+	{
+		debugf(LOG_Audio, "AUDIO TESTOFF\n");
+		if (iTestPID != -1)
+		{
+			GAudio.SfxStop(iTestPID);
+			GAudio.ExitLevel();
+			GAudio.Exit();
+			iTestPID = -1;
+		}
+	}
+	else if (GetCMD(&Str, "EDIT"))
 	{
 		/*
-		** ???
+		** Edit a sound object.  This happens
+		** when the user presses the "edit sound"
+		** button in the Unreal editor.
 		*/
-		USound *Sound;
-		if (GetUSound(Str, "NAME=", &Sound))
+		char		TempName[256];	/* Name of object. */
+		USound *	Sound;		/* Ptr to object. */
+		void *		NewCSound;	/* Ptr to edited data. */
+		long		NewSize;	/* Size of edited data. */
+
+		if (!GetSTRING(Str, "NAME=", TempName, 256))
 		{
-			Sound->FamilyName = NAME_NONE;
+			debugf(LOG_Audio, "AUDIO EDIT:  No NAME= specified!\n");
+			return;
+		}
+
+		Sound = NULL;
+		if (!GetUSound(Str, "NAME=", &Sound))
+		{
+			debugf(LOG_Audio, "AUDIO EDIT:  Specified sound not found in object list!\n");
+			return;
+		}
+
+		/* Let user edit the sound's data. */
+		if (UfxEdit(Sound->Data, &NewCSound, &NewSize))
+		{
+			/* User has edited the sound. */
+			/* Replace sound's data with edited data. */
+			Sound->DataSize = NewSize;
+			Sound->Realloc();
+			memcpy(Sound->Data, NewCSound, NewSize);
+			free(NewCSound);
 		}
 	}
 	else if (GetCMD (&Str,"QUERY"))
@@ -489,16 +463,16 @@ UNREAL_API AudioCmdLine(const char *Str)
 	else if (GetCMD (&Str,"DEBUG"))
 	{
 		/*
-		** Output list of audio resources to log window,
+		** Output list of audio objects to log window,
 		** for debugging.  This is called by issuing the
 		** "AUDIO DEBUG" command to the UnrealEd console.
 		*/
 		USound	*Sound;
 		int	i;
 
-		/* Loop through all the sound resources. */
+		/* Loop through all the sound objects. */
 		i = 0;	
-		FOR_ALL_TYPED_RES(Sound, RES_Sound, USound)
+		FOR_ALL_TYPED_OBJECTS(Sound,USound)
 		{
 			debugf("USound %d:\n", i);
 			debugf("  Name == \"%s\"\n",
@@ -514,12 +488,12 @@ UNREAL_API AudioCmdLine(const char *Str)
 			}
 			i++;
 		}
-		END_FOR_ALL_TYPED_RES;
+		END_FOR_ALL_TYPED_OBJECTS;
 
-		/* If there were no sound resources, say so. */
+		/* If there were no sound objects, say so. */
 		if (i < 1)
 		{
-			debugf("No sound resources found.\n");
+			debugf("No sound objects found.\n");
 		}
 	}
 	else
@@ -527,7 +501,7 @@ UNREAL_API AudioCmdLine(const char *Str)
 		/* Add more commands as necessary... */
 	}
 
-	UNGUARD("AudioCmdLine");
+	unguard;
 } /* End AudioCmdLine() */
 
 /*-----------------------------------------------------------------------------
@@ -541,7 +515,7 @@ UNREAL_API AudioCmdLine(const char *Str)
 static void
 audioQuerySoundForLink(char *FamilyName)
 {
-	GUARD;
+	guard(audioQuerySoundForLink);
 
 	FName	Name;
 	int	All = !stricmp(FamilyName,"(All)");
@@ -557,7 +531,7 @@ audioQuerySoundForLink(char *FamilyName)
 	GCurResult  = 0;
 	GNumResults = 0;
 
-	FOR_ALL_TYPED_RES(Sound,RES_Sound,USound)
+	FOR_ALL_TYPED_OBJECTS(Sound,USound)
 	{
 		if ((GNumResults < MAX_RESULTS) &&
 			((Sound->FamilyName == Name) ||
@@ -566,9 +540,9 @@ audioQuerySoundForLink(char *FamilyName)
 			GTempList[GNumResults++] = Sound;
 		}
 	}
-	END_FOR_ALL_TYPED_RES;
+	END_FOR_ALL_TYPED_OBJECTS;
 
-	UNGUARD("audioQuerySoundForLink");
+	unguard;
 } /* End audioQuerySoundForLink() */
 
 //
@@ -577,7 +551,7 @@ audioQuerySoundForLink(char *FamilyName)
 static void
 audioQueryFamilyForLink(void)
 {
-	GUARD;
+	guard(audioQueryFamilyForLink);
 
 	USound	*Sound;
 	FName	ListName;
@@ -595,7 +569,7 @@ audioQueryFamilyForLink(void)
 	GNumFamResults = 0;
 
 	GTempFamList [GNumFamResults++].Add("(All)");
-	FOR_ALL_TYPED_RES(Sound,RES_Sound,USound)
+	FOR_ALL_TYPED_OBJECTS(Sound,USound)
 	{
 		ListName = Sound->FamilyName;
 		if (!ListName.IsNone())
@@ -611,9 +585,9 @@ audioQueryFamilyForLink(void)
 			}
 		}
 	}
-	END_FOR_ALL_TYPED_RES;
+	END_FOR_ALL_TYPED_OBJECTS;
 
-	UNGUARD("audioQueryFamilyForLink");
+	unguard;
 } /* End audioQueryFamilyForLink() */
 
 //
@@ -629,7 +603,7 @@ AUTOREGISTER_TOPIC("Audio",AudioTopicHandler);
 void
 AudioTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, char *Data)
 {
-	GUARD;
+	guard(AudioTopicHandler::Get);
 	USound	*Sound;
 	FName	FamilyName;
 
@@ -665,7 +639,7 @@ AudioTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, char 
 	{
 	}
 #endif
-	UNGUARD("AudioTopicHandler::Get");
+	unguard;
 } /* End AudioTopicHandler::Get() */
 
 /*
@@ -676,7 +650,7 @@ AudioTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, char 
 void
 AudioTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, const char *Data)
 {
-	GUARD;
+	guard(AudioTopicHandler::Set);
 
 #ifdef ADBG
 	debugf(LOG_Audio, "AudioTopicHandler::Set(Level, Topic==\"%s\", Item==\"%s\", Data)\n",
@@ -687,8 +661,9 @@ AudioTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, const
 	{
 		// Set some parameter based on the contents of *Data
 	};
-	UNGUARD("AudioTopicHandler::Set");
+	unguard;
 } /* End AudioTopicHandler::Set() */
+#endif
 
 /*
 =============================================================================

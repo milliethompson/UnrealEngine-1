@@ -1,30 +1,32 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{248DD890-BB45-11CF-9ABC-0080C7E7B78D}#1.0#0"; "MSWINSCK.OCX"
 Begin VB.Form GateConnection 
    Caption         =   "GateServer Connection"
-   ClientHeight    =   2235
+   ClientHeight    =   2295
    ClientLeft      =   5550
    ClientTop       =   1320
-   ClientWidth     =   3840
-   Height          =   2595
+   ClientWidth     =   3930
    Icon            =   "GateConn.frx":0000
-   Left            =   5490
    LinkTopic       =   "Form1"
-   ScaleHeight     =   2235
-   ScaleWidth      =   3840
-   Top             =   1020
-   Width           =   3960
-   Begin WINSOCKLib.TCP TCP 
-      Left            =   1560
-      Top             =   900
-      _ExtentX        =   635
-      _ExtentY        =   635
-      RemoteHost      =   ""
-      RemotePort      =   0
-      LocalPort       =   0
+   PaletteMode     =   1  'UseZOrder
+   ScaleHeight     =   2295
+   ScaleWidth      =   3930
+   Begin VB.Timer Timer1 
+      Interval        =   1000
+      Left            =   2040
+      Top             =   1080
+   End
+   Begin MSWinsockLib.Winsock TCP 
+      Left            =   840
+      Top             =   1440
+      _ExtentX        =   741
+      _ExtentY        =   741
    End
 End
 Attribute VB_Name = "GateConnection"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' GateConn.frm: Gatekeeper server TCP connection handler.
@@ -50,6 +52,7 @@ Option Explicit
 Private Log As GateLog
 Private ConnectionList As GateConnectionList
 Private Keeper As Gatekeeper
+Private Pending As Boolean
 
 ' Set when a command is executing.
 Private IsAtPrompt As Boolean
@@ -405,7 +408,9 @@ End Sub
 '
 Public Sub Send(S As String)
     On Error GoTo SendError
-    If Not IsVirtual Then TCP.SendData S & Chr(13) & Chr(10)
+    If Not IsVirtual Then
+        TCP.SendData S & Chr(13) & Chr(10)
+    End If
 SendError:
 End Sub
 
@@ -414,7 +419,9 @@ End Sub
 '
 Public Sub SendRaw(S As String)
     On Error GoTo SendError
-    If Not IsVirtual Then TCP.SendData S
+    If Not IsVirtual Then
+        TCP.SendData S
+    End If
 SendError:
 End Sub
 
@@ -445,9 +452,13 @@ End Sub
 ' Send an async notification.
 '
 Public Sub Notify(MachineCode As Long, Data As String, HumanCode As String)
+    
+    Pending = True
+    
     BeginAsyncNotification
     Call Respond(MachineCode, Data, HumanCode)
     EndAsyncNotification
+
 End Sub
 
 '
@@ -640,11 +651,10 @@ End Function
 '/////////////////////////////////////////////////////////
 
 '
-' Tick function is periodically called, i.e. once every
-' 30 seconds, to log off timed-out connections.
+' Tick function is periodically called.
+' Todo: Log off timed-out connections.
 '
 Public Sub Tick()
-    ' Does nothing.
 End Sub
 
 '/////////////////////////////////////////////////////////
@@ -731,10 +741,17 @@ End Sub
 ' TCP error event.  Indicates that some kind of WinSock error
 ' has occured.
 '
-Private Sub TCP_Error(Number As Integer, Description As String, Scode As Long, Source As String, HelpFile As String, HelpContext As Long, CancelDisplay As Boolean)
+Private Sub TCP_Error(ByVal Number As Integer, Description As String, ByVal Scode As Long, ByVal Source As String, ByVal HelpFile As String, ByVal HelpContext As Long, CancelDisplay As Boolean)
     Log.Log "CRITICAL: TCP_Error: " & Description
 End Sub
 
 '/////////////////////////////////////////////////////////
 ' The End.
 '/////////////////////////////////////////////////////////
+
+Private Sub Timer1_Timer()
+    If Pending And TCP.State = 7 Then
+        TCP.SendData Chr(13) & Chr(10)
+        Pending = False
+    End If
+End Sub

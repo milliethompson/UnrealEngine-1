@@ -2,7 +2,7 @@
 UnKeyVal.h: Unreal key-value pair processing.
 Used by: Interfaces that deal with keyed values in text form.
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0.
 
 Description:
@@ -27,7 +27,7 @@ Revision history:
 #include "UnParse.h"
 
 // A class for managing key-value pairs:
-class UNREAL_API FKeyValues
+class UNENGINE_API FKeyValues
 {
 public:
     enum
@@ -41,7 +41,7 @@ public:
     //   by a null character and last string is terminated with two null characters.
     //   Note that there can't be an empty string in the list, since such a
     //   string would cause 2 nulls and be considered as the end of the list.
-    struct UNREAL_API TStringList
+    struct UNENGINE_API TStringList
     {
         char * Strings;
         TStringList() { Strings = 0; }

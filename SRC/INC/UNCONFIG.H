@@ -2,7 +2,7 @@
 UnConfig.h: Unreal configuration and customization
 Used by: The Windows interface and initialization code
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0.
 
 Description:
@@ -16,7 +16,7 @@ Revision history:
 #define _INC_UnConfig
 
 #include "UnKeyVal.h"
-class UNREAL_API FConfiguration
+class UNENGINE_API FConfiguration
 {
 
 public:
@@ -140,6 +140,6 @@ private:
     int CurrentLineNumber;
 };
 
-extern UNREAL_API FConfiguration GConfiguration;
+extern UNENGINE_API FConfiguration GConfiguration;
 
 #endif

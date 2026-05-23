@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmPopups 
    Caption         =   "frmPopups"
    ClientHeight    =   870
@@ -6,24 +6,21 @@ Begin VB.Form frmPopups
    ClientTop       =   3615
    ClientWidth     =   7560
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   1560
    Icon            =   "Popups.frx":0000
-   Left            =   4785
    LinkTopic       =   "Form1"
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   870
    ScaleWidth      =   7560
    ShowInTaskbar   =   0   'False
-   Top             =   2985
-   Width           =   7680
    Begin VB.Label Label1 
       Caption         =   "Misc popup menus that are brought up when you left-click on stuff"
       Height          =   495
@@ -210,7 +207,9 @@ Begin VB.Form frmPopups
    End
 End
 Attribute VB_Name = "frmPopups"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 

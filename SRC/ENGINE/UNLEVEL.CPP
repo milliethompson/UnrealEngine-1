@@ -1,75 +1,54 @@
 /*=============================================================================
 	UnLevel.cpp: Level-related functions
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
 		* Created by Tim Sweeney
-        * July 21, 1996: Mark added global GLevel
+        * July 21, 1996: Mark added global GLevel.
+		* Dec  13, 1996: Tim removed GLevel.
 =============================================================================*/
 
 #include "Unreal.h"
-#include "UnDynBsp.h"
-
-/*-----------------------------------------------------------------------------
-	Globals.
------------------------------------------------------------------------------*/
-
-//
-// Level state description text
-//
-UNREAL_API const char *GLevelStateDescr[LEVEL_MAX]=
-{
-	"Down","Up for play","Up for editing","Up for demo"
-};
 
 /*-----------------------------------------------------------------------------
 	Level creation & emptying.
 -----------------------------------------------------------------------------*/
 
 //
-//	Create a new level and allocate all resources needed for it.
+//	Create a new level and allocate all objects needed for it.
 //	Call with Editor=1 to allocate editor structures for it, also.
 //
-ULevel::ULevel( int Editable )
+ULevel::ULevel( int InMax, int InEditable, int InRootOutside )
+:	UDatabase( InMax, 0 )
 {
 	guard(ULevel::ULevel);
-	char TempName[256];
 
-	State=LEVEL_Down;
+	// Init state.
+	State = LEVEL_Down;
 
-	// Figure out how much stuff we need.
-	INDEX MaxActors		= 1200;
-	INDEX MaxTextSize	= 20000;
-	INDEX MaxBrushes	= 5000;
-	INDEX MaxMisc		= 64;
-
-	// Allocate all resources (indentation shows hierarchy).
-	Model			= new(Name,CREATE_Replace) UModel(Editable);
-
-	// Allocate actor list.
-	ActorList		= new(Name,CREATE_Replace) UActorList(MaxActors);
-	ActorList->RelistActors();
+	// Allocate model.
+	Model = new( GetName(), CREATE_Replace )UModel( InEditable, InRootOutside );
 
 	// Allocate brush array.
-	sprintf(TempName,"%s_Brushes",Name);
-	BrushArray		= new(Name,CREATE_Replace) TArray<UModel>(MaxBrushes);
-	BrushArray->Add  (new("Brush",CREATE_Replace) UModel(Editable));
+	if( InEditable )
+	{
+		char TempName[256];
+		sprintf(TempName,"%s_Brushes",GetName());
+		BrushArray = new( GetName(),CREATE_Replace,RF_NotForClient|RF_NotForServer ) TArray<UModel*>( 0 );
+		BrushArray->AddItem( new("Brush",CREATE_Replace,RF_NotForClient|RF_NotForServer)UModel(InEditable,1) );
+	}
 
-	// Allocate misc resources for level.
-	sprintf(TempName,"%s_Misc",Name);
-	Misc = new(TempName,CREATE_Replace) TArray<UResource>(MaxMisc);
-	Misc->Add(GClasses.Actor);
-	Misc->Add(GClasses.Camera);
-	Misc->Add(GClasses.Light);
-	Misc->Add(GClasses.LevelDescriptor);
-
-	// Stick level in world.
-	GServer.Levels->Add(this);
+	// Allocate ReachSpecs.
+	ReachSpecs = new( GetName(), CREATE_Replace ) UReachSpecs(0);
 
 	// Bring level up.
-	if (Editable) SetState (LEVEL_UpEdit,NULL);
+	if( InEditable )
+		SetState( LEVEL_UpEdit );
+
+	// Empty the level.
+	EmptyLevel();
 
 	unguard;
 }
@@ -77,71 +56,55 @@ ULevel::ULevel( int Editable )
 //
 // Empty the contents of a level.
 //
-void ULevel::Empty()
+void ULevel::EmptyLevel()
 {
-	guard(ULevel::Empty);
+	guard(ULevel::EmptyLevel);
 
 	// Clear the brush array except for brush 0.
-	for (int i=BrushArray->Num-1; i>0; i--) 
+	Lock(LOCK_ReadWrite);
+	for( int i=BrushArray->Num-1; i>0; i-- )
 	{
 		BrushArray->Element(i)->Kill();
-		BrushArray->Delete(BrushArray->Element(i));
+		BrushArray->Remove(i);
 	}
 
 	// Clear the model.
-	ILevel LevelInfo;
-	Lock(&LevelInfo,LOCK_NoTrans);
+	Model->EmptyModel( 1, 1 );
 
-	LevelInfo.ModelInfo.NumVectors  = 0;
-	LevelInfo.ModelInfo.NumPoints   = 0;
-	LevelInfo.ModelInfo.NumBspNodes = 0;
-	LevelInfo.ModelInfo.NumBspSurfs = 0;
-	LevelInfo.ModelInfo.NumVertPool = 0;
-	LevelInfo.ModelInfo.ModelFlags  = 0;
+	// Kill all nonplayer actors.
+	for( i=0; i<Num; i++ )
+		if( Element(i) && !Element(i)->GetPlayer() )
+			DestroyActor( Element(i) );
 
-	// Kill actors.
-	AActor *Actor = &LevelInfo.Actors->Element(0);
-	for ( i=0; i<LevelInfo.Actors->Max; i++ )
-	{
-		if( Actor->Class && !Actor->GetPlayer() )
-		{
-			LevelInfo.DestroyActor(i);
-		}
-		Actor->bJustDeleted = 0;
-		Actor++;
-	}
-	LevelInfo.Actors->RelistActors();
+	// Spawn the level info.
+	AActor *Temp = SpawnActor( new("LevelInfo",FIND_Existing)UClass );
+	checkState(Temp==Element(0));
 
-	// Spawn the level descriptor.
-	INDEX iTemp = LevelInfo.SpawnActor
-	(
-		GClasses.LevelDescriptor,
-		NAME_NONE,
-		&GMath.ZeroVector
-	);
+	// Hook the level info up to all player actors.
+	for( i=0; i<Num; i++ )
+		if( Element(i) )
+			Element(i)->Level = GetLevelInfo();
 
-	if (iTemp!=0)
-		appErrorf("Spawned bad leveldescriptor: %i",iTemp);
-	
-	Unlock(&LevelInfo);
+	// Allocate misc objects for level.
+	char TempName[NAME_SIZE];
+	sprintf(TempName,"%s_Misc",GetName());
+	Misc = new(TempName,CREATE_Replace) TArray<UObject*>(0);
+	Unlock(LOCK_ReadWrite);
 
 	unguard;
 }
 
 //
-// Delete all stuff related to a level.
+// Shrink everything in a level to its minimum size.
 //
-void ULevel::KillAll()
+void ULevel::ShrinkLevel()
 {
-	guard(ULevel::KillAll);
+	guard(ULevel::Shrink);
 
-	SetState(LEVEL_Down,NULL);
+	Model->ShrinkModel();
+	if( BrushArray ) BrushArray->Shrink();
+	if( ReachSpecs ) ReachSpecs->Shrink();
 
-	for (int i=1; i<BrushArray->Num; i++) 
-		BrushArray->Element(i)->Kill();
-
-	Kill();
-	
 	unguard;
 }
 
@@ -149,99 +112,86 @@ void ULevel::KillAll()
 	Level locking and unlocking.
 -----------------------------------------------------------------------------*/
 
-void ULevel::Lock(ILevel *LevelInfo, int NewLockType)
+//
+// Lock this level.
+//
+INT ULevel::Lock(DWORD NewLockType)
 {
 	guard(ULevel::Lock);
+	checkState(!IsLocked());
 
-	checkVital( GLevel==0, "Level: Multiple locks" );
-	GLevel = LevelInfo;
+	// Init collision if first time through.
+	guard(1);
+	if( !Hash.CollisionInitialized )
+		InitCollision();
+	unguard;
 
-	LevelInfo->State		= State;
-	LevelInfo->Level		= this;
-	LevelInfo->Model		= Model;
-	LevelInfo->PlayerList	= PlayerList;
-	LevelInfo->BrushArray	= BrushArray;
-	LevelInfo->Brush        = BrushArray->Element(0);
-	LevelInfo->Model->Lock	(&LevelInfo->ModelInfo,NewLockType);
-	LevelInfo->Actors		= ActorList;
-	LevelInfo->Actors->Lock(NewLockType);
-	LevelInfo->Dynamics.Locked = 0;
+	// Lock our parent class.
+	INT Result=0;
+	guard(2);
+	Result = UDatabase::Lock(NewLockType);
+	unguard;
 
-    if( ActorList->ActiveActors != 0 )
-    {
-		// Safety check in case we haven't set up the lists yet.
-        ActorList->StaticActors        ->Compress();
-        ActorList->DynamicActors       ->Compress();
-        ActorList->CollidingActors     ->Compress();
-        ActorList->ActiveActors        ->Compress();
-        ActorList->UnusedActors        ->Compress();
-        ActorList->JustDeletedActors   ->Compress();
-    }
+	// Init deleted chain.
+	guard(3);
+	FirstDeleted = NULL;
+	unguard;
 
-	// Go through all actors and clear 'bJustDeleted' so that actors destroyed
-	// in the previous tick can be recycled during this tick.
-    if( ActorList->JustDeletedActors != 0 )
-    {
-        while( ActorList->JustDeletedActors->Count() > 0 )
-        {
-            AActor * Actor = (*ActorList->JustDeletedActors)[0];
-            Actor->bJustDeleted = FALSE;
-            Actor->Class = 0;
-            ActorList->JustDeletedActors->RemoveIndex(0);
-            ActorList->UnusedActors->Add(Actor);
-        }
-    }
-	sporeLock(LevelInfo);
-	LevelInfo->Dynamics.Lock(&GMem,LevelInfo,Max(1000,LevelInfo->ModelInfo.NumBspNodes*5));
+	guard(4);
+	Model->Lock(NewLockType);
+	unguard;
 
-	// Get the LevelDescriptor, if any.
-	if ( ActorList->Element(0) && ActorList->Element(0).IsKindOf("LevelDescriptor") ) 
-	{
-		LevelInfo->Descriptor = (ALevelDescriptor*)&ActorList->Element(0);
-		ALevelDescriptor* Descriptor = LevelInfo->Descriptor;
+	guard(5);
+	if( BrushArray )
+		BrushArray->Lock(NewLockType);
+	unguard;
 
-		// Set time info.
-		INT UnusedDayOfWeek;
-		GApp->SystemTime(&Descriptor->Year,&Descriptor->Month,&UnusedDayOfWeek,
-			&Descriptor->Day,&Descriptor->Hour,&Descriptor->Minute,&Descriptor->Second,
-			&Descriptor->Millisecond);
-		Descriptor->Ticks	= GServer.Ticks;
-		Descriptor->Time	=
-		(
-			Descriptor->Hour/24.0 + 
-			Descriptor->Minute/60.0/24.0 + 
-			Descriptor->Second/60.0/60.0/24.0 + 
-			Descriptor->Millisecond/1000.0/60.0/60.0/24.0
-		) * Descriptor->DayFactor + Descriptor->DayBase;
-		Descriptor->Time -= (int)Descriptor->Time;
+	guard(6);
+	GBrushTracker.Lock();
+	unguard;
 
-		// Compute DayFraction and NightFraction.
-		int Base					= Descriptor->Minute + Descriptor->Hour*60;
-		int NoonDistance			= Abs(Base - 12*60);
-		int MidnightDistance		= (Base < 12*60) ? Base : (24*60 - Base);
-		Descriptor->NightFraction	= (MidnightDistance > 9*60) ? 0.0 : Square(MidnightDistance / (9.0 * 60.0));
-		Descriptor->DayFraction		= (NoonDistance     > 9*60) ? 0.0 : Square(NoonDistance     / (9.0 * 60.0));
-	}
-	else LevelInfo->Descriptor = NULL;
+	// Get the LevelInfo, if any.
+	guard(7);
+	Info = NULL;
+	if( Num>0 && Element(0) && Element(0)->IsA("LevelInfo") ) 
+		Info = (ALevelInfo*)Element(0);
+	unguard;
 
+	return Result;
 	unguard;
 }
 
-void ULevel::Unlock(ILevel *LevelInfo)
+//
+// Unlock this level.
+//
+void ULevel::Unlock(DWORD OldLockType)
 {
 	guard(ULevel::Unlock);
+	checkState(IsLocked());
 
-	if( !GLevel )
-		appError("Level: Unlock without lock");
-	
-	GLevel = NULL;
+	// Clean up deleted actors.
+	guard(1);
+	CleanupDestroyed();
+	unguard;
 
-	LevelInfo->Dynamics.Unlock();
-	sporeUnlock();
+	// Unlock stuff.
+	guard(2);
+	GBrushTracker.Unlock();
+	unguard;
 
-	State  = LevelInfo->State;
-	LevelInfo->Actors->Unlock();
-	LevelInfo->Model->Unlock (&LevelInfo->ModelInfo);
+	guard(3);
+	Model->Unlock(OldLockType);
+	unguard;
+
+	guard(4);
+	if( BrushArray )
+		BrushArray->Unlock(OldLockType);
+	unguard;
+
+	// Unlock our parent class.
+	guard(5);
+	UDatabase::Unlock(OldLockType);
+	unguard;
 
 	unguard;
 }
@@ -251,121 +201,85 @@ void ULevel::Unlock(ILevel *LevelInfo)
 -----------------------------------------------------------------------------*/
 
 //
-// Return the level's current state (LEVEL_UpPlay, etc).
-//
-ELevelState ULevel::GetState()
-{
-	guard(ULevel::GetState);
-	return State;
-	unguard;
-}
-
-//
 // Set the level's state.  Notifies all actors of the state change.
 // If you're setting the state to LEVEL_UP_PLAY, you must specify
 // the network mode and difficulty level.
 //
-void ULevel::SetState(ELevelState NewState,PBeginPlay *PlayInfo)
+void ULevel::SetState(ELevelState NewState)
 {
 	guard(ULevel::SetState);
 
-	ILevel		Level;
 	ELevelState	OldState;
-
 	OldState	= State;
 	State		= NewState;
 
-	if (NewState == OldState) 
+	if( NewState == OldState )
 		return;
 
 	// Send messages to all level actors notifying state we're exiting.
-	Lock (&Level,LOCK_NoTrans);
+	Lock(LOCK_ReadWrite);
 
-	if (OldState==LEVEL_UpPlay)	Level.BroadcastMessage (ACTOR_EndPlay,NULL);
-	if (OldState==LEVEL_UpEdit)	Level.BroadcastMessage (ACTOR_EndEdit,NULL);
+	if( OldState==LEVEL_UpPlay ) SendEx( NAME_EndPlay, NULL );
+	if( OldState==LEVEL_UpEdit ) SendEx( NAME_EndEdit, NULL );
+
+	if( Info )
+		Info->LevelState = State;
 
 	// Send message to actors notifying them of new level state.
 	if( NewState == LEVEL_UpPlay )
 	{
-		if (!PlayInfo)
-			appError ("Missing PlayInfo");
-		
-		this->PlayInfo = *PlayInfo;
-		debugf (LOG_Server,"Level %s is now up for play",Name);
+		// Init touching actors.
+		for( INDEX i=0; i<Num; i++ )
+			if( Element(i) )
+				for( int j=0; j<ARRAY_COUNT(Element(i)->Touching); j++ )
+					Element(i)->Touching[j] = NULL;
 
-		Level.BroadcastMessage(ACTOR_PreBeginPlay,PlayInfo);
-		Level.BroadcastMessage(ACTOR_BeginPlay,PlayInfo);
+		// Begin scripting.
+		for( i=0; i<Num; i++ )
+			if( Element(i) )
+				Element(i)->BeginExecution();
 
-		for( INDEX i=0; i<Level.Actors->Max; i++ )
-		{
-			AActor *Actor = &Level.Actors->Element(i);
-			if( Actor->Class )
-			{
-				Actor->Zone = 0;
-				Level.SetActorZone(i);
-			}
-		}
-		Level.BroadcastMessage(ACTOR_PostBeginPlay,PlayInfo);
+		// Send begin play messages.
+		SendEx( NAME_PreBeginPlay, NULL );
+		SendEx( NAME_BeginPlay,    NULL );
+
+		// Set zones.
+		for( i=0; i<Num; i++ )
+			if( Element(i) )
+				SetActorZone( Element(i) );
+
+		SendEx( NAME_PostBeginPlay, NULL );
+		debugf( LOG_Info, "Level %s is now up for play", GetName() );
 	}
 	else if( NewState == LEVEL_UpEdit )
 	{
-		debugf (LOG_Server,"Level %s is now up for play",Name);
-		Level.BroadcastMessage(ACTOR_BeginEdit,NULL);
+		SendEx( NAME_BeginEdit, NULL );
+		debugf( LOG_Info, "Level %s is now up for edit", GetName() );
 	}
 	else if( NewState == LEVEL_Down )
 	{
-		debugf (LOG_Server,"Level %s is now down",Name);
+		debugf( LOG_Info, "Level %s is now down", GetName() );
 	}
 	else 
 	{
-		appErrorf ("SetLevelState: Bad state %i",NewState);
+		appErrorf( "SetLevelState: Bad state %i",NewState );
 	}
-	Unlock (&Level);
+	Unlock( LOCK_ReadWrite );
 	unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	Level resource implementation.
+	Level object implementation.
 -----------------------------------------------------------------------------*/
 
-void ULevel::Register(FResourceType *Type)
-{
-	guard(ULevel::Register);
-
-	Type->HeaderSize = sizeof (ULevel);
-	Type->RecordSize = 0;
-	Type->Version    = 1;
-	strcpy (Type->Descr,"Level");
-
-	unguard;
-}
-void ULevel::InitHeader()
-{
-	guard(ULevel::InitHeader);
-
-	// Init resource header to defaults.
-	State			= LEVEL_Down;
-	BrushArray		= NULL;
-	Model		    = NULL;
-	ActorList		= NULL;
-	Misc			= NULL;
-
-	// Clear all text blocks.
-	for (int i=0; i<NUM_LEVEL_TEXT_BLOCKS; i++)
-		TextBlocks[i]=NULL;
-
-	unguard;
-}
-const char *ULevel::Import(const char *Buffer, const char *BufferEnd,const char *FileType)
+const char *ULevel::Import( const char *Buffer, const char *BufferEnd, const char *FileType )
 {
 	guard(ULevel::Import);
+	checkState(BrushArray->Num>0);
 
 	int ImportedActiveBrush=0,NumBrushes=0;
 	char StrLine[256],BrushName[NAME_SIZE];
 	const char *StrPtr;
-
-	if (BrushArray->Num==0)
-		appError ("No active brush in level");
 
 	// Assumes data is being imported over top of a new, valid map.
 	GetNEXT  (&Buffer);
@@ -397,92 +311,75 @@ const char *ULevel::Import(const char *Buffer, const char *BufferEnd,const char 
 				}
 				else
 				{
-					// Parse a new brush, which has not yet been allocated.
-					GRes.MakeUniqueName(BrushName,Name,"_S",RES_Model);
-					TempModel = new(BrushName,CREATE_Unique)UModel;
+					// Parse a new brush which has not yet been allocated.
+					TempModel = new(BrushName,CREATE_MakeUnique,RF_NotForClient|RF_NotForServer)UModel;
 					Buffer = TempModel->Import(Buffer,BufferEnd,FileType);
-					if (!Buffer) return NULL;
-					BrushArray->Add(TempModel);						
+					if( !Buffer ) return NULL;
+					BrushArray->AddItem(TempModel);						
 				}
 				TempModel->ModelFlags |= MF_Selected;
 			}
 		}
 		else if( GetBEGIN(&StrPtr,"ACTORLIST") )
 		{
-			Buffer = ActorList->Import(Buffer,BufferEnd,FileType);
-			if (!Buffer)
+			Buffer = ImportActors( Buffer, BufferEnd, FileType );
+			if( !Buffer )
 				return NULL;
 		}
 	}
 	return Buffer;
 	unguard;
 }
-char *ULevel::Export(char *Buffer,const char *FileType,int Indent)
+void ULevel::Export( FOutputDevice &Out, const char *FileType, int Indent )
 {
 	guard(ULevel::Export);
 
-	Buffer += sprintf (Buffer,"%s;\r\n",spc(Indent));
-	Buffer += sprintf (Buffer,"%s; Unreal World Editor\r\n",spc(Indent));
-	Buffer += sprintf (Buffer,"%s; Version: %s\r\n",spc(Indent),ENGINE_VERSION);
-	Buffer += sprintf (Buffer,"%s; Exported map \r\n",spc(Indent));
-	Buffer += sprintf (Buffer,"%s;\r\n",spc(Indent));
+	Out.Logf( "%s;\r\n", spc(Indent) );
+	Out.Logf( "%s; UnrealEd %s\r\n", spc(Indent), ENGINE_VERSION );
+	Out.Logf( "%s; Exported map \r\n", spc(Indent) );
+	Out.Logf( "%s;\r\n", spc(Indent) );
 
-	Buffer += sprintf (Buffer,"%sBegin Map Name=%s Brushes=%i\r\n",spc(Indent),Name,BrushArray->Num);
-	Buffer += sprintf (Buffer,"%s   ;\r\n",spc(Indent));
+	Out.Logf( "%sBegin Map Name=%s Brushes=%i\r\n", spc(Indent), GetName(), BrushArray->Num );
+	Out.Logf( "%s   ;\r\n", spc(Indent) );
 
 	// Export brushes.
-	for (int i=0; i<BrushArray->Num; i++)
-	{
-		Buffer = BrushArray->Element(i)->Export(Buffer,FileType,Indent+3);
-		if (!Buffer) return NULL;
-	}
+	for( int i=0; i<BrushArray->Num; i++ )
+		BrushArray->Element(i)->Export( Out, FileType, Indent+3 );
 
 	// Export actors.
-	Buffer  = ActorList->Export(Buffer,FileType,Indent+3);
-	if (!Buffer)
-		return NULL;
+	ExportActors( Out, FileType, Indent+3 );
 
-	Buffer += sprintf (Buffer,"%sEnd Map\r\n",spc(Indent));
-
-	return Buffer;
+	// End.
+	Out.Logf( "%sEnd Map\r\n", spc(Indent) );
 	unguard;
 }
-void ULevel::QueryHeaderReferences(FResourceCallback &Callback)
+void ULevel::ModifyAllItems()
 {
-	guard(ULevel::QueryHeaderReferences);
+	guard(ULevel::ModifyAllItems);
 
-	Callback.Resource(this,(UResource**)&Model      ,0);
-	Callback.Resource(this,(UResource**)&ActorList  ,0);
-	Callback.Resource(this,(UResource**)&BrushArray ,0);
-	Callback.Resource(this,(UResource**)&Misc       ,0);
-
-	for (int i=0; i<NUM_LEVEL_TEXT_BLOCKS; i++)
-		Callback.Resource(this,(UResource**)&TextBlocks[i],0);
-
+	// Modify all actors that exist.
+	for( int i=0; i<Max; i++ )
+	{
+		ModifyItem( i );
+		if( Element(i) )
+			Element(i)->ModifyHeader();
+	}
 	unguard;
 }
-void ULevel::QueryDataReferences(FResourceCallback &Callback)
+void ULevel::PreKill()
 {
-	guard(ULevel::QueryDataReferences);
-	unguard;
+	// Free the cached collision info.
+	if( Hash.CollisionInitialized )
+		Hash.Exit();
 }
-void ULevel::Flip()
-{	
-	guard(ULevel::Flip);
-
-	UResource::Flip();
-	//todo:
-
-	unguard;
-}
-AUTOREGISTER_RESOURCE(RES_Level,ULevel,0xB2D90857,0xCCD211cf,0x91360000,0xC028B992);
+IMPLEMENT_DB_CLASS(ULevel);
 
 /*-----------------------------------------------------------------------------
 	Level link topic.
 -----------------------------------------------------------------------------*/
 
 AUTOREGISTER_TOPIC("Lev",LevTopicHandler);
-void LevTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, char *Data)
+void LevTopicHandler::Get(ULevel *Level, const char *Item, FOutputDevice &Out)
 {
 	guard(LevTopicHandler::Get);
 
@@ -493,52 +390,54 @@ void LevTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, ch
 		return; // Item isn't a number.
 
 	ItemNum = atoi (Item);
-	if ((ItemNum < 0) || (ItemNum >= ULevel::NUM_LEVEL_TEXT_BLOCKS)) 
+	if( (ItemNum < 0) || (ItemNum >= ULevel::NUM_LEVEL_TEXT_BLOCKS) )
 		return; // Invalid text block number.
 
 	Text = Level->TextBlocks[ItemNum];
 
-	if (Text) 
-		strcpy (Data,Text->GetData());
+	if( Text )
+	{
+		Text->Lock(LOCK_Read);
+		Out.Log( &Text->Element(0) );
+		Text->Unlock(LOCK_Read);
+	}
 
 	unguard;
 }
-void LevTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, const char *Data)
+void LevTopicHandler::Set(ULevel *Level, const char *Item, const char *Data)
 {
 	guard(LevTopicHandler::Set);
 
-	UTextBuffer	*Text;
-	char		Name[NAME_SIZE];
-	int			ItemNum;
-
-	if (!isdigit (Item[0]))
+	if( !isdigit(Item[0]) )
 		return; // Item isn't a number.
 
-	ItemNum = atoi (Item);
+	int ItemNum = atoi (Item);
 	if ((ItemNum < 0) || (ItemNum >= ULevel::NUM_LEVEL_TEXT_BLOCKS)) return; // Invalid text block number
 
-	GRes.CombineName (Name,Level->Name,"T",ItemNum);
-
-	Text = new(Name,CREATE_Replace)UTextBuffer(strlen(Data)+1,1);
-	strcpy (Text->GetData(),Data);
-
-	Level->TextBlocks[ItemNum] = Text;
+	if( !Level->TextBlocks[ItemNum] )
+		Level->TextBlocks[ItemNum] = new(Level->GetName(),CREATE_MakeUnique,RF_NotForClient|RF_NotForServer)UTextBuffer;
+	
+	Level->TextBlocks[ItemNum]->Max = strlen(Data)+1;
+	Level->TextBlocks[ItemNum]->Realloc();
+	
+	Level->TextBlocks[ItemNum]->Lock(LOCK_ReadWrite);
+	strcpy(&Level->TextBlocks[ItemNum]->Element(0),Data);
+	Level->TextBlocks[ItemNum]->Unlock(LOCK_ReadWrite);
 
 	unguard;
 }
 
 /*-----------------------------------------------------------------------------
 	Reconcile actors and cameras after loading or creating a new level.
+
+	These functions provide the basic mechanism by which UnrealEd associates
+	cameras and actors together, even when new maps are loaded which contain
+	an entirely different set of actors which must be mapped onto the existing 
+	cameras.
 -----------------------------------------------------------------------------*/
 
 //
-// These functions provide the basic mechanism by which UnrealEd associates
-// cameras and actors together, even when new maps are loaded which contain
-// an entirely different set of actors which must be mapped onto the existing cameras.
-//
-
-//
-// Step 1: Remember actors.  This is called prior to loading a level, and it
+// Remember actors.  This is called prior to loading a level, and it
 // places temporary camera actor location/status information into each camera,
 // which can be used to reconcile the actors once the new level is loaded and the
 // current actor list is replaced with an entirely new one.
@@ -546,12 +445,12 @@ void LevTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, co
 void ULevel::RememberActors()
 {
 	guard(ULevel::RememberActors);
-	UCamera	*Camera;
-
 	for( int i=0; i<GCameraManager->CameraArray->Num; i++ )
 	{
-		Camera = GCameraManager->CameraArray->Element(i);
-		Camera->RememberedActor = Camera->GetActor();
+		UCamera *Camera                = GCameraManager->CameraArray->Element(i);
+		Camera->RememberedActor        = *Camera->Actor;
+		Camera->RememberedActor.Camera = NULL;
+		Camera->Actor				   = NULL;
 	}
 	unguard;
 }
@@ -562,128 +461,122 @@ void ULevel::RememberActors()
 void ULevel::DissociateActors()
 {
 	guard(ULevel::DissociateActors);
-
-	AActor *Actor = &ActorList->Element(0);
 	
-	for( INDEX i=0; i<ActorList->Max; i++ )
-	{
-		APawn *Player = Actor->GetPlayer();
-		if( Player )
-		{
-			Player->Camera = NULL;
-		}
-		Actor++;
-	}
+	for( INDEX i=0; i<Num; i++ )
+		if( Element(i) && Element(i)->GetPlayer() )
+			Element(i)->GetPlayer()->Camera = NULL;
+
 	unguard;
 }
 
 //
-// Step 2: Reconcile actors.  This is called after loading a level.
+// Reconcile actors.  This is called after loading a level.
 // It attempts to match each existing camera to an actor in the newly-loaded
 // level.  If no decent match can be found, creates a new actor for the camera.
 //
 void ULevel::ReconcileActors( int Remembered )
 {
 	guard(ULevel::ReconcileActors);
-
-	ILevel		LevelInfo;
-	UCamera		*Camera;
-	AActor		*Actor;
-	FName		Name;
-
-	Lock( &LevelInfo, LOCK_NoTrans );
+	Lock(LOCK_ReadWrite);
 
 	// Dissociate all actor Cameras.
 	DissociateActors();
 
-	if( LevelInfo.State == LEVEL_UpEdit )
+	if( GetState() == LEVEL_UpEdit )
 	{
 		// Match cameras and camera-actors with identical names.  These cameras
 		// will obtain all of their desired display properties from the actors.
 		for( int i=0; i<GCameraManager->CameraArray->Num; i++ )
 		{
-			Camera			= GCameraManager->CameraArray->Element(i);
+			UCamera *Camera	= GCameraManager->CameraArray->Element(i);
 			Camera->Level   = this;
-			Camera->iActor	= INDEX_NONE;
-			Name.Add(Camera->Name);
+			Camera->Actor	= NULL;
 
-			for( INDEX j=0; j<LevelInfo.Actors->Max; j++ )
+			for( INDEX j=0; j<Num; j++ )
 			{
-				Actor = &LevelInfo.Actors->Element(j);
-				if( Actor->Name==Name && Actor->IsKindOf("Camera") )
+				AActor *Actor = Element(j);
+				if( Actor && Actor->IsA("View") && Actor->GetFName()==Camera->GetFName() )
 				{
-					debugf (LOG_Info,"Matched camera %s",Camera->Name);
-					Camera->iActor = j;
-
-					goto NextCam;
+					debugf( LOG_Info, "Matched camera %s",Camera->GetName() );
+					Camera->Actor = (APawn *)Actor;
+					break;
 				}
 			}
-			NextCam:;
 		}
 
 		// Match up all remaining cameras to actors.  These cameras will get default
 		// display properties.
 		for( i=0; i<GCameraManager->CameraArray->Num; i++ )
 		{
-			Camera = GCameraManager->CameraArray->Element(i);
+			UCamera *Camera = GCameraManager->CameraArray->Element(i);
 
 			// Hook camera up to an existing (though unpossessed) camera actor, or create
-			// a new camera actor for it.  Sends ACTOR_SPAWN and ACTOR_POSSESS.  Returns
+			// a new camera actor for it.  Sends NAME_SPAWN and NAME_POSSESS.  Returns
 			// actor index or INDEX_NONE if failed.
-			if( Camera->iActor == INDEX_NONE )
+			if( !Camera->Actor )
 			{
-				Name.Add(Camera->Name);
-				Camera->iActor = LevelInfo.SpawnCameraActor(Camera,Name);
-				if( Camera->iActor == INDEX_NONE )
+				FName Name(Camera->GetName(),FNAME_Add);
+				Camera->Actor = SpawnViewActor
+				(
+					Camera,
+					Name,
+					Remembered ? &Camera->RememberedActor : NULL
+				);
+				if( !Camera->Actor )
 				{
-					debug(LOG_Ed,"Camera spawn failed");
+					debug( LOG_Problem, "Camera spawn failed" );
 					Camera->Kill();
 					i--;
 				}
-				else
-				{
-					debugf (LOG_Info,"Spawned camera %s",Camera->Name);
-					if( Remembered )
-					{
-						AActor &Actor	= Camera->GetActor();
-						Actor			= Camera->RememberedActor;
-						Actor.iMe		= Camera->iActor;
-						Actor.SetBinPointers(Actor.Class);
-					}
-				}
+				debugf( LOG_Info, "Spawned camera %s", Camera->GetName() );
 			}
 		}
 	}
 	else
 	{
-		// State==LEVEL_UpPlay
+		// Match existing cameras to actors.
 		for( int i=0; i<GCameraManager->CameraArray->Num; i++ )
 		{
-			Camera          = GCameraManager->CameraArray->Element(i);
-			Camera->iActor  = LevelInfo.SpawnPlayActor(Camera);
+			UCamera *Camera	= GCameraManager->CameraArray->Element(i);
+			Camera->Level   = this;
+			Camera->Actor	= NULL;
 
-			if (Camera->iActor==INDEX_NONE) appError (
-				"Can't play this level: No 'PlayerStart' actor was found to "
-				"specify the player's starting position.");
+			for( INDEX j=0; j<Num; j++ )
+			{
+				AActor *Actor = Element(j);
+				if( Actor && Actor->IsA("Pawn") && ((APawn*)Actor)->bIsPlayer )
+				{
+					debugf( LOG_Info, "Matched camera %s to %s %s", Camera->GetName(), Actor->GetClassName(), Actor->GetName() );
+					Camera->Actor = (APawn *)Actor;
+					break;
+				}
+			}
+		}
+
+		// Spawn actors for any unmatched cameras.
+		for( i=0; i<GCameraManager->CameraArray->Num; i++ )
+		{
+			UCamera *Camera = GCameraManager->CameraArray->Element(i);
+			if( !Camera->Actor )
+				if( !SpawnPlayActor(Camera) ) appError 
+					(
+						"Can't play this level: No 'PlayerStart' actor was found to "
+						"specify the player's starting position."
+					);
 		}
 	}
-	Unlock (&LevelInfo);
+	Unlock(LOCK_ReadWrite);
 
 	// Associate cameras and actors.
 	GCameraManager->UpdateActorUsers();
 
 	// Kill any remaining camera actors.
-	Lock (&LevelInfo,LOCK_NoTrans);
-	for( INDEX i=0; i<LevelInfo.Actors->Max; i++ )
-	{
-		AActor *Actor = &LevelInfo.Actors->Element(i);
+	Lock(LOCK_ReadWrite);
+	for( INDEX i=0; i<Num; i++ )
+		if( Element(i) && Element(i)->IsA("View") && !((AView*)Element(i))->Camera )
+			DestroyActor(Element(i));
 
-		if( Actor && Actor->IsKindOf("Camera") && !((ACamera*)Actor)->Camera )
-		{
-			LevelInfo.DestroyActor(i);
-		}
-	}
-	Unlock (&LevelInfo);
+	Unlock(LOCK_ReadWrite);
 	unguard;
 }
 
@@ -696,115 +589,176 @@ int ULevel::Exec(const char *Cmd,FOutputDevice *Out)
 	guard(ULevel::Exec);
 
 	const char *Str = Cmd;
-	if( GetCMD(&Str,"STATUS" ) && ( GetCMD(&Str,"LEVEL" ) || !Str[0]))
+	if( GetCMD(&Str,"KILLACTORS") )
 	{
-		int n=0;
-		for (int i=0; i<ActorList->Max; i++) if (ActorList->Element(i).Class) n++;
+		Lock(LOCK_ReadWrite);
+		for( int i=0; i<Num; i++ )
+			if( Element(i) && !Element(i)->IsA("Light") && !Element(i)->GetPlayer() )
+				DestroyActor( Element(i) );
 
-		Out->Logf("   LEVEL - %s, %i/%i actors",GLevelStateDescr[State],n,ActorList->Max);
-		return Str[0]!=0;
-	}
-	else if( GetCMD(&Str,"KILLACTORS") )
-	{
-		ILevel LevelInfo;
-		Lock(&LevelInfo,LOCK_NoTrans);
-		AActor *Actor = &LevelInfo.Actors->Element(0);
-		for( int i=0; i<LevelInfo.Actors->Max; i++ )
-		{
-			if( Actor->Class && !Actor->IsKindOf("Light") && 
-				!Actor->GetPlayer() )
-			{
-				LevelInfo.DestroyActor(i);
-			}
-			Actor++;
-		}
-		Unlock(&LevelInfo);
+		Unlock(LOCK_ReadWrite);
 		Out->Log("Killed all actors");
 		return 1;
 	}
 	else if( GetCMD(&Str,"KILLPAWNS") )
 	{
-		ILevel LevelInfo;
-		Lock(&LevelInfo,LOCK_NoTrans);
-		AActor *Actor = &LevelInfo.Actors->Element(0);
-		for (int i=0; i<LevelInfo.Actors->Max; i++)
-		{
-			if( Actor->Class && Actor->IsKindOf("Pawn") && !Actor->GetPlayer() )
-				LevelInfo.DestroyActor(i);
+		Lock(LOCK_ReadWrite);
+		for( int i=0; i<Num; i++ )
+			if( Element(i) && Element(i)->IsA("Pawn") && !Element(i)->GetPlayer() )
+				DestroyActor( Element(i) );
 
-			Actor++;
-		}
 		Out->Log("Killed all NPC's");
-		Unlock(&LevelInfo);
+		Unlock(LOCK_ReadWrite);
 		return 1;
 	}
-	else if( GetCMD(&Str,"LINKS") )
+	else if( GetCMD(&Str,"LEVEL") )
 	{
-		Out->Log("Level links:");
-		AActor *Actor = &ActorList->Element(0);
-		for (int i=0; i<ActorList->Max; i++)
+		if( GetCMD(&Str,"REDRAW") )
 		{
-			Actor++;
+			GCameraManager->RedrawLevel(this);
+			return 1;
 		}
-		return 1;
-	}
-	else if( GetCMD(&Str,"ACTORS") )
-	{
-		int TotalCount=0,TotalStatic=0,TotalCollision=0;
-
-		int *ActorCount		= (int *)GMem.GetZeroed(GRes.MaxRes * sizeof(int));
-		int *StaticCount	= (int *)GMem.GetZeroed(GRes.MaxRes * sizeof(int));
-		int *CollisionCount	= (int *)GMem.GetZeroed(GRes.MaxRes * sizeof(int));
-
-		UClass *Class=NULL;
-		GetUClass(Str,"CLASS=",&Class);
-
-		AActor *Actor = &ActorList->Element(0);
-		for( int i=0; i<ActorList->Max; i++ )
+		else if( GetCMD(&Str,"LINKS") )
 		{
-			if( Actor->Class )
-			{
-				ActorCount[Actor->Class->Index]++;
-				TotalCount++;
+			UTextBuffer *Results = new("Results",CREATE_Replace)UTextBuffer(1);
+			int Internal=0,External=0;
+			Results->Logf("Level links:\r\n");
 
-				if (Actor->bStatic)
+			Lock(LOCK_ReadWrite);
+			for( int i=0; i<Num; i++ )
+			{
+				if( Element(i) && Element(i)->IsA("Teleporter") )
 				{
-					StaticCount[Actor->Class->Index]++;
-					TotalStatic++;
-				}
-				if (Actor->bCollideActors)
-				{
-					CollisionCount[Actor->Class->Index]++;
-					TotalCollision++;
+					ATeleporter &Teleporter = *(ATeleporter *)Element(i);
+					Results->Logf("   %s\r\n",Teleporter.TeleportURL);
+					if(strchr(Teleporter.TeleportURL,'//')) External++;
+					else Internal++;
 				}
 			}
-			Actor++;
+			Unlock(LOCK_ReadWrite);
+			Results->Logf("End, %i internal link(s), %i external.\r\n",Internal,External);
+			return 1;
 		}
-		if (TotalCount>0)
-			Out->Logf("Actors:");
-
-		UClass *TestClass;
-		FOR_ALL_TYPED_RES(TestClass,RES_Class,UClass)
+		else if( GetCMD(&Str,"VALIDATE") )
 		{
-			if( ActorCount[TestClass->Index] && ((Class==NULL) || (Class==TestClass)) )
+			// Validate the level.
+			UTextBuffer *Results = new("Results",CREATE_Replace)UTextBuffer(1);
+			int Errors=0, Warnings=0;
+			Results->Log("Level validation:\r\n");
+
+			// Make sure it's not empty.
+			if( Model->Nodes->Num == 0 )
 			{
-				Out->Logf
-				(
-					" %s...%i (%i, %i)",TestClass->Name,
-					ActorCount		[TestClass->Index],
-					StaticCount		[TestClass->Index],
-					CollisionCount	[TestClass->Index]
-				);
+				Results->Log("Error: Level is empty!\r\n");
+				return 1;
+			}
+
+			// Make sure BSP is valid.
+			if( Model->ModelFlags & MF_InvalidBsp )
+			{
+				Results->Logf("Error: Geometry must be rebuild!\r\n");
+				return 1;
+			}
+
+			// Find playerstart.
+			for( int i=0; i<Num; i++ )
+				if( Element(i) && Element(i)->IsA("PlayerStart") )
+					break;
+			if( i == Num )
+			{
+				Results->Log("Error: Missing PlayerStart actor!\r\n");
+				return 1;
+			}
+
+			// Make sure PlayerStarts are outside.
+			for( i=0; i<Num; i++ )
+			{
+				if( Element(i) && Element(i)->IsA("PlayerStart") )
+				{
+					FCheckResult Hit(0.0);
+					if( !Model->PointCheck( Hit, NULL, Element(i)->Location, 0 ) )
+					{
+						Results->Log("Error: PlayerStart doesn't fit!\r\n");
+						return 1;
+					}
+				}
+			}
+
+			// Check scripts.
+			if( GEditor && !GEditor->CheckScripts( new(TOP_CLASS_NAME,FIND_Existing)UClass, *Results ) )
+			{
+				Results->Logf("\r\nError: Scripts need to be rebuilt!\r\n");
+				return 1;
+			}
+
+			// Check level title.
+			if( GetLevelInfo()->Title[0]==0 )
+			{
+				Results->Logf("Error: Level is missing a title!");
+				return 1;
+			}
+			else if( stricmp(GetLevelInfo()->Title,"Untitled")==0 )
+				Results->Logf("Warning: Level is untitled\r\n");
+
+			// Check actors.
+			for( i=0; i<Num; i++ )
+			{
+				AActor *Actor = Element(i);
+				if( Actor )
+				{
+					guard(CheckingActors);
+					checkState(Actor->GetClass()!=NULL);
+					checkState(Actor->GetClass()->Script!=NULL);
+					checkState(Actor->GetClass()->StackTree!=NULL);
+					checkState(Actor->GetClass()->StackTree->Num>0);
+					checkState(Actor->MainStack.Object==Actor);
+					checkState(Actor->Level!=NULL);
+					checkState(Actor->XLevel!=NULL);
+					checkState(Actor->XLevel==this);
+					checkState(Actor->XLevel->Element(0)!=NULL);
+					checkState(Actor->XLevel->Element(0)==Actor->Level);
+					unguardf(("(%i %s)",i,Actor->GetClassName()));
+				}
+			}
+
+			// Success.
+			Results->Logf("Success: Level validation succeeded!\r\n");
+			return 1;
+		}
+		else
+		{
+			return 0;
+		}
+	}
+	else
+	{
+		return 0;
+	}
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	FOutputDevice interface.
+-----------------------------------------------------------------------------*/
+
+//
+// Output a message to all players in the level.
+//
+void ULevel::Write(const void *Data, int Length, ELogType MsgType)
+{
+	guard(ULevel::Write);
+	for( int i=0; i<Num; i++ )
+	{
+		if( Element(i) && Element(i)->IsA("Pawn") )
+		{
+			APawn *Actor = (APawn *)Element(i);
+			if( Actor->Camera )
+			{
+				//todo: Also send to network players!!
+				Actor->Camera->Write(Data,Length,MsgType);
 			}
 		}
-		END_FOR_ALL_TYPED_RES;
-
-		Out->Logf("%i Actors (%i static, %i collision)",TotalCount,TotalStatic,TotalCollision);
-		GMem.Release(ActorCount);
-
-		return 1;
 	}
-	else return 0;
 	unguard;
 }
 

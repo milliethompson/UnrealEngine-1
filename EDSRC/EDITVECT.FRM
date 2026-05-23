@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmEditVector 
    BorderStyle     =   4  'Fixed ToolWindow
    Caption         =   "Vector"
@@ -7,18 +7,15 @@ Begin VB.Form frmEditVector
    ClientTop       =   2625
    ClientWidth     =   2700
    ControlBox      =   0   'False
-   Height          =   1545
    Icon            =   "EditVect.frx":0000
    KeyPreview      =   -1  'True
-   Left            =   8565
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1185
    ScaleWidth      =   2700
    ShowInTaskbar   =   0   'False
-   Top             =   2325
-   Width           =   2820
    Begin VB.CommandButton Cancel 
       Cancel          =   -1  'True
       Caption         =   "&Cancel"
@@ -81,7 +78,9 @@ Begin VB.Form frmEditVector
    End
 End
 Attribute VB_Name = "frmEditVector"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 Dim Owner As Form

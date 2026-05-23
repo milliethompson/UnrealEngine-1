@@ -1,0 +1,519 @@
+DeclareClass Name=Class
+DeclareClass Name=Script
+DeclareClass Name=Decoration
+DeclareClass Name=Vase
+DeclareClass Name=Chandelier
+DeclareClass Name=Hammok
+DeclareClass Name=urn
+DeclareClass Name=lamp1
+DeclareClass Name=lamp4
+DeclareClass Name=plant1
+DeclareClass Name=plant2
+DeclareClass Name=plant3
+DeclareClass Name=sign1
+DeclareClass Name=flag1
+DeclareClass Name=flag2
+DeclareClass Name=flag3
+DeclareClass Name=candle
+DeclareClass Name=candle2
+DeclareClass Name=fan1
+DeclareClass Name=fan2
+
+Begin Class Name=Decoration
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// The decoration class.
+//=============================================================================
+class Decoration expands Actor
+	abstract
+	package(UnGame);
+
+// If set, the pyrotechnic or explosion when item is damaged.
+var() class EffectWhenDestroyed;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      EffectWhenDestroyed=None
+      bStatic=True
+	  bMeshCurvy=True
+      Texture=None
+      Physics=PHYS_Walking
+      Mass=+00000.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Vase
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Vase.
+//=============================================================================
+class Vase expands Decoration
+	package(UnGame);
+
+#call ..\Models\Vase.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bCollideWorld=True
+      DrawType=DT_Mesh
+      Mesh=Vase
+      CollisionHeight=+00052.000000
+      DefaultEdCategory=Display
+   End DefaultProperties
+End Class
+
+Begin Class Name=Chandelier
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Chandelier.
+//=============================================================================
+class Chandelier expands Decoration
+	package(UnGame);
+
+#call ..\Models\Light1.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Light1
+   End DefaultProperties
+End Class
+
+Begin Class Name=Hammok
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Hammok.
+//=============================================================================
+class Hammok expands Decoration
+	package(UnGame);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+   End DefaultProperties
+End Class
+
+Begin Class Name=urn
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// urn
+//=============================================================================
+class urn expands Decoration;
+
+#exec MESH IMPORT MESH=urn ANIVFILE=..\MODELS\urn_a.3D DATAFILE=..\MODELS\urn_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=urn X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=urn SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=urn SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jurn1 FILE=..\MODELS\urn.PCX FAMILY=!Skins PALETTE=Jurn1 FLAGS=2
+#exec MESHMAP NEW   MESHMAP=urn MESH=urn 
+#exec MESHMAP SCALE MESHMAP=urn X=0.025 Y=0.025 Z=0.05
+
+#exec MESHMAP SETTEXTURE MESHMAP=urn NUM=1 TEXTURE=Jurn1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bCollideWorld=True
+      DrawType=DT_Mesh
+      Mesh=urn
+      CollisionRadius=+00016.000000
+      CollisionHeight=+00004.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=lamp1
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// lamp1.
+//=============================================================================
+class lamp1 expands Decoration;
+
+#exec MESH IMPORT MESH=lamp1 ANIVFILE=..\MODELS\lamp1_a.3D DATAFILE=..\MODELS\lamp1_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=lamp1 X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=lamp1 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=lamp1 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jlamp11 FILE=..\MODELS\lamp1.PCX FAMILY=!Skins PALETTE=Jlamp11 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=lamp1 MESH=lamp1 
+#exec MESHMAP SCALE MESHMAP=lamp1 X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=lamp1 NUM=1 TEXTURE=Jlamp11
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=lamp1
+      CollisionHeight=+00192.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=lamp4
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// lamp4.
+//=============================================================================
+class lamp4 expands Decoration;
+#exec MESH IMPORT MESH=lamp4 ANIVFILE=..\MODELS\lamp4_a.3D DATAFILE=..\MODELS\lamp4_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=lamp4 X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=lamp4 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=lamp4 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jlamp41 FILE=..\MODELS\lamp4.PCX FAMILY=!Skins PALETTE=Jlamp41 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=lamp4 MESH=lamp4 
+#exec MESHMAP SCALE MESHMAP=lamp4 X=0.05 Y=0.05 Z=0.1
+
+#exec MESHMAP SETTEXTURE MESHMAP=lamp4 NUM=1 TEXTURE=Jlamp41
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bCollideWorld=True
+      DrawType=DT_Mesh
+      Mesh=lamp4
+      CollisionHeight=+00032.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=plant1
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// plant1ly.
+//=============================================================================
+class plant1 expands Decoration;
+
+#exec MESH IMPORT MESH=plant1 ANIVFILE=..\MODELS\plant1_a.3D DATAFILE=..\MODELS\plant1_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=plant1 X=0 Y=100 Z=-10 YAW=64
+
+#exec MESH SEQUENCE MESH=plant1 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=plant1 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jplant11 FILE=..\MODELS\plant1.PCX FAMILY=!Skins PALETTE=Jplant11 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=plant1 MESH=plant1 
+#exec MESHMAP SCALE MESHMAP=plant1 X=0.05 Y=0.05 Z=0.1
+
+#exec MESHMAP SETTEXTURE MESHMAP=plant1 NUM=1 TEXTURE=Jplant11
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bCollideWorld=True
+      DrawType=DT_Mesh
+      Mesh=plant1
+      CollisionRadius=+00006.000000
+      CollisionHeight=+00010.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=plant2
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// plant2ly.
+//=============================================================================
+class plant2 expands Decoration;
+
+#exec MESH IMPORT MESH=plant2 ANIVFILE=..\MODELS\plant2_a.3D DATAFILE=..\MODELS\plant2_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=plant2 X=0 Y=100 Z=100 YAW=64
+
+#exec MESH SEQUENCE MESH=plant2 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=plant2 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jplant21 FILE=..\MODELS\plant2.PCX FAMILY=!Skins PALETTE=Jplant21 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=plant2 MESH=plant2
+#exec MESHMAP SCALE MESHMAP=plant2 X=0.05 Y=0.05 Z=0.1
+
+#exec MESHMAP SETTEXTURE MESHMAP=plant2 NUM=1 TEXTURE=Jplant21
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bCollideWorld=True
+      DrawType=DT_Mesh
+      Mesh=plant2
+      CollisionRadius=+00006.000000
+      CollisionHeight=+00007.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=plant3
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// plant3.
+//=============================================================================
+class plant3 expands Decoration;
+
+#exec MESH IMPORT MESH=plant3 ANIVFILE=..\MODELS\plant3_a.3D DATAFILE=..\MODELS\plant3_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=plant3 X=0 Y=100 Z=210 YAW=64
+
+#exec MESH SEQUENCE MESH=plant3 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=plant3 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jplant31 FILE=..\MODELS\plant3.PCX FAMILY=!Skins PALETTE=Jplant31 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=plant3 MESH=plant3 
+#exec MESHMAP SCALE MESHMAP=plant3 X=0.05 Y=0.05 Z=0.1
+
+#exec MESHMAP SETTEXTURE MESHMAP=plant3 NUM=1 TEXTURE=Jplant31
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bCollideWorld=True
+      DrawType=DT_Mesh
+      Mesh=plant3
+      CollisionRadius=+00012.000000
+      CollisionHeight=+00015.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=sign1
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// sign1ly.
+//=============================================================================
+class sign1 expands Decoration;
+
+#exec MESH IMPORT MESH=sign1 ANIVFILE=..\MODELS\sign1_a.3D DATAFILE=..\MODELS\sign1_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=sign1 X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=sign1 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=sign1 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jsign11 FILE=..\MODELS\sign1.PCX FAMILY=!Skins PALETTE=Jsign11 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=sign1 MESH=sign1 
+#exec MESHMAP SCALE MESHMAP=sign1 X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=sign1 NUM=1 TEXTURE=Jsign11
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=sign1
+   End DefaultProperties
+End Class
+
+Begin Class Name=flag1
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// flag1.
+//=============================================================================
+class flag1 expands Decoration;
+
+#exec MESH IMPORT MESH=flag1 ANIVFILE=..\MODELS\flag1_a.3D DATAFILE=..\MODELS\flag1_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=flag1 X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=flag1 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=flag1 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jflag11 FILE=..\MODELS\flag1.PCX FAMILY=!Skins PALETTE=Jflag11 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=flag1 MESH=flag1 
+#exec MESHMAP SCALE MESHMAP=flag1 X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=flag1 NUM=1 TEXTURE=Jflag11
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=flag1
+   End DefaultProperties
+End Class
+
+Begin Class Name=flag2
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// flag2.
+//=============================================================================
+class flag2 expands Decoration;
+
+#exec MESH IMPORT MESH=flag2 ANIVFILE=..\MODELS\flag2_a.3D DATAFILE=..\MODELS\flag2_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=flag2 X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=flag2 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=flag2 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jflag21 FILE=..\MODELS\flag2.PCX FAMILY=!Skins PALETTE=Jflag21 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=flag2 MESH=flag2
+#exec MESHMAP SCALE MESHMAP=flag2 X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=flag2 NUM=1 TEXTURE=Jflag21
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+   End DefaultProperties
+End Class
+
+Begin Class Name=flag3
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// flag3.
+//=============================================================================
+class flag3 expands Decoration;
+
+#exec MESH IMPORT MESH=flag3 ANIVFILE=..\MODELS\flag3_a.3D DATAFILE=..\MODELS\flag3_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=flag3 X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=flag3 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=flag3 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jflag31 FILE=..\MODELS\flag3.PCX FAMILY=!Skins PALETTE=Jflag31 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=flag3 MESH=flag3 
+#exec MESHMAP SCALE MESHMAP=flag3 X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=flag3 NUM=1 TEXTURE=Jflag31
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+   End DefaultProperties
+End Class
+
+Begin Class Name=candle
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// candle.
+//=============================================================================
+class candle expands Decoration;
+
+#exec MESH IMPORT MESH=candle ANIVFILE=..\MODELS\candle_a.3D DATAFILE=..\MODELS\candle_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=candle X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=candle SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=candle SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jcandle1 FILE=..\MODELS\candle.PCX FAMILY=!Skins PALETTE=Jcandle1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=candle MESH=candle 
+#exec MESHMAP SCALE MESHMAP=candle X=0.03 Y=0.03 Z=0.06
+
+#exec MESHMAP SETTEXTURE MESHMAP=candle NUM=1 TEXTURE=Jcandle1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=candle
+      CollisionRadius=+00005.000000
+      CollisionHeight=+00012.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=candle2
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// candle2
+//=============================================================================
+class candle2 expands Decoration;
+
+#exec MESH IMPORT MESH=candl2 ANIVFILE=..\MODELS\candl2_a.3D DATAFILE=..\MODELS\candl2_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=candl2 X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=candl2 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=candl2 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jcandl21 FILE=..\MODELS\candl2.PCX FAMILY=!Skins PALETTE=Jcandl21 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=candl2 MESH=candl2 
+#exec MESHMAP SCALE MESHMAP=candl2 X=0.03 Y=0.03 Z=0.06
+
+#exec MESHMAP SETTEXTURE MESHMAP=candl2 NUM=1 TEXTURE=Jcandl21
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=candl2
+      CollisionRadius=+00005.000000
+      CollisionHeight=+00012.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=fan1
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// fan1.
+//=============================================================================
+class fan1 expands Decoration;
+
+#exec MESH IMPORT MESH=fan1 ANIVFILE=..\MODELS\fan1_a.3D DATAFILE=..\MODELS\fan1_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=fan1 X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=fan1 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=fan1 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jfan11 FILE=..\MODELS\fan1.PCX FAMILY=!Skins PALETTE=Jfan11 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=fan1 MESH=fan1 
+#exec MESHMAP SCALE MESHMAP=fan1 X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=fan1 NUM=1 TEXTURE=Jfan11
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=fan1
+   End DefaultProperties
+End Class
+
+Begin Class Name=fan2
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// fan2.
+//=============================================================================
+class fan2 expands Decoration;
+
+#exec MESH IMPORT MESH=fan2 ANIVFILE=..\MODELS\fan2_a.3D DATAFILE=..\MODELS\fan2_d.3D X=0 Y=0 Z=0
+#alwaysexec MESH ORIGIN MESH=fan2 X=0 Y=-300 Z=0 YAW=64
+
+#exec MESH SEQUENCE MESH=fan2 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=fan2 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jfan21 FILE=..\MODELS\fan2.PCX FAMILY=!Skins PALETTE=Jfan21 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=fan2 MESH=fan2
+#exec MESHMAP SCALE MESHMAP=fan2 X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=fan2 NUM=1 TEXTURE=Jfan21
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=fan2
+   End DefaultProperties
+End Class
+

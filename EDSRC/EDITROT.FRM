@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmEditRotation 
    BorderStyle     =   4  'Fixed ToolWindow
    Caption         =   "Rotation"
@@ -7,18 +7,15 @@ Begin VB.Form frmEditRotation
    ClientTop       =   4980
    ClientWidth     =   2970
    ControlBox      =   0   'False
-   Height          =   1530
    Icon            =   "EditRot.frx":0000
    KeyPreview      =   -1  'True
-   Left            =   7995
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1170
    ScaleWidth      =   2970
    ShowInTaskbar   =   0   'False
-   Top             =   4680
-   Width           =   3090
    Begin VB.CommandButton Cancel 
       Cancel          =   -1  'True
       Caption         =   "&Cancel"
@@ -81,7 +78,9 @@ Begin VB.Form frmEditRotation
    End
 End
 Attribute VB_Name = "frmEditRotation"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 Dim Owner As Form

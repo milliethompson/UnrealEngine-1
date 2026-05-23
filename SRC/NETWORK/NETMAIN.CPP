@@ -1,7 +1,7 @@
 /*=============================================================================
 	NetMain.cpp: Main networking code
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -41,14 +41,14 @@ BOOL CALLBACK JoinInternetDialogProc		(HWND hDlg,UINT uMsg,WPARAM wParam,LPARAM 
 //
 void NPacket::Init(NSocket *SocketToSendThrough)
 	{
-	GUARD;
+	guard(NPacket::Init);
 	//
 	Size	= 0;
 	Crc		= 0;
 	MaxSize	= SocketToSendThrough->MaxPacketSize();
 	DestSocketForSanityCheck = SocketToSendThrough;
 	//
-	UNGUARD("NPacket::Init");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
@@ -62,7 +62,7 @@ void NPacket::Init(NSocket *SocketToSendThrough)
 //
 void NSocket::Init(NDriver *CreatingDriver)
 	{
-	GUARD;
+	guard(NSocket::Init);
 	//
 	// Set socket to "negotiating" to start with:
 	//
@@ -77,7 +77,7 @@ void NSocket::Init(NDriver *CreatingDriver)
 	//
 	SetAction(NS_NEGOTIATING);
 	//
-	UNGUARD("NSocket::Init");
+	unguard;
 	};
 
 //
@@ -87,7 +87,7 @@ void NSocket::Init(NDriver *CreatingDriver)
 //
 void NSocket::Delete()
 	{
-	GUARD;
+	guard(NSocket::Delete);
 	//
 	// Set socket to "disconnected":
 	//
@@ -98,7 +98,7 @@ void NSocket::Delete()
 	Driver->RemoveSocketFromList(this);
 	delete this;
 	//
-	UNGUARD("NSocket::Exit");
+	unguard;
 	};
 
 //
@@ -110,10 +110,10 @@ void NSocket::Delete()
 //
 void NSocket::Tick()
 	{
-	GUARD;
+	guard(NSocket::Tick);
 	//
 	//
-	UNGUARD("NSocket::Tick");
+	unguard;
 	};
 
 //
@@ -122,7 +122,7 @@ void NSocket::Tick()
 //
 ESocketAction NSocket::GetAction()
 	{
-	GUARD;
+	guard(NSocket::GetAction);
 	switch (Action)
 		{
 		case NS_DISCONNECTED:	return Action;
@@ -132,7 +132,7 @@ ESocketAction NSocket::GetAction()
 		case NS_FILE_RECEIVE:	return Action;
 		};
 	appError ("Invalid current socket action"); return Action;
-	UNGUARD("NSocket::GetAction");
+	unguard;
 	};
 
 //
@@ -141,7 +141,7 @@ ESocketAction NSocket::GetAction()
 //
 void NSocket::SetAction(ESocketAction NewAction)
 	{
-	GUARD;
+	guard(NSocket::SetAction);
 	int Ok;
 	switch (Action)
 		{
@@ -175,7 +175,7 @@ void NSocket::SetAction(ESocketAction NewAction)
 		};
 	if (!Ok) appErrorf("Invalid action transition from %i to %i",Action,NewAction);
 	Action = NewAction;
-	UNGUARD("NSocket::SetAction");
+	unguard;
 	};
 
 //
@@ -184,12 +184,12 @@ void NSocket::SetAction(ESocketAction NewAction)
 //
 void NSocket::AssertPacketValidBeforeSend(NPacket *Packet)
 	{
-	GUARD;
+	guard(NSocket::AssertPacketValidBeforeSend);
 	//
 	if (Packet->Size > Packet->MaxSize) appErrorf("Packet size %i overflowed %i maximum",Packet->Size,Packet->MaxSize);
 	if (Packet->DestSocketForSanityCheck != this) appError("Packet init and send sockets differ");
 	//
-	UNGUARD("NSocket::AssertPacketValidBeforeSend");
+	unguard;
 	};
 
 //
@@ -197,9 +197,9 @@ void NSocket::AssertPacketValidBeforeSend(NPacket *Packet)
 //
 void NSocket::AssertValid()
 	{
-	GUARD;
+	guard(NSocket::AssertValid);
 	GetAction(); // Validates the current action
-	UNGUARD("NSocket::AssertValid");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
@@ -211,13 +211,13 @@ void NSocket::AssertValid()
 //
 void NServerAd::GenericAssign(char *LevelName)
 	{
-	GUARD;
+	guard(NServerAd::GenericAssign);
 	//
 	if (Name[0]) appError("Server ad is already in use");
 	if (strlen(LevelName) > NET_NAME_SIZE) appErrorf("Level name %s too large",LevelName);
 	strcpy(Name,LevelName);
 	//
-	UNGUARD("NServerAd::Empty");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
@@ -231,7 +231,7 @@ void NServerAd::GenericAssign(char *LevelName)
 //
 int NManager::BeginAdvertisingLevel(char *LevelName)
 	{
-	GUARD;
+	guard(NManager::BeginAdvertisingLevel);
 	AssertInitialized();
 	//
 	int	ServerID = FindAvailableAd(LevelName);
@@ -243,7 +243,7 @@ int NManager::BeginAdvertisingLevel(char *LevelName)
 		};
 	return ServerID;
 	//
-	UNGUARD("NManager::BeginAdvertisingLevel");
+	unguard;
 	};
 
 //
@@ -251,17 +251,16 @@ int NManager::BeginAdvertisingLevel(char *LevelName)
 //
 void NManager::EndAdvertisingLevel(int ServerID)
 	{
-	GUARD;
+	guard(NManager::EndAdvertisingLevel);
 	AssertInitialized();
-	//
-	for (int i=0; i<MAX_DRIVERS; i++)
-		{
-		if (Drivers[i]) Drivers[i]->EndAdvertising(Ads[ServerID]);
-		};
+	for( int i=0; i<MAX_DRIVERS; i++ )
+	{
+		if( Drivers[i] )
+			Drivers[i]->EndAdvertising(Ads[ServerID]);
+	}
 	DeleteAd(ServerID);
-	//
-	UNGUARD("NManager::EndAdvertisingLevel");
-	};
+	unguard;
+}
 
 //
 // See if any connections are waiting for a particular level.  If so,
@@ -269,22 +268,21 @@ void NManager::EndAdvertisingLevel(int ServerID)
 // If no connections are waiting, returns NULL.
 //
 NSocket *NManager::ServerAcceptConnection(int ServerID)
-	{
-	GUARD;
+{
+	guard(NManager::ServerAcceptConnection);
 	AssertInitialized();
-	//
-	for (int i=0; i<MAX_DRIVERS; i++)
+
+	for( int i=0; i<MAX_DRIVERS; i++ )
+	{
+		if( Drivers[i] )
 		{
-		if (Drivers[i])
-			{
 			NSocket *Result = Drivers[i]->ServerAcceptConnection(ServerID);
 			if (Result) return Result;
-			};
-		};
+		}
+	}
 	return NULL;
-	//
-	UNGUARD("NManager::ServerAcceptConnection");
-	};
+	unguard;
+}
 
 //
 // Try to open a client connection to a specified server.  If successful,
@@ -295,7 +293,7 @@ NSocket *NManager::ServerAcceptConnection(int ServerID)
 //
 NSocket *NManager::ClientOpenServer(char *ServerURL, char *ErrorMessage)
 	{
-	GUARD;
+	guard(NManager::ClientOpenServer);
 	AssertInitialized();
 	//
 	for (int i=0; i<MAX_DRIVERS; i++)
@@ -307,8 +305,7 @@ NSocket *NManager::ClientOpenServer(char *ServerURL, char *ErrorMessage)
 			};
 		};
 	return NULL;
-	//
-	UNGUARD("NManager::ClientOpenServer");
+	unguard;
 	};
 
 //
@@ -324,9 +321,9 @@ NSocket *NManager::ClientOpenServer(char *ServerURL, char *ErrorMessage)
 //
 ENetworkPlayMode NManager::BeginGameByUI(char *ResultURL,NSocket **ClientSocket)
 	{
-	GUARD;
+	guard(NManager::BeginGameByUI);
 	//
-	debugf(LOG_Net,"BeginGameByUI begin");
+	debugf(LOG_Info,"BeginGameByUI begin");
 	//
 	if (DialogBox
 		(
@@ -337,16 +334,16 @@ ENetworkPlayMode NManager::BeginGameByUI(char *ResultURL,NSocket **ClientSocket)
 		))
 		{
 		*ClientSocket = ResultClientSocket;
-		debugf(LOG_Net,"BeginGameByUI not implemented");
+		debugf(LOG_Info,"BeginGameByUI not implemented");
 		if (ResultPlayMode==PM_NONE) appError("Inconsistency");
 		return ResultPlayMode;
 		}
 	else
 		{
-		debugf(LOG_Net,"BeginGameByUI canceled");
+		debugf(LOG_Info,"BeginGameByUI canceled");
 		return PM_NONE;
 		};
-	UNGUARD("NManager::BeginGameByUI");
+	unguard;
 	};
 
 //
@@ -359,7 +356,7 @@ ENetworkPlayMode NManager::BeginGameByUI(char *ResultURL,NSocket **ClientSocket)
 //
 int NManager::RegisterDriver(NDriver *Driver)
 	{
-	GUARD;
+	guard(NManager::RegisterDriver);
 	AssertInitialized();
 	//
 	for (int i=0; i<MAX_DRIVERS; i++)
@@ -374,7 +371,7 @@ int NManager::RegisterDriver(NDriver *Driver)
 		};
 	appError ("Too many network drivers registered");
 	return 0;
-	UNGUARD("NManager::RegisterDriver");
+	unguard;
 	};
 
 //
@@ -382,10 +379,12 @@ int NManager::RegisterDriver(NDriver *Driver)
 //
 void NManager::UnregisterDriver(NDriver *Driver)
 	{
+	guard(NManager::UnregisterDriver);
 	for (int i=0; i<MAX_DRIVERS; i++)
 		{
 		if (Drivers[i]==Driver) Drivers[i]=NULL;
 		};
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
@@ -397,7 +396,7 @@ void NManager::UnregisterDriver(NDriver *Driver)
 //
 void NManager::Init()
 	{
-	GUARD;
+	guard(NManager::Init);
 	//
 	// Init net manager:
 	//
@@ -406,8 +405,6 @@ void NManager::Init()
 	//
 	Initialized=1;
 	Ticks=0;
-	//
-	GTaskManager->AddTask(this,NULL,GApp,PRIORITY_Realtime,TASK_NoUserKill);
 	//
 	// Init drivers:
 	//
@@ -423,15 +420,13 @@ void NManager::Init()
 	//
 	debugf(LOG_Init,"Networking initialized");
 	//
-	UNGUARD("NManager::Init");
+	unguard;
 	};
 
 void NManager::Exit()
 	{
-	GUARD;
+	guard(NManager::Exit);
 	AssertInitialized();
-	//
-	GTaskManager->KillTask(this);
 	//
 	// Shut down all drivers:
 	//
@@ -454,7 +449,7 @@ void NManager::Exit()
 	//
 	debugf(LOG_Exit,"Networking shut down");
 	//
-	UNGUARD("NManager::Exit");
+	unguard;
 	};
 
 //
@@ -464,7 +459,7 @@ void NManager::Exit()
 //
 int NManager::FindAvailableAd(char *LevelName)
 	{
-	GUARD;
+	guard(NManager::FindAvailableAd);
 	AssertInitialized();
 	//
 	AssertInitialized();
@@ -486,7 +481,7 @@ int NManager::FindAvailableAd(char *LevelName)
 	//
 	return i;
 	//
-	UNGUARD("NManager::GenericFindAvailableAd");
+	unguard;
 	};
 
 //
@@ -495,7 +490,7 @@ int NManager::FindAvailableAd(char *LevelName)
 //
 void NManager::DeleteAd(int ServerID)
 	{
-	GUARD;
+	guard(NManager::DeleteAd);
 	AssertInitialized();
 	//
 	if ((ServerID<=0) || (ServerID>=MAX_ACTIVE_LEVELS)) appErrorf("Invalid ServerID %i",ServerID);
@@ -504,7 +499,7 @@ void NManager::DeleteAd(int ServerID)
 	//
 	if (!Ad) appErrorf("ServerID %i is already empty",ServerID);
 	//
-	UNGUARD("NManager::GenericDeleteAd");
+	unguard;
 	};
 
 //
@@ -512,14 +507,14 @@ void NManager::DeleteAd(int ServerID)
 //
 void NManager::AssertValid()
 	{
-	GUARD;
+	guard(NManager::AssertValid);
 	AssertInitialized();
 	//
 	for (int i=0; i<MAX_DRIVERS; i++)
 		{
 		if (Drivers[i]) Drivers[i]->AssertValid();
 		};
-	UNGUARD("NManager::AssertValid");
+	unguard;
 	};
 
 //
@@ -527,33 +522,15 @@ void NManager::AssertValid()
 //
 int NManager::Exec(const char *Cmd,FOutputDevice *Out)
 	{
-	GUARD;
+	guard(NManager::Exec);
 	const char *Str = Cmd;
 	//
-	if (NetGetCMD(&Str,"STATUS"))
+	for (int i=0; i<MAX_DRIVERS; i++)
 		{
-		if (NetGetCMD(&Str,"NET") || !Str[0])
-			{
-			int n=0; for (int i=0; i<MAX_DRIVERS;       i++) if (Drivers[i]) n++;
-			int m=0; for (    i=0; i<MAX_ACTIVE_LEVELS; i++) if (Ads    [i]) m++;
-			//
-			Out->Logf("   NET - Ok: %i drivers, %i ads, %i ticks",n,m,Ticks);
-			//
-			if (Str[0]==0) goto PassToDrivers;
-			return 1;
-			}
-		else return 0;
-		}
-	else
-		{
-		PassToDrivers:
-		for (int i=0; i<MAX_DRIVERS; i++)
-			{
-			if (Drivers[i] && Drivers[i]->Exec(Cmd,Out)) return 1;
-			};
-		return 0; // Not executed
+		if (Drivers[i] && Drivers[i]->Exec(Cmd,Out)) return 1;
 		};
-	UNGUARD("NManager::Exec");
+	return 0; // Not executed
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
@@ -561,40 +538,15 @@ int NManager::Exec(const char *Cmd,FOutputDevice *Out)
 -----------------------------------------------------------------------------*/
 
 //
-// Shut down the generic internals of the network manager.
-// Retracts all still-active server ads from all drivers.
-// Shuts down all registered drivers.
-//
-void NManager::TaskExit()
-	{
-	GUARD;
-	UNGUARD("NManager::TaskExit");
-	};
-
-//
-// Return the status of the network manager task
-//
-char *NManager::TaskStatus(char *Name,char *Desc)
-	{
-	GUARD;
-	//
-	sprintf(Name,"NetManager");
-	sprintf(Desc,"");
-	return Name;
-	//
-	UNGUARD("NManager::TaskStatus");
-	};
-
-//
 // Network manager tick function.
 //
-void NManager::TaskTick()
+void NManager::Tick()
 	{
-	GUARD;
+	guard(NManager::Tick);
 	//
 	// Nothing to do..
 	//
-	UNGUARD("NManager::TaskTick");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
@@ -608,12 +560,12 @@ void NManager::TaskTick()
 //
 void NDriver::BeginAdvertising(NServerAd *Ad)
 	{
-	GUARD;
+	guard(NDriver::BeginAdvertising);
 	AssertInitialized();
 	//
 	// Default implementation does nothing
 	//
-	UNGUARD("NDriver::BeginAdvertising");
+	unguard;
 	};
 
 //
@@ -623,12 +575,12 @@ void NDriver::BeginAdvertising(NServerAd *Ad)
 //
 void NDriver::EndAdvertising(NServerAd *Ad)
 	{
-	GUARD;
+	guard(NDriver::EndAdvertising);
 	AssertInitialized();
 	//
 	// Default implementation does nothing
 	//
-	UNGUARD("NDriver::EndAdvertising");
+	unguard;
 	};
 
 //
@@ -636,7 +588,7 @@ void NDriver::EndAdvertising(NServerAd *Ad)
 //
 void NDriver::RemoveSocketFromList(NSocket *Socket)
 	{
-	GUARD;
+	guard(NDriver::EndAdvertising);
 	AssertInitialized();
 	//
 	for (int i=0; i<MAX_DRIVER_SOCKETS; i++)
@@ -648,8 +600,7 @@ void NDriver::RemoveSocketFromList(NSocket *Socket)
 			};
 		};
 	appError ("Socket not found");
-	//
-	UNGUARD("NDriver::RemoveSocketFromList");
+	unguard;
 	};
 
 //
@@ -658,7 +609,7 @@ void NDriver::RemoveSocketFromList(NSocket *Socket)
 //
 int NDriver::FindAvailableSocketIndex()
 	{
-	GUARD;
+	guard(NDriver::FindAvailableSocketIndex);
 	AssertInitialized();
 	//
 	for (int i=1; i<MAX_DRIVER_SOCKETS; i++)
@@ -666,8 +617,7 @@ int NDriver::FindAvailableSocketIndex()
 		if (!Sockets[i]) return i;
 		};
 	return 0; // No sockets are available
-	//
-	UNGUARD("NDriver::RemoveSocketFromList");
+	unguard;
 	};
 
 //
@@ -675,7 +625,7 @@ int NDriver::FindAvailableSocketIndex()
 //
 int NDriver::Init(char *ParamBuffer,char *ErrorMessage)
 	{
-	GUARD;
+	guard(NDriver::Init);
 	//
 	DriverDescription = "Uninitialized";
 	//
@@ -686,7 +636,7 @@ int NDriver::Init(char *ParamBuffer,char *ErrorMessage)
 	Initialized=1;
 	return 1;
 	//
-	UNGUARD("NDriver::Init");
+	unguard;
 	};
 
 //
@@ -696,7 +646,7 @@ int NDriver::Init(char *ParamBuffer,char *ErrorMessage)
 //
 void NDriver::Exit()
 	{
-	GUARD;
+	guard(NDriver::Exit);
 	AssertInitialized();
 	//
 	for (int i=0; i<MAX_DRIVER_SOCKETS; i++)
@@ -704,7 +654,7 @@ void NDriver::Exit()
 		if (Sockets[i]) Sockets[i]->Delete();
 		if (Sockets[i]) appError ("Socket failed to delete itself");
 		};
-	UNGUARD("NDriver::Exit");
+	unguard;
 	};
 
 //
@@ -713,8 +663,7 @@ void NDriver::Exit()
 //
 void NDriver::AssertValid()
 	{
-	GUARD;
-	//
+	guard(NDriver::AssertValid);
 	for (int i=0; i<MAX_DRIVER_SOCKETS; i++)
 		{
 		if (Sockets[i])
@@ -723,7 +672,7 @@ void NDriver::AssertValid()
 			if (Sockets[i]->Driver != this) appErrorf("Driver %s improperly linked to socket",DriverDescription);
 			};
 		};
-	UNGUARD("NDriver::AssertValid");
+	unguard;
 	};
 
 //
@@ -731,11 +680,11 @@ void NDriver::AssertValid()
 //
 int NDriver::Exec(const char *Cmd,FOutputDevice *Out)
 	{
-	GUARD;
+	guard(NDriver::Exec);
 	//
 	return 0;
 	//
-	UNGUARD("NDriver::Exec");
+	unguard;
 	};
 
 /*------------------------------------------------------------------------------
@@ -748,7 +697,7 @@ int NDriver::Exec(const char *Cmd,FOutputDevice *Out)
 //
 void MakeFullURL(const char *CurrentURL, const char *PossiblyRelativeURL, char *Result)
 	{
-	GUARD;
+	guard(MakeFullURL);
 	#if 0
 	//
 	char SourceURL[256];
@@ -772,13 +721,15 @@ void MakeFullURL(const char *CurrentURL, const char *PossiblyRelativeURL, char *
 		{
 		};
 	#endif
-	UNGUARD("MakeFullURL");
+	unguard;
 	};
 
 void ParseFullURL(char *SourceURL,EURLType *Type, char **URLName)
 	{
+	guard(ParseFullURL);
 	*Type    = URL_INVALID;
 	*URLName = SourceURL;
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
@@ -790,7 +741,7 @@ void ParseFullURL(char *SourceURL,EURLType *Type, char **URLName)
 //
 int UNNETWORK_API NetGetCMD (const char **Stream, const char *Match)
 	{
-	GUARD;
+	guard(NetGetCMD);
 	while ((**Stream==' ')||(**Stream==9)) (*Stream)++;
 	if (strnicmp(*Stream,Match,strlen(Match))==0)
 		{
@@ -807,7 +758,7 @@ int UNNETWORK_API NetGetCMD (const char **Stream, const char *Match)
 			};
 		}
 	else return 0; // No match
-	UNGUARD("NetGetCMD");
+	unguard;
 	};
 
 //
@@ -815,6 +766,7 @@ int UNNETWORK_API NetGetCMD (const char **Stream, const char *Match)
 //
 int UNNETWORK_API NetGrabSTRING(const char *&Str,char *Result, int MaxLen)
 	{
+	guard(NetGrabSTRING);
 	int Len=0;
 	while ((*Str==' ')||(*Str==9)) Str++;
 	while ((*Str) && (*Str!=' ') && (*Str!=9) && ((Len+1)<MaxLen))
@@ -823,6 +775,7 @@ int UNNETWORK_API NetGrabSTRING(const char *&Str,char *Result, int MaxLen)
 		};
 	Result[Len]=0;
 	return Len!=0;
+	unguard;
 	};
 
 /*------------------------------------------------------------------------------
@@ -831,8 +784,8 @@ int UNNETWORK_API NetGrabSTRING(const char *&Str,char *Result, int MaxLen)
 
 BOOL CALLBACK MainWizardDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
+	guard(MainWizardDialogProc);
 	static HWND hWndChild;
-	GUARD;
 	if (uMsg==WM_COMMAND) switch(LOWORD(wParam))
 		{
 		case IDCANCEL:
@@ -867,7 +820,7 @@ BOOL CALLBACK MainWizardDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM l
 		default:
 			return FALSE;
 		};
-	UNGUARD("MainWizardDialogProc");
+	unguard;
 	};
 
 /*------------------------------------------------------------------------------
@@ -876,8 +829,8 @@ BOOL CALLBACK MainWizardDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM l
 
 BOOL CALLBACK NetWizDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
+	guard(NetWizDialogProc);
 	static HWND hWndReturn;
-	GUARD;
 	if (uMsg==WM_COMMAND) switch(LOWORD(wParam))
 		{
 		case IDCANCEL:
@@ -942,7 +895,7 @@ BOOL CALLBACK NetWizDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 		default:
 			return FALSE;
 		};
-	UNGUARD("NetWizDialogProc");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
@@ -952,7 +905,7 @@ BOOL CALLBACK NetWizDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 BOOL CALLBACK JoinTypeDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
 	static HWND hWndReturn;
-	GUARD;
+	guard(JoinTypeDialogProc);
 	if (uMsg==WM_COMMAND) switch(LOWORD(wParam))
 		{
 		case IDCANCEL:
@@ -1026,7 +979,7 @@ BOOL CALLBACK JoinTypeDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 		default:
 			return FALSE;
 		};
-	UNGUARD("JoinTypeDialogProc");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
@@ -1035,8 +988,8 @@ BOOL CALLBACK JoinTypeDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 
 BOOL CALLBACK HostTypeDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
+	guard(HostTypeDialogProc);
 	static HWND hWndReturn;
-	GUARD;
 	if (uMsg==WM_COMMAND) switch(LOWORD(wParam))
 		{
 		case IDCANCEL:
@@ -1092,7 +1045,7 @@ BOOL CALLBACK HostTypeDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 		default:
 			return FALSE;
 		};
-	UNGUARD("HostTypeDialogProc");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------

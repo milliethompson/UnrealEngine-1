@@ -11,7 +11,6 @@
 #define IDP_OLE_INIT_FAILED             100
 #define IDS_ABOUTBOX                    101
 #define IDC_CAMERAZOOM                  101
-#define IDD_UNWN_DIALOG                 102
 #define IDC_BRUSHFREE                   102
 #define IDD_LOG                         102
 #define IDB_SPLASH                      103
@@ -57,6 +56,7 @@
 #define IDD_PROPERTIES                  157
 #define IDD_PROPERTIES_PREFERENCES      158
 #define IDD_SERVER                      159
+#define IDB_SPLASH2                     163
 #define IDD_ACTION_SELECTION            167
 #define IDR_COMBO_POPUP                 172
 #define IDD_KEYBOARD_KEY                174
@@ -452,12 +452,18 @@
 #define ID_DDMODE_7                     57645
 #define ID_DDMODE_8                     57646
 #define ID_DDMODE_9                     57647
+#define IDC_RATE11KHZ                   57648
+#define IDC_RATE22KHZ                   57649
+#define IDC_RATE44KHZ                   57650
+#define IDC_ENABLE_16BIT                57651
+#define IDC_MUSIC_DISABLE               57652
+#define IDC_SFX_DISABLE                 57653
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        157
+#define _APS_NEXT_RESOURCE_VALUE        164
 #define _APS_NEXT_COMMAND_VALUE         32850
 #define _APS_NEXT_CONTROL_VALUE         1021
 #define _APS_NEXT_SYMED_VALUE           113

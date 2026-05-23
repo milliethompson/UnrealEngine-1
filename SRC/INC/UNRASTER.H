@@ -29,60 +29,66 @@ public:
 		// Start and end points in array form.
 		TRasterPointT Point[2];
 	};
+
 	// Draw a flatshaded range of pixels.
-	inline void DrawFlatRange(const ICamera &Camera,RAINBOW_PTR CameraLine, BYTE Color, INT Start, INT End) const
+	void DrawFlatRange(const UCamera *Camera,RAINBOW_PTR CameraLine, BYTE Color, INT Start, INT End) const
 	{
 		INT Pixels = End - Start;
 		if( Pixels > 0)
 		{
-			if( Camera.ColorBytes==1 )
+			if( Camera->ColorBytes==1 )
 			{
 				CameraLine.PtrBYTE += Start;
 				while( Pixels-- > 0 )
 					*CameraLine.PtrBYTE++ = Color;
 			}
-			else if( Camera.ColorBytes==2 )
+			else if( Camera->ColorBytes==2 )
 			{
+				GGfx.DefaultPalette->Lock(LOCK_Read);
 				WORD HiColor = 
-					(Camera.Caps & CC_RGB565) 
-				?	GGfx.DefaultColors[Color].HiColor565()
-				:	GGfx.DefaultColors[Color].HiColor555();
+					(Camera->Caps & CC_RGB565) 
+				?	GGfx.DefaultPalette(Color).HiColor565()
+				:	GGfx.DefaultPalette(Color).HiColor555();
+				GGfx.DefaultPalette->Unlock(LOCK_Read);
 
 				CameraLine.PtrWORD += Start;
 				while( Pixels-- > 0 )
 					*CameraLine.PtrWORD++ = HiColor;
 			}
-			else if( Camera.ColorBytes==4)
+			else if( Camera->ColorBytes==4)
 			{
-				DWORD TrueColor = GGfx.DefaultColors[Color].TrueColor();
-
+				GGfx.DefaultPalette->Lock(LOCK_Read);
+				DWORD TrueColor = GGfx.DefaultPalette(Color).TrueColor();
 				CameraLine.PtrDWORD += Start;
 				while( Pixels-- > 0 )
 					*CameraLine.PtrDWORD++ = TrueColor;
+				GGfx.DefaultPalette->Unlock(LOCK_Read);
 			}
 		}
 	}
+
 	// Draw a flatshaded span.
-	inline void DrawFlatSpan(const ICamera &Camera,RAINBOW_PTR CameraLine, BYTE Color) const
+	void DrawFlatSpan(const UCamera *Camera,RAINBOW_PTR CameraLine, BYTE Color) const
 	{
 		DrawFlatRange(Camera,CameraLine,Color,Start.GetX(),End.GetX());
 	}
+
 	// Draw a flatshaded clipped span.
-	inline void DrawFlatSpanClipped
-		(
-		const ICamera &Camera,
+	void DrawFlatSpanClipped
+	(
+		const UCamera *Camera,
 		RAINBOW_PTR CameraLine,
 		BYTE Color,
 		FSpan *Span
-		) const
+	) const
 	{
 		INT StartX	= Start.GetX();
 		INT EndX    = End.GetX();
 
-		if ( EndX > StartX )
+		if( EndX > StartX )
 		{
 			// Draw all possibly visible spans.
-			while( (Span != NULL) && (Span->Start < EndX) )
+			while( Span!=NULL && Span->Start<EndX )
 			{
 				if( Span->End > StartX )
 				{
@@ -110,15 +116,15 @@ public:
 	TRasterLineT	Lines[1];
 
 	// Force the polygon to be facing the viewer.
-	inline void ForceForwardFace();
+	void ForceForwardFace();
 
 	// Draw the polygon flatshaded.
-	inline void DrawFlat(const ICamera &Camera,BYTE Color,FSpanBuffer *SpanBuffer);
+	void DrawFlat(const UCamera *Camera,BYTE Color,FSpanBuffer *SpanBuffer);
 
 	// Draw the polygon using the specified setup info.
-	inline void Draw
+	void Draw
 	(
-		const ICamera &Camera,
+		const UCamera *Camera,
 		FPolySpanTextureInfoBase &Info,
 		FSpanBuffer *SpanBuffer
 	);
@@ -126,31 +132,31 @@ public:
 template <class TRasterPointT,class TThisT> class TRasterSideSetup
 {
 public:
-	INT					DY;			// Y length
-	TThisT				*Next;		// Next side in list, NULL=none
-	TRasterPointT		P;			// Value at this point
-	TRasterPointT		DP;			// X-derivative at this point
+	INT					DY;			// Y length.
+	TThisT				*Next;		// Next side in list, NULL=none.
+	TRasterPointT		P;			// Value at this point.
+	TRasterPointT		DP;			// X-derivative at this point.
 };
 template <class TRasterSideSetupT, class TRasterLineT, class TRasterPolyT, class TThisT, class TTransformT> class TRasterSetup
 {
 public:
-	INT					StartY;		// Starting Y value
-	INT					EndY;		// Ending Y value + 1
-	VOID				*MemTop;	// Top of allocated memory
-	TRasterSideSetupT	*LeftSide;	// Left side rasterization setup, NULL = none
-	TRasterSideSetupT	*RightSide;	// Right side rasterization setup, NULL = none
-	FMemPool			*Mem;		// Memory pool
+	INT					StartY;		// Starting Y value.
+	INT					EndY;		// Ending Y value + 1.
+	TRasterSideSetupT	*LeftSide;	// Left side rasterization setup, NULL = none.
+	TRasterSideSetupT	*RightSide;	// Right side rasterization setup, NULL = none.
+	FMemStack			*Mem;		// Memory pool.
+	FMemMark			Mark;		// Top of memory pool marker.
 
 	// Functions.
-	inline void CalcBound(const TTransformT *Pts, INT NumPts, FScreenBounds &BoxBounds);
-	inline void Setup(const ICamera &Camera, const TTransformT *Pts, INT NumPts, FMemPool *MemPool);
-	inline void SetupCached(const ICamera &Camera, const TTransformT *Pts, INT NumPts, FMemPool *TempPool, FMemPool *CachePool, TRasterSideSetupT **Cache);
-	inline void Generate(TRasterPolyT *Raster) const;
-	inline void Release()
+	void CalcBound(const TTransformT *Pts, INT NumPts, FScreenBounds &BoxBounds);
+	void Setup(const UCamera *Camera, const TTransformT *Pts, INT NumPts, FMemStack *MemStack);
+	void SetupCached(const UCamera *Camera, const TTransformT *Pts, INT NumPts, FMemStack *TempPool, FMemStack *CachePool, TRasterSideSetupT **Cache);
+	void Generate(TRasterPolyT *Raster) const;
+	void Release()
 	{
-		GUARD;
-		Mem->Release(MemTop);
-		UNGUARD("TRasterSetup::Release");
+		guard("TRasterSetup::Release");
+		Mark.Pop();
+		unguard;
 	};
 };
 
@@ -162,20 +168,22 @@ class FRasterPoint
 {
 public:
 	INT X;
-	inline INT GetX() const {return X;};
+	INT GetX() const
+	{
+		return X;
+	}
 };
 class FRasterLine : public TRasterLine<FRasterPoint>
 {
 public:
-	inline void SetupSpan
+	void SetupSpan
 	(
 		FPolySpanTextureInfoBase &Info
 	)
-	{
-	}
-	inline void DrawSpan
+	{}
+	void DrawSpan
 	(
-		const ICamera &Camera,
+		const UCamera *Camera,
 		RAINBOW_PTR CameraLine,
 		FPolySpanTextureInfoBase &Info,
 		INT Line
@@ -183,9 +191,9 @@ public:
 	{
 		DrawFlatSpan(Camera,CameraLine,SelectColor);
 	}
-	inline void DrawSpanClipped
+	void DrawSpanClipped
 	(
-		const ICamera &Camera,
+		const UCamera *Camera,
 		RAINBOW_PTR CameraLine,
 		FPolySpanTextureInfoBase &Info,
 		INT Line,
@@ -194,7 +202,7 @@ public:
 	{
 		DrawFlatSpanClipped(Camera,CameraLine,SelectColor,Span);
 	}
-	inline INT IsBackwards()
+	INT IsBackwards()
 	{
 		return Start.X > End.X;
 	}
@@ -202,15 +210,15 @@ public:
 class FRasterSideSetup : public TRasterSideSetup<FRasterPoint,FRasterSideSetup>
 {
 public:
-	inline VOID SetupSide(const FTransform *P1, const FTransform *P2,INT NewY)
+	void SetupSide(const FTransform *P1, const FTransform *P2,INT NewY)
 	{
 		FLOAT YAdjust	= (FLOAT)(NewY+1) - P1->ScreenY;
 		FLOAT FloatDX 	= (P2->ScreenX - P1->ScreenX) / (P2->ScreenY - P1->ScreenY);
 
-		ftoi(DP.X,FloatDX);
-		ftoi(P.X,P1->ScreenX + FloatDX * YAdjust);
+		DP.X = ftoi(FloatDX);
+		P.X  = ftoi(P1->ScreenX + FloatDX * YAdjust);
 	}
-	inline void GenerateSide(FRasterLine *Line,INT Offset,INT TempDY) const
+	void GenerateSide(FRasterLine *Line,INT Offset,INT TempDY) const
 	{
 		INT TempFixX	= P.X;
 		INT TempFixDX	= DP.X;
@@ -259,11 +267,11 @@ public:
 			pop ebp				
 		}
 #else
-		while ( TempDY-- > 0 )
-		{
-			(Line++)->Point[Offset].X  = Unfix(TempFixX);
-			TempFixX += TempFixDX;
-		}
+	while ( TempDY-- > 0 )
+	{
+		(Line++)->Point[Offset].X  = Unfix(TempFixX);
+		TempFixX += TempFixDX;
+	}
 
 #endif
 	};
@@ -293,7 +301,7 @@ public:
 			INT		IntX;
 		};
 	};
-	inline INT GetX() const
+	INT GetX() const
 	{	
 		return ftoi(FloatX);
 	}
@@ -301,11 +309,11 @@ public:
 class FRasterTexLine : public TRasterLine<FRasterTexPoint>
 {
 public:
-	inline INT IsBackwards()
+	INT IsBackwards()
 	{
 		return Start.FloatX > End.FloatX;
 	}
-	inline void SetupSpan
+	void SetupSpan
 	(
 		FPolySpanTextureInfoBase &Info
 	)
@@ -323,56 +331,56 @@ public:
 
 		//optimize: Use IEEE fadd/fst trick and hand optimize this.
 		Start.Q =
-			(
+		(
 			((QWORD)(ftoi(Start.FloatG + XAdjust * FloatDG) & 0x3fff                 )) +
 			((QWORD)(ftoi(Start.FloatV + XAdjust * FloatDV) & ((1<<(Info.VBits+16))-1)) << 16) +
 			((QWORD)(ftoi(Start.FloatU + XAdjust * FloatDU) & 0xfffffffc              ) << (48-Info.UBits))
-			);
+		);
 		End.Q =
-			(
+		(
 			((QWORD)(ftoi(FloatDG) & 0xffff                 )) +
 			((QWORD)(ftoi(FloatDV) & ((1<<(Info.VBits+16))-1)) << 16) +
 			((QWORD)(ftoi(FloatDU) & 0xfffffffc              ) << (48-Info.UBits))
-			);
+		);
 		Start.IntX = StartX;
 		End.IntX   = EndX;
 	}
-	inline void DrawSpan
-		(
-		const ICamera &Camera,
-		RAINBOW_PTR CameraLine,
-		FPolySpanTextureInfoBase &Info,
-		INT Line
-		)
+	void DrawSpan
+	(
+		const UCamera				*Camera,
+		RAINBOW_PTR					CameraLine,
+		FPolySpanTextureInfoBase	&Info,
+		INT							Line
+	)
 	{
 		INT Pixels = End.IntX - Start.IntX;
-		if ( Pixels > 0 )
+		if( Pixels > 0 )
 		{
 			(Info.*Info.DrawFunc)
 			(
 				Start.Q,
 				End.Q, 
-				CameraLine.PtrBYTE + Start.IntX * Camera.ColorBytes, 
+				CameraLine.PtrBYTE + Start.IntX * Camera->ColorBytes, 
 				Pixels, 
 				Line 
 			);
 		}
 	}
-	inline void DrawSpanClipped
-		(
-		const ICamera &Camera,
+	void DrawSpanClipped
+	(
+		const UCamera *Camera,
 		RAINBOW_PTR CameraLine,
 		FPolySpanTextureInfoBase &Info,
 		INT Line,
 		FSpan *Span
-		) const
+	) const
 	{
 		INT StartX = Start.IntX;
 		INT EndX   = End.IntX;
-		if ( EndX > StartX )
+		if( EndX > StartX )
 		{
 			// Draw all possibly visible spans.
-			while( (Span != NULL) && (Span->Start < EndX) )
+			while( Span!=NULL && Span->Start<EndX )
 			{
 				if( Span->End > StartX )
 				{
@@ -384,7 +392,7 @@ public:
 						(
 							Start.Q,
 							End.Q,
-							CameraLine.PtrBYTE + StartX * Camera.ColorBytes,
+							CameraLine.PtrBYTE + StartX * Camera->ColorBytes,
 							Min( EndX, Span->End ) - StartX, 
 							Line
 						);
@@ -396,7 +404,7 @@ public:
 						(
 							Start.Q + (Span->Start-StartX) * End.Q,
 							End.Q,
-							CameraLine.PtrBYTE + Span->Start * Camera.ColorBytes,
+							CameraLine.PtrBYTE + Span->Start * Camera->ColorBytes,
 							Min( EndX, Span->End ) - Span->Start, 
 							Line
 						);
@@ -411,7 +419,7 @@ public:
 class FRasterTexSideSetup : public TRasterSideSetup<FRasterTexPoint,FRasterTexSideSetup>
 {
 public:
-	inline void SetupSide(const FTransTex *P1, const FTransTex *P2,INT NewY)
+	void SetupSide(const FTransTexture *P1, const FTransTexture *P2,INT NewY)
 	{
 		FLOAT FloatRDY		= 1.0 / (P2->ScreenY - P1->ScreenY);
 		FLOAT FloatYAdjust	= (FLOAT)(NewY+1) - P1->ScreenY;
@@ -419,14 +427,14 @@ public:
 		DP.FloatX 			= (P2->ScreenX  - P1->ScreenX ) * FloatRDY;
 		DP.FloatU			= (P2->U        - P1->U       ) * FloatRDY;
 		DP.FloatV			= (P2->V        - P1->V       ) * FloatRDY;
-		DP.FloatG			= (P2->G        - P1->G       ) * FloatRDY;
+		DP.FloatG			= (P2->Color.G  - P1->Color.G ) * FloatRDY;
 
 		P.FloatX			= P1->ScreenX  + DP.FloatX * FloatYAdjust;
 		P.FloatU			= P1->U        + DP.FloatU * FloatYAdjust;
 		P.FloatV			= P1->V        + DP.FloatV * FloatYAdjust;
-		P.FloatG			= P1->G        + DP.FloatG * FloatYAdjust;
+		P.FloatG			= P1->Color.G  + DP.FloatG * FloatYAdjust;
 	}
-	inline void GenerateSide(FRasterTexLine *Line,INT Offset,INT TempDY) const
+	void GenerateSide(FRasterTexLine *Line,INT Offset,INT TempDY) const
 	{
 #if ASM
 		FRasterTexPoint *Point		= &Line->Point[Offset];
@@ -434,7 +442,7 @@ public:
 		const FRasterTexPoint *LDP  = &DP;
 		__asm
 		{
-			// Optimization ideas by Erik de Nieve
+			// Optimization ideas by Erik de Nieve.
             mov edx,[TempDY]
             mov eax,[Point]
             mov ebx,[LP]
@@ -500,7 +508,7 @@ public:
 	}
 };
 class FRasterTexPoly  : public TRasterPoly<FRasterTexLine,FRasterTexPoint> {};
-class FRasterTexSetup : public TRasterSetup<FRasterTexSideSetup,FRasterTexLine,FRasterTexPoly,class FRasterTexSetup,FTransTex> {};
+class FRasterTexSetup : public TRasterSetup<FRasterTexSideSetup,FRasterTexLine,FRasterTexPoly,class FRasterTexSetup,FTransTexture> {};
 
 class FGlobalRaster
 {

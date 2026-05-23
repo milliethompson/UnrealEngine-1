@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnOutDev.cpp: Unreal FOutputDevice implementation
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -11,66 +11,70 @@
 #include "Unreal.h"
 
 /*-----------------------------------------------------------------------------
-	FOutputDevice implementation
+	FOutputDevice implementation.
 -----------------------------------------------------------------------------*/
 
 //
 // Print a message on the output device using LOG_Info type.
 //
-void FOutputDevice::Log(const char *Text)
-	{
-	GUARD;
-	Log(LOG_Info,Text);
-	UNGUARD("FOutputDevice::Log");
-	};
+int FOutputDevice::Log( const char *Text )
+{
+	guard(FOutputDevice::Log);
+
+	int Length = strlen(Text);
+	Write(Text,Length,LOG_Info);
+	return Length;
+
+	unguard;
+};
+
+//
+// Print a message on the output device using LOG_Info type.
+//
+int FOutputDevice::Log( ELogType MsgType, const char *Text )
+{
+	guard(FOutputDevice::Log);
+
+	int Length = strlen(Text);
+	Write(Text,Length,MsgType);
+	return Length;
+
+	unguard;
+};
 
 //
 // Print a message on the output device, variable parameters.
 //
-void VARARGS FOutputDevice::Logf(ELogType Event,const char *Fmt,...)
-	{
+int VARARGS FOutputDevice::Logf(ELogType Event,const char *Fmt,...)
+{
 	char TempStr[4096];
 	va_list  ArgPtr;
-	//
+
 	va_start (ArgPtr,Fmt);
 	vsprintf (TempStr,Fmt,ArgPtr);
 	va_end   (ArgPtr);
-	//
-	GUARD;
-	Log(Event,TempStr);
-	UNGUARD("FOutputDevice::Logf");
-	};
+
+	guard(FOutputDevice::Logf);
+	return Log(Event,TempStr);
+	unguard;
+}
 
 //
 // Print a message on the output device, variable parameters.
 //
-void VARARGS FOutputDevice::Logf(const char *Fmt,...)
-	{
+int VARARGS FOutputDevice::Logf(const char *Fmt,...)
+{
 	char TempStr[4096];
 	va_list  ArgPtr;
-	//
+
 	va_start (ArgPtr,Fmt);
 	vsprintf (TempStr,Fmt,ArgPtr);
 	va_end   (ArgPtr);
-	//
-	GUARD;
-	Log(LOG_Info,TempStr);
-	UNGUARD("FOutputDevice::Logf");
-	};
 
-//
-// Output device startup message.
-//
-void FOutputDevice::SpawnConsoleMessage()
-	{
-	GUARD;
-	//
-	Logf(CONSOLE_SPAWN_1);
-	Logf(CONSOLE_SPAWN_2);
-	Logf("");
-	//
-	UNGUARD("FOutputDevice::SpawnConsoleMessage");
-	};
+	guard(FOutputDevice::Logf);
+	return Log(LOG_Info,TempStr);
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
 	The End

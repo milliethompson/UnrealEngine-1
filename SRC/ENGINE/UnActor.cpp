@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnActor.cpp: AActor implementation
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -11,7 +11,106 @@
 #include "Unreal.h"
 
 /*-----------------------------------------------------------------------------
-	AActorHelper member functions
+	AActor object implementation.
+-----------------------------------------------------------------------------*/
+
+IMPLEMENT_CLASS(AActor);
+
+/*-----------------------------------------------------------------------------
+	Actor touch minions.
+-----------------------------------------------------------------------------*/
+
+//
+// Note that TouchActor has begin touching Actor.
+//
+// If an actor's touch list overflows, neither actor receives the
+// touch messages, as if they are not touching.
+//
+// This routine is reflexive.
+//
+// Handles the case of the first-notified actor changing its touch status.
+//
+void AActor::BeginTouch( AActor *Other )
+{
+	guard(AActor::BeginTouch);
+
+	// See if a touch slot is available in Actor.
+	int Available=-1;
+	for( int i=0; i<ARRAY_COUNT(Touching); i++ )
+	{
+		if( Touching[i] == NULL )
+			Available = i;
+		else if( Touching[i] == Other )
+			goto SkipActor;
+	}
+	if( Available >= 0 )
+	{
+		// Make Actor touch TouchActor.
+		Touching[Available] = Other;
+		Process( NAME_Touch, &PActor(Other) );
+
+		// See if first actor did something that caused an UnTouch.
+		if( Touching[Available] != Other )
+			return;
+	}
+	SkipActor:;
+
+	// See if a touch slot is available in TouchActor.
+	Available=-1;
+	for( i=0; i<ARRAY_COUNT(Other->Touching); i++ )
+	{
+		if( Other->Touching[i] == NULL )
+			Available=i;
+		else if( Other->Touching[i] == this )
+			goto SkipTouchActor;
+	}
+	if( Available >= 0 )
+	{
+		Other->Touching[Available] = this;
+		Other->Process( NAME_Touch, &PActor(this) );
+	}
+	SkipTouchActor:;
+
+	unguard;
+}
+
+//
+// Note that TouchActor is no longer touching Actor.
+//
+// If NoNotifyActor is specified, Actor is not notified but
+// TouchActor is (this happens during actor destruction).
+//
+void AActor::EndTouch( AActor *Other, BOOL NoNotifySelf )
+{
+	guard(AActor::EndTouch);
+
+	// Notify Actor.
+	for( int i=0; i<ARRAY_COUNT(Touching); i++ )
+	{
+		if( Touching[i] == Other )
+		{
+			Touching[i] = NULL;
+			if( !NoNotifySelf )
+				Process( NAME_UnTouch, &PActor(Other) );
+			break;
+		}
+	}
+
+	// Notify TouchActor.
+	for( i=0; i<ARRAY_COUNT(Other->Touching); i++ )
+	{
+		if( Other->Touching[i] == this )
+		{
+			Other->Touching[i] = NULL;
+			Other->Process( NAME_UnTouch, &PActor(this) );
+			break;
+		}
+	}
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	AActor member functions.
 -----------------------------------------------------------------------------*/
 
 //
@@ -19,30 +118,28 @@
 // position.  If Editor=1 and UnrealEd is active, snaps the brush to the
 // grid as needed.
 //
-void AActorBase::UpdateBrushPosition( ILevel *Level,INDEX iActor,int Editor )
+void AActor::UpdateBrushPosition( ULevel *Level,int Editor )
 {
-	guard(AActorBase::UpdateBrushPosition);
+	guard(AActor::UpdateBrushPosition);
 
-	if (IsBrush())
+	if( IsBrush() )
 	{
 		Brush->Location = Location;
-		Brush->Rotation = DrawRot;
+		Brush->Rotation = Rotation;
 
 		if (Editor && GEditor)
 		{
 			// Snap brush rotation and location to grid.
-			if (GEditor->Constraints.RotGridEnabled)
+			if( GEditor->Constraints.RotGridEnabled )
 			{
 				Brush->Rotation = Brush->Rotation.GridSnap(GEditor->Constraints.RotGrid);
 			}
-			if (GEditor->Constraints.GridEnabled)
+			if( GEditor->Constraints.GridEnabled )
 			{
 				Brush->Location = Brush->Location.GridSnap(GEditor->Constraints.Grid);
 			}
-			if (Level)
-			{
-				Level->SendMessage(iActor,ACTOR_PostEditMove,NULL);
-			}
+			if( Level )
+				Process( NAME_PostEditMove, NULL );
 		}
 		Brush->BuildBound(1);
 	}
@@ -52,221 +149,52 @@ void AActorBase::UpdateBrushPosition( ILevel *Level,INDEX iActor,int Editor )
 //
 // Returns 1 if the actor is a brush, 0 if not.
 //
-int AActorBase::IsBrush()
+int AActor::IsBrush()
 {
-	return (DrawType==DT_Brush) && (Brush!=NULL);
+	return DrawType==DT_Brush && Brush!=NULL;
 }
 
 //
 // Returns 1 if the actor is a moving brush, 0 if not.
 //
-int AActorBase::IsMovingBrush()
+int AActor::IsMovingBrush()
 {
-	return (DrawType==DT_Brush) && (Brush!=NULL);
-}
-
-//
-// Compute the actor's view coordinate system.  Upon return:
-//
-// Coords->XAxis points in the direction that the actor perceives as 'right'.
-// Coords->YAxis points in the direction that the actor perceives as 'down'.
-// Coords->ZAxis points in the direction that the actor perceives as 'forward'.
-//
-void AActorBase::GetViewCoords( FCoords *Coords ) const
-{
-	guard(AActorBase::GetViewCoords);
-
-	*Coords = GMath.CameraViewCoords;
-	Coords->DeTransformByRotation (ViewRot);
-
-	unguard;
-}
-
-//
-// Compute the actor's rendering coordinate system.
-//
-void AActorBase::GetDrawCoords(FCoords *Coords) const
-{
-	guard(AActorBase::GetDrawCoords);
-
-	*Coords = GMath.CameraViewCoords;
-	Coords->DeTransformByRotation (DrawRot);
-
-	unguard;
-}
-
-//
-// Transform a world point into a point relative to the actor.  
-// On return:
-//
-// LocalPoint.X indicates how far right the point is of the actor.
-// LocalPoint.Y indicates how far the point is below the actor.
-// LocalPoint.Z indicates how far ahead the point is of the actor.
-//
-void AActorBase::TransformPoint( FVector &LocalPoint, const FVector &WorldPoint )
-{
-	guard(AActorBase::TransformPoint);
-
-	FCoords Coords;
-	GetViewCoords(&Coords);
-
-	LocalPoint = WorldPoint;
-	LocalPoint.TransformVector(Coords);
-
-	unguard;
+	return DrawType==DT_Brush && Brush!=NULL;
 }
 
 /*-----------------------------------------------------------------------------
-	Initialization.
+	Relations.
 -----------------------------------------------------------------------------*/
 
 //
-// Initialize all root properties of an actor.
+// Change the actor's owner.
 //
-void AActorBase::Init(UClass *ThisClass)
+void AActor::SetOwner( AActor *NewOwner )
 {
-	guard(AActorBase::Init);
+	guard(AActor::SetOwner);
 
-	// Zero fill the actor.
-	mymemset(this,0,sizeof(AActor));
+	// Sets this actor's parent to the specified actor.
+	if( Owner != NULL )
+		Owner->Process( NAME_LostChild, &PActor(this) );
 
-	// Set its basic properties.
-	Class		= ThisClass;
-	Name		= NAME_NONE;
-	Event		= NAME_NONE;
-	iParent		= INDEX_NONE;
-	iTarget		= INDEX_NONE;
-	iWeapon		= INDEX_NONE;
-	iInventory	= INDEX_NONE;
-	BlitType	= BT_Normal;
-	DrawType	= DT_Sprite;
-	DrawScale	= 1.0;
-	Mass		= 200.0;
-	DefaultEdCategory	= NAME_NONE;
+	Owner = NewOwner;
 
-	// Set the pointers to its local and static data.
-	SetBinPointers(Class);
-
-	// Init touching records.
-	for (int i=0; i<MAX_TOUCHING_ACTORS; i++)
-		iTouchingActors[i] = INDEX_NONE;
+	if( Owner != NULL )
+		Owner->Process( NAME_GainedChild, &PActor(this) );
 
 	unguard;
 }
 
 //
-// Set the actor's private pointers.
+// Change the actor's floor.
 //
-void AActorBase::SetBinPointers(UClass *Class)
+void AActor::SetFloor( AActor *NewFloor )
 {
-	guard(AActorBase::SetBinPointers);
+	guard(AActor::SetFloor);
 
-	// Global data.
-	((AActor*)this)->Private.PropertyBins[0] = (BYTE *)this;
+	//todo!!
+	Floor = NewFloor;
 
-	// Static data.
-	((AActor*)this)->Private.PropertyBins[1] = (BYTE *)&Class->DefaultActor;
-
-	// Local data.
-	((AActor*)this)->Private.PropertyBins[2] = NULL;
-
-	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	Resource related functions.
------------------------------------------------------------------------------*/
-
-//
-// Call the callback with all names and resources referenced by the actor.  This
-// is used both by UClass's query functions and UActorList's query functions, since
-// they both contain actors.
-//
-void AActorBase::QueryReferences
-(
-	UResource			*Owner,
-	FResourceCallback	&Callback,
-	DWORD				ContextFlags,
-	INT					AllProperties
-)
-{
-	// Remember possibly-delinked class.
-	UClass *TrueClass;
-	guard(AActorBase::QueryReferences Setup);
-	{
-		if (Owner->Type==RES_ActorList)
-			TrueClass = (UClass *)Callback.GetActualResource(Owner,Class);
-		else
-			TrueClass = (UClass *)Owner;
-
-		// Set up property bins.
-		SetBinPointers(TrueClass);
-	}
-	unguard;
-
-	// Return all references according to class property list.
-	// Relies on the class's data being in place, but can not expect that the
-	// class's resources and names are linked.
-	guard(AActorBase::QueryReferences);
-
-	for (int i=0; i<TrueClass->Num; i++)
-	{
-		FClassProperty	*Property = &TrueClass->Element(i);
-
-		if( AllProperties || Property->IsPerActor() )
-		{
-			if ((Property->Type == CPT_Resource) && !(Property->Flags & CPF_NoSaveResource))
-			{
-				for (int j=0; j<Property->ArrayDim; j++)
-				{
-					Callback.Resource
-					(
-						Owner,
-						(UResource **)GetPropertyPtrFromClass(TrueClass,i,j),
-						ContextFlags
-					);
-				}
-			}
-			else if (Property->Type == CPT_Name)
-			{
-				for (int j=0; j<Property->ArrayDim; j++)
-				{
-					Callback.Name
-					(
-						Owner,
-						(FName *)GetPropertyPtrFromClass(TrueClass,i,j),
-						ContextFlags
-					);
-				}
-			}
-		}
-	}
-	unguardf(("(Ptr=%i, Name=%s)",(int)TrueClass,TrueClass->Name));
-}
-
-//
-// Called after loading an actor from disk.
-//
-void AActorBase::PostLoad( UResource *Owner, INT AllProperties )
-{
-	guard(AActorBase::PostLoad);
-
-	// Set up property bins.
-	SetBinPointers(Class);
-
-	// Fix up everything.
-	FClassProperty *Property = &Class->Element(0);
-	for (int j=0; j<Class->Num; j++)
-	{
-		if( (Property->Type == CPT_Resource)
-			&& (Property->Flags & CPF_NoSaveResource)
-			&& (AllProperties || Property->IsPerActor()) )
-		{
-			for( int k=0; k<Property->ArrayDim; k++ )
-				*(UResource **)GetPropertyPtr(j,k) = NULL;
-		}
-		Property++;
-	}
 	unguard;
 }
 

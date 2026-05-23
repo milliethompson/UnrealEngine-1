@@ -1,19 +1,17 @@
 /*=============================================================================
-	UnCache.cpp: FMemoryCache implementation.
+	UnCache.cpp: FMemCache implementation.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Notes:
-	You can't lock an object more than 126 times. If you do, the lock count
+	You can't apply more than 126 locks to an object. If you do, the lock count
 	overflows and you'll get a "not locked" error when unlocking.
 
 Revision history:
 	* Initially implementated by Mark Randell.
 	* Rewritten by Tim Sweeney (speed, speed, speed!)
 =============================================================================*/
-
-#define CHECK_ALL /* Turn on all checks for development */
 
 #include "Unreal.h"
 
@@ -24,9 +22,15 @@ Revision history:
 //
 // Init the memory cache.
 //
-void FMemoryCache::Init( int BytesToAllocate, int MaxItems )
+void FMemCache::Init
+(
+	int		BytesToAllocate,	// Number of bytes for the cache.
+	int		MaxItems,			// Maximum cache items to track.
+	void	*Start,				// Start of preallocated cache memory, NULL=allocate it.
+	int		SegmentSize			// Size of segment boundary, or 0=unsegmented.
+)
 {
-	guard(FMemoryCache::Init);
+	guard(FMemCache::Init);
 	checkState( Initialized==0 );
 
 	// Remember totals.
@@ -34,10 +38,12 @@ void FMemoryCache::Init( int BytesToAllocate, int MaxItems )
 	ItemsTotal = MaxItems;
 
 	// Allocate cache memory.
-	CacheMemory = (BYTE *)appMallocAligned( BytesToAllocate, DEFAULT_ALIGNMENT, "CacheMemory" );
+	if( Start )	CacheMemory = (BYTE *)Start;
+	else		CacheMemory = (BYTE *)appMalloc( BytesToAllocate, "CacheMemory" );
 
 	// Allocate item tracking memory.
-	UnusedItemMemory = (FCacheItem *)appMallocAligned( MaxItems*sizeof(FCacheItem), 32, "CacheItems" );
+	ItemMemory       = appMalloc( MaxItems*sizeof(FCacheItem)+CACHE_LINE_SIZE-1, "CacheItems" );
+	UnusedItemMemory = (FCacheItem *)Align(ItemMemory,(int)CACHE_LINE_SIZE);
 
 	// Build linked list of items not associated with cache memory.
 	FCacheItem **PrevLink = &UnusedItems;
@@ -48,14 +54,35 @@ void FMemoryCache::Init( int BytesToAllocate, int MaxItems )
 	}
 	*PrevLink = NULL;
 
-	// Mark the first item unused and associate it with entire cache memory.
-	CreateNewFreeSpace
-	(
-		CacheMemory,
-		CacheMemory + BytesToAllocate,
-		NULL,
-		NULL
-	);
+	// Create one or more segments of free space in the cache memory.
+	if( SegmentSize==0 )
+	{
+		CreateNewFreeSpace
+		(
+			CacheMemory,
+			CacheMemory + BytesToAllocate,
+			NULL,
+			NULL,
+			0
+		);
+	}
+	else
+	{
+		FCacheItem *Prev=NULL;
+		for( int Segment = 0; Segment * SegmentSize < BytesToAllocate; Segment++ )
+		{
+			FCacheItem *ThisItem = UnusedItems;
+			CreateNewFreeSpace
+			(
+				CacheMemory + Segment * SegmentSize,
+				CacheMemory + Segment * SegmentSize + Min(SegmentSize,BytesToAllocate - Segment * SegmentSize),
+				Prev,
+				NULL,
+				Segment
+			);
+			Prev = ThisItem;
+		}
+	}
 
 	// Init the hash table to empty since no items are used.
 	for( i=0; i<HASH_COUNT; i++ )
@@ -70,17 +97,17 @@ void FMemoryCache::Init( int BytesToAllocate, int MaxItems )
 //
 // Shut down the memory cache.
 //
-void FMemoryCache::Exit()
+void FMemCache::Exit( int FreeMemory )
 {
-	guard(FMemoryCache::Exit);
+	guard(FMemCache::Exit);
 	CheckState();
 
 	// Release all memory.
-	appFree( UnusedItemMemory );
-	appFree( CacheMemory );
+	appFree( ItemMemory );
+	if( FreeMemory ) appFree( CacheMemory );
 
 	// Success.
-	Initialized=0;
+	Initialized = 0;
 	unguard;
 }
 
@@ -92,9 +119,9 @@ void FMemoryCache::Exit()
 // Merge a cache item and its immediate successor into one
 // item, and remove the second. Returns the new merged item.
 //
-FMemoryCache::FCacheItem *FMemoryCache::MergeWithNext( FCacheItem *First )
+FMemCache::FCacheItem *FMemCache::MergeWithNext( FCacheItem *First )
 {
-	guard(FMemoryCache::AttemptToMerge);
+	guard(FMemCache::MergeWithNext);
 
 	// Sanity check.
 	checkInput( First != NULL );
@@ -128,26 +155,26 @@ FMemoryCache::FCacheItem *FMemoryCache::MergeWithNext( FCacheItem *First )
 // Flush a cache item and return the one immediately
 // following it in memory, or NULL if at end.
 //
-FMemoryCache::FCacheItem *FMemoryCache::FlushItem( FCacheItem *Item )
+FMemCache::FCacheItem *FMemCache::FlushItem( FCacheItem *Item )
 {
-	guard(FMemoryCache::FlushItem);
+	guard(FMemCache::FlushItem);
 	debugInput( Item != NULL );
 	debugInput( Item->Id != 0 );
 
 	// Flushing a locked object is a critical error.
 	if( Item->Cost >= COST_INFINITE ) 
-		appError( "Flushed a locked cache object ");
+		appErrorf( "Flushed locked cache object %x", Item->Id );
 
 	// Flush this one item.
 	Item->Id	= 0;
 	Item->Cost	= 0;
 
 	// If previous item is free space, merge with it.
-	if( Item->LinearPrev && Item->LinearPrev->Id==0 )
+	if( Item->LinearPrev && Item->LinearPrev->Id==0 && Item->Segment==Item->LinearPrev->Segment )
 		Item = MergeWithNext( Item->LinearPrev );
 
 	// If next item is free space, merge with it.
-	if( Item->LinearNext && Item->LinearNext->Id==0 )
+	if( Item->LinearNext && Item->LinearNext->Id==0 && Item->Segment==Item->LinearNext->Segment )
 		Item = MergeWithNext( Item );
 
 	return Item->LinearNext;
@@ -157,9 +184,9 @@ FMemoryCache::FCacheItem *FMemoryCache::FlushItem( FCacheItem *Item )
 //
 // Make sure the state is valid.
 //
-void FMemoryCache::CheckState()
+void FMemCache::CheckState()
 {
-	guard(FMemoryCache::CheckState);
+	guard(FMemCache::CheckState);
 
 	// Make sure we're initialized.
 	checkState( Initialized == 1 );
@@ -168,7 +195,7 @@ void FMemoryCache::CheckState()
 	checkState( CacheItems != NULL );
 
 	// Init stats.
-	INT ItemCount=0, UsedItemCount=0, WasFree=0, HashCount=0, MemoryCount=0;
+	INT ItemCount=0, UsedItemCount=0, WasFree=0, HashCount=0, MemoryCount=0, PrevSegment=-1;
 	BYTE *ExpectedPointer = CacheMemory;
 
 	// Traverse all cache items.
@@ -188,10 +215,11 @@ void FMemoryCache::CheckState()
 		ItemCount++;
 
 		// Make sure that free items aren't contiguous.
-		if( Item->Id == 0 )
+		if( Item->Id==0 && Item->Segment==PrevSegment )
 			checkState( !WasFree );
 
-		WasFree = (Item->Id == 0);
+		WasFree     = (Item->Id == 0);
+		PrevSegment = Item->Segment;
 
 		// Verify previous link.
 		if( Item != CacheItems )
@@ -253,27 +281,28 @@ void FMemoryCache::CheckState()
 // If either of Next or Prev are free space, simply merges
 // and does not create a new item.
 //
-void FMemoryCache::CreateNewFreeSpace
+void FMemCache::CreateNewFreeSpace
 (
 	BYTE		*Start, 
 	BYTE		*End, 
 	FCacheItem	*Prev, 
-	FCacheItem	*Next 
+	FCacheItem	*Next,
+	INT			Segment
 )
 {
-	guard(FMemoryCache::CreateNewFreeSpace);
+	guard(FMemCache::CreateNewFreeSpace);
 
 	// Make sure parameters are valid.
 	debugInput( Start >= CacheMemory );
 	debugInput( End <= (CacheMemory + MemTotal) );
 	debugInput( Start < End );
 
-	if( Prev && Prev->Id==0 )
+	if( Prev && Prev->Id==0 && Prev->Segment==Segment )
 	{
 		// The previous item is free space, so merge with it.
 		Prev->Size += End-Start;
 	}
-	else if( Next && Next->Id==0 )
+	else if( Next && Next->Id==0 && Next->Segment==Segment )
 	{
 		// The next item is free space, so merge with it.
 		Next->Size += End-Start;
@@ -290,6 +319,7 @@ void FMemoryCache::CreateNewFreeSpace
 
 		// Create the free space item.
 		Item->Data			= Start;
+		Item->Segment		= Segment;
 		Item->Time			= 0;
 		Item->Id			= 0;
 		Item->Size			= End - Start;
@@ -319,9 +349,9 @@ void FMemoryCache::CreateNewFreeSpace
 // If Mask=~0, flush exactly Id.
 // Otherwise flush all Ids for which (TestId&Mask)==Id.
 //
-void FMemoryCache::Flush( DWORD Id, DWORD Mask )
+void FMemCache::Flush( DWORD Id, DWORD Mask )
 {
-	guard(FMemoryCache::Flush);
+	guard(FMemCache::Flush);
 
 	if( Id == 0 )
 		// Flush all items.
@@ -386,20 +416,22 @@ void FMemoryCache::Flush( DWORD Id, DWORD Mask )
 //
 // This is O(num_items_in_cache), sacrificing some speed in the
 // name of better cache efficiency. However there aren't any really
-// good algorithms for this kind of routine where the priorities
-// change so often.
+// good algorithms for priority queues where most priorities change
+// every iteration this that I'm aware of.
 //
-BYTE *FMemoryCache::Create
+BYTE *FMemCache::Create
 (
 	DWORD		Id, 
 	FCacheItem	*&Item, 
 	INT			CreateSize, 
-	INT			Alignment
+	INT			Alignment,
+	INT			MaxCreateSize
 )
 {
-	guard(FMemoryCache::Create);
+	guard(FMemCache::Create);
 	clock(CreateTime);
 	checkInput( CreateSize > 0 );
+	checkInput( MaxCreateSize==0 || MaxCreateSize>=CreateSize );
 	checkInput( Id != 0 );
 	NumCreates++;
 
@@ -410,19 +442,19 @@ BYTE *FMemoryCache::Create
 
 	// Iterate through items. Find shortest contiguous sets of items
 	// which contain enough space for this entry. Evaluate the sum cost
-	// for each potential set, remembering the best cost.
+	// for each set, remembering the best cost.
 	FCacheItem *First = CacheItems;
 	INT        Cost=0, Size=0;
 	for( FCacheItem *Last = CacheItems; Last; Last = Last->LinearNext )
 	{
-		// Add the cost and size of new Last element to our accumulator:
+		// Add the cost and size of new Last element to our accumulator.
 		Cost += Last->Cost;
 		Size += Last->Size;
 
 		// While the interval from First to Last (inclusive) contains
 		// enough space for the item we're creating, consider it as a
 		// candidate, and go to the next First.
-		while( First && (Size + First->Data - Align(First->Data,Alignment) >= CreateSize))
+		while( First && (Size + First->Data - Align(First->Data,Alignment) >= CreateSize) )
 		{
 			// Is this the best solution so far?
 			if( Cost < BestCost )
@@ -445,7 +477,13 @@ BYTE *FMemoryCache::Create
 	if( BestFirst == NULL )
 	{
 		// Critical error: the item can't fit in the cache.
-		appErrorf( "Create failed: %i, %i", Size, Alignment );
+		int ItemsLocked=0, BytesLocked=0;
+		for( Last = CacheItems; Last; Last = Last->LinearNext )
+		{
+			ItemsLocked += (Last->Cost >= COST_INFINITE);
+			BytesLocked += (Last->Size);
+		}
+		appErrorf( "Create %08x failed: Size=%i Align=%i NumLocked=%i BytesLocked=%i", Id, Size, Alignment, ItemsLocked, BytesLocked );
 	}
 
 	// Merge all items from Start to End into one bigger item,
@@ -459,11 +497,16 @@ BYTE *FMemoryCache::Create
 
 	// Now we have a big free memory block from BestFirst->Data to 
 	// BestFirst->Data + BestFirst->Size.
-	BYTE *Result = Align(BestFirst->Data,Alignment);
+	BYTE *Result = Align( BestFirst->Data, Alignment );
 	debugLogic( Result + CreateSize <= BestFirst->Data + BestFirst->Size );
 	debugLogic( ((int)Result & (Alignment-1)) == 0 );
 
-	// Claim BestFirst for the block we're creating.
+	// If a nonzero MaxCreateSize was specified, the caller wants to take
+	// more than CreateSize bytes of memory if it's available.
+	if( MaxCreateSize )
+		CreateSize = Min(MaxCreateSize, BestFirst->Size - (Result - BestFirst->Data) );
+
+	// Claim BestFirst for the block we're creating, and lock it.
 	BestFirst->Time = Time;
 	BestFirst->Id   = Id;
 	BestFirst->Cost = CreateSize + COST_INFINITE;
@@ -481,7 +524,8 @@ BYTE *FMemoryCache::Create
 			Result + CreateSize, 
 			BestFirst->Data + BestFirst->Size,
 			BestFirst,
-			BestFirst->LinearNext
+			BestFirst->LinearNext,
+			BestFirst->Segment
 		);
 
 		// Chop the new free space off this item.
@@ -496,7 +540,8 @@ BYTE *FMemoryCache::Create
 			BestFirst->Data, 
 			Result,
 			BestFirst->LinearPrev,
-			BestFirst
+			BestFirst,
+			BestFirst->Segment
 		);
 
 		// Chop the new free space off this item.
@@ -507,8 +552,8 @@ BYTE *FMemoryCache::Create
 	// Set the resulting Item.
 	Item = BestFirst;
 
-	unclock(CreateTime);
 	ConditionalCheckState();
+	unclock(CreateTime);
 	return Result;
 	unguard;
 }
@@ -520,10 +565,10 @@ BYTE *FMemoryCache::Create
 //
 // Handle time passing.
 //
-void FMemoryCache::Tick()
+void FMemCache::Tick()
 {
-	guard(FMemoryCache::Tick);
-	CheckState();
+	guard(FMemCache::Tick);
+	ConditionalCheckState();
 
 	// Init memory stats.
 	MemFresh = MemStale = 0;
@@ -558,6 +603,7 @@ void FMemoryCache::Tick()
 			}
 		}
 	}
+
 	// Update the cache's time.
 	Time++;
 	unguard;
@@ -570,17 +616,20 @@ void FMemoryCache::Tick()
 //
 // Write useful human readable performance stats into a string.
 //
-void FMemoryCache::Status( char *StatusText )
+void FMemCache::Status( char *StatusText )
 {
 	// Display stats.
-	sprintf( StatusText, "Gets=%04i Crts=%03i Msec=%05.1f Fresh=%03i%% Stale=%03i%% Items=%03i",
+	sprintf
+	(
+		StatusText, 
+		"Gets=%04i Crts=%03i Msec=%05.1f Fresh=%03i%% Stale=%03i%% Items=%03i",
 		NumGets,
 		NumCreates,
 		GApp->CpuToMilliseconds(CreateTime),
 		(MemFresh*100)/MemTotal,
 		(MemStale*100)/MemTotal,
 		ItemsFresh
-		);
+	);
 	// Reinitialize time-variant stats.
 	NumGets = NumCreates = CreateTime = 0;
 }
@@ -588,8 +637,9 @@ void FMemoryCache::Status( char *StatusText )
 //
 // Draw the cache layout to a frame buffer.
 //
-void FMemoryCache::DrawCache( BYTE *Dest, int XR, int YR, int ColorBytes )
+void FMemCache::DrawCache( BYTE *Dest, int XR, int YR, int ColorBytes )
 {
+	// Make sure the frame buffer is large enough.
 	if( !XR || YR<8)
 		return;
 
@@ -599,18 +649,10 @@ void FMemoryCache::DrawCache( BYTE *Dest, int XR, int YR, int ColorBytes )
 	// Draw all cache items.
 	for( FCacheItem *Item = CacheItems; Item; Item = Item->LinearNext )
 	{
-		FLOAT Next = (FLOAT) ColorBytes * (Item->Data + Item->Size - CacheMemory) / Factor;
-
-		BYTE B;		
-		if		( Item->Id == 0 )			B = 255;
-		else if ((Time - Item->Time) <= 1 )	B = 32;
-		else								B = 150;
-
-		while( Current < Next )
-		{
+		FLOAT Next = (FLOAT)ColorBytes * (Item->Data + Item->Size - CacheMemory) / Factor;
+		BYTE  B    = (Item->Id==0) ? 255 : ((Time-Item->Time) <= 1) ? 32 : 150;
+		for( Current; Current<Next; Current+=1.0 )
 			*Dest++ = B;
-			Current+=1.0;
-		}
 	}
 }
 

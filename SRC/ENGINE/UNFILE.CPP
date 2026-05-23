@@ -1,172 +1,244 @@
 /*=============================================================================
    UnFile.cpp: Various file-management functions.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
 		* Created by Tim Sweeney
 =============================================================================*/
 
-#include "UnPort.h"
-#include "UnFile.h"
+#include "Unreal.h"
 
 #ifdef __MSVC__
 	#include <direct.h>
 #endif
 
 /*-----------------------------------------------------------------------------
-   fsize: Size of a file.  Returns -1 if doesn't exist.
-   This is a good function to tell whether a file exists.
+	File functions.
 -----------------------------------------------------------------------------*/
 
-long fsize (const char *fname)
-	{
+//
+// Size of a file.  Returns -1 if doesn't exist.
+//
+long fsize( const char *fname )
+{
+	guard(fsize);
+
 	FILE *f;
 	long result;
-	//
-	f=fopen(fname,"rb");
+
+	f = fopen(fname,"rb");
 	if (f==NULL) return -1;
-	//
-	if (fseek(f,0,SEEK_END)!=0)
-		{
+
+	if( fseek(f,0,SEEK_END) != 0 )
+	{
 		fclose (f);
 		return -1;
-		};
-	result=ftell(f);
+	}
+	result = ftell(f);
+
 	fclose (f);
 	return result;
-	};
+	unguard;
+}
 
-/*-----------------------------------------------------------------------------
-   fdelete: Deletes a file
-   Returns: 0 if success, nonzero if error.
------------------------------------------------------------------------------*/
-
-int fdelete (const char *fname)
-	{
+//
+// Delete a file, return 0 if success, nonzero if error.
+//
+int fdelete( const char *fname )
+{
+	guard(fdelete);
 	return (unlink(fname));
-	};
+	unguard;
+}
 
-/*-----------------------------------------------------------------------------
-   frename: Renames a file
-   Returns: 0 if success, nonzero if error.
------------------------------------------------------------------------------*/
-
-int frename (const char *oldname, const char *newname)
-	{
+//
+// Rename a file, return 0 if success, nonzero if error.
+//
+int frename( const char *oldname, const char *newname )
+{
+	guard(frename);
 	return (rename(oldname,newname));
-	};
+	unguard;
+}
 
-/*-----------------------------------------------------------------------------
-   fgetdir: Gets the name of the current working directory
-   example: "C:\UNREAL\"
------------------------------------------------------------------------------*/
-
-char *fgetdir(char *dir)
-	{
+//
+// Gets the name of the current working directory. Example: "C:\UNREAL\".
+//
+char *fgetdir( char *dir )
+{
+	guard(fgetdir);
 	_getcwd(dir,256);
 	strcat (dir,"\\");
 	return dir;
-	};
+	unguard;
+}
 
-/*-----------------------------------------------------------------------------
-   fsetdir: Sets the current working drive and/or directory.
-   Returns 0 if ok, nonzero if error.
-   This will accept directories like either "C:\UNREAL\" or "C:\UNREAL".
------------------------------------------------------------------------------*/
-
-int fsetdir(const char *dir)
-	{
+//
+// Sets the current working drive and/or directory.
+// Returns 0 if ok, nonzero if error.
+// This will accept directories like either "C:\UNREAL\" or "C:\UNREAL".
+//
+int fsetdir( const char *dir )
+{
+	guard(fsetdir);
 	char temp[256];
 	char *newdir;
 	int i;
-	//
+
 	strcpy(temp,dir); newdir=temp;
 	i=strlen(newdir)-1;
-	if (i>0) if (newdir[i]=='\\') newdir[i]='\0';
-	if (*newdir) {
-		if (newdir[1]==':') {
-			newdir+=2;
-			};
-		}
-	if (!*newdir) return 0;
-	return (_chdir (newdir));
-	};
 
-/*-----------------------------------------------------------------------------
-   fmkdir: Makes a directory
-   Returns 0 if ok, nonzero if error.
------------------------------------------------------------------------------*/
+	if( i>0 && newdir[i]=='\\' )
+		newdir[i]='\0';
 
-int fmkdir (const char *dir)
-	{
+	if( *newdir && newdir[1]==':' )
+		newdir+=2;
+
+	if( !*newdir )
+		return 0;
+	else
+		return _chdir (newdir);
+	unguard;
+}
+
+//
+// Make a directory. Returns 0 if ok, nonzero if error.
+//
+int fmkdir( const char *dir )
+{
+	guard(fmkdir);
 	return _mkdir(dir);
-	};
+	unguard;
+}
 
-/*-----------------------------------------------------------------------------
-   fext: Gets the extension of a file, such as "H".  Returns NULL if none.
-   string if there's no extension.
------------------------------------------------------------------------------*/
+//
+// Gets the extension of a file, such as "PCX".  Returns NULL if none.
+// string if there's no extension.
+//
+const char *fext( const char *fname )
+{
+	guard(fext);
 
-const char *fext(const char *fname)
-	{
-	if (strchr(fname,':'))		fname = strchr(fname,':')+1;
-	while (strchr(fname,'/'))	fname = strchr(fname,'/')+1;
-	do	{
+	if( strchr(fname,':') )
+		fname = strchr(fname,':')+1;
+
+	while( strchr(fname,'/') )
+		fname = strchr(fname,'/')+1;
+
+	do
 		fname = strchr(fname,'.')+1;
-		} while (fname && strchr(fname,'.'));
+	while (fname && strchr(fname,'.'));
+
 	return fname;
-	};
+	unguard;
+}
 
-/*-----------------------------------------------------------------------------
-   fgetstartupdir: Returns the directory that the program was run from.
-   Example of directory: "C:\UNREAL\"
------------------------------------------------------------------------------*/
-
-void fgetstartupdir (char *run_path)
-	{
+//
+// Returns the directory that the program was run from.
+// Example of directory: "C:\UNREAL\".
+//
+void fgetstartupdir( char *run_path )
+{
+	guard(fgetstartupdir);
 	strcpy(run_path,"");
-	};
+	unguard;
+}
 
-/*-----------------------------------------------------------------------------
-   mystrncpy: Copy a string with length checking
------------------------------------------------------------------------------*/
+//
+// Copy a string with length checking.
+//
+char *mystrncpy( char *dest, const char *src, int maxlen )
+{
+	guard(mystrncpy);
 
-char *mystrncpy (char *dest, const char *src, int maxlen)
-	{
 	strncpy(dest,src,maxlen);
 	dest[maxlen-1]=0;
 	return dest;
-	};
 
-/*-----------------------------------------------------------------------------
-   mystrncpy: Concatenate a string with length checking
------------------------------------------------------------------------------*/
+	unguard;
+}
 
-char *mystrncat (char *dest, const char *src, int maxlen)
-	{
+//
+// Concatenate a string with length checking
+//
+char *mystrncat( char *dest, const char *src, int maxlen )
+{
+	guard(mystrncat);
+
 	char *newdest;
 	int  len;
-	//
+
 	len      = strlen(dest);
 	maxlen  -= len;
 	newdest  = dest+len;
-	//
-	if (maxlen>0)
-		{
+
+	if( maxlen > 0 )
+	{
 		strncpy(newdest,src,maxlen);
 		newdest[maxlen-1]=0;
-		};
+	}
 	return dest;
-	};
+	unguard;
+}
+
+//
+// Find string in string, case insensitive, requires non-alphanumeric lead-in
+//
+const char *mystrstr( const char *str, const char *find )
+{
+	guard(mystrstr);
+	
+	int alnum,length;
+	char f,c;
+
+	alnum  = 0;
+	f      = toupper(*find);
+	length = strlen(find)-1;
+	find   ++;
+	c      = *str++;
+	while( c )
+	{
+		c = toupper(c);
+		if ((!alnum) && (c==f) && !strnicmp(str,find,length)) return str-1;
+		alnum = ((c>='A')&&(c<='Z')) || ((c>='0')&&(c<='9'));
+		c = *str++;
+	}
+	return NULL;
+	unguard;
+}
+
+//
+// Returns a certain number of spaces.
+// Only one return value is valid at a time.
+//
+const char *spc( int num )
+{
+	guard(spc);
+
+	static char spacing[256];
+	static int  oldnum=-1;
+
+	if (num!=oldnum)
+	{
+		memset( spacing,' ',num );
+		spacing [num]=0;
+		oldnum=num;
+	}
+	return spacing;
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-   strcrc: Compute the 32-bit CRC of a data buffer
+	CRC and hashing.
 -----------------------------------------------------------------------------*/
 
-unsigned long CRCTable[256] =
-	{
+//
+// CRC table.
+//
+UNENGINE_API DWORD GCRCTable[256] =
+{
     0x00000000,  0x77073096, 0x0EE0E612C,  0x990951BA,
     0x076DC419,  0x706AF48F, 0x0E963A535,  0x9E6495A3,
     0x0EDB8832,  0x79DCB8A4, 0x0E0D5E91E,  0x97D2D988,
@@ -231,209 +303,40 @@ unsigned long CRCTable[256] =
     0x0BAD03605, 0x0CDD70693, 0x54DE5729,  0x23D967BF,
     0x0B3667A2E, 0x0C4614AB8, 0x5D681B02,  0x2A6F2B94,
     0x0B40BBE37, 0x0C30C8EA1, 0x5A05DF1B,  0x2D02EF8D
-	};
+};
 
 //
 // CRC32 computer based on polynomial:
-// x^32+x^26+x^23+x^22+x^16+x^12+x^11+x^10+x^8+x^7+x^5+x^4+x^2+x+1
+// x^32+x^26+x^23+x^22+x^16+x^12+x^11+x^10+x^8+x^7+x^5+x^4+x^2+x+1.
 //
-unsigned long strcrc (const unsigned char *Data, int Length)
+unsigned long memcrc( const unsigned char *Data, int Length )
+{
+	guard(memcrc);
+	unsigned long CRC = 0xFFFFFFFF;
+	for( int i=0; i<Length; i++ )
 	{
-	unsigned long CRC, Index;
-	int i;
-	//
-	CRC = 0xFFFFFFFF;
-	for (i=0; i<Length; i++)
-		{
-		Index = (CRC ^ *(Data++)) & 0x000000FF;
-		CRC   = ((CRC >> 8) & 0x00FFFFFF) ^ CRCTable[Index];
-		};
+		int Index = (CRC ^ *(Data++)) & 0x000000FF;
+		CRC       = ((CRC >> 8) & 0x00FFFFFF) ^ GCRCTable[Index];
+	}
 	return ~CRC;
-	};
-
-unsigned long strhash (char *Data, int NumKeys)
-	{
-	return strcrc((unsigned char *)Data,strlen(Data)) % NumKeys;
-	};
-
-inline char UPPER(char c) {return ((c<'a')||(c>'z')) ? c : (c+'A'-'a');};
-//
-// Find string in string, case insensitive, requires non-alphanumeric lead-in
-//
-const char *mystrstr (const char *str, const char *find)
-	{
-	int alnum,length;
-	char f,c;
-	//
-	alnum  = 0;
-	f      = UPPER(*find);
-	length = strlen(find)-1;
-	find   ++;
-	c      = *str++;
-	while(c)
-		{
-		c = UPPER(c);
-		if ((!alnum) && (c==f) && !strnicmp(str,find,length)) return str-1;
-		alnum = ((c>='A')&&(c<='Z')) || ((c>='0')&&(c<='9'));
-		c = *str++;
-		};
-	return NULL;
-	};
-
-const char *spc(int num)
-	{
-	static char spacing[256];
-	static int  oldnum=-1;
-	//
-	if (num!=oldnum)
-		{
-		mymemset (spacing,' ',num); // Indentation for text file
-		spacing [num]=0;
-		oldnum=num;
-		};
-	return spacing;
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	mymemset
+	Exceptions.
 -----------------------------------------------------------------------------*/
 
-//
-// Set memory to a value
-//
-void UNREAL_API mymemset(void *Dest,char c,int Count)
-	{
-	static FLOAT F;
-#if ASM
-	__asm
-		{
-		mov al,[c]
-		mov edi,[Dest]
-		mov ah,[c]
-		mov esi,[Count]
-		mov ebx,eax
-		cmp esi,0
-		jle LoopOut
-		shl eax,16
-		dec esi
-		mov ax,bx
-		;
-		PreLoop1:
-		test edi,15
-		jz  Loop4Enter
-		mov [edi],al
-		inc edi
-		sub esi,1
-		jnc PreLoop1
-		jmp LoopOut
-		;
-		Loop4Enter:
-		sub esi,15
-		jc  PostLoop1Enter
-		;
-		mov DWORD PTR [F],eax
-		mov DWORD PTR [F+4],eax
-		fld [F]
-		;
-		ALIGN 16
-		Loop16:
-		fst  QWORD PTR [edi]
-		fst  QWORD PTR [edi+8]
-		; mov [edi   ],eax
-		; mov [edi+4 ],eax
-		; mov [edi+8 ],eax
-		; mov [edi+12],eax
-		add edi,16
-		sub esi,16
-		jnc Loop16
-		;
-		fst [F]
-		jmp PostLoop1Enter
-		;
-		PostLoop1Enter:
-		add esi,16
-		jz  LoopOut
-		;
-		PostLoop1:
-		mov [edi],al
-		inc edi
-		sub esi,1
-		jnz PostLoop1
-		;
-		LoopOut:
-		};
-	#else
-		memset(Dest,c,Count);
-	#endif
-	};
+// Throw a string exception with a message.
+UNENGINE_API void VARARGS throwf( char *Fmt, ... )
+{
+	char		TempStr[4096];
+	va_list		ArgPtr;
+	va_start	(ArgPtr,Fmt);
+	vsprintf	(TempStr,Fmt,ArgPtr);
+	va_end		(ArgPtr);
+	throw		(TempStr);
+}
 
 /*-----------------------------------------------------------------------------
-	mymemeq
------------------------------------------------------------------------------*/
-
-//
-// Compare memory.  Fast for large blocks.  Returns 1 if equal, 0 if nonequal.
-//
-UNREAL_API int mymemeq(void *P1, void *P2, int n)
-	{
-	BYTE *B1 = (BYTE *)P1;
-	BYTE *B2 = (BYTE *)P2;
-#ifdef ASM
-	while (n&15)
-		{
-		if (*B1 != *B2) return 0;
-		B1++; B2++; n--;
-		};
-	int Result=1;
-	if (n>0) __asm
-		{
-		mov esi,[n]
-		mov eax,[B1]
-		shr esi,4
-		mov ebx,[B2]
-		mov [Result],0
-		;
-		CmpLoop:
-		;1
-		mov ecx,[eax]
-		mov edx,[ebx]
-		cmp ecx,edx
-		jne NotEq
-		;2
-		mov ecx,[eax+4]
-		mov edx,[ebx+4]
-		cmp ecx,edx
-		jne NotEq
-		;3
-		mov ecx,[eax+8]
-		mov edx,[ebx+8]
-		cmp ecx,edx
-		jne NotEq
-		;4
-		mov ecx,[eax+12]
-		mov edx,[ebx+12]
-		cmp ecx,edx
-		jne NotEq
-		;
-		add eax,16
-		add ebx,16
-		dec esi
-		jg  CmpLoop
-		;
-		mov [Result],1
-		;
-		NotEq:
-		};
-	return Result;
-#else
-	while (n-- > 0)
-		{
-		if (*B1++ != *B2++) return 0;
-		};
-	return 1;
-#endif
-	};
-
-/*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/

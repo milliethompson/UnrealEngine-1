@@ -1,33 +1,33 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{0BA686C6-F7D3-101A-993E-0000C0EF6F5E}#1.0#0"; "THREED32.OCX"
 Begin VB.Form frmParSolCube 
-   BorderStyle     =   3  'Fixed Dialog
+   BorderStyle     =   4  'Fixed ToolWindow
    Caption         =   "Build a Cube"
    ClientHeight    =   4395
-   ClientLeft      =   3540
-   ClientTop       =   2355
+   ClientLeft      =   5145
+   ClientTop       =   4095
    ClientWidth     =   2490
    ControlBox      =   0   'False
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H00C0C0C0&
-   Height          =   4755
    HelpContextID   =   153
    Icon            =   "PsRect.frx":0000
-   Left            =   3480
    LinkTopic       =   "Form5"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
+   MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   4395
    ScaleWidth      =   2490
    ShowInTaskbar   =   0   'False
-   Top             =   2055
-   Width           =   2610
    Begin Threed.SSPanel SSPanel1 
       Height          =   1455
       Left            =   120
@@ -40,6 +40,15 @@ Begin VB.Form frmParSolCube
       _StockProps     =   15
       ForeColor       =   -2147483640
       BackColor       =   12632256
+      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
       BevelInner      =   1
       Begin VB.Line Line1 
          BorderColor     =   &H0000FFFF&
@@ -110,13 +119,13 @@ Begin VB.Form frmParSolCube
       Cancel          =   -1  'True
       Caption         =   "&Help"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   960
@@ -127,13 +136,13 @@ Begin VB.Form frmParSolCube
    Begin VB.OptionButton IsSolid 
       Caption         =   "Solid"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   1680
@@ -145,13 +154,13 @@ Begin VB.Form frmParSolCube
    Begin VB.OptionButton IsHollow 
       Caption         =   "Hollow"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   1680
@@ -162,13 +171,13 @@ Begin VB.Form frmParSolCube
    Begin VB.TextBox Group 
       BackColor       =   &H00FFFFFF&
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H00000000&
       Height          =   285
@@ -181,13 +190,13 @@ Begin VB.Form frmParSolCube
    Begin VB.TextBox RWidth 
       BackColor       =   &H00FFFFFF&
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H00000000&
       Height          =   285
@@ -200,13 +209,13 @@ Begin VB.Form frmParSolCube
    Begin VB.TextBox RBreadth 
       BackColor       =   &H00FFFFFF&
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H00000000&
       Height          =   285
@@ -219,13 +228,13 @@ Begin VB.Form frmParSolCube
    Begin VB.TextBox RThickness 
       BackColor       =   &H00FFFFFF&
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H00000000&
       Height          =   285
@@ -238,13 +247,13 @@ Begin VB.Form frmParSolCube
    Begin VB.TextBox RHeight 
       BackColor       =   &H00FFFFFF&
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H00000000&
       Height          =   285
@@ -258,13 +267,13 @@ Begin VB.Form frmParSolCube
       Caption         =   "&Build"
       Default         =   -1  'True
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   120
@@ -275,13 +284,13 @@ Begin VB.Form frmParSolCube
    Begin VB.CommandButton Command2 
       Caption         =   "&Close"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   1680
@@ -306,13 +315,13 @@ Begin VB.Form frmParSolCube
       BackStyle       =   0  'Transparent
       Caption         =   "Group Name"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   240
@@ -325,13 +334,13 @@ Begin VB.Form frmParSolCube
       BackStyle       =   0  'Transparent
       Caption         =   "Wall Thickness"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   0
@@ -344,13 +353,13 @@ Begin VB.Form frmParSolCube
       BackStyle       =   0  'Transparent
       Caption         =   "Height"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   600
@@ -363,13 +372,13 @@ Begin VB.Form frmParSolCube
       BackStyle       =   0  'Transparent
       Caption         =   "Width"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   720
@@ -382,13 +391,13 @@ Begin VB.Form frmParSolCube
       BackStyle       =   0  'Transparent
       Caption         =   "Breadth"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   600
@@ -401,13 +410,13 @@ Begin VB.Form frmParSolCube
       BackStyle       =   0  'Transparent
       Caption         =   "Item Names are: Floor,Ceiling,Wall,Outside"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   240
@@ -417,7 +426,9 @@ Begin VB.Form frmParSolCube
    End
 End
 Attribute VB_Name = "frmParSolCube"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 

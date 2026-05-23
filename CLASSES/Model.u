@@ -1,0 +1,77 @@
+Begin Class Name=XModel
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Model.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class XModel expands Actor
+	//intrinsic
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// Subobjects.
+
+var const Vectors	Vectors;
+var const Vectors   Points;
+var const BspNodes	Nodes;
+var const BspSurfs	Surfs;
+var const Verts		Verts;
+var const Polys     Polys;
+var const LightMesh LightMesh;
+var const Bounds    Bounds;
+var const Ints      LeafHulls;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=XModel
+   End DefaultProperties
+End Class
+
+Begin Class Name=XBrush
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Brush.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class XBrush expands XModel
+	//intrinsic
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// Brush properties.
+
+var const vector PrePivot;
+
+var const vector Scale;
+var const float  ScaleSheerRate;
+var const int    ScaleSheerAxis;
+
+var const int    CsgOper;
+var const int    Color;
+var const int    PolyFlags;
+var const int    ModelFlags;
+var const int    PostPivot;
+
+var const vector PostScale;
+var const float  PostScaleSheerRate;
+var const int    PostScaleSheerAxis;
+
+var const vector TempScale;
+var const float  TempScaleSheerRate;
+var const int    TempScaleSheerAxis;
+
+var const vector Bound0Min;
+var const vector Bound0Max;
+var const vector Bound0Sphere;
+
+var const vector Bound1Min;
+var const vector Bound1Max;
+var const vector Bound1Sphere;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=XBrush
+   End DefaultProperties
+End Class

@@ -1,4 +1,5 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{0BA686C6-F7D3-101A-993E-0000C0EF6F5E}#1.0#0"; "THREED32.OCX"
 Begin VB.Form frmBrushBrowser 
    BorderStyle     =   0  'None
    Caption         =   "Brush Browser"
@@ -6,17 +7,14 @@ Begin VB.Form frmBrushBrowser
    ClientLeft      =   8505
    ClientTop       =   5280
    ClientWidth     =   2415
-   Height          =   6825
    Icon            =   "BrBrush.frx":0000
-   Left            =   8445
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   6465
    ScaleWidth      =   2415
    ShowInTaskbar   =   0   'False
-   Top             =   4980
-   Width           =   2535
    Begin Threed.SSPanel SSPanel1 
       Align           =   2  'Align Bottom
       Height          =   960
@@ -29,6 +27,15 @@ Begin VB.Form frmBrushBrowser
       _ExtentY        =   1693
       _StockProps     =   15
       BackColor       =   14198960
+      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
       Begin VB.CommandButton BroExport 
          Caption         =   "E&xport"
          Height          =   255
@@ -86,7 +93,9 @@ Begin VB.Form frmBrushBrowser
    End
 End
 Attribute VB_Name = "frmBrushBrowser"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '
 ' Sound Browser: This is a form that implements

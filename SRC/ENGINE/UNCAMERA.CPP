@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnCamera.cpp: Generic Unreal camera code
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -10,174 +10,140 @@
 
 #include "Unreal.h"
 #include "UnRender.h"
+#include "UnIn.h"
 
 /*-----------------------------------------------------------------------------
-	UCamera resource implementation.
+	UCamera object implementation.
 -----------------------------------------------------------------------------*/
 
-//
-// Resource functions
-//
-void UCamera::Register(FResourceType *Type)
-{
-	guard(UCamera::Register);
-
-	Type->HeaderSize = sizeof (UCamera);
-	Type->RecordSize = 0;
-	Type->Version    = 1;
-	Type->TypeFlags  = RTF_ScriptReferencable;
-	strcpy (Type->Descr,"Camera");
-
-	unguard;
-}
 void UCamera::InitHeader()
 {
 	guard(UCamera::InitHeader);
 
+	// Call parent class.
+	UObject::InitHeader();
+
 	// Start camera looking ahead, facing along the X axis, looking
 	// towards the origin.
-	Locked      = 0;
 	OnHold		= 0;
 	Texture     = NULL;
-	Level       = GServer.Levels->Element(0); // Temp hack !!
-	iActor      = INDEX_NONE;
+	Level       = GServer.GetLevel();
+	Actor       = NULL;
 	MiscRes		= NULL;
-	MiscName	= NAME_NONE;
 	DataSize    = 0;
 	LastUpdateTime = 0;
 
 	// Default sizes (can be changed before call to pOpenCameraWindow).
-	SXR         = GDefaults.CameraSXR;
-	SYR         = GDefaults.CameraSYR;
+	X			= GDefaults.CameraSXR;
+	Y			= GDefaults.CameraSYR;
 	Caps		= 0;
 
 	Current		= 0;
 	ClickFlags  = 0;
 
-	OpenX		  = -1;				// No default opening position
-	OpenY		  = 0;				// No default opening size
+	OpenX		  = -1;				// No default opening position.
+	OpenY		  = 0;				// No default opening size.
 	ParentWindow  = 0;
 
 	GCameraManager->InitCameraWindow (this);
 	unguard;
 }
-void UCamera::FreeData()
-{
-	guard(UCamera::FreeData);
-	GCameraManager->CloseCameraWindow(this);
-	unguard;
-}
-void UCamera::QueryHeaderReferences(FResourceCallback &Callback)
-{
-	guard(UCamera::QueryHeaderReferences);
-	Callback.Resource (this,(UResource **)&Texture,0);
-	unguard;
-}
-void UCamera::Flip()
-{
-	guard(UCamera::Flip);
-	appError("Not implemented; resource type not saveable.");
-	unguard;
-}
-AUTOREGISTER_RESOURCE(RES_Camera,UCamera,0xB2D90852,0xCCD211cf,0x91360000,0xC028B992);
+IMPLEMENT_CLASS(UCamera);
 
 /*-----------------------------------------------------------------------------
 	Custom camera creation and destruction.
 -----------------------------------------------------------------------------*/
 
 //
-// Create a new camera and return an ID to it or NULL.  Does not open a window on screen.
-// Call pOpenCameraWindow for that.  Set Level to the level, or NULL=first level on file.
+// UCamera constructor.  Creates the camera object but doesn't open its window.
 //
-// Cameras can't be tracked transactionally because of the special textures that must go
-// along with cameras.
-//
-UCamera::UCamera(ULevel *CLevel)
+UCamera::UCamera( ULevel *ThisLevel )
 {
 	guard(UCamera::UCamera);
 
-	ILevel			LevelInfo;
-	APawn			*Actor;
-
-	if (CLevel==NULL)
+	// Figure out which level to use.
+	if( ThisLevel == NULL )
 	{
-		if (GServer.Levels->Num==0)
+		if( !GServer.GetLevel() )
 			appError ("Can't create camera in empty world");
-		else
-			Level = GServer.Levels->Element(0);
+		
+		Level = GServer.GetLevel();
 	}
-	else Level = CLevel;
+	else Level = ThisLevel;
 
-	Level->Lock(&LevelInfo,LOCK_NoTrans);
-
-	GCameraManager->CameraArray->Add(this);
+	Level->Lock(LOCK_ReadWrite);
+	GCameraManager->CameraArray->AddItem(this);
 
 	// Find an available camera actor or spawn a new one.  Sends ACTOR_SPAWN message followed
 	// by ACTOR_POSSESS message.
-	if (LevelInfo.State==LEVEL_UpEdit)
+	if( Level->GetState()==LEVEL_UpEdit )
 	{
-		iActor = LevelInfo.SpawnCameraActor (this,NAME_NONE);
-		if (iActor==INDEX_NONE)
-			appError ("SpawnCameraActor failed");
+		checkState(GEditor!=NULL);
+		Actor = Level->SpawnViewActor( this, NAME_None, NULL );
+		checkState(Actor!=NULL);
 	}
 	else
 	{
-		iActor = LevelInfo.SpawnPlayActor (this);
-		if( iActor==INDEX_NONE ) appError
-			(
+		checkState(GEditor==NULL);
+		if( !Level->SpawnPlayActor( this ) ) appError
+		(
 			"Can't play this level: No 'PlayerStart' actor was found to "
 			"specify the player's starting position."
-			);
+		);
+		checkState(Actor!=NULL);
 	}
-	Actor				= &GetActor();
-	Actor->ShowFlags	= GGfx.DefaultCameraFlags;
-	Actor->RendMap		= GGfx.DefaultRendMap;
-	Actor->OrthoZoom	= 40000.0;
-	Actor->FovAngle		= GDefaults.Fov;
-	Actor->Misc1		= 0;
-	Actor->Misc2		= 0;
 
 	// Allocate texture for the camera.
-	Texture = new(Name,CREATE_Unique)UTexture;
+	Texture = new(GetName(),CREATE_Unique)UTexture;
+	Texture->TextureFlags |= TF_NoTile;
 
 	// Init player console.
 	Console = GGameBase->CreateCameraConsole(this);
 	Console->Init(this);
 
-	Level->Unlock(&LevelInfo);
+	// Init input system.
+	Input = NewInput();
+	Input->Init(this,GApp);
+
+	Level->Unlock(LOCK_ReadWrite);
 	unguard;
 }
 
 //
 // Close a camera.
-//warning: Lots of interrelated stuff is happening here.
+//warning: Lots of interrelated stuff is happening here between the camera code,
+// object code, platform-specific camera manager code, and Windows.
 //
 void UCamera::PreKill()
 {
 	guard(UCamera::PreKill);
-	ICamera CameraInfo;
-
-	// Unlink then delete actor unless camera is already locked (which happens
-	// when camera is closed upon destroying a camera actor).
-	if( Lock(&CameraInfo) )
-	{
-		CameraInfo.Actor->Camera = NULL;
-		CameraInfo.Level.DestroyActor(CameraInfo.iActor);
-		CameraInfo.iActor = iActor = INDEX_NONE;
-		CameraInfo.Actor  = NULL;
-		Unlock(&CameraInfo,0);
-		Console->Exit();
-	}
-	GGameBase->DestroyCameraConsole(Console);
 
 	// Close the camera window.
 	GCameraManager->CloseCameraWindow(this);
 
-	// Shut down Windows resources.
-	GCameraManager->CameraArray->Delete(this);
+	// Unlink then delete actor unless camera is already locked (which happens
+	// when camera is closed upon destroying a camera actor).
+	if( GApp->ServerAlive )
+	{
+		Level->Lock(LOCK_ReadWrite);
+		Actor->Camera = NULL;
+		Level->DestroyActor( Actor );
+		Actor = NULL;
+		Level->Unlock(LOCK_ReadWrite);
+		Console->Exit();
+	}
+	GGameBase->DestroyCameraConsole(Console);
+
+	// Kill the input subsystem.
+	Input->Exit();
+
+	// Close the camera window.
+	GCameraManager->CloseCameraWindow(this);
+
+	// Shut down Windows objects.
+	GCameraManager->CameraArray->RemoveItem(this);
 	Texture->Kill();
 
-	// Remove resource reference from global camera list.
 	unguard;
 }
 
@@ -186,10 +152,11 @@ void UCamera::PreKill()
 -----------------------------------------------------------------------------*/
 
 //
-// Handle all camera movement.  Returns 1 if the camera movement was processed
-// by UnrealEd, or 0 if it should be queued up for later gameplay use.
+// Handle all mouse movement in a camera.  Returns 1 if the camera movement 
+// was processed by UnrealEd, or 0 if it should be queued up for later 
+// gameplay use.
 //
-int UCamera::Move(BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl)
+int UCamera::Move( BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl )
 {
 	guard(UCamera::Move);
 	if( GEditor )
@@ -198,24 +165,6 @@ int UCamera::Move(BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl)
 		return 1;
 	}
 	else return 0;
-	unguard;
-}
-
-//
-// Handle general keypresses.  Routes to a mode-specific handler.
-//
-int UCamera::Key(int Key)
-{
-	guard(UCamera::Key);
-
-	if (Console->Key(Key))
-		return 1; // Player console keypress handler.
-
-	if (GEditor)
-		return GEditor->edcamKey( this,Key );
-	else
-		return 0;
-
 	unguard;
 }
 
@@ -229,8 +178,8 @@ int UCamera::Click( BYTE Buttons, SWORD MouseX, SWORD MouseY,int Shift, int Ctrl
 	ELevelState State = Level->GetState();
 	if( State==LEVEL_UpEdit )
 	{
-		if (GEditor)
-			GEditor->edcamClick (this,Buttons,MouseX,MouseY,Shift,Ctrl);
+		if( GEditor )
+			GEditor->edcamClick( this, Buttons, MouseX, MouseY, Shift, Ctrl );
 		return 1;
 	}
 	else return 0;
@@ -238,31 +187,34 @@ int UCamera::Click( BYTE Buttons, SWORD MouseX, SWORD MouseY,int Shift, int Ctrl
 	unguard;
 }
 
-void UCamera::Draw(int Scan)
+//
+// Render a frame for the camera.
+//
+void UCamera::Draw( int Scan )
 {
 	guard(UCamera::Draw);
+	FMemMark MemMark(GMem);
+	FMemMark DynMark(GDynMem);
 
-	if( (SXR>0) && (SYR>0) )
+	if( X>0 && Y>0 )
 	{
-		if (GEditor)
-			GEditor->edcamDraw(this,Scan);
-		else
-			GUnreal.Draw(this,Scan);
+		if( GEditor )	GEditor->edcamDraw( this, Scan );
+		else			GUnreal.Draw( this, Scan );
 	}
+
+	MemMark.Pop();
+	DynMark.Pop();
+
 	unguard;
 }
 
-/*---------------------------------------------------------------------------------------
-	ICamera implementation.
----------------------------------------------------------------------------------------*/
-
 //
-// Build camera's coordinate system:
+// Build camera's coordinate system.
 //
-void ICamera::BuildCoords()
+void UCamera::BuildCoords()
 {
-	guard(ICamera::BuildCoords);
-	FCalcViewCoords(Actor->Location,Actor->ViewRot,Coords,Uncoords);
+	guard(UCamera::BuildCoords);
+	FCalcViewCoords(Actor->Location,Actor->ViewRotation,Coords,Uncoords);
 	unguard;
 }
 
@@ -270,9 +222,9 @@ void ICamera::BuildCoords()
 // If camera is in an orthogonal mode, return its viewing plane normal.
 // Otherwise, return NULL.
 //
-FVector *ICamera::GetOrthoNormal()
+const FVector *UCamera::GetOrthoNormal()
 {
-	switch(RendMap)
+	switch( Actor->RendMap )
 	{
 		case REN_OrthXY:	return &GMath.ZAxisVector;
 		case REN_OrthXZ:	return &GMath.YAxisVector;
@@ -282,72 +234,70 @@ FVector *ICamera::GetOrthoNormal()
 }
 
 //
-// Precompute CameraInfo rendering parameters.
+// Precompute rendering information.
 //
-void ICamera::PrecomputeRenderInfo(int CamSXR, int CamSYR)
+void UCamera::PrecomputeRenderInfo( int CamSXR, int CamSYR )
 {
-	guard(ICamera::PrecomputeRenderInfo);
+	guard(UCamera::PrecomputeRenderInfo);
 
 	// Stride.
-	Camera->Texture->USize = Stride;
+	Texture->USize = Stride;
 
 	// Sizing.
-	SXR 		= CamSXR;
-	SYR 		= CamSYR;
+	X 			= CamSXR;
+	Y 			= CamSYR;
 	ByteStride	= Stride * ColorBytes;
 
 	// Integer precomputes.
-	SXR2 		= SXR/2;
-	SYR2 		= SYR/2;
-	FixSXR 		= Fix(SXR);
+	X2 			= X/2;
+	Y2 			= Y/2;
+	FixX 		= Fix(X);
 
 	// Float precomputes.
-	FSXR 		= (FLOAT)SXR;
-	FSYR 		= (FLOAT)SYR;
-	FSXR1 		= 65536.0 * (FSXR + 1);
-	FSYR1 		= FSYR + 1;
-	FSXR2		= FSXR * 0.5;
-	FSYR2		= FSYR * 0.5;	
-	FSXR15		= (FSXR+1.0001) * 0.5;
-	FSYR15		= (FSYR+1.0001) * 0.5;	
-	FSXRM5		= FSXR15 - 0.5;
-	FSYRM5		= FSYR15 - 0.5;
+	FX 			= (FLOAT)X;
+	FY 			= (FLOAT)Y;
+	FX1 		= 65536.0 * (FX + 1);
+	FY1 		= FY + 1;
+	FX2			= FX * 0.5;
+	FY2			= FY * 0.5;	
+	FX15		= (FX+1.0001) * 0.5;
+	FY15		= (FY+1.0001) * 0.5;	
+	FXM5		= FX15 - 0.5;
+	FYM5		= FY15 - 0.5;
 
-	ProjZ		= FCalcFov (FSXR, FovAngle);
-	Zoom 		= OrthoZoom / (SXR * 15.0);
+	INT Angle   = (0.5 * 65536.0 / 360.0) * Actor->FovAngle;
+	ProjZ       = FX / (2.0*GMath.SinTab(Angle) / GMath.CosTab(Angle));
+
+	Zoom 		= Actor->OrthoZoom / (X * 15.0);
 	RZoom       = 1.0/Zoom;
 	RProjZ		= 1.0/ProjZ;
 
 	// The following have a fudge factor to adjust for floating point imprecision in
 	// the screenspace clipper.
-	ProjZRSX2	= 1.00005 * ProjZ / FSXR2;
-	ProjZRSY2	= 1.00005 * ProjZ / FSYR2;
+	ProjZRX2	= 1.00005 * ProjZ / FX2;
+	ProjZRY2	= 1.00005 * ProjZ / FY2;
 
 	// Calculate camera view coordinates.
 	BuildCoords();
 
 	// Precomputed camera view frustrum edges (worldspace).
 	FLOAT TempSigns[2]={-1.0,+1.0};
-	FVector Normal;
-	for (int i=0; i<2; i++)
+	for( int i=0; i<2; i++ )
 	{
-		for (int j=0; j<2; j++)
+		for( int j=0; j<2; j++ )
 		{
-			ViewSides[i*2+j].X = TempSigns[i] * FSXR2;
-			ViewSides[i*2+j].Y = TempSigns[j] * FSYR2;
-			ViewSides[i*2+j].Z = ProjZ;
-			ViewSides[i*2+j].Normalize();
-			ViewSides[i*2+j].TransformVector(Uncoords);
+			ViewSides[i*2+j] = FVector(TempSigns[i] * FX2, TempSigns[j] * FY2, ProjZ).Normal().TransformVectorBy(Uncoords);
 		}
-		Normal.Make(0,TempSigns[i] / FSYR2,1.0/ProjZ);
-		Normal.Normalize();
-		Normal.TransformVector(Uncoords);
-		ViewPlanes[i].MakePlane(Coords.Origin,Normal);
-
-		Normal.Make(TempSigns[i] / FSXR2,0,1.0/ProjZ);
-		Normal.Normalize();
-		Normal.TransformVector(Uncoords);
-		ViewPlanes[i+2].MakePlane(Coords.Origin,Normal);
+		ViewPlanes[i] = FPlane
+		(
+			Coords.Origin,
+			FVector(0,TempSigns[i] / FY2,1.0/ProjZ).Normal().TransformVectorBy(Uncoords)
+		);
+		ViewPlanes[i+2] = FPlane
+		(
+			Coords.Origin,
+			FVector(TempSigns[i] / FX2,0,1.0/ProjZ).Normal().TransformVectorBy(Uncoords)
+		);
 	}
 	unguard;
 }
@@ -356,87 +306,14 @@ void ICamera::PrecomputeRenderInfo(int CamSXR, int CamSYR)
 	Camera information functions.
 ---------------------------------------------------------------------------------------*/
 
-int UCamera::IsOrtho()
-{
-	guard(UCamera::IsOrtho);
-
-	int RendMap = GetActor().RendMap;
-	return ((RendMap==REN_OrthXY)||(RendMap==REN_OrthXZ)||(RendMap==REN_OrthYZ));
-	
-	unguard;
-}
-
-int UCamera::IsRealWire()
-{
-	guard(UCamera::IsRealWire);
-
-	int RendMap = GetActor().RendMap;
-	return ((RendMap==REN_OrthXY)||(RendMap==REN_OrthXZ)||(RendMap==REN_OrthYZ)||(RendMap==REN_Wire));
-
-	unguard;
-}
-
-int UCamera::IsRealtime()
-{
-	guard(UCamera::IsRealtime);
-	return (GetActor().ShowFlags & (SHOW_RealTime | SHOW_PlayerCtrl))!=0;
-	unguard;
-}
-
-int UCamera::IsInvalidBsp()
-{
-	guard(UCamera::IsInvalidBsp);
-	return (Level->Model->ModelFlags & MF_InvalidBsp) == MF_InvalidBsp;	
-	unguard;
-}
-
+//
+// Is this camrea a wireframe view?
+//
 int UCamera::IsWire()
 {
 	guard(UCamera::IsWire);
-	int RendMap = GetActor().RendMap;
+	int RendMap = Actor->RendMap;
 	return ((GEditor&&GEditor->MapEdit) || (RendMap==REN_OrthXY)||(RendMap==REN_OrthXZ)||(RendMap==REN_OrthYZ)||(RendMap==REN_Wire));
-	unguard;
-}
-
-int UCamera::WireMode()
-{
-	guard(UCamera::WireMode);
-	
-	int RendMap = GetActor().RendMap;
-	if ((RendMap==REN_OrthXY)||(RendMap==REN_OrthXZ)||(RendMap==REN_OrthYZ)||(RendMap==REN_Wire))
-		return RendMap;
-	else
-		return REN_Wire;
-
-	unguard;
-}
-
-int UCamera::IsBrowser()
-{
-	guard(UCamera::IsBrowser);
-
-	int RendMap = GetActor().RendMap;
-	switch (RendMap)
-	{
-		case REN_TexView:		return 1;
-		case REN_TexBrowser:	return 1;
-		case REN_MeshBrowser:	return 1;
-		default:				return 0;
-	}
-	unguard;
-}
-
-int UCamera::IsGame()
-{
-	guard(UCamera::IsGame);
-	return Level->GetState()==LEVEL_UpPlay;
-	unguard;
-}
-
-int UCamera::IsEditor()
-{
-	guard(UCamera::IsEditor);
-	return Level->GetState()==LEVEL_UpEdit;
 	unguard;
 }
 
@@ -445,94 +322,84 @@ int UCamera::IsEditor()
 -----------------------------------------------------------------------------*/
 
 //
-// Locks the camera structure.  When locked, a Camera's virtual buffer will
-// not be resized by other processes.  When a camera is unlocked, you can't
+// Locks the camera.  When locked, a Camera's framebuffer will
+// not be resized.  When a camera is unlocked, you can't
 // count on the size remaining constant (the user may resize it or close it).
 //
 // Returns 0 if ok, nonzero if the user has closed the camera window.  Any code that
 // locks the camera must check for a nonzero result, which can happen in the normal
 // course of operation.
 //
-int UCamera::Lock( ICamera *CameraInfo )
+INT UCamera::Lock(DWORD ThisLockType)
 {
 	guard(UCamera::Lock);
-
-	if (Locked) 
-		appError("Camera is already locked");
+	checkState(!IsLocked());
 	
-	if (OnHold || (SXR==0) || (SYR==0)) 
-		return 0;
-
-	// Copy all information.
-	CameraInfo->Camera 		= this;
-	CameraInfo->iActor 		= iActor;
-	CameraInfo->SXR			= SXR;
-	CameraInfo->SYR			= SYR;
-	CameraInfo->Stride		= SXR;
-	CameraInfo->Caps		= Caps;
-	CameraInfo->ColorBytes	= ColorBytes;
-	CameraInfo->Texture		= Texture;
-
-	// Call the platform-specific camera manager to lock the camera's window
-	// and frame buffer.  It sets CameraInfo->SXStride and CameraInfo->RealScreen.
-
-	if (!GCameraManager->LockCameraWindow(this,CameraInfo)) return 0; // Sets SXStride, RealScreen
-	CameraInfo->Screen = CameraInfo->RealScreen;
-
-	// Lock the level and snag the camera actor.
-
-	Level->Lock(&CameraInfo->Level,LOCK_Trans);
-	CameraInfo->Actor		= &GetActor();
-
-	CameraInfo->RendMap 	= CameraInfo->Actor->RendMap;
-	CameraInfo->ShowFlags 	= CameraInfo->Actor->ShowFlags;
-	CameraInfo->FovAngle 	= CameraInfo->Actor->FovAngle;
-	CameraInfo->OrthoZoom 	= CameraInfo->Actor->OrthoZoom;
-
-	CameraInfo->ExtraPolyFlags = 0;
-	if ((CameraInfo->RendMap==REN_PolyCuts) || (CameraInfo->RendMap==REN_Zones))
+	if( OnHold || X==0 || Y==0 )
 	{
-		CameraInfo->ExtraPolyFlags = PF_NoMerge;
+		// Can't lock it.
+		if( !(ThisLockType & LOCK_CanFail) )
+			appErrorf("Failed locking Camera %s",GetName());
+
+		return 0;
 	}
 
+	// Compute information.
+	Stride = X;
+
+	// Call the platform-specific camera manager to lock the camera's window
+	// and frame buffer.  It sets Camera->SXStride and Camera->RealScreen.
+	Texture->Lock(ThisLockType);
+	if( !GCameraManager->LockCameraWindow(this) )
+	{
+		if( !(ThisLockType & LOCK_CanFail) )
+			appErrorf("Failed locking Camera %s",GetName());
+
+		Texture->Unlock(ThisLockType);
+		return 0;
+	}
+
+	// Set the screen pointer.
+	Screen = RealScreen;
+
+	// Lock the level.
+	Level->Lock( ThisLockType );
+
+	// Get extra polygon flags.
+	ExtraPolyFlags = 
+		((Actor->RendMap==REN_PolyCuts) || (Actor->RendMap==REN_Zones)) ? PF_NoMerge : 0;
+
+	// Set border.
+	FXB = FYB = 0.0;
+
 	// Precomputed info.
-	CameraInfo->PrecomputeRenderInfo(SXR,SYR);
+	PrecomputeRenderInfo(X,Y);
 
 	// Successfully locked it and set Screen pointer.
-	Locked = 1;
-	return 1;
-
+	return UObject::Lock(ThisLockType);
 	unguard;
 }
 
-// 
+//
 // Unlock a camera.  When unlocked, you can't access the *Screen pointer because
 // the corresponding window may have been resized or deleted.
 //
-void UCamera::Unlock(ICamera *CameraInfo,int Blit)
+void UCamera::Unlock(DWORD OldLockType, int Blit)
 {
 	guard(UCamera::Unlock);
-
-	if (!Locked)
-		appError ("Camera isn't locked");
-	
-	GCameraManager->UnlockCameraWindow(this,CameraInfo,Blit);
-
-	// Update all properties.
-	if( iActor != INDEX_NONE )
-	{
-		APawn &Actor		= GetActor();
-		Actor.RendMap		= CameraInfo->RendMap;
-		Actor.ShowFlags 	= CameraInfo->ShowFlags;
-		Actor.FovAngle 		= CameraInfo->FovAngle;
-		Actor.OrthoZoom		= CameraInfo->OrthoZoom;
-	}
-
-	// Unlock the level.
-	Level->Unlock (&CameraInfo->Level);
+	checkState(IsLocked());
 
 	// Done unlocking.
-	Locked = 0;
+	UObject::Unlock(OldLockType);
+
+	// Unlock the level.
+	Level->Unlock(OldLockType);
+
+	// Unlock the platform specifics.
+	GCameraManager->UnlockCameraWindow(this,Blit);
+
+	// Unlock the texture.
+	Texture->Unlock(OldLockType);
 
 	unguard;
 }
@@ -541,17 +408,23 @@ void UCamera::Unlock(ICamera *CameraInfo,int Blit)
 	Window-related.
 -----------------------------------------------------------------------------*/
 
-void UCamera::OpenWindow(DWORD ParentWindow,int Temporary)
+//
+// Open the window for the camera.
+//
+void UCamera::OpenWindow( DWORD ParentWindow, int Temporary )
 {
 	guard(UCamera::OpenWindow);
-	GCameraManager->OpenCameraWindow(this,ParentWindow,Temporary);
+	GCameraManager->OpenCameraWindow( this, ParentWindow, Temporary );
 	unguard;
 }
 
+//
+// Update the camera's window.
+//
 void UCamera::UpdateWindow()
 {
 	guard(UCamera::UpdateWindow);
-	GCameraManager->UpdateCameraWindow(this);
+	GCameraManager->UpdateCameraWindow( this );
 	unguard;
 }
 
@@ -559,6 +432,9 @@ void UCamera::UpdateWindow()
 	Holding and unholding.
 -----------------------------------------------------------------------------*/
 
+//
+// Put the camera on hold, preventing it from being resized.
+//
 void UCamera::Hold()
 {
 	guard(UCamera::Hold);
@@ -566,6 +442,9 @@ void UCamera::Hold()
 	unguard;
 }
 
+//
+// Unhold the camera, and perform any latent resizing.
+//
 void UCamera::Unhold()
 {
 	guard(UCamera::Unhold);
@@ -581,38 +460,44 @@ void UCamera::Unhold()
 	Command line.
 -----------------------------------------------------------------------------*/
 
-int UCamera::Exec( const char *Cmd,FOutputDevice *Out )
+//
+// UCamera command line.
+//
+int UCamera::Exec( const char *Cmd, FOutputDevice *Out )
 {
 	guard(UCamera::Exec);
 	const char *Str = Cmd;
 
-	if( GetCMD(&Str,"STATUS") )
+	if( GetCMD(&Str,"SHOWACTORS") )
 	{
-		if( GetCMD(&Str,"CAMERA") || !Str[0] )
-		{
-			Out->Logf("   CAMERA - Ok in level %s",Level->Name);
-			return Str[0]!=0;
-		}
-		else return 0;
-	}
-	else if( GetCMD(&Str,"SHOWACTORS") )
-	{
-		GetActor().ShowFlags |= SHOW_Actors;
+		Actor->ShowFlags |= SHOW_Actors;
 		return 1;
 	}
 	else if( GetCMD(&Str,"HIDEACTORS") )
 	{
-		GetActor().ShowFlags &= ~SHOW_Actors;
+		Actor->ShowFlags &= ~SHOW_Actors;
 		return 1;
 	}
 	else if( GetCMD(&Str,"BEHINDVIEW") )
 	{
-		GetActor().bBehindView = 1;
+		Actor->bBehindView = 1;
 		return 1;
 	}
 	else if( GetCMD(&Str,"NORMALVIEW") )
 	{
-		GetActor().bBehindView = 0;
+		Actor->bBehindView = 0;
+		return 1;
+	}
+	else if( GetCMD(&Str,"RESPAWN") )
+	{
+		if( !GEditor )
+		{
+			Level->Lock(LOCK_ReadWrite);
+			if( !Level->SpawnPlayActor(this) ) Out->Logf("Respawned failed");
+			else Out->Logf("Respawned player");
+			Level->Unlock(LOCK_ReadWrite);
+		}
+		else Out->Logf(LOG_ExecError,"Can't respawn player");
 		return 1;
 	}
 	else if( GetCMD(&Str,"RMODE") )
@@ -620,47 +505,165 @@ int UCamera::Exec( const char *Cmd,FOutputDevice *Out )
 		int Mode = atoi(Str);
 		if( (Mode>REN_None) && (Mode<REN_MAX) )
 		{
-			GetActor().RendMap = Mode;
+			Actor->RendMap = Mode;
 			Out->Logf("Rendering mode set to %i",Mode);
 		}
 		else Out->Logf(LOG_ExecError,"Invalid mode");
 		return 1;
 	}
+	else if( GetCMD(&Str,"EXEC") )
+	{
+		char Filename[64];
+		if( GrabSTRING(Str,Filename,ARRAY_COUNT(Filename)) )
+			ExecMacro( Filename, Out );
+		else 
+			Out->Logf("Missing filename to exec");
+		return 1;
+	}
+	else if( Console && Console->Exec(Cmd,Out) )
+	{
+		// Camera console handled it.
+		return 1;
+	}
+	else if( Input && Input->Exec(Cmd,Out) )
+	{
+		// Input system handled it.
+		return 1;
+	}
+	else if( Level && Actor && GetCMD(&Str,"SERVER") )
+	{
+		// Send to special player-exec handler, i.e. for firing.
+		Level->Lock(LOCK_ReadWrite);
+		Level->PlayerExec( Actor, Str, Out );
+		Level->Unlock( LOCK_ReadWrite );
+		return 1;
+	}
 	else
 	{
-		// Not executed.
+		// Pass to engine for execing.
+		return GUnreal.Exec( Cmd, Out );
+	}
+	unguard;
+}
+
+//
+// Execute a macro on this camera.
+//
+void UCamera::ExecMacro( const char *Filename, FOutputDevice *Out )
+{
+	guard(UCamera::ExecMacro);
+
+	UTextBuffer *Text = new("Macro",Filename,IMPORT_MakeUnique)UTextBuffer;
+	if( Text )
+	{
+		Out->Logf("Execing %s",Filename);
+		Text->Lock(LOCK_Read);
+		char Temp[256];
+		const char *Data = &Text->Element(0);
+		while( GetLINE (&Data,Temp,256)==0 )
+		{
+			// Pass to game console handler for execing.
+			Exec( Temp, Out );
+		}
+		Text->Unlock(LOCK_Read);
+		Text->Kill();
+	}
+	else Out->Logf(LOG_ExecError,"Macro file %s not found",Filename);
+
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	Input processing.
+-----------------------------------------------------------------------------*/
+
+//
+// Process low-level input.
+//
+int	UCamera::Process( EInputKey iKey, EInputState State, FLOAT Delta )
+{
+	guard(UCamera::Process);
+	if( Console->Process( iKey, State, Delta ) )
+	{
+		// Player console handled it.
+		return 1;
+	}
+	else if( Input->Process( *Console, iKey, State, Delta ) )
+	{
+		// Input system handled it.
+		return 1;
+	}
+	else
+	{
+		// Nobody handled it.
+		return 0;
+	}
+	unguard;
+}
+
+//
+// Process a keystroke.
+//
+int UCamera::Key( INT Key )
+{
+	guard(UCamera::Key);
+
+	if( Console->Key(Key) )
+	{
+		// Player console handled it.
+		return 1;
+	}
+	else if( GEditor && GEditor->edcamKey( this, Key ) )
+	{
+		// Editor handled it.
+		return 1;
+	}
+	else
+	{
+		// Nobody processed it.
 		return 0;
 	}
 	unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	Task functions.
+	UCamera FOutputDevice interface.
 -----------------------------------------------------------------------------*/
 
-void UCamera::TaskTick()
+//
+// Output a message on the camera's console.
+//
+void UCamera::Write(const void *Data, int Length, ELogType MsgType)
 {
-	guard(UCamera::TaskTick);
-	unguard;
-}
+	guard(UCamera::Write);
 
-void UCamera::TaskExit()
-{
-	guard(UCamera::TaskExit);
-	unguard;
-}
-
-char *UCamera::TaskStatus(char *Name, char *Desc)
-{
-	guard(UCamera::TaskStatus);
-
-	sprintf(Name,"Camera");
-	sprintf(Desc,"");
-	return Name;
+	// Pass to console.
+	if( Console ) Console->Write(Data,Length,MsgType);
 
 	unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	The End
+	Input related.
+-----------------------------------------------------------------------------*/
+
+//
+// Read input from the camera.
+//
+void UCamera::ReadInput( PPlayerTick &Move, FLOAT DeltaSeconds, FOutputDevice *Out )
+{
+	guard(UCamera::ReadInput);
+	checkState(Input!=NULL);
+	checkState(Console!=NULL);
+
+	// Get input from input system.
+	Input->ReadInput( Move, DeltaSeconds, Out );
+
+	// Allow game-specific camera console to postprocess the input.
+	Console->PostReadInput( Move, DeltaSeconds, Out );
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	The End.
 -----------------------------------------------------------------------------*/

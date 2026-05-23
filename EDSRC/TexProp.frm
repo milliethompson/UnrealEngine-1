@@ -1,4 +1,6 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{BDC217C8-ED16-11CD-956C-0000C04E4C0A}#1.1#0"; "tabctl32.ocx"
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "comctl32.ocx"
 Begin VB.Form frmTexProp 
    BorderStyle     =   4  'Fixed ToolWindow
    Caption         =   "Texture Properties"
@@ -7,27 +9,25 @@ Begin VB.Form frmTexProp
    ClientTop       =   3945
    ClientWidth     =   5745
    ForeColor       =   &H80000008&
-   Height          =   4950
    HelpContextID   =   123
    Icon            =   "TexProp.frx":0000
-   Left            =   3570
    LinkTopic       =   "Form8"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   4590
    ScaleWidth      =   5745
    ShowInTaskbar   =   0   'False
-   Top             =   3645
-   Width           =   5865
    Begin VB.PictureBox TexView 
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   700
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   3915
       Left            =   180
@@ -44,36 +44,37 @@ Begin VB.Form frmTexProp
       TabIndex        =   0
       Top             =   60
       Width           =   5595
-      _Version        =   65536
       _ExtentX        =   9869
       _ExtentY        =   7858
-      _StockProps     =   15
-      Caption         =   "Picture"
-      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   9
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
-      EndProperty
-      TabsPerRow      =   4
-      Tab             =   0
-      TabOrientation  =   0
-      Tabs            =   4
+      _Version        =   327680
       Style           =   1
-      TabMaxWidth     =   0
+      Tabs            =   4
+      TabsPerRow      =   4
       TabHeight       =   529
+      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "Arial"
+         Size            =   9
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
+      EndProperty
       TabCaption(0)   =   "Picture"
       Tab(0).ControlCount=   6
       Tab(0).ControlEnabled=   -1  'True
       Tab(0).Control(0)=   "Label4"
+      Tab(0).Control(0).Enabled=   0   'False
       Tab(0).Control(1)=   "TextureName"
+      Tab(0).Control(1).Enabled=   0   'False
       Tab(0).Control(2)=   "Label5"
+      Tab(0).Control(2).Enabled=   0   'False
       Tab(0).Control(3)=   "TextureFamily"
+      Tab(0).Control(3).Enabled=   0   'False
       Tab(0).Control(4)=   "Label7"
+      Tab(0).Control(4).Enabled=   0   'False
       Tab(0).Control(5)=   "TextureSize"
+      Tab(0).Control(5).Enabled=   0   'False
       TabCaption(1)   =   "Properties"
       Tab(1).ControlCount=   0
       Tab(1).ControlEnabled=   0   'False
@@ -81,19 +82,30 @@ Begin VB.Form frmTexProp
       Tab(2).ControlCount=   1
       Tab(2).ControlEnabled=   0   'False
       Tab(2).Control(0)=   "PolyFlagsHolder"
+      Tab(2).Control(0).Enabled=   -1  'True
       TabCaption(3)   =   "Fire Engine"
       Tab(3).ControlCount=   10
       Tab(3).ControlEnabled=   0   'False
       Tab(3).Control(0)=   "Label1"
+      Tab(3).Control(0).Enabled=   0   'False
       Tab(3).Control(1)=   "Slider1"
+      Tab(3).Control(1).Enabled=   0   'False
       Tab(3).Control(2)=   "Label2"
+      Tab(3).Control(2).Enabled=   0   'False
       Tab(3).Control(3)=   "Label20"
+      Tab(3).Control(3).Enabled=   0   'False
       Tab(3).Control(4)=   "Slider2"
+      Tab(3).Control(4).Enabled=   0   'False
       Tab(3).Control(5)=   "Label3"
+      Tab(3).Control(5).Enabled=   0   'False
       Tab(3).Control(6)=   "FractalType"
+      Tab(3).Control(6).Enabled=   -1  'True
       Tab(3).Control(7)=   "Command1"
+      Tab(3).Control(7).Enabled=   -1  'True
       Tab(3).Control(8)=   "SparkType"
+      Tab(3).Control(8).Enabled=   -1  'True
       Tab(3).Control(9)=   "Command2"
+      Tab(3).Control(9).Enabled=   -1  'True
       Begin VB.PictureBox PolyFlagsHolder 
          Height          =   1935
          Left            =   -74760
@@ -134,6 +146,28 @@ Begin VB.Form frmTexProp
          TabIndex        =   2
          Top             =   720
          Width           =   1395
+      End
+      Begin ComctlLib.Slider Slider2 
+         Height          =   255
+         Left            =   -70860
+         TabIndex        =   10
+         Top             =   2700
+         Width           =   1215
+         _ExtentX        =   2143
+         _ExtentY        =   450
+         _Version        =   327680
+         MouseIcon       =   "TexProp.frx":030A
+      End
+      Begin ComctlLib.Slider Slider1 
+         Height          =   255
+         Left            =   -70800
+         TabIndex        =   5
+         Top             =   1380
+         Width           =   1215
+         _ExtentX        =   2143
+         _ExtentY        =   450
+         _Version        =   327680
+         MouseIcon       =   "TexProp.frx":0326
       End
       Begin VB.Label TextureSize 
          Alignment       =   2  'Center
@@ -194,17 +228,6 @@ Begin VB.Form frmTexProp
          Top             =   2460
          Width           =   855
       End
-      Begin ComctlLib.Slider Slider2 
-         Height          =   255
-         Left            =   -70860
-         TabIndex        =   10
-         Top             =   2700
-         Width           =   1215
-         _Version        =   65536
-         _ExtentX        =   2143
-         _ExtentY        =   450
-         _StockProps     =   64
-      End
       Begin VB.Label Label20 
          Caption         =   "Spark Type:"
          Height          =   255
@@ -221,17 +244,6 @@ Begin VB.Form frmTexProp
          Top             =   1140
          Width           =   855
       End
-      Begin ComctlLib.Slider Slider1 
-         Height          =   255
-         Left            =   -70800
-         TabIndex        =   5
-         Top             =   1380
-         Width           =   1215
-         _Version        =   65536
-         _ExtentX        =   2143
-         _ExtentY        =   450
-         _StockProps     =   64
-      End
       Begin VB.Label Label1 
          Caption         =   "Fractal Type:"
          Height          =   255
@@ -243,7 +255,9 @@ Begin VB.Form frmTexProp
    End
 End
 Attribute VB_Name = "frmTexProp"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 Dim TexName As String

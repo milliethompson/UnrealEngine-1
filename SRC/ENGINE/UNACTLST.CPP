@@ -1,7 +1,7 @@
 /*=============================================================================
-	UnActor.cpp: UActorList implementation
+	UnActor.cpp: Actor list functions.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -11,230 +11,122 @@
 #include "Unreal.h"
 
 /*-----------------------------------------------------------------------------
-	UActorList exportation helpers.
+	Actor exportation helpers.
 -----------------------------------------------------------------------------*/
-
-//
-// Set the text type, name, and value of a single actor property.  Used for
-// exporting actor properties.
-//
-void ExportActorProperty
-(
-	char			*Type,
-	char			*Name,
-	char			*Value,
-	int				iProperty,
-	AActor			*Actor, 
-	int				Flags, 
-	int				Descriptive, 
-	int				ArrayElement, 
-	AActor			*Delta, 
-	FName			Category
-)
-{
-	guard(ExportActorProperty);
-
-	// Init caller values.
-	Type[0]=0; 
-	Name[0]=0; 
-	Value[0]=0;
-
-	// Get property pointer.
-	FClassProperty *Property = &Actor->Class->Element(iProperty);
-
-	// Make sure property is valid.
-	if (Property->Name.IsNone())
-		appErrorf("Missing name in class %s %i",Actor->Class->Name,iProperty);
-
-	BYTE *RawActor = (BYTE*) Actor;
-	BYTE *PropertyValue = &RawActor
-	[
-		Property->Offset + ArrayElement * Property->ElementSize
-	];
-	if 
-	(
-		((Property->Flags & Flags) || !Flags) &&
-		((!Delta) || !Property->Compare(Actor,Delta,ArrayElement)) &&
-		((Category==NAME_NONE)||(Category==Property->Category))
-	)
-	{
-		strcpy(Name,Property->Name.Name());
-
-		switch( Property->Type )
-		{
-			case CPT_Byte:
-			{
-				BYTE Temp = *(BYTE *)PropertyValue;
-
-				if (Property->Enum)
-					sprintf(Type,"BYTE.%s",Property->Enum->Name);
-				else
-					strcpy(Type,"BYTE");
-
-				if (Property->Enum && Descriptive)
-					sprintf(Value,"%i - %s",Temp,Property->Enum->Element(Temp).Name());
-				else
-					sprintf(Value,"%i",Temp);
-				break;
-			}
-			case CPT_Integer:
-			{
-				strcpy(Type,"INTEGER");
-				sprintf(Value,"%i",*(INT *)PropertyValue);
-				break;
-			}
-			case CPT_Real:
-			{
-				strcpy(Type,"REAL");
-				sprintf(Value,"%+013.6f",*(FLOAT *)PropertyValue);
-				break;
-			}
-			case CPT_String:
-			{
-				strcpy(Type,"STRING");
-				if (Descriptive)
-					sprintf(Value,"%s",(char *)PropertyValue);
-				else
-					sprintf(Value,"\"%s\"",(char *)PropertyValue);
-				break;
-			}
-			case CPT_Boolean:
-			{
-				strcpy(Type,"BOOLEAN");
-				char *Temp = ((*(DWORD *)PropertyValue) & Property->BitMask) ? "True" : "False";
-				sprintf(Value,"%s",Temp);
-				break;
-			}
-			case CPT_Actor:
-			{
-				strcpy(Type,"ACTOR");
-				INDEX Temp = *(INDEX *)PropertyValue;
-				if (Temp!=INDEX_NONE)
-					sprintf(Value,"%i",Temp);
-				else
-					sprintf(Value,"None");
-				break;
-			}
-			case CPT_Resource:
-			{
-				strcpy(Type,GRes.GetTypeName(Property->ResType));
-				UResource *Temp = *(UResource **)PropertyValue;
-				if (Temp)
-					strcpy(Value,Temp->Name);
-				else
-					strcpy(Value,"None");
-				break;
-			}
-			case CPT_Name:
-			{
-				strcpy(Type,"NAME");
-				FName Temp = *(FName *)PropertyValue;
-				strcpy(Value,Temp.Name());
-				break;
-			}
-			case CPT_Vector:
-			{
-				strcpy(Type,"VECTOR");
-				FVector *Temp = (FVector *)PropertyValue;
-				sprintf(Value,"(%+013.6f,%+013.6f,%+013.6f)",Temp->X,Temp->Y,Temp->Z);
-				break;
-			}
-			case CPT_Rotation:
-			{
-				strcpy(Type,"ROTATION");
-				FRotation *TempRot = (FRotation *)PropertyValue;
-				sprintf(Value,"(%i,%i,%i)",TempRot->Pitch,TempRot->Yaw,TempRot->Roll);
-				break;
-			}
-			default:
-			{
-				appErrorf("ExportActor: Unknown type in class %s",Actor->Class->Name);
-				break;
-			}
-		}
-	}
-	unguard;
-}
 
 //
 // Export one entire actor, or the specified named property, to text.
 //
-int ExportActor
+void ExportActor
 (
-	AActor		*Actor,
-	char		*Ptr,
-	FName		PropertyName,
-	int			Indent,
-	int			Descriptive,
-	int			Flags, 
-	AActor		*Delta,
-	int			Resources,
-	int			ArrayElement,
-	FName		Category
+	UClass*			XClass,
+	BYTE*const*		ActorBins,
+	FOutputDevice&	Out,
+	FName			PropertyName,
+	int				Indent,
+	int				Descriptive,
+	int				Flags, 
+	UClass			*Diff,
+	int				Objects,
+	int				ArrayElement,
+	FName			Category,
+	BYTE			WhichBins[PROPBIN_MAX]
 )
 {
 	guard(ExportActor);
-	char			*NewPtr	= Ptr;
-	char			Type[128],Name[128],Value[128];
-	FClassProperty	*Property;
+	char Type[128],Name[128],Value[128];
+
+	// Get difference bins.
+	BYTE **DiffBins=NULL, *DeltaBins[PROPBIN_MAX];
+	if( Diff )
+	{
+		Diff->GetClassBins(DeltaBins);
+		DiffBins = DeltaBins;
+	}
 
 	// Export actor.
-
-	Property = &Actor->Class->Element(0);
-	for (int i=0; i<Actor->Class->Num; i++)
+	for( FPropertyIterator It(XClass); It; ++It )
 	{
-		if( (PropertyName.IsNone()) || (PropertyName==Property->Name) )
+		FProperty &Property = It();
+		if
+		(	(PropertyName==NAME_None || PropertyName==Property.Name)
+		&&	(WhichBins[Property.Bin])
+		&& !(Property.Flags & (CPF_Private | CPF_Transient)) )
 		{
-			if( !(Property->Flags & CPF_Array) )
+			if( Property.ArrayDim == 1 )
 			{
 				// Export single element.
-				ExportActorProperty(Type,Name,Value,i,Actor,Flags,Descriptive,0,Delta,Category);
-				if (Type[0] && Name[0])
+				Property.ExportText
+				(
+					Type,
+					Name,
+					Value,
+					ActorBins,
+					Flags,
+					Descriptive,
+					0,
+					Diff && Diff->IsChildOf(It.GetClass()) ? DiffBins : NULL,
+					Category
+				);
+				if( Type[0] && Name[0] )
 				{
-					if( Resources && (Property->Type==CPT_Resource) &&
-						(Property->Flags & CPF_ExportResource) )
+					if
+					(	(Objects)
+					&&	(Property.Type == CPT_Object)
+					&&	(Property.Flags & CPF_ExportObject) )
 					{
-						UResource *Res = *(UResource **)Actor->GetPropertyPtr(i);
-						if (Res && !(Res->Flags & RF_TagImp))
+						UObject *Res = *(UObject **)&ActorBins[Property.Bin][Property.Offset];
+						if (Res && !(Res->GetFlags() & RF_TagImp))
 						{
 							// Don't export more than once.
-							NewPtr = Res->Export(NewPtr,"",Indent+1);
-							Res->Flags |= RF_TagImp;
+							Res->Export( Out, "", Indent+1 );
+							Res->SetFlags( RF_TagImp );
 						}
 					}
-					if (Descriptive!=2) NewPtr += sprintf(NewPtr,"%s%s %s=%s\r\n",spc(Indent),Descriptive?Type:"",Name,Value);
-					else                NewPtr += sprintf(NewPtr,"%s",Value);
+					if (Descriptive!=2) Out.Logf("%s%s %s=%s\r\n",spc(Indent),Descriptive?Type:"",Name,Value);
+					else                Out.Logf("%s",Value);
 					//bug("%s%s %s=%s\r\n",spc(Indent),Descriptive?Type:"",Name,Value);
 				}
 			}
 			else
 			{
 				// Export array.
-				for( INT j=0; j<Property->ArrayDim; j++ )
+				for( INT j=0; j<Property.ArrayDim; j++ )
 				{
-					ExportActorProperty(Type,Name,Value,i,Actor,Flags,Descriptive,j,Delta,Category);
-					if( Type[0] && Name[0] && ((ArrayElement==-1) || (ArrayElement==(int)j)) )
+					Property.ExportText
+					(
+						Type,
+						Name,
+						Value,
+						ActorBins,
+						Flags,
+						Descriptive,
+						j,
+						Diff && Diff->IsChildOf(It.GetClass()) ? DiffBins : NULL,
+						Category
+					);
+					if( Type[0] && Name[0] && (ArrayElement==-1 || ArrayElement==(int)j) )
 					{
-						if( Resources && (Property->Type==CPT_Resource) &&
-							(Property->Flags & CPF_ExportResource) )
+						if
+						(	(Objects)
+						&&	(Property.Type==CPT_Object)
+						&&	(Property.Flags & CPF_ExportObject) )
 						{
-							UResource *Res = *(UResource **)Actor->GetPropertyPtr(i,j);
-							if (Res && !(Res->Flags & RF_TagImp))
+							UObject *Res = *(UObject **)&ActorBins[Property.Bin][Property.Offset + j*Property.ElementSize];
+							if (Res && !(Res->GetFlags() & RF_TagImp))
 							{
 								// Don't export more than once.
-								NewPtr = Res->Export(NewPtr,"",Indent+1);
-								Res->Flags |= RF_TagImp;
+								Res->Export(Out,"",Indent+1);
+								Res->SetFlags(RF_TagImp);
 							}
 						}
-						if (Descriptive!=2) NewPtr += sprintf(NewPtr,"%s%s %s(%i)=%s\r\n",spc(Indent),Descriptive?Type:"",Name,j,Value);
-						else                NewPtr += sprintf(NewPtr,"%s",Value);
+						if( Descriptive!=2 ) Out.Logf("%s%s %s(%i)=%s\r\n",spc(Indent),Descriptive?Type:"",Name,j,Value);
+						else                 Out.Logf("%s",Value);
 					}
 				}
 			}
 		}
-		Property++;
 	}
-	return (int)(NewPtr-Ptr);
 	unguard;
 }
 
@@ -247,29 +139,29 @@ int ExportActor
 // Does not export arrays properly, except for strings (only exports first element of array).
 // Assumes that the script compiler prevents non-string arrays from being declared as editable.
 //
-int ExportMultipleActors
+void ExportMultipleActors
 (
-	UActorList	*Actors,
-	char		*Ptr,
-	FName		PropertyName,
-	int			Indent,
-	int			Descriptive,
-	FName		Category
+	ULevel*			Actors,
+	FOutputDevice&	Out,
+	FName			PropertyName,
+	INT				Indent,
+	INT				Descriptive,
+	FName			Category,
+	BYTE			WhichBins[PROPBIN_MAX]
 )
 {
 	guard(ExportMultipleActors);
 
 	AActor			*FirstActor=NULL,*Actor;
-	char			*NewPtr	= Ptr;
-	int				iActor,i,j,iStart=-1;
-	char			FirstType[128],FirstName[128],FirstValue[128];
-	char			Type[128],Name[128],Value[128];
+	char			FirstType[256],FirstName[256],FirstValue[256];
+	char			Type[256],Name[256],Value[256];
 
 	// Find first actor.
-	for (iActor=0; iActor<Actors->Max; iActor++)
+	INDEX iStart = -1;
+	for( INDEX iActor=0; iActor<Actors->Num; iActor++ )
 	{
-		FirstActor = &Actors->Element(iActor);
-		if (FirstActor->Class && FirstActor->bSelected)
+		FirstActor = Actors->Element(iActor);
+		if( FirstActor && FirstActor->bSelected )
 		{
 			iStart = iActor+1;
 			break;
@@ -277,39 +169,59 @@ int ExportMultipleActors
 	}
 
 	// At least one actor is selected.
-	if (iStart>=0)
+	if( iStart>=0 )
 	{
 		// Find property in first actor.
-		FClassProperty *FirstProperty = &FirstActor->Class->Element(0);
-		for (i=0; i<FirstActor->Class->Num; i++)
+		for( FPropertyIterator It1(FirstActor->GetClass()); It1; ++It1 )
 		{
-			if ( ((PropertyName.IsNone()) || (PropertyName==FirstProperty->Name))
-			&&	(!(FirstProperty->Flags & CPF_Array)) )
+			FProperty &FirstProperty = It1();
+			if
+			(	(PropertyName==NAME_None || PropertyName==FirstProperty.Name)
+			&&	(FirstProperty.ArrayDim == 1) 
+			&&	(WhichBins[FirstProperty.Bin])
+			&&	(It1.GetFlagMask() & CPF_Edit)
+			&& !(FirstProperty.Flags & (CPF_Private|CPF_Transient))
+			)
 			{
-				ExportActorProperty(FirstType,FirstName,FirstValue,i,FirstActor,CPF_Edit,Descriptive,0,NULL,Category);
+				BYTE *ObjectBins[PROPBIN_MAX]; FirstActor->GetObjectBins(ObjectBins);
+				FirstProperty.ExportText
+				(
+					FirstType,
+					FirstName,
+					FirstValue,
+					ObjectBins,
+					CPF_Edit,
+					Descriptive,
+					0,
+					NULL,
+					Category
+				);
 				if( FirstType[0] && FirstName[0] )
 				{
 					// Now go through all other actors and see if this property is shared.
-					for( iActor=iStart; iActor<Actors->Max; iActor++ )
+					for( iActor=iStart; iActor<Actors->Num; iActor++ )
 					{
-						Actor = &Actors->Element(iActor);
-						if( Actor->Class && Actor->bSelected )
+						Actor = Actors->Element(iActor);
+						if( Actor && Actor->bSelected )
 						{
-							FClassProperty *Property = &Actor->Class->Element(0);
-							for( j=0; j<Actor->Class->Num; j++ )
+							for( FPropertyIterator It2(Actor->GetClass()); It2; ++It2 )
 							{
-								if( Property->Name == FirstProperty->Name )
+								FProperty &Property = It2();
+								if
+								(	(Property.Name==FirstProperty.Name)
+								&&  (Property.ArrayDim == 1)
+								&&	(WhichBins[Property.Bin])
+								&&	(It2.GetFlagMask() & CPF_Edit)
+								&& !(Property.Flags & (CPF_Private|CPF_Transient))
+								)
 								{
-									if( Property->ArrayDim != 1 )
-										goto NextProperty;
-									
-									ExportActorProperty
+									BYTE *ObjectBins[PROPBIN_MAX]; Actor->GetObjectBins(ObjectBins);
+									Property.ExportText
 									(
 										Type,
 										Name,
 										Value,
-										j,
-										Actor,
+										ObjectBins,
 										CPF_Edit,
 										Descriptive,
 										0,
@@ -317,41 +229,34 @@ int ExportMultipleActors
 										Category
 									);
 									
-									if( stricmp(Type,FirstType) || stricmp(Name,FirstName) )
+									if( stricmp(Type,FirstType)!=0 || stricmp(Name,FirstName)!=0 )
 									{					
 										// Mismatch.					
 										goto NextProperty;
 									}
-									if (stricmp(Value,FirstValue))
+									if( stricmp(Value,FirstValue)!=0 )
 									{
 										// Blank out value if not identical.
 										FirstValue[0]=0;
 									}
 								}
-								Property++;
 							}
 						}
 					}
 					if( strcmp(Value,FirstValue)==0 )
-					{
-						NewPtr += sprintf(NewPtr,"%s%s %s=%s\r\n",spc(Indent),Descriptive?Type:"",Name,Value);
-					}
+						Out.Logf("%s%s %s=%s\r\n",spc(Indent),Descriptive?Type:"",Name,Value);
 					else
-					{
-						NewPtr += sprintf(NewPtr,"%s%s %s=\r\n",spc(Indent),Descriptive?Type:"",Name);
-					}
+						Out.Logf("%s%s %s=\r\n",spc(Indent),Descriptive?Type:"",Name);
 				}
 			}
 			NextProperty:;
-			FirstProperty++;
-			}
+		}
 	}
-	return (int)(NewPtr-Ptr);
 	unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	UActorList importation helpers.
+	Actor importation helpers.
 -----------------------------------------------------------------------------*/
 
 //
@@ -362,19 +267,24 @@ int ExportMultipleActors
 //
 // This requires that the actor's Class be set in advance.
 //
-const char *ImportActorProperties( AActor *Actor, const char *Data )
+UNENGINE_API const char *ImportActorProperties
+(
+	ULevel*			Actors,
+	UClass*			Class,
+	BYTE**			ObjectBins,
+	const char*		Data,
+	BYTE			WhichBins[PROPBIN_MAX],
+	INT				ImportingFromFile
+)
 {
 	guard(ImportActorProperties);
+	FMemMark Mark(GMem);
 
-	UClass	*Class		= Actor->Class;
-	BYTE	*RawActor	= (BYTE *)Actor;
-	char	*PropText	= (char *)GMem.Get(65536);
+	char	*PropText	= new(GMem,65536)char;
 	char	*Top		= &PropText[0];
-	char	*MemTop		= &PropText[0];
 
-	// Parse all resources stored in the actor.
+	// Parse all objects stored in the actor.
 	// Build list of all text properties.
-
 	*PropText = 0;
 	char StrLine[256];
 	while( GetLINE (&Data,StrLine,256)==0 )
@@ -385,31 +295,34 @@ const char *ImportActorProperties( AActor *Actor, const char *Data )
 			// Parse brush on this line.
 			char BrushName[NAME_SIZE];
 
-			if (GetSTRING(Str,"NAME=",BrushName,NAME_SIZE))
+			if( GetSTRING(Str,"NAME=",BrushName,NAME_SIZE) )
 			{
 				// If a brush with this name already exists in the
 				// level, rename the existing one.  This is necessary
 				// because we can't rename the brush we're importing without
 				// losing our ability to associate it with the actor properties
 				// that reference it.
-
 				UModel *ExistingBrush = new(BrushName,FIND_Optional)UModel;
 				if( ExistingBrush )
 				{
 					char TempName[NAME_SIZE];
-					GRes.MakeUniqueName(TempName,BrushName,"",RES_Model);
+					GObj.MakeUniqueObjectName(TempName,BrushName,UModel::GetBaseClass());
 
-					debugf(LOG_Info,"Renaming %s to %s",ExistingBrush->Name,TempName);
-					strcpy(ExistingBrush->Name,TempName);
+					debugf(LOG_Info,"Renaming %s to %s",ExistingBrush->GetName(),TempName);
+					ExistingBrush->Rename(TempName);
 
-					if (ExistingBrush->Polys)
-						strcpy(ExistingBrush->Polys->Name,TempName);
+					if( ExistingBrush->Polys )
+						ExistingBrush->Polys->Rename(TempName);
 				}
 				UModel *Brush = new(BrushName,CREATE_Unique)UModel;
 				Data = Brush->Import(Data,NULL,"");
+
+				// Prep it for collision.
+				checkState(GEditor!=NULL);
+				GEditor->csgPrepMovingBrush(Brush);
 			}
 		}
-		else if (GetEND(&Str,"ACTOR") || GetEND(&Str,"DEFAULTPROPERTIES"))
+		else if( GetEND(&Str,"ACTOR") || GetEND(&Str,"DEFAULTPROPERTIES") )
 		{
 			// End of actor properties.
 			break;
@@ -423,327 +336,381 @@ const char *ImportActorProperties( AActor *Actor, const char *Data )
 	}
 
 	// Parse all text properties.
-	FClassProperty	*Property = Class->GetData();
-	for (int i=0; i<Class->Num; i++)
+	for( FPropertyIterator It(Class); It; ++It )
 	{
-		char LookFor[80];
-
-		for( int j=0; j<Property->ArrayDim; j++ )
+		FProperty &Property = It();
+		if
+		(	WhichBins[Property.Bin]
+		&& !(Property.Flags & (CPF_Private | CPF_Transient) )
+		&&	stricmp(Property.Name(),"Zone") )
 		{
-			BYTE *Value	= &RawActor
-				[
-				Property->Offset + j*Property->ElementSize
-				];
-
-			if( Property->Flags & CPF_Array )
-				sprintf(LookFor,"%s(%i)=",Property->Name.Name(),j);
-			else
-				sprintf(LookFor,"%s=",Property->Name.Name());
-
-			switch( Property->Type )
+			char LookFor[80];
+			for( int j=0; j<Property.ArrayDim; j++ )
 			{
-				case CPT_Byte:
-					GetBYTE(PropText,LookFor,(BYTE *)Value);
-					break;
-				case CPT_Integer:
-					GetINT(PropText,LookFor,(INT *)Value);
-					break;
-				case CPT_Boolean:
-					int Result;
-					if (GetONOFF(PropText,LookFor,&Result))
+				BYTE *Value	= &ObjectBins[Property.Bin][Property.Offset + j*Property.ElementSize];
+
+				if( Property.ArrayDim == 1 )
+					sprintf(LookFor,"%s=",Property.Name());
+				else
+					sprintf(LookFor,"%s(%i)=",Property.Name(),j);
+
+				switch( Property.Type )
+				{
+					case CPT_Byte:
+						if( !GetBYTE( PropText, LookFor, (BYTE *)Value ) && Property.Enum )
+						{
+							// Try to get enum tag.
+							char TempTag[NAME_SIZE];
+							if( GetSTRING( PropText, LookFor, TempTag, NAME_SIZE ) )
+							{
+								// Map tag to enum index.
+								INDEX iEnum;
+								if( Property.Enum->FindNameIndex( TempTag, iEnum ) )
+									*(BYTE*)Value = iEnum;
+							}
+						}
+						break;
+					case CPT_Int:
+						GetINT(PropText,LookFor,(INT *)Value);
+						break;
+					case CPT_Bool:
+						int Result;
+						if (GetONOFF(PropText,LookFor,&Result))
+						{
+							if (Result) *(DWORD *)Value |=  Property.BitMask;
+							else		*(DWORD *)Value &= ~Property.BitMask;
+						}
+						break;
+					case CPT_Float:
+						GetFLOAT(PropText,LookFor,(FLOAT *)Value);
+						break;
+					case CPT_Object:
 					{
-						if (Result) *(DWORD *)Value |=  Property->BitMask;
-						else		*(DWORD *)Value &= ~Property->BitMask;
+						if( Property.Class->IsChildOf("Actor") )
+						{
+							// An actor reference.
+							if( ImportingFromFile == 0 )
+							{
+								// Import regular object name.
+								INDEX iTemp;
+								if( GetINDEX( PropText, LookFor, &iTemp ) && iTemp!=INDEX_NONE )
+									if( Actors!=NULL && iTemp>=0 && iTemp<Actors->Max )
+										*(AActor**)Value = Actors->Element(iTemp);
+							}
+							else if( ImportingFromFile == 1 )
+							{
+								// Importing from old format .t3d.
+								*(INDEX*)Value = INDEX_NONE;
+								GetINDEX( PropText, LookFor, (INDEX*)Value );
+							}
+							else
+							{
+								// Importing from new format .t3d.
+								*(FName*)Value = NAME_None;
+								GetNAME( PropText, LookFor, (FName*)Value );
+							}
+						}
+						else
+						{
+							// An object reference.
+							GetOBJ(PropText,LookFor,Property.Class,(UObject **)Value);
+						}
+						break;
 					}
-					break;
-				case CPT_Real:
-					GetFLOAT(PropText,LookFor,(FLOAT *)Value);
-					break;
-				case CPT_Actor:
-					GetINDEX(PropText,LookFor,(INDEX *)Value);
-					break;
-				case CPT_Resource:
-					GetRES(PropText,LookFor,Property->ResType,(UResource **)Value);
-					break;
-				case CPT_Name:
-					GetNAME(PropText,LookFor,(FName *)Value);
-					break;
-				case CPT_String:
-					GetSTRING(PropText,LookFor,(char *)Value,Property->ElementSize);
-					break;
-				case CPT_Vector:
-					GetFVECTOR(PropText,LookFor,(FVector *)Value);
-					break;
-				case CPT_Rotation:
-					GetFROTATION(PropText,LookFor,(FRotation *)Value,1);
-					break;
-				default:
-					appErrorf("Bad class property type %i in %s",Property->Type,Class->Name);
-					break;
+					case CPT_Name:
+						if( !GetNAME(PropText,LookFor,(FName *)Value) )
+						{
+							// Update Name to Tag from old version.
+							if( Property.Name==NAME_Tag )
+								GetNAME(PropText,"Name=",(FName *)Value);
+						}
+						break;
+					case CPT_String:
+						GetSTRING(PropText,LookFor,(char *)Value,Property.ElementSize);
+						break;
+					case CPT_Vector:
+						GetFVECTOR(PropText,LookFor,(FVector *)Value);
+						break;
+					case CPT_Rotation:
+						GetFROTATION(PropText,LookFor,(FRotation *)Value,1);
+						break;
+					case CPT_EnumDef:
+						break;
+					default:
+						appErrorf("Bad property type %i (%i/%i) in %s of %s (%s)",Property.Type,It.GetIndex(),It.GetClass()->Num,Property.Name(),It.GetClass()->GetName(),Class->GetName());
+						break;
+				}
 			}
 		}
-		Property++;
 	}
-	GMem.Release(MemTop);
+	Mark.Pop();
 	return Data;
-
 	unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	UActorList resource implementation.
+	Actor importing and exporting.
 -----------------------------------------------------------------------------*/
 
-//
-// Standard resource functions.
-//
-void UActorList::Register(FResourceType *Type)
+const char *ULevel::ImportActors( const char *Buffer, const char *BufferEnd, const char *FileType )
 {
-	guard(UActorList::Register);
+	guard(ULevel::ImportActors);
 
-	Type->HeaderSize = sizeof (UActorList);
-	Type->RecordSize = sizeof (AActor);
-	Type->Version    = 1;
-	strcpy (Type->Descr,"ActorList");
-	
-	unguard;
-}
-void UActorList::InitHeader()
-{
-	guard(UActorList::InitHeader);
-
-	Max					= 0;
-	Num					= 0;
-	LockType			= LOCK_None;
-    StaticActors        = 0;
-    DynamicActors       = 0;
-    CollidingActors     = 0;
-    ActiveActors        = 0;
-    UnusedActors        = 0;
-    JustDeletedActors   = 0;
-	
-	unguard;
-}
-void UActorList::InitData()
-{
-	guard(UActorList::InitData);
-	Num = 0;
-	unguard;
-}
-const char *UActorList::Import(const char *Buffer, const char *BufferEnd,const char *FileType)
-{
-	guard(UActorList::Import);	
-	char StrLine[256];
+	// Default to old-format.
+	int ImportFormat = 1;
 
 	// Allocate working memory for remapping.
-	INDEX *Remaps  = (INDEX *)GMem.Get(Max * 4 * sizeof(INDEX));
-	INDEX *IsRemap = (INDEX *)GMem.Get(Max *     sizeof(INDEX));
+	FMemMark Mark(GMem);
+	INDEX *Remaps      = new(GMem,Max * 4)INDEX;
+	INDEX *IsRemap     = new(GMem,Max    )INDEX;
+	FName *ImportNames = new(GMem,Max    )FName;
 
-	for( int i=0; i<Max; i++ )
-		IsRemap[i] = 0;
+	// Init items between Num and Max.
+	for( int i=Num; i<Max; i++ )
+		Element(i) = NULL;
 
-	for( i=0; i<Max*4; i++ )
-		Remaps[i] = INDEX_NONE;
-
-	// Empty the lists.
-    StaticActors        ->Empty(TRUE);
-    DynamicActors       ->Empty(TRUE);
-    CollidingActors     ->Empty(TRUE);
-    ActiveActors        ->Empty(TRUE);
-    UnusedActors        ->Empty(TRUE);
-    JustDeletedActors   ->Empty(TRUE);
+	// Init remap tables.
+	for( int j=0; j<Max; j++ )
+	{
+		IsRemap    [j] = 0;
+		ImportNames[j] = NAME_None;
+	}
+	for( j=0; j<Max*4; j++ )
+	{
+		Remaps[j] = INDEX_NONE;
+	}
+	Remaps[0] = 0;
 
 	// Import a sparse actor list.
-	AActor *Actor = NULL;
+	guard(Importing);
+	char StrLine[256];
 	while( GetLINE (&Buffer,StrLine,256)==0 )
 	{
 		const char *Str = &StrLine[0];
 		if( GetBEGIN(&Str,"ACTOR") )
 		{
-			INDEX  iNew;
 			UClass *TempClass;
-
-			if( GetUClass(Str,"CLASS=",&TempClass) )
+			FName ActorName(NAME_None);
+			if( GetUClass(Str,"CLASS=",TempClass) )
 			{
-				// Find a new index for this actor.
-				iNew = INDEX_NONE;
-				for( i=0; i<Max; i++ )
+				if( GetNAME( Str, "NAME=", &ActorName ) )
 				{
-					if( Element(i).Class == NULL )
+					// This indicates we are importing a new .t3d format file.
+					ImportFormat = 2;
+				}
+
+				// Find a new index for this actor.
+				INDEX iActor = INDEX_NONE;
+				for( j=0; j<Max; j++ )
+				{
+					if( Element(j) == NULL )
 					{
-						iNew = i;
+						iActor = j;
 						break;
 					}
 				}
-				if( iNew != INDEX_NONE )
+				if( iActor != INDEX_NONE )
 				{
 					// Import it.
-					Actor			 = &Element(iNew);
-					Actor->Class	 = TempClass;
-					memcpy(Actor,&Actor->Class->DefaultActor,sizeof(AActor));
-					Actor->SetBinPointers(Actor->Class);
-					Buffer			 = ImportActorProperties(Actor,Buffer);
+					AActor *Actor = Element(iActor) = (AActor*)GObj.CreateObject
+					(
+						ActorName!=NAME_None ? ActorName() : TempClass->GetName(),
+						TempClass,
+						CREATE_MakeUnique
+					);
+					memcpy
+					(
+						(BYTE *)Actor                                           + sizeof(UObject),
+						&Actor->GetClass()->Bins[PROPBIN_PerObject]->Element(0) + sizeof(UObject),
+						Actor->GetClass()->Bins[PROPBIN_PerObject]->Num         - sizeof(UObject)
+					);
 
-					if( Actor->iMe>=0 && Actor->iMe<Max*4 )
+					// Init properties.
+					Actor->ZoneNumber = 0;
+					Actor->XLevel     = new( "TestLev", FIND_Existing )ULevel;
+					Actor->Hash       = NULL;
+
+					BYTE WhichBins[PROPBIN_MAX]; memset(WhichBins,0,sizeof(WhichBins));
+					WhichBins[PROPBIN_PerObject] = 1;
+					BYTE *ObjectBins[PROPBIN_MAX]; Actor->GetObjectBins(ObjectBins);
+
+					INT ImportIndex = INDEX_NONE;
+					GetINT( Buffer, "SELFINDEX=", &ImportIndex );//!!
+					GetINT( Buffer, "ME=", &ImportIndex );
+					Buffer = ImportActorProperties
+					(
+						this,
+						Actor->GetClass(),
+						ObjectBins,
+						Buffer,
+						WhichBins,
+						ImportFormat
+					);
+
+					if( (ImportIndex!=INDEX_NONE && ImportIndex<Max*4) || ActorName!=NAME_None )
 					{
-						if( Actor->iMe==0 && Actor->IsKindOf("LevelDescriptor") )
+						if( Actor->IsA("LevelInfo") )
 						{
-							// Replace the existing level descriptor with this one.
-							Element(0)   = *Actor;
-							Actor->Class = NULL;
+							// Copy the one LevelInfo the position #0.
+							if( Element(0) )
+								Element(0)->Kill();
+							Element(0)       = Actor;
+							Element(iActor)  = NULL;
+							iActor           = 0;
 						}
-						else
+						if( ImportIndex!=INDEX_NONE )
 						{
-							// Remember to remap it.
-							IsRemap[iNew      ] = 1;
-							Remaps [Actor->iMe] = iNew;
+							IsRemap[iActor          ] = 1;
+							Remaps [ImportIndex     ] = iActor;
 						}
+						ImportNames[iActor] = ActorName;
 					}
 					else
 					{
 						// Kill the invalid actor.
-						Actor->Class = NULL;
+						debugf
+						(
+							"Got an invalid actor: %s %s",
+							Actor->GetClassName(),
+							Actor->GetName()
+						);
+						Actor->Kill();
+						Element(iActor) = NULL;
 					}
 				}
 			}
 		}
-		else if (GetEND(&Str,"ACTORLIST")) 
-		{
-			break;
-		}
+		else if( GetEND(&Str,"ACTORLIST") ) break;
 	}
+	unguard;
 
 	// Remap the imported actors.
 	// Necessary because we may be merging two maps by importing
 	// a second map into the first, and the second map's actors will
-	// need new indices.
-	for( i=0; i<Max; i++ )
+	// need adjusting.
+	guard(Remapping);
+	Num = 0;
+	for( int i=0; i<Max; i++ )
 	{
-		if( IsRemap[i] )
+		AActor *Actor = Element(i);
+		if( Actor && IsRemap[i] )
 		{
-			// Remap this actor.
-			AActor         *Actor    = &Element(i);
-			UClass		   *Class    = Actor->Class;
-			FClassProperty *Property = &Class->Element(0);
-			
-			if( Actor->iMe == INDEX_NONE ) appErrorf("!%s!",Actor->Class->Name);
-
 			// Check all properties.
-			for( int j=0; j<Class->Num; j++ )
+			UClass *Class = Actor->GetClass();
+			for( FPropertyIterator It(Actor->GetClass()); It; ++It )
 			{
-				if( Property->Type == CPT_Actor && Property->IsPerActor() )
+				FProperty &Property = It();
+				if( Property.Type==CPT_Object && Property.Bin==PROPBIN_PerObject && Property.Class->IsChildOf("Actor") )
 				{
-					for( int k=0; k<Property->ArrayDim; k++ )
+					for( int k=0; k<Property.ArrayDim; k++ )
 					{
-						INDEX *iActor = (INDEX *)Actor->GetPropertyPtr(j,k);
-						if( *iActor>=0 && *iActor<Max*4 )
+						// Remap this.
+						void *Test = Actor->ObjectPropertyPtr(Property,k);
+						if( ImportFormat == 1 )
 						{
-							// Remap this.
-							*iActor = Remaps[*iActor];
+							// Old format t3d.
+							guard(RemapOldIndex);
+							if( *(INDEX*)Test == INDEX_NONE )
+							{
+								*(AActor**)Test = NULL;
+							}
+							else
+							{
+								*(AActor**)Test = Element(Remaps[*(INDEX*)Test]);
+							}
+							unguard;
+						}
+						else
+						{
+							// New format t3d.
+							guard(RemapNewIndex);
+							if( *(FName*)Test == NAME_None )
+							{
+								*(AActor**)Test=NULL;
+							}
+							else
+							{
+								for( int i=0; i<Max; i++ )
+								{
+									if( ImportNames[i] == *(FName*)Test )
+									{
+										checkState(Element(i)!=NULL);
+										*(AActor**)Test = Element(i);
+									}
+								}
+							}
+							unguard;
 						}
 					}
 				}
-				Property++;
 			}
-			if( Actor->iMe != i ) appErrorf("Remap failed %i %i",Actor->iMe,i);
+		}
+		if( Actor )
+		{
+			guard(FixupActor);
+			Actor->Level = (ALevelInfo*)Element(0);
+			Actor->Zone  = Actor->Zone ? Actor->Zone : (ALevelInfo*)Element(0);
+			Num          = i + 1;
+			unguard;
 		}
 	}
+	checkLogic(Element(0)!=NULL && Element(0)->IsA("LevelInfo"));
+	unguard;
 
-	Num=Max;
-	Realloc();
-    RelistActors();
-	GMem.Release(Remaps);
+	Mark.Pop();
 	return Buffer;
 
 	unguard;
 }
-char *UActorList::Export(char *Buffer,const char *FileType,int Indent)
+void ULevel::ExportActors
+(
+	FOutputDevice	&Out,
+	const char		*FileType,
+	int				Indent
+)
 {
-	guard(UActorList::Export);
+	guard(ULevel::ExportActors);
 
 	// Export all active actors.
-	Buffer += sprintf (Buffer,"%sBegin ActorList Max=%i\r\n",spc(Indent),Max);
+	Out.Logf("%sBegin ActorList Max=%i\r\n",spc(Indent),Max);
+
+	BYTE WhichBins[PROPBIN_MAX]; memset(WhichBins,0,sizeof(WhichBins));
+	WhichBins[PROPBIN_PerObject] = 1;
 
 	for( INDEX iActor=0; iActor<Num; iActor++ )
 	{
-		AActor *Actor = &Element(iActor);
-		if( Actor->Class && !Actor->IsKindOf("Camera") )
+		AActor *Actor = Element(iActor);
+		if( Actor && !Actor->IsA("View") )
 		{
-			Buffer += sprintf(Buffer,"%s   Begin Actor Class=%s\r\n",spc(Indent),Actor->Class->Name);
-			Buffer += ExportActor (Actor,Buffer,NAME_NONE,Indent+6,0,0,&Actor->Class->DefaultActor,1,-1,NAME_NONE);
-			Buffer += sprintf(Buffer,"%s   End Actor\r\n",spc(Indent));
+			Out.Logf
+			(
+				"%s   Begin Actor Class=%s Name=%s\r\n",
+				spc(Indent),
+				Actor->GetClassName(),
+				Actor->GetName()
+			);
+			BYTE *ObjectBins[PROPBIN_MAX]; Actor->GetObjectBins(ObjectBins);
+			ExportActor
+			(
+				Actor->GetClass(),
+				ObjectBins,
+				Out,
+				NAME_None,
+				Indent+6,
+				0,
+				0,
+				Actor->GetClass(),
+				1,
+				-1,
+				NAME_None,
+				WhichBins
+			);
+			Out.Logf("%s   End Actor\r\n",spc(Indent));
 		}
 	}
-	Buffer += sprintf (Buffer,"%sEnd ActorList\r\n",spc(Indent));
-	return Buffer;
-	
+	Out.Logf("%sEnd ActorList\r\n",spc(Indent));
 	unguard;
 }
-void UActorList::QueryHeaderReferences( FResourceCallback &Callback )
-{
-	guard(UActorList::QueryHeaderReferences);
-	unguard;
-}
-void UActorList::QueryDataReferences( FResourceCallback &Callback )
-{
-	guard(UActorList::QueryDataReferences);
-
-	AActor *Actor = &Element(0);
-	for( INDEX iActor=0; iActor<Num; iActor++ )
-	{
-		if (Actor->Class)
-		{
-			Actor->QueryReferences( this,Callback,0,0 );
-		}
-		Actor++;
-	}
-	unguard;
-}
-void UActorList::PostLoad()
-{
-	guard(UActorList::PostLoad);
-
-	Flip();
-	for( int i=0; i<Num; i++ )
-	{
-		AActor *Actor = &Element(i);
-		if( Actor->Class )
-			Actor->PostLoad(this,0);
-	}
-    StaticActors		= 0;
-	DynamicActors		= 0;
-	CollidingActors		= 0;
-	ActiveActors		= 0;
-	UnusedActors		= 0;
-	JustDeletedActors	= 0;
-    RelistActors();
-
-	unguard(UActorList::PostLoad);
-}
-void UActorList::PreKill()
-{
-	guard(UActorList::PreKill);
-
-	// Free the actor lists.
-    delete StaticActors;
-    delete DynamicActors;
-    delete CollidingActors;
-    delete ActiveActors;
-    delete UnusedActors;
-    delete JustDeletedActors;
-
-	unguard;
-}
-void UActorList::Flip()
-{
-	guard(UActorList::Flip);
-
-	UDatabase::Flip();
-	//todo:
-
-	unguard;
-}
-AUTOREGISTER_RESOURCE(RES_ActorList,UActorList,0xB2D90850,0xCCD211cf,0x91360000,0xC028B992);
 
 /*---------------------------------------------------------------------------------------
    Actor link topic handler.
@@ -753,54 +720,49 @@ enum {MAX_PROP_CATS=64};
 FName GPropCats[MAX_PROP_CATS];
 int GNumPropCats;
 
-void CheckPropCats(UClass *Class)
+void CheckPropCats( UClass *Class )
 {
-	for( int i=0; i<Class->Num; i++ )
+	for( FPropertyIterator It(Class); It; ++It )
 	{
-		FClassProperty *Prop = &Class->Element(i);
-		FName CatName = Prop->Category;
+		FProperty &Property = It();
+		FName     CatName   = Property.Category;
 
-		if( (Prop->Flags & CPF_Edit) && 
-			(CatName!=NAME_NONE) && 
-			(GNumPropCats < MAX_PROP_CATS) )
+		if
+		(	(It.GetFlagMask() & Property.Flags & CPF_Edit)
+		&&	(CatName != NAME_None)
+		&&	(GNumPropCats < MAX_PROP_CATS) )
 		{
-			for (int j=0; j<GNumPropCats; j++)
-				if (GPropCats[j]==CatName) 
+			for( int j=0; j<GNumPropCats; j++ )
+				if( GPropCats[j]==CatName )
 					break;
-			if (j>=GNumPropCats) 
+			if( j>=GNumPropCats )
 				GPropCats[GNumPropCats++] = CatName;
 		}
 	}
 }
 
 AUTOREGISTER_TOPIC("Actor",ActorTopicHandler);
-void ActorTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, char *Data)
+void ActorTopicHandler::Get(ULevel *Level, const char *Item, FOutputDevice &Out)
 {
 	guard(ActorTopicHandler::Get);
 
-	UActorList	*Actors = Level->ActorList;
-	UClass		*AllClass   = NULL;
-	INDEX		i,n,AnyClass;
+	int		 n			= 0;
+	INDEX	 AnyClass	= 0;
+	UClass	 *AllClass	= NULL;
 
-	Actors->Lock(LOCK_Read);
-	n        = 0;
-	AnyClass = 0;
-
-	for( i=0; i<Actors->Max; i++ )
+	for( int i=0; i<Level->Num; i++ )
 	{
-		if( Actors->Element(i).Class && Actors->Element(i).bSelected )
+		if( Level->Element(i) && Level->Element(i)->bSelected )
 		{
-			if (AnyClass && (Actors->Element(i).Class != AllClass)) 
+			if( AnyClass && Level->Element(i)->GetClass()!=AllClass ) 
 				AllClass = NULL;
 			else 
-				AllClass = Actors->Element(i).Class;
+				AllClass = Level->Element(i)->GetClass();
 
 			AnyClass=1;
 			n++;
 		}
 	}
-
-	Actors->Unlock();
 
 	if
 	(
@@ -810,7 +772,7 @@ void ActorTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, 
 	)
 	{
 		// Parse name and optional array element.
-		FName PropertyName = NAME_NONE;
+		FName PropertyName = NAME_None;
 		int Element = -1;
 		char Temp[80];
 
@@ -822,7 +784,8 @@ void ActorTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, 
 				Element = atoi(&c[1]);
 				*c = 0;
 			}
-			if (!PropertyName.Find(Temp)) 
+			PropertyName = FName( Temp, FNAME_Find );
+			if( PropertyName == NAME_None )
 				return;
 		}
 		// Only return editable properties.
@@ -836,44 +799,105 @@ void ActorTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, 
 			Descriptive  = 2; // Data only, not names or formatting.
 		}
 
-		FName CategoryName=NAME_NONE;
+		FName CategoryName=NAME_None;
 		GetNAME(Item,"CATEGORY=",&CategoryName);
 
 		if( !strnicmp(Item,"Properties",10) )
 		{
+			BYTE WhichBins[PROPBIN_MAX]; memset(WhichBins,0,sizeof(WhichBins));
+			WhichBins[PROPBIN_PerObject] = 1;
 			if( n==1 )
 			{
 				// 1 actor is selected - just send it.
-				for( i=0; i<Actors->Max; i++ )
+				for( i=0; i<Level->Num; i++ )
 				{
-					AActor *Actor = &Actors->Element(i);
-					if( Actor->Class && Actor->bSelected )
+					AActor *Actor = Level->Element(i);
+					if( Actor && Actor->bSelected )
 					{
-						ExportActor (Actor,(char *)Data,PropertyName,0,Descriptive,PropertyMask,NULL,0,Element,CategoryName);
+						BYTE *ObjectBins[PROPBIN_MAX]; Actor->GetObjectBins(ObjectBins);
+						ExportActor
+						(
+							Actor->GetClass(),
+							ObjectBins,
+							Out,
+							PropertyName,
+							0,
+							Descriptive,
+							PropertyMask,
+							NULL,
+							0,
+							Element,
+							CategoryName,
+							WhichBins
+						);
 						break;
 					}
 				}
 			}
-			else if (n>1) 
+			else if( n > 1 ) 
 			{
 				// Export multiple actors.
-				ExportMultipleActors(Actors,(char *)Data,PropertyName,0,1,CategoryName);
+				ExportMultipleActors
+				(
+					Level,
+					Out,
+					PropertyName,
+					0,
+					1,
+					CategoryName,
+					WhichBins
+				);
 			}
 		}
 		else if( !strnicmp(Item,"DefaultProperties",17) )
 		{
+			BYTE WhichBins[PROPBIN_MAX]; memset(WhichBins,0,sizeof(WhichBins));
+			WhichBins[PROPBIN_PerObject] = WhichBins[PROPBIN_PerClass] = 1;
 			UClass *Class;
-			if (GetUClass(Item,"CLASS=",&Class))
+			if( GetUClass(Item,"CLASS=",Class) )
 			{
-				if(Class!=Class->DefaultActor.Class) appError ("Actor class mismatch");
-				ExportActor (&Class->DefaultActor,(char *)Data,PropertyName,0,1,PropertyMask,NULL,0,Element,CategoryName);
+				BYTE *ClassBins[PROPBIN_MAX];
+				Class->GetClassBins(ClassBins);
+				ExportActor
+				(
+					Class,
+					ClassBins,
+					Out,
+					PropertyName,
+					0,
+					Descriptive,
+					PropertyMask,
+					NULL,
+					0,
+					Element,
+					CategoryName,
+					WhichBins
+				);
 			}
 		}
-		else if( (!strnicmp(Item,"LevelProperties",15)) && 
-			Actors->Element(0) &&
-			Actors->Element(0).IsKindOf("LevelDescriptor") )
+		else if
+		(	(!strnicmp(Item,"LevelProperties",15))
+		&&	Level->Element(0)
+		&&	Level->Element(0)->IsA("LevelInfo") )
 		{
-			ExportActor (&Actors->Element(0),(char *)Data,PropertyName,0,1,PropertyMask,NULL,0,Element,CategoryName);
+			BYTE WhichBins[PROPBIN_MAX]; memset(WhichBins,0,sizeof(WhichBins));
+			WhichBins[PROPBIN_PerObject] = 1;
+			BYTE *ObjectBins[PROPBIN_MAX]; Level->Element(0)->GetObjectBins(ObjectBins);
+			ExportActor 
+			(
+				Level->Element(0)->GetClass(),
+				ObjectBins,
+				Out,
+				PropertyName,
+				0,
+				Descriptive,
+				PropertyMask,
+				NULL,
+				0,
+				Element,
+				CategoryName,
+				WhichBins
+			);
 		}
 	}
 	if ( !strnicmp(Item,"PropCats",8) ||
@@ -882,357 +906,129 @@ void ActorTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, 
 		GNumPropCats=0;
 		if( !strnicmp(Item,"PropCats",8) )
 		{
-			for( int i=0; i<Actors->Max; i++ )
+			for( int i=0; i<Level->Num; i++ )
 			{
-				AActor *Actor = &Actors->Element(i);
-				if (Actor->Class && Actor->bSelected) 
-					CheckPropCats(Actor->Class);
+				AActor *Actor = Level->Element(i);
+				if( Actor && Actor->bSelected )
+					CheckPropCats(Actor->GetClass());
 			}
 		}
 		else if( !strnicmp(Item,"DefaultPropCats",15) )
 		{
 			UClass *Class;
-			if (GetUClass(Item,"CLASS=",&Class)) 
+			if (GetUClass(Item,"CLASS=",Class)) 
 				CheckPropCats(Class);
 		}
-		*Data=0;
 		for (int i=0; i<GNumPropCats; i++) 
-			Data += sprintf(Data,"%s ",GPropCats[i].Name());
+			Out.Logf("%s ",GPropCats[i]());
 	}
 	else if( !stricmp(Item,"NumSelected") )
 	{
-		sprintf(Data,"%i",n);
+		Out.Logf("%i",n);
 	}
 	else if( !stricmp(Item,"ClassSelected") )
 	{
-		if (AnyClass && AllClass)
-			sprintf(Data,"%s",AllClass->Name);
-		else
-			sprintf(Data,"");
+		if( AnyClass && AllClass )
+			Out.Logf( "%s", AllClass->GetName() );
 	}
 	else if( !strnicmp(Item,"IsKindOf",8) )
 	{
-		// Sees if the 1 selected actor belongs to a class.
+		// Sees if the one selected actor belongs to a class.
 		UClass *Class;
-		if (GetUClass(Item,"CLASS=",&Class) && AllClass && AllClass->IsKindOf(Class))
-			sprintf(Data,"1");
+		if( GetUClass(Item,"CLASS=",Class) && AllClass && AllClass->IsChildOf(Class) )
+			Out.Logf("1");
 		else
-			sprintf(Data,"0");
+			Out.Logf("0");
 	}
 	unguard;
 }
-void ActorTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, const char *Data)
+void ActorTopicHandler::Set( ULevel *Level, const char *Item, const char *Data )
 {
 	guard(ActorTopicHandler::Set);
-	
-	UActorList	*Actors = Level->ActorList;
 
 	if( !stricmp(Item,"Properties") )
 	{
 		GTrans->Begin(Level,"Changing actor property");
-		ILevel LevelInfo;
-		Level->Lock(&LevelInfo,LOCK_Trans);
+		Level->Lock(LOCK_Trans);
 
-		for (int i=0; i<Actors->Max; i++)
+		for( int i=0; i<Level->Num; i++ )
 		{
-			AActor *Actor = &Actors->Element(i);
-			if( Actor->Class && Actor->bSelected )
+			AActor *Actor = Level->Element(i);
+			if( Actor && Actor->bSelected )
 			{
-				LevelInfo.SendMessageReverse(i,ACTOR_PreEditChange,NULL);
+				Actor->Process( NAME_PreEditChange, NULL );
 
-				GTrans->NoteActor (Actors,i);
-				ImportActorProperties(&Actors->Element(i),Data);
-				Actors->Element(i).iMe = i;
+				BYTE WhichBins[PROPBIN_MAX]; memset(WhichBins,0,sizeof(WhichBins));
+				WhichBins[PROPBIN_PerObject] = 1;
+				BYTE *ObjectBins[PROPBIN_MAX]; Actor->GetObjectBins(ObjectBins);
 
-				LevelInfo.SendMessageReverse(i,ACTOR_PostEditChange,NULL);
-
-				Actor->bTempLightChanged = 1; // Force light meshes to be rebuilt
+				Actor->Lock(LOCK_Trans);
+				ImportActorProperties
+				(
+					Level,
+					Level->Element(i)->GetClass(),
+					ObjectBins,
+					Data,
+					WhichBins,
+					0
+				);
+				Actor->Process( NAME_PostEditChange, NULL );
+				Actor->bLightChanged = 1; // Force light meshes to be rebuilt
+				Actor->Unlock(LOCK_Trans);
 			}
 		}
-		Level->Unlock(&LevelInfo);
+		Level->Unlock(LOCK_Trans);
 		GTrans->End();
 	}
 	else if( !strnicmp(Item,"DefaultProperties",17) )
 	{
 		UClass *Class;
-		if( GetUClass(Item,"CLASS=",&Class) )
+		if( GetUClass(Item,"CLASS=",Class) )
 		{
-			GTrans->Begin			(Level,"Changing default actor property");
-			GTrans->NoteResHeader	(Class);
-			ImportActorProperties	(&Class->DefaultActor,Data);
-			GTrans->End				();
+			GTrans->Begin(Level,"Changing default actor property");
+
+			BYTE WhichBins[PROPBIN_MAX]; memset(WhichBins,0,sizeof(WhichBins));
+			WhichBins[PROPBIN_PerObject] = WhichBins[PROPBIN_PerClass] = 1;
+
+			BYTE *ClassBins[PROPBIN_MAX]; Class->GetClassBins(ClassBins);
+			ImportActorProperties
+			(
+				(ULevel*)NULL,
+				Class,
+				ClassBins,
+				Data,
+				WhichBins,
+				0
+			);
+			GTrans->End();
 		}
 	}
-	else if( (!strnicmp(Item,"LevelProperties",15)) && 
-		Actors->Element(0) &&
-		Actors->Element(0).IsKindOf("LevelDescriptor") )
+	else if
+	(	(!strnicmp(Item,"LevelProperties",15))
+	&&	Level->Element(0)
+	&&	Level->Element(0)->IsA("LevelInfo") )
 	{
-		GTrans->Begin			(Level,"Changing level properties");
-		GTrans->NoteActor		(Actors,0);
-		ImportActorProperties	(&Actors->Element(0),Data);
-		Actors->Element(0).bTempLightChanged = 1;
-		GTrans->End				();
+		GTrans->Begin(Level,"Changing level info");
+		Level->Element(0)->Lock(LOCK_Trans);
+
+		BYTE WhichBins[PROPBIN_MAX]; memset(WhichBins,0,sizeof(WhichBins));
+		WhichBins[PROPBIN_PerObject] = 1;
+		BYTE *ObjectBins[PROPBIN_MAX]; Level->Element(0)->GetObjectBins(ObjectBins);
+
+		ImportActorProperties
+		(
+			Level,
+			Level->Element(0)->GetClass(),
+			ObjectBins,
+			Data,
+			WhichBins,
+			0
+		);
+		Level->Element(0)->bLightChanged = 1;
+		Level->Element(0)->Unlock(LOCK_Trans);
+		GTrans->End();
 	}
 	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	Actor list locking and unlocking.
------------------------------------------------------------------------------*/
-
-//
-// Lock an actor list.
-//
-void UActorList::Lock(int NewLockType)
-{
-	guard(UActorList::Lock);
-
-	// Check state.
-	if (NewLockType == LOCK_None)
-		appError ("LOCK_NONE");
-	if (LockType != LOCK_None)
-		appErrorf("%s is already locked",Name);
-
-	if (GTrans && (NewLockType==LOCK_Trans))
-	{
-		GTrans->NoteResHeader(this);
-		Trans=1;
-	}
-	else
-	{
-		Trans=0;
-	}
-
-	LockType = NewLockType;
-
-	 // Mark as modified.
-	Modify();
-
-	unguard;
-}
-
-//
-// Unlock an actor list.
-//
-void UActorList::Unlock()
-{
-	guard(UActorList::Unlock);
-	LockType = LOCK_None;
-	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	Actor list manipulations.
------------------------------------------------------------------------------*/
-
-//
-// Rebuild the above redundant lists from scratch by scanning the actor list.
-//
-void UActorList::RelistActors()
-{
-    guard(UActorList::RelistActors);
-
-    if( UnusedActors == 0 )
-    {
-        StaticActors        = new CompactList;
-        DynamicActors       = new CompactList;
-        CollidingActors     = new CompactList;
-        ActiveActors        = new CompactList;
-        UnusedActors        = new CompactList;
-        JustDeletedActors   = new CompactList;
-    }
-    else
-    {
-        ActiveActors->Empty();
-        UnusedActors->Empty();
-        JustDeletedActors->Empty();
-        StaticActors->Empty();
-        DynamicActors->Empty();
-        CollidingActors->Empty();
-    }
-
-    {
-        // We make enough room in each list for all the actors.
-        // This is important because sometimes we iterate over the lists
-        // using pointer iteration (instead of index iteration), and such 
-        // an approach is doomed to disaster if new elements are added to
-        // the array mid-iteration and the array is reallocated.
-        StaticActors        ->MakeRoom( Max );
-        DynamicActors       ->MakeRoom( Max );
-        CollidingActors     ->MakeRoom( Max );
-        ActiveActors        ->MakeRoom( Max );
-        UnusedActors        ->MakeRoom( Max );
-        JustDeletedActors   ->MakeRoom( Max );
-    }
-
-    // Traverse the list in reverse order so that unused actors are put
-    // on the UnusedActors list in reverse order. This lets us take
-    // actors off the end of the UnusedActors list and keep the actor indexes (iMe)
-    // low.
-    for( int Which = Max-1; Which >= 0; Which-- )
-    {
-        AActor * Actor = &Element(Which);
-        if( Which >= Num )
-        {
-            // Actors in the latter part of the array (beyond Num) are unused.
-            Actor->Class        = 0     ;
-            Actor->bJustDeleted = FALSE ;
-        }
-        if( Actor->Class != 0 )
-        {
-            ActiveActors->Add(Actor);
-            ListActor( Actor );
-        }
-        else if( Actor->bJustDeleted )
-        {
-            JustDeletedActors->Add(Actor);
-        }
-        else
-        {
-            UnusedActors->Add(Actor);
-        }
-    }
-    unguard;
-}
- 
-//
-// Remove an actor from the appropriate main lists (based on its properties).
-//
-void UActorList::UnlistActor(AActor * Actor)
-{
-    if( Actor->bStatic )
-    {
-        StaticActors->RemoveActor(Actor);
-    }
-    else
-    {
-        DynamicActors->RemoveActor(Actor);
-    }
-    if( Actor->bCollideActors )
-    {
-        CollidingActors->RemoveActor(Actor);
-    }
-}
-
-//
-// Add an actor to appropriate main lists (based on its properties).
-//
-void UActorList::ListActor(AActor * Actor)
-{
-	guard(UActorList::ListActor);
-
-    if( Actor->Class != 0 )
-    {
-        if( Actor->bStatic )
-        {
-            StaticActors->Add(Actor);
-        }
-        else
-        {
-            DynamicActors->Add(Actor);
-        }
-        if( Actor->bCollideActors )
-        {
-            CollidingActors->Add(Actor);
-        }
-    }
-	unguard;
-}
-
-//
-// Debug: Check the redundant lists for correctness and completeness.
-//
-void UActorList::CheckLists()
-{
-	guard(UActorList::CheckLists);
-
-    // As a bonus, let's give some info about the lists.
-    debugf( LOG_Info, "ActiveActors: %i", ActiveActors->Count() );
-    debugf( LOG_Info, "UnusedActors: %i", UnusedActors->Count() );
-    debugf( LOG_Info, "JustDeletedActors: %i", JustDeletedActors->Count() );
-    debugf( LOG_Info, "StaticActors: %i", StaticActors->Count() );
-    debugf( LOG_Info, "DynamicActors: %i", DynamicActors->Count() );
-    debugf( LOG_Info, "CollidingActors: %i", CollidingActors->Count() );
-
-    for( int Which = 0; Which < Num; Which++)
-    {
-        AActor * Actor = &Element(Which);
-        const BOOL IsOnActiveList       = ActiveActors->Find(Actor)      >= 0;
-        const BOOL IsOnUnusedList       = UnusedActors->Find(Actor)      >= 0;
-        const BOOL IsOnJustDeletedList  = JustDeletedActors->Find(Actor) >= 0;
-        const int Count = // Number of administrative lists this actor is on.
-            ( IsOnActiveList       ? 1 : 0 )
-        +   ( IsOnUnusedList       ? 1 : 0 )
-        +   ( IsOnJustDeletedList  ? 1 : 0 )
-        ;
-        if( Count != 1 ) // Actor is not on exactly one administrative list?
-        {
-            debugf( LOG_Info, "Actor [%i] is on %i administrative lists!", Which, Count );
-        }
-        if( IsOnActiveList && Actor->Class == 0 )
-        {
-            debugf( LOG_Info, "Actor [%i] on active list with class==0", Which );
-        }
-        if( IsOnUnusedList && Actor->Class != 0 )
-        {
-            debugf( LOG_Info, "Actor [%i] on unused list with class!=0", Which );
-        }
-        if( IsOnUnusedList && Actor->bJustDeleted )
-        {
-            debugf( LOG_Info, "Actor [%i] on unused list with bJustDeleted", Which );
-        }
-        if( IsOnJustDeletedList && Actor->Class != 0 )
-        {
-            debugf( LOG_Info, "Actor [%i] on just deleted list with class!=0", Which );
-        }
-        if( IsOnJustDeletedList && !Actor->bJustDeleted )
-        {
-            debugf( LOG_Info, "Actor [%i] on just deleted list with !bJustDeleted", Which );
-        }
-        const BOOL IsOnStaticList    = StaticActors->Find(Actor)    >= 0;
-        const BOOL IsOnDynamicList   = DynamicActors->Find(Actor)   >= 0;
-        const BOOL IsOnCollidingList = CollidingActors->Find(Actor) >= 0;
-        if( IsOnStaticList && Actor->Class == 0 )
-        {
-            debugf( LOG_Info, "Actor [%i] on static list with Class==0", Which );
-        }
-        if( IsOnDynamicList && Actor->Class == 0 )
-        {
-            debugf( LOG_Info, "Actor [%i] on dynamic list with Class==0", Which );
-        }
-        if( IsOnCollidingList && Actor->Class == 0 )
-        {
-            debugf( LOG_Info, "Actor [%i] on colliding list with Class==0", Which );
-        }
-        if( Actor->Class != 0 )
-        {
-            if( IsOnStaticList && !Actor->bStatic )
-            {
-                debugf( LOG_Info, "Actor [%i] on static list with !bStatic", Which );
-            }
-            else if( !IsOnStaticList && Actor->bStatic )
-            {
-                debugf( LOG_Info, "Actor [%i] not on static list but has bStatic", Which );
-            }
-            if( IsOnDynamicList && Actor->bStatic )
-            {
-                debugf( LOG_Info, "Actor [%i] on dynamic list with bStatic", Which );
-            }
-            else if( !IsOnDynamicList && !Actor->bStatic )
-            {
-                debugf( LOG_Info, "Actor [%i] not on dynamic list but has !bStatic", Which );
-            }
-            if( IsOnCollidingList && !Actor->bCollideActors )
-            {
-                debugf( LOG_Info, "Actor [%i] on colliding list with !bCollideActors", Which );
-            }
-            else if( !IsOnCollidingList && Actor->bCollideActors )
-            {
-                debugf( LOG_Info, "Actor [%i] not on colliding list but has bCollideActors", Which );
-            }
-        }
-    }
-    unguard;
 }
 
 /*-----------------------------------------------------------------------------

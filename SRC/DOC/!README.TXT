@@ -19,19 +19,19 @@ Check out the list of contacts there to find the approprite person to question.
 This package
 ------------
 
-Version:		Unreal 0.84.  See UnBuild.h for detailed version information.
-Included:		Server, Engine, Render, Game, Networking, Launcher, Editor
+Version:		Unreal 0.86.  See UnBuild.h for detailed version information.
+Included:		Server, Engine, Render, Game, Networking, Launcher, Editor.
 
 --------------------
 Development Platform
 --------------------
 
 Unreal source, Windows 95/NT, requires:
-   * Visual C++ 4.0, 4.1, or 4.2
+   * Visual C++ 5.0 (also works with 4.0, 4.1, or 4.2 if you create a new .mak).
    * MASM 6.11d (from \Unreal\Src\Tools), ML.EXE must be in path
 
 UnrealEd, Windows 95/NT, requires:
-   * Visual Basic Professional or Enterprise 4.0
+   * Visual Basic Professional or Enterprise 5.0
 
 --------------------
 Install instructions
@@ -53,13 +53,8 @@ Documentation Index
 	File			Contents
 	--------------- -------------------------------------------------------
 	!ReadMe.txt		This index
-	Actions.txt     Description of the input system and input actions
-	Amff.txt		Galaxy sound system AMFF file format docs
-	Galaxy.txt		Galaxy docs
 	ProjMan.txt		Important source code guidelines to be aware of
-	Script.txt		UnrealScript preliminary docs & samples
 	T3d.txt			Unreal brush .T3D file format docs
-	TaskList.txt	List of major tasks to be done
 	TimLog.txt		Tim Sweeney work log
 	TimNotes.txt	Tim Sweeney misc notes (confidential)
 	TimOld.txt		Tim Sweeney old work logs
@@ -85,7 +80,6 @@ Utils.mak Index
 	Project		   Description             Target			            Compatibility
 	-------------  ----------------------  ---------------------------  --------------------
 	Launcher	   Unreal launcher stub	   \Unreal\Unreal.exe           Ansi C & Windows API
-	Install		   Installation utilities  \Unreal\System\Install.exe   Ansi C & Windows API
 
 ---------------
 Directory Index
@@ -98,7 +92,7 @@ From the Unreal source distribution:
 
 Unreal\					Root Unreal directory
 	Classes\			Actor class descriptions
-		Root.tcx		Root actor class description
+		*.u				Actor class scripts
 		Classes.mac		UnrealEd macro to import all actor classes
 	Doc\				Documentation files directory
 		!ReadMe.txt		This index file
@@ -120,7 +114,6 @@ Unreal\					Root Unreal directory
 		Editor\			Unreal editor support files
 		Windows\		All windows-specific code for Unreal
 		Launcher\		Unreal launcher stub
-		Install\		Install utility
 		Listing\		VC++ generated assembly listing files
 
 From auxillary Unreal distributions:
@@ -128,8 +121,7 @@ From auxillary Unreal distributions:
 	\Unreal\Graphics\			Ancillary game and editor graphics, compiled to \Unreal\System\Unreal.gfx
 		Graphics.mac			UnrealEd macro that imports all graphics resources
 
-	\Unreal\Models\				All 3D models and their associated texture maps referenced by Root.tcx
-		Models.mac				UnrealEd macro that imports all models
+	\Unreal\Models\				All 3D models and their associated texture maps referenced by scripts.
 
 ----------
 File types
@@ -138,6 +130,7 @@ File types
 Industry standard filetypes supported by Unreal:
 
 	*.pcx: 256-color PCX graphics files.
+	*.bmp: 256-color Windows bitmap.
 	*.wav: 8-bit and 16-bit mono audio samples.
 	*.asc: 3D Studio Release 4 exported brushes.
 	*.dxf: Standard AutoCad model format (only certain varieties are supported).
@@ -145,7 +138,7 @@ Industry standard filetypes supported by Unreal:
 Text files native to Unreal:
 
 	*.t3d: Level files (exported levels) and brush files (exported brushes).
-	*.tcx: Actor class definitions (exported actor classes).
+	*.u:   Unreal class definitions (exported actor classes).
 
 Binary files native to Unreal:
 
@@ -199,6 +192,7 @@ Legal notice
 	herein are trade secrets of Epic MegaGames, Inc., including, but not limited to
 	the following:
 
+    * Curved surface rendering techniques.
 	* All specific texture mapping concept and algorithms
 	* All texture and light filtering/dithering concepts and algoritms
 	* Lattice-based rendering concept

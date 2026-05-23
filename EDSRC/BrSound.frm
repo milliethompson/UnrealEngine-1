@@ -1,61 +1,77 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{0BA686C6-F7D3-101A-993E-0000C0EF6F5E}#1.0#0"; "THREED32.OCX"
+Object = "{BE4F3AC8-AEC9-101A-947B-00DD010F7B46}#1.0#0"; "MSOUTL32.OCX"
 Begin VB.Form frmSoundFXBrowser 
    BorderStyle     =   0  'None
    Caption         =   "Sound Browser"
-   ClientHeight    =   5895
-   ClientLeft      =   6825
-   ClientTop       =   2775
+   ClientHeight    =   5910
+   ClientLeft      =   6945
+   ClientTop       =   2535
    ClientWidth     =   2445
-   Height          =   6255
-   Icon            =   "BrSound.frx":0000
-   Left            =   6765
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
    MinButton       =   0   'False
-   ScaleHeight     =   5895
+   PaletteMode     =   1  'UseZOrder
+   ScaleHeight     =   5910
    ScaleWidth      =   2445
    ShowInTaskbar   =   0   'False
-   Top             =   2475
-   Width           =   2565
    Begin VB.PictureBox SoundsHolder 
-      Height          =   5055
+      Height          =   4935
       Left            =   60
-      ScaleHeight     =   4995
+      ScaleHeight     =   4875
       ScaleWidth      =   2295
       TabIndex        =   8
-      Top             =   0
+      Top             =   60
       Width           =   2355
       Begin MSOutl.Outline SoundsOutline 
-         Height          =   4995
+         Height          =   4875
          Left            =   0
          TabIndex        =   9
          Top             =   0
          Width           =   2295
          _Version        =   65536
          _ExtentX        =   4048
-         _ExtentY        =   8811
+         _ExtentY        =   8599
          _StockProps     =   77
          BackColor       =   -2147483643
+         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          BorderStyle     =   0
          Style           =   2
       End
    End
    Begin Threed.SSPanel SoundButtonPanel 
-      Height          =   735
+      Height          =   975
       Left            =   0
       TabIndex        =   0
-      Top             =   5160
+      Top             =   4980
       Width           =   2415
       _Version        =   65536
       _ExtentX        =   4260
-      _ExtentY        =   1296
+      _ExtentY        =   1720
       _StockProps     =   15
-      Begin VB.CommandButton SoundDelete 
-         Caption         =   "&Delete"
+      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Begin VB.CommandButton SoundEdit 
+         Caption         =   "&Edit..."
          Height          =   255
          Left            =   1620
          TabIndex        =   7
-         Top             =   480
+         Top             =   660
          Width           =   795
       End
       Begin VB.CommandButton SoundExport 
@@ -63,7 +79,7 @@ Begin VB.Form frmSoundFXBrowser
          Height          =   255
          Left            =   840
          TabIndex        =   6
-         Top             =   480
+         Top             =   660
          Width           =   795
       End
       Begin VB.CommandButton SoundImport 
@@ -71,7 +87,7 @@ Begin VB.Form frmSoundFXBrowser
          Height          =   255
          Left            =   0
          TabIndex        =   5
-         Top             =   480
+         Top             =   660
          Width           =   855
       End
       Begin VB.CommandButton SoundSave 
@@ -79,7 +95,7 @@ Begin VB.Form frmSoundFXBrowser
          Height          =   255
          Left            =   1200
          TabIndex        =   2
-         Top             =   240
+         Top             =   420
          Width           =   1215
       End
       Begin VB.CommandButton SoundLoad 
@@ -87,7 +103,7 @@ Begin VB.Form frmSoundFXBrowser
          Height          =   255
          Left            =   0
          TabIndex        =   1
-         Top             =   240
+         Top             =   420
          Width           =   1215
       End
       Begin VB.CommandButton SoundRefresh 
@@ -95,21 +111,23 @@ Begin VB.Form frmSoundFXBrowser
          Height          =   255
          Left            =   1200
          TabIndex        =   3
-         Top             =   0
+         Top             =   180
          Width           =   1215
       End
       Begin VB.CommandButton SoundTest 
-         Caption         =   "&Test"
+         Caption         =   "&Play"
          Height          =   255
          Left            =   0
          TabIndex        =   4
-         Top             =   0
+         Top             =   180
          Width           =   1215
       End
    End
 End
 Attribute VB_Name = "frmSoundFXBrowser"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '
 ' Sound Browser: This is a form that implements
@@ -191,6 +209,21 @@ Private Sub SoundDelete_Click()
     SoundRefresh_Click
 End Sub
 
+Private Sub SoundEdit_Click()
+    Dim resname As String
+    
+    ' For debugging
+    Ed.Server.Exec "AUDIO EDITBUTTONCLICKED"
+    
+    ' get name of currently selected sound resource
+    resname = CurrentResource()
+    If (resname = "") Then Exit Sub
+    
+    ' edit the sound
+    Ed.Server.Exec "AUDIO EDIT NAME=" & Quotes(resname)
+
+End Sub
+
 Private Sub SoundExport_Click()
     Dim resname As String
     
@@ -204,9 +237,8 @@ Private Sub SoundExport_Click()
     On Error GoTo Skip
     Ed.Server.Disable
     frmDialogs.SoundExportDlg.DialogTitle = "Export sound " & resname
-    frmDialogs.SoundExportDlg.filename = resname & ".WAV"
-    frmDialogs.SoundExportDlg.DefaultExt = "WAV"
-    frmDialogs.SoundExportDlg.Flags = 2 'Prompt if overwrite
+    frmDialogs.SoundExportDlg.filename = resname & ".UFX"
+    frmDialogs.SoundExportDlg.DefaultExt = "UFX"
     frmDialogs.SoundExportDlg.ShowSave
     '
     Call UpdateDialog(frmDialogs.SoundExportDlg)
@@ -280,18 +312,12 @@ Skip:
     Ed.Server.Enable
 End Sub
 
-Private Sub SoundNewFamily_Click()
-    Ed.Server.Exec "SOUND NEWFAMILYBUTTONCLICKED"
-End Sub
 
-Private Sub SoundNew_Click()
-    Ed.Server.Exec "SOUND NEWBUTTONCLICKED"
-End Sub
 
 Private Sub SoundRefresh_Click()
     Dim stmp As String
     Dim resname As String
-    Dim index As Integer
+    Dim Index As Integer
     
     ' For debugging aid
     Ed.Server.Exec "AUDIO REFRESHBUTTONCLICKED"
@@ -301,31 +327,31 @@ Private Sub SoundRefresh_Click()
     ' resources.
     SoundsOutline.Clear
     Ed.Server.Exec "AUDIO QUERY"
-    index = 0
+    Index = 0
     Do
         ' Get next audio family in families list
         stmp = Ed.Server.GetProp("Audio", "QueryFam")
         If (stmp <> "" And stmp <> AllString) Then
             ' Add family name to browser outline control
-            SoundsOutline.List(index) = stmp
-            SoundsOutline.Indent(index) = 1
-            index = index + 1
+            SoundsOutline.List(Index) = stmp
+            SoundsOutline.Indent(Index) = 1
+            Index = Index + 1
         
             ' Get audio resources in this family
             Ed.Server.Exec "AUDIO QUERY FAMILY=" & Quotes(stmp)
             Do
                 resname = Ed.Server.GetProp("Audio", "QueryAudio")
                 If (resname = "") Then Exit Do
-                SoundsOutline.List(index) = resname
-                SoundsOutline.Indent(index) = 2
-                index = index + 1
+                SoundsOutline.List(Index) = resname
+                SoundsOutline.Indent(Index) = 2
+                Index = Index + 1
             Loop
         End If
     Loop Until stmp = ""
 
     
     ' Tell Ed that we want a list of all sound resources
-'    Ed.Server.Exec "RES QUERY TYPE=Sound"
+'    Ed.Server.Exec "RESOURCE QUERY TYPE=Sound"
     
     ' Loop through the list of sound resources
 '    i = 0
@@ -377,7 +403,6 @@ TryAgain:
     Ed.Server.Disable
     frmDialogs.SoundSaveFamilyDlg.DialogTitle = "Save " & FamilyName & " sound family"
     frmDialogs.SoundSaveFamilyDlg.DefaultExt = "uax"
-    frmDialogs.SoundSaveFamilyDlg.Flags = 2 'Prompt if overwrite
     frmDialogs.SoundSaveFamilyDlg.ShowSave
     Ed.Server.Enable
 
@@ -412,7 +437,21 @@ End Sub
 
 
 Private Sub SoundsOutline_DblClick()
-    Ed.Server.Exec "SOUND OUTLINEDBLCLICK"
+'old:
+'   Ed.Server.Exec "SOUND OUTLINEDBLCLICK"
+
+'new:
+    Dim resname As String
+    
+    ' For debugging
+    Ed.Server.Exec "AUDIO TESTBUTTONCLICKED"
+    
+    ' get name of currently selected sound resource
+    resname = CurrentResource()
+    If (resname = "") Then Exit Sub
+    
+    ' play the sound
+    Ed.Server.Exec "AUDIO TEST NAME=" & Quotes(resname)
 End Sub
 
 
@@ -435,40 +474,53 @@ Private Sub SoundTest_Click()
     ' get name of currently selected sound resource
     resname = CurrentResource()
     If (resname = "") Then Exit Sub
-    '
-    Ed.Server.Exec "AUDIO TEST NAME=" & Quotes(resname)
+    
+    ' play the sound
+    Ed.Server.Disable
+'    Ed.Server.Exec "AUDIO TEST NAME=" & Quotes(resname)
+    Ed.BeginSlowTask "Audio Preview"
+    Screen.MousePointer = 0
+    Ed.Server.SlowExec "AUDIO TEST NAME=" & Quotes(resname)
+    Ed.EndSlowTask
+    Ed.Server.Enable
+    
+    ' wait for user
+'    MsgBox "Playing " & Quotes(resname), vbOKOnly, "Test Sound Effect"
+
+    ' stop the sound
+'    Ed.Server.Exec "AUDIO TESTOFF"
 End Sub
 
 ' Determine which family is currently hilited in
 ' the sound browser outline control
 Public Function CurrentFamily() As String
-    Dim index As Integer
+    Dim Index As Integer
 
-    index = SoundsOutline.ListIndex
-    While (index >= 0 And SoundsOutline.Indent(index) <> 1)
-        index = index - 1
+    Index = SoundsOutline.ListIndex
+    While (Index >= 0 And SoundsOutline.Indent(Index) <> 1)
+        Index = Index - 1
     Wend
-    If (index < 0) Then
+    If (Index < 0) Then
         CurrentFamily = ""
         Exit Function
     End If
-    CurrentFamily = SoundsOutline.List(index)
+    CurrentFamily = SoundsOutline.List(Index)
 End Function
 
 Public Function CurrentResource() As String
-    Dim index As Integer
+    Dim Index As Integer
 
-    index = SoundsOutline.ListIndex
-    If (index < 1) Then
+    Index = SoundsOutline.ListIndex
+    If (Index < 1) Then
         ' No hilite in list.
         CurrentResource = ""
         Exit Function
     End If
-    If (SoundsOutline.Indent(index) <> 2) Then
+    If (SoundsOutline.Indent(Index) <> 2) Then
         ' Hilite is not on a sound resource (probably on a family instead).
         CurrentResource = ""
         Exit Function
     End If
     ' Caller gets current resource name.
-    CurrentResource = SoundsOutline.List(index)
+    CurrentResource = SoundsOutline.List(Index)
 End Function

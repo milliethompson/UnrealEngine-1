@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmGrid 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Grid Settings"
@@ -8,38 +8,36 @@ Begin VB.Form frmGrid
    ClientWidth     =   6855
    ControlBox      =   0   'False
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   2400
    HelpContextID   =   111
    Icon            =   "Grid.frx":0000
-   Left            =   4410
    LinkTopic       =   "Form8"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1995
    ScaleWidth      =   6855
    ShowInTaskbar   =   0   'False
-   Top             =   3870
-   Width           =   6975
    Begin VB.CommandButton Command3 
       Appearance      =   0  'Flat
       BackColor       =   &H80000005&
       Caption         =   "&Help"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   4200
@@ -50,13 +48,13 @@ Begin VB.Form frmGrid
    Begin VB.Frame Frame1 
       Caption         =   "Grid Size"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   1935
       Left            =   120
@@ -66,13 +64,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton G128 
          Caption         =   "128 inches"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   2640
@@ -83,13 +81,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton G16 
          Caption         =   "16 inches"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   1320
@@ -101,13 +99,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton G4 
          Caption         =   "4 inches"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -118,13 +116,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton G2 
          Caption         =   "2 inches"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -135,13 +133,13 @@ Begin VB.Form frmGrid
       Begin VB.TextBox Size 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   120
@@ -153,13 +151,13 @@ Begin VB.Form frmGrid
       Begin VB.TextBox SX 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   1800
@@ -171,13 +169,13 @@ Begin VB.Form frmGrid
       Begin VB.TextBox SY 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   2520
@@ -189,13 +187,13 @@ Begin VB.Form frmGrid
       Begin VB.TextBox SZ 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   3240
@@ -207,13 +205,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton Option6 
          Caption         =   "Irregular Size"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   1560
@@ -224,13 +222,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton Option2 
          Caption         =   "Custom  Size"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -241,13 +239,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton G64 
          Caption         =   "64 inches"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   2640
@@ -258,13 +256,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton G32 
          Caption         =   "32 inches"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   1320
@@ -275,13 +273,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton G8 
          Caption         =   "8 inches"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   1320
@@ -292,13 +290,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton G256 
          Caption         =   "256 inches"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   2640
@@ -309,13 +307,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton G1 
          Caption         =   "1 inch"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -334,13 +332,13 @@ Begin VB.Form frmGrid
    Begin VB.Frame Frame2 
       Caption         =   "Vertex snap dist"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   1455
       Left            =   4200
@@ -350,13 +348,13 @@ Begin VB.Form frmGrid
       Begin VB.TextBox SnapVal 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   1200
@@ -368,13 +366,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton Option7 
          Caption         =   "100 (10 ft)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   1320
@@ -385,13 +383,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton Option5 
          Caption         =   "50   (5 ft)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   1320
@@ -402,13 +400,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton Option4 
          Caption         =   "2    (2 in)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -419,13 +417,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton Option3 
          Caption         =   "20   (2 ft)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   1320
@@ -436,13 +434,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton Option1 
          Caption         =   "5    (5 in)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -453,13 +451,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton SnapCust 
          Caption         =   "Custom:"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -470,13 +468,13 @@ Begin VB.Form frmGrid
       Begin VB.OptionButton Snap10 
          Caption         =   "10  (1 ft)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -504,13 +502,13 @@ Begin VB.Form frmGrid
       Cancel          =   -1  'True
       Caption         =   "&Close"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   5880
@@ -520,7 +518,9 @@ Begin VB.Form frmGrid
    End
 End
 Attribute VB_Name = "frmGrid"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 

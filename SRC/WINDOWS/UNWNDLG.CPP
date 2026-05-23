@@ -2,7 +2,7 @@
 	UnWnDlg.cpp: Server console's main dialog screen
 	Used by: Windows console
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -43,7 +43,6 @@ void CUnrealWnDlg::DoDataExchange(CDataExchange* pDX)
 }
 
 BEGIN_MESSAGE_MAP(CUnrealWnDlg, CDialog)
-	ON_MESSAGE(WM_UNREALTIMER,OnUnrealTimer)
 	//{{AFX_MSG_MAP(CUnrealWnDlg)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
@@ -120,6 +119,11 @@ BOOL CUnrealWnDlg::OnInitDialog()
 		GetDlgItem(IDC_SPLASHER )->ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_COPYRT   )->ShowWindow(SW_HIDE);
 	}
+
+	// Set parent.
+	DWORD ParentWindow=0;
+	if( GetDWORD(App.CmdLine,"HWND=", &ParentWindow) )
+		::SetParent(m_hWnd,(HWND)ParentWindow);
 
 	// return TRUE unless you set the focus to a control.
 	return TRUE;
@@ -318,16 +322,6 @@ void CUnrealWnDlg::OnSetfocusCmdLog()
 /////////////////////////////////////////////////////////////////////////////
 // Windows events.
 /////////////////////////////////////////////////////////////////////////////
-
-//
-// Timer. Currently unused.
-//
-LONG CUnrealWnDlg::OnUnrealTimer(UINT wParam,LONG lParam)
-{
-	guard(CUnrealWnDlg::OnUnrealTimer);
-	return 0;
-	unguard;
-}
 
 //
 // System menu command handler.

@@ -1,21 +1,18 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmExPoint 
    Caption         =   "Extrude to Point"
    ClientHeight    =   1920
    ClientLeft      =   4005
    ClientTop       =   4740
    ClientWidth     =   4095
-   Height          =   2280
    Icon            =   "ExPoint.frx":0000
-   Left            =   3945
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1920
    ScaleWidth      =   4095
    ShowInTaskbar   =   0   'False
-   Top             =   4440
-   Width           =   4215
    Begin VB.CommandButton btnLoft 
       Appearance      =   0  'Flat
       BackColor       =   &H80000005&
@@ -111,7 +108,9 @@ Begin VB.Form frmExPoint
    End
 End
 Attribute VB_Name = "frmExPoint"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Private Sub btnCancel_Click()
     btnCancel.Default = True

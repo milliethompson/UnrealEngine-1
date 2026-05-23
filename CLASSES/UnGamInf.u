@@ -1,0 +1,54 @@
+//=============================================================================
+// Unreal game info.
+//=============================================================================
+class UnrealGameInfo expands GameInfo;
+
+//=============================================================================
+// Imports.
+
+// Required console textures.
+#exec Texture Import File=..\Graphics\Console.pcx  Name=Console       Mips=Off
+#exec Texture Import File=..\Graphics\Border.pcx   Name=Border        Mips=Off
+
+// UnrealEd textures.
+#exec Texture Import File=..\Graphics\Default.pcx  Name=Default
+#exec Texture Import File=..\Graphics\Bad.pcx      Name=Bad
+#exec Texture Import File=..\Graphics\Bkgnd.pcx    Name=Bkgnd
+
+// Temporary.
+#exec Texture Import File=..\Graphics\Backdrop.pcx Name=Backdrop      Mips=Off
+#exec Texture Import File=..\Graphics\Status.pcx   Name=StatusBar     Mips=Off
+#exec Texture Import File=..\Graphics\Status_s.pcx Name=StatusBarS    Mips=Off
+
+// Standard fonts.
+#exec Font Import File=..\Graphics\F_Huge.pcx   Name=F_Huge  Mips=Off
+#exec Font Import File=..\Graphics\F_Large.pcx  Name=F_Large Mips=Off
+#exec Font Import File=..\Graphics\F_Tech.pcx   Name=F_Tech  Mips=Off
+#exec Font Import File=..\Graphics\F_Small.pcx  Name=F_Small Mips=Off
+
+// UnrealEd buttons.
+#exec Texture Import File=..\Graphics\B_MenuDn.pcx Name=B_MenuDn  Palette=Palette Mips=Off 
+#exec Texture Import File=..\Graphics\B_MenuUp.pcx Name=B_MenuUp  Palette=Palette Mips=Off 
+#exec Texture Import File=..\Graphics\B_CollOn.pcx Name=B_CollOn  Palette=Palette Mips=Off 
+#exec Texture Import File=..\Graphics\B_CollOf.pcx Name=B_CollOff Palette=Palette Mips=Off
+#exec Texture Import File=..\Graphics\B_PlyrOn.pcx Name=B_PlyrOn  Palette=Palette Mips=Off
+#exec Texture Import File=..\Graphics\B_PlyrOf.pcx Name=B_PlyrOff Palette=Palette Mips=Off
+#exec Texture Import File=..\Graphics\B_LiteOn.pcx Name=B_LiteOn  Palette=Palette Mips=Off
+#exec Texture Import File=..\Graphics\B_LiteOf.pcx Name=B_LiteOff Palette=Palette Mips=Off
+
+// UnrealEd brushes.
+#exec Brush Import File=..\Graphics\Arrow.t3d Name=Arrow Merge=Off
+#exec Brush Import File=..\Graphics\Roothull.t3d Name=RootHull Merge=Off
+
+//=============================================================================
+// Variables.
+
+// Console.
+var(Console) texture        ConsoleFrame  = texture(Console);
+var(Console) texture        ConsoleBorder = texture(Border);
+
+// UnrealEd.
+
+//=============================================================================
+// Functions.
+

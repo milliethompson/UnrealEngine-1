@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form ThingEntry 
    Caption         =   "Thing Entry"
    ClientHeight    =   1560
@@ -6,15 +6,12 @@ Begin VB.Form ThingEntry
    ClientTop       =   7365
    ClientWidth     =   4350
    ControlBox      =   0   'False
-   Height          =   1920
-   Left            =   4155
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1560
    ScaleWidth      =   4350
-   Top             =   7065
-   Width           =   4470
    Begin VB.CommandButton Ok 
       Caption         =   "&Ok"
       Default         =   -1  'True
@@ -51,7 +48,9 @@ Begin VB.Form ThingEntry
    End
 End
 Attribute VB_Name = "ThingEntry"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' ThingEnt.frm: Gatekeeper client text entry form.

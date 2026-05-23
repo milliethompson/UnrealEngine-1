@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form SiteEntry 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Remote Gatekeeper Information"
@@ -7,17 +7,14 @@ Begin VB.Form SiteEntry
    ClientTop       =   6105
    ClientWidth     =   4245
    ControlBox      =   0   'False
-   Height          =   2220
    Icon            =   "SiteEnt.frx":0000
-   Left            =   1410
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1860
    ScaleWidth      =   4245
    ShowInTaskbar   =   0   'False
-   Top             =   5805
-   Width           =   4365
    Begin VB.TextBox RemotePort 
       Height          =   315
       Left            =   1200
@@ -46,6 +43,7 @@ Begin VB.Form SiteEntry
    End
    Begin VB.TextBox RemotePassword 
       Height          =   315
+      IMEMode         =   3  'DISABLE
       Left            =   1200
       PasswordChar    =   "*"
       TabIndex        =   2
@@ -90,7 +88,9 @@ Begin VB.Form SiteEntry
    End
 End
 Attribute VB_Name = "SiteEntry"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' OpenRmt.frm: Information about a remote site.

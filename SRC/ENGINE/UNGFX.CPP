@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnGfx.cpp: FGlobalGfx implementation - general-purpose graphics routines
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -12,827 +12,160 @@
 #include "UnRender.h"
 
 /*------------------------------------------------------------------------------
-	Palette-related functions
+	Frame functions.
 ------------------------------------------------------------------------------*/
 
-//
-// Gamma correct a palette using the game's current gamma value:
-//
-void FGlobalGfx::GammaCorrectPalette (UPalette *DestPalette, UPalette *SourcePalette)
-	{
-	GUARD;
-	FColor	*DestColors		= DestPalette->GetData();
-	FColor	*SourceColors	= SourcePalette->GetData();
-	//
-	FLOAT F     = (FLOAT)(NumGammaLevels-GammaLevel)/(FLOAT)NumGammaLevels;
-	FLOAT Gamma = 0.75 + 0.50 * F;
-	//
-	for (int i=0; i<256; i++)
-		{
-		DestColors->Red   = 255.0 * exp(Gamma * log(0.0001 + (FLOAT)SourceColors->Red   / 255.0));
-		DestColors->Green = 255.0 * exp(Gamma * log(0.0001 + (FLOAT)SourceColors->Green / 255.0));
-		DestColors->Blue  = 255.0 * exp(Gamma * log(0.0001 + (FLOAT)SourceColors->Blue  / 255.0));
-		//
-		SourceColors++;
-		DestColors++;
-		};
-	UNGUARD("FGlobalGfx::GammaCorrectPalette");
-	};
-
-//
-// Set the palette.  This function sets the screen palette to a
-// gamma-corrected version of the source palette.
-//
-void FGlobalGfx::SetPalette()
-	{
-	GUARD;
-	//
-	GammaCorrectPalette(GammaPalette,DefaultPalette);
-	GCameraManager->SetPalette(DefaultPalette,GammaPalette);
-	//
-	UNGUARD("FGlobalGfx::SetPalette");
-	};
-
-//
-// Adjust a regular (imported) palette:
-//
-void FGlobalGfx::FixPalette (UPalette *Palette)
-	{
-	GUARD;
-	//
-	FColor  *Colors     = (FColor *)Palette->GetData();
-	FColor  *TempColors = (FColor *)GMem.Get(256 * sizeof (FColor));
-	int     iColor,iShade,iStart;
-	//
-	for (int i=0; i<256; i++) TempColors[i] = Colors[0];
-	//
-	for (iColor=0; iColor<8; iColor++)
-		{
-		if (iColor==0)	iStart=1;
-		else			iStart=32*iColor;
-		//
-		for (iShade=0; iShade<28; iShade++)
-			{
-			TempColors[16 + iColor + (iShade<<3)] = Colors[iStart + iShade];
-			};
-		};
-	memcpy (Colors,TempColors,256*sizeof(FColor));
-	//
-	Colors[0].RemapIndex=0;
-	for (i=1; i<256; i++) Colors[i].RemapIndex = i+0x10;
-	//
-	UNGUARD("FGlobalGfx::FixPalette");
-	};
-
-//
-// Convert byte hue-saturation-brightness to floating point red-green-blue.
-//
-void FGlobalGfx::RGBtoHSV( FVector &Result,BYTE H,BYTE S,BYTE V,int CameraColorBytes )
+FMemMark Mark;
+BYTE *SavedScreen;
+UCamera SavedCamera;
+void FGlobalGfx::PreRender( UCamera *Camera )
 {
-	FLOAT	Brightness	= (FLOAT)V;
-	FLOAT	Alpha		= (FLOAT)S / 255.0; // 0=full color, 1=full white
-
-	if( CameraColorBytes == 1 )
+	guard(FGlobalGfx::PreRender);
+	Mark.Push(GMem);
+	if( Smooth )
 	{
-
-		Brightness *= (0.5/255.0) * (Alpha + 1.00);
-		Brightness *= 0.70/(0.01 + sqrt(Brightness));
-		Brightness = Clamp(Brightness,0.f,1.f);
-
-		Result.R = Result.G = Result.B = Brightness;
+		SavedScreen = Camera->Screen;
+		Camera->Screen = new(GMem,Camera->ByteStride * Camera->Y)BYTE;
 	}
-	else
+	if( Stretch )
 	{
-		Brightness 		*= (1.4/255.0);
-		Brightness		*= 0.70/(0.01 + sqrt(Brightness));
-		Brightness		 = Clamp(Brightness,(FLOAT)0.0,(FLOAT)1.0);
-
-		FVector *Hue     = &HueData[H];
-
-		Result.R	= (Hue->R + Alpha * (1.0 - Hue->R)) * Brightness;
-		Result.G	= (Hue->G + Alpha * (1.0 - Hue->G)) * Brightness;
-		Result.B	= (Hue->B + Alpha * (1.0 - Hue->B)) * Brightness;
+		SavedCamera = *Camera;
+		Camera->X /= 2;
+		Camera->Stride /= 2;
+		Camera->Y /= 2;
+		Camera->ByteStride /= 2;
+		Camera->PrecomputeRenderInfo(Camera->X,Camera->Y);
+		Camera->Screen = new(GMem,Camera->ByteStride * Camera->Y)BYTE;
 	}
-}
-
-/*------------------------------------------------------------------------------
-	FGlobalGfx Text output: Character drawer
-------------------------------------------------------------------------------*/
-
-//
-// Draw a character onto a texture.
-//
-void FGlobalGfx::Cout
-(
-	UTexture	*DestTexture, 
-	int			X, 
-	int			Y, 
-	int			XSpace, 
-	UFont		*Font, 
-	int			Color, 
-	char		C, 
-	RAINBOW_PTR PaletteTable
-)
-{
-	guard(FGlobalGfx::Cout);
-
-	FFontCharacter  *FontIndex  	= &Font->Element(C);
-	UTexture		*SourceTexture	= Font->Texture;
-	BYTE			*Source			= Font->Texture->GetData();
-	RAINBOW_PTR		Dest			= DestTexture->GetData();
-	FCacheItem		*Item			= NULL;
-	
-	BYTE			*SourcePtr1,*SourcePtr,*DestPtr1,*DestPtr,B;
-	int				U,V,EndX,EndY,XC;
-
-	U=0; if (X<0) {U+=(-X); X=0;}; EndX = X+FontIndex->USize-U; U += FontIndex->StartU;
-	V=0; if (Y<0) {V+=(-Y); Y=0;}; EndY = Y+FontIndex->VSize-V; V += FontIndex->StartV;
-
-	if (EndX > DestTexture->USize) EndX = DestTexture->USize;
-	if (EndY > DestTexture->VSize) EndY = DestTexture->VSize;
-
-	SourcePtr1 = &Source [U + V*SourceTexture->USize];
-	if( DestTexture->ColorBytes==1 )
+	if( 0 )
 	{
-		int ColorOffset	= Color - 16;
-		DestPtr1		= &Dest.PtrBYTE[X + Y*DestTexture->USize];
-		while( Y++ < EndY )
-		{
-			SourcePtr = SourcePtr1;
-			DestPtr   = DestPtr1;
-
-			for( XC=X; XC<EndX; XC++ )
-			{
-				B = *SourcePtr++;
-				if (B) *DestPtr = B + ColorOffset;
-				DestPtr++;
-			}
-			SourcePtr1 += SourceTexture->USize;
-			DestPtr1   += DestTexture  ->USize;
-		}
-	}
-	else if( DestTexture->ColorBytes==2 )
-	{
-		WORD *Table    = PaletteTable.PtrWORD ? PaletteTable.PtrWORD : DestTexture->Palette->GetColorDepthPalette(Item,DestTexture).PtrWORD;
-		WORD *DestPtr1 = &Dest.PtrWORD[X + Y*DestTexture->USize],*DestPtr;
-		while( Y++ < EndY )
-		{
-			SourcePtr = SourcePtr1;
-			DestPtr   = DestPtr1;
-
-			for( XC=X; XC<EndX; XC++ )
-			{
-				B = *SourcePtr++;
-				if (B) *DestPtr = Table[B + Color];
-				DestPtr++;
-			}
-			SourcePtr1 += SourceTexture->USize;
-			DestPtr1   += DestTexture->USize;
-		}
-	}
-	else if( DestTexture->ColorBytes==4 )
-	{
-		DWORD *Table    = PaletteTable.PtrDWORD ? PaletteTable.PtrDWORD : DestTexture->Palette->GetColorDepthPalette(Item,DestTexture).PtrDWORD;
-		DWORD *DestPtr1 = &Dest.PtrDWORD[X + Y*DestTexture->USize],*DestPtr;
-		while( Y++ < EndY )
-		{
-			SourcePtr = SourcePtr1;
-			DestPtr   = DestPtr1;
-
-			for( XC=X; XC<EndX; XC++ )
-			{
-				B = *SourcePtr++;
-				if (B) *DestPtr = Table[B + Color];
-				DestPtr++;
-			}
-			SourcePtr1 += SourceTexture->USize;
-			DestPtr1   += DestTexture->USize;
-		}
-	}
-	if( Item ) Item->Unlock();
-	unguard;
-}
-
-/*------------------------------------------------------------------------------
-	FGlobalGfx Text output: String length functions
-------------------------------------------------------------------------------*/
-
-//
-// Calculate the length of a string built from a font, starting at a specified
-// position and counting up to the specified number of characters (-1 = infinite).
-//
-void FGlobalGfx_PartialStrLen(int *XL, int *YL, int XSpace, int YSpace, 
-	UFont *Font, const char *Text,
-	int iStart,int NumChars)
-{
-	guard(FGlobalGfx_PartialStrLen);
-
-	FFontCharacter	*Index = Font->GetData();
-	const char		*c;
-
-	*XL=0; *YL=0; c=&Text[iStart];
-
-	while( *c && NumChars )
-	{
-		*XL += Index [*c].USize + XSpace;
-		*YL  = Max (*YL,Index[*c].VSize);
-		c++;
-		NumChars--;
-	}
-	*YL += YSpace;
-	unguard;
-}
-
-//
-// Calculate the size of a string built from a font:
-//
-void FGlobalGfx::StrLen
-(
-	int			*XL, 
-	int			*YL, 
-	int			XSpace, 
-	int			YSpace, 
-	UFont		*Font, 
-	const char	*Text
-)
-{
-	guard(FGlobalGfx::StrLen);
-	FGlobalGfx_PartialStrLen(XL,YL,XSpace,YSpace,Font,Text,0,-1);
-	unguard;
-}
-
-//
-// Calculate the size of a string built from a font, word wrapped
-// to a specified region.
-//
-// Algorithm: 
-//
-void FGlobalGfx::WrappedStrLen(int *XL, int *YL, int XSpace, int YSpace, 
-	UFont *Font, int MaxWidth, const char *Text)
-	{
-	GUARD;
-	*XL=0; *YL=0;
-	int iLine=0;
-	int TestXL,TestYL;
-	//
-	// Process each output line:
-	//
-	while (Text[iLine])
-		{
-		//
-		// Process each word until the current line overflows:
-		//
-		int iWord, iTestWord=iLine;
-		do	{
-			iWord = iTestWord;
-			if (!Text[iTestWord]) break;
-			//
-			while (Text[iTestWord] && (Text[iTestWord]!=' ')) iTestWord++;
-			while (Text[iTestWord]==' ') iTestWord++;
-			//
-			FGlobalGfx_PartialStrLen(&TestXL,&TestYL,XSpace,YSpace,Font,Text,iLine,iTestWord-iLine);
-			} while (TestXL <= MaxWidth);
-		if (iWord==iLine)
-			{
-			//
-			// The text didn't fit word-wrapped onto this line, so chop it:
-			//
-			int iTestWord = iLine;
-			do	{
-				iWord   = iTestWord;
-				if (!Text[iTestWord]) break;
-				//
-				iTestWord++;
-				//
-				FGlobalGfx_PartialStrLen(&TestXL,&TestYL,XSpace,YSpace,Font,Text,iLine,iWord-iLine);
-				} while (TestXL <= MaxWidth);
-			if (iWord==iLine) return; // Word wrap failed
-			}
-		//
-		// Sucessfully split this line:
-		//
-		FGlobalGfx_PartialStrLen(&TestXL,&TestYL,XSpace,YSpace,Font,Text,iLine,iWord-iLine);
-		*YL += TestYL;
-		*XL  = Max(*XL,TestXL);
-		// Go to the next line:
-		while (Text[iWord]==' ') iWord++;
-		iLine = iWord;
-		};
-	if (*XL>MaxWidth) appError("Logic error");
-	UNGUARD("FGlobalGfx::WrappedStrLen");
-	};
-
-/*------------------------------------------------------------------------------
-	FGlobalGfx Text output: String printing functions
-------------------------------------------------------------------------------*/
-
-//
-// Draw a font onto a texture.  Normally called with a camera's
-// screen texture.
-//
-void VARARGS FGlobalGfx::Printf
-(
-	UTexture	*DestTexture, 
-	int			X, 
-	int			Y, 
-	int			XSpace, 
-	UFont		*Font, 
-	int			Color, 
-	const char	*Fmt,...
-)
-{
-	va_list  ArgPtr;
-	char	 Text[256];
-
-	va_start (ArgPtr,Fmt);
-	vsprintf (Text,Fmt,ArgPtr);
-	va_end   (ArgPtr);
-
-	guard(FGlobalGfx::Printf);
-
-	FCacheItem *Item;
-	RAINBOW_PTR Ptr = DestTexture->Palette->GetColorDepthPalette(Item, DestTexture);
-
-	FFontCharacter	*Index = Font->GetData();
-	char *c = &Text[0];
-
-	while( *c != 0 )
-	{
-		Cout( DestTexture,X,Y,XSpace,Font,Color,*c,Ptr );
-		X += Index [*c].USize + XSpace;
-		c ++;
-	}
-	Item->Unlock();
-
-	unguard;
-}
-
-void VARARGS FGlobalGfx::WrappedPrintf
-(
-	UTexture	*DestTexture,
-	int			X, 
-	int			Y, 
-	int			XSpace, 
-	int			YSpace,
-	UFont		*Font, 
-	int			Color, 
-	int			Width, 
-	int			Center, 
-	const char	*Fmt,...
-)
-{
-	va_list  ArgPtr;
-	char	 Text[256];
-
-	va_start (ArgPtr,Fmt);
-	vsprintf (Text,Fmt,ArgPtr);
-	va_end   (ArgPtr);
-
-	guard(FGlobalGfx::WrappedPrintf);
-
-	int iLine=0;
-	int TestXL,TestYL;
-
-	// Process each output line.
-	while( Text[iLine] )
-	{
-		// Process each word until the current line overflows.
-		int iWord, iTestWord=iLine;
-		do
-		{
-			iWord = iTestWord;
-			if (!Text[iTestWord]) 
-				break;
-
-			while (Text[iTestWord] && (Text[iTestWord]!=' ')) 
-				iTestWord++;
-			
-			while (Text[iTestWord]==' ') 
-				iTestWord++;
-
-			FGlobalGfx_PartialStrLen(&TestXL,&TestYL,XSpace,YSpace,Font,Text,iLine,iTestWord-iLine);
-
-		} while (TestXL <= Width);
-
-		if( iWord==iLine )
-		{
-			// The text didn't fit word-wrapped onto this line, so chop it.
-			int iTestWord = iLine;
-			do
-			{
-				iWord = iTestWord;
-				if (!Text[iTestWord]) 
-					break;
-
-				iTestWord++;
-
-				FGlobalGfx_PartialStrLen(&TestXL,&TestYL,XSpace,YSpace,Font,Text,iLine,iWord-iLine);
-			
-			} while (TestXL <= Width);
-			
-			if (iWord==iLine) 
-				return; // Word wrap failed.
-		}
-
-		// Sucessfully split this line, now draw it.
-		char Temp[256];
-		strcpy(Temp,&Text[iLine]);
-		Temp[iWord-iLine]=0;
-
-		FGlobalGfx_PartialStrLen(&TestXL,&TestYL,XSpace,YSpace,Font,Text,iLine,iWord-iLine);
-		
-		if( TestXL>Width )
-			appError("Logic error");
-
-		Printf
-		(
-			DestTexture,Center ? (X + ((Width-TestXL)>>1)) : X, Y,
-			XSpace,Font,Color,"%s",Temp
-		);
-		Y += TestYL;
-
-		// Go to the next line.
-		while (Text[iWord]==' ') 
-			iWord++;
-		
-		iLine = iWord;
+		memcpy(&SavedCamera,Camera,sizeof(UCamera));
+		Camera->X      *= 2;
+		Camera->Y      *= 2;
+		Camera->Stride *= 2;
+		Camera->PrecomputeRenderInfo(Camera->X,Camera->Y);
+		Camera->Screen  = new(GMem,Camera->ByteStride * Camera->Y)BYTE;
 	}
 	unguard;
 }
-
-/*------------------------------------------------------------------------------
-	Font importing/processing
-------------------------------------------------------------------------------*/
-
-//
-//	Fast pixel-lookup macro
-//
-//	a=screen buffer (byte pointer)
-//	b=screen length (such as 320)
-//	x=X coordinate
-//	y=Y coordinate
-//
-inline BYTE AT(BYTE *Screen,int SXL,int X,int Y) {return Screen[X+Y*SXL];};
-
-//
-//	Find the border around a font character that starts at x,y (it's upper
-//	left hand corner).  If it finds a character box, it returns 0 and the
-//	character's length (xl,yl).  Otherwise returns -1.
-//
-// Doesn't check x or y for overflowing.
-//
-int FGlobalGfx::ScanFontBox (UTexture *Texture, int X,int Y,int *XL,int *YL)
-	{
-	GUARD;
-	BYTE	*TextureData = Texture->GetData();
-	int 	FontXL = Texture->USize;
-	int 	NewXL,NewYL;
-	//
-	// Find x-length
-	//
-	NewXL = 1;
-	while
-		(
-		(AT(TextureData,FontXL,X+NewXL,Y)==255) &&
-		(AT(TextureData,FontXL,X+NewXL,Y+1)!=255)
-		) NewXL++;
-	if (AT(TextureData,FontXL,X+NewXL,Y)!=255) return -1;
-	//
-	// Find y-length
-	//
-	NewYL = 1;
-	while
-		(
-		(AT(TextureData,FontXL,X,Y+NewYL)==255)&&
-		(AT(TextureData,FontXL,X+1,Y+NewYL)!=255)
-		) NewYL++;
-	if (AT(TextureData,FontXL,X,Y+NewYL)!=255) return -1;
-	//
-	*XL=NewXL - 1;
-	*YL=NewYL - 1;
-	return 0;
-	//
-	UNGUARD("FGlobalGfx::ScanFontBox");
-	};
-
-UFont *FGlobalGfx::MakeFontFromTexture (UTexture *Texture)
-	{
-	GUARD;
-	BYTE			*TextureData	= Texture->GetData();
-	UFont			*Font			= new(Texture->Name,CREATE_Replace)UFont(256,1);
-	FFontCharacter	*Index			= Font->GetData();
-	int				i,X,Y,XL,YL,MaxYL;
-	//
-	Font->Texture = Texture;
-	for (i=0; i<256; i++) // Init all characters to "unavailable"
-		{
-		Index[i].StartU = 0; Index[i].USize = 0;
-		Index[i].StartV = 0; Index[i].VSize = 0;
-		};
-	//
-	// Scan in all fonts, starting at character 32:
-	//
-	i = 32;
-	Y = 0;
-	//
-	RowLoop:
-	//
-	X = 0;
-	while ((AT(TextureData,Texture->USize,X,Y) != 255)&&(Y < Texture->VSize))
-		{
-		X++;
-		if (X >= Texture->USize)
-			{
-			X = 0;
-			Y++;
-			//
-			if (Y >= Texture->VSize) goto Done;
-			};
-		};
-	//
-	// Scan all characters in this row:
-	//
-	MaxYL = 0;
-	//
-	while ((i<256) && (ScanFontBox (Texture,X,Y,&XL,&YL)==0))
-		{
-		//bug ("C%i %i,%i - %i,%i",i,X,Y,XL,YL);
-		Index[i].StartU = X+1;
-		Index[i].StartV = Y+1;
-		Index[i].USize  = XL;
-		Index[i].VSize  = YL;
-		//
-		X += XL + 1;
-		i ++;
-		if (YL>MaxYL) MaxYL = YL;
-		};
-	Y = Y + MaxYL + 1; /* Proceed past end of this row. */
-	//
-	if ((i < 256) && (Y < Texture->VSize)) goto RowLoop;
-	//
-	Done: // Finished scanning font
-	return Font;
-	//
-	UNGUARD("FGlobalGfx::MakeFontFromTexture");
-	};
-
-/*------------------------------------------------------------------------------
-	Frame functions
-------------------------------------------------------------------------------*/
-
-//
-// Darken a rectangular area
-//
-void FGlobalGfx::BurnRect (UTexture *Texture,int X1,int X2,int Y1,int Y2,int Bright)
-	{
-	GUARD;
-	BYTE			*Data = Texture->GetData();
-	BYTE			*Dest1,*Dest;
-	DWORD			*DDest1,*DDest;
-	WORD			*WDest1,*WDest;
-	int				i,j;
-	//
-	X1 = Clamp(X1,0,Texture->USize);
-	X2 = Clamp(X2,0,Texture->USize);
-	Y1 = Clamp(Y1,0,Texture->VSize);
-	Y2 = Clamp(Y2,0,Texture->VSize);
-	//
-	if (Texture->ColorBytes==1)
-		{
-		Dest1  = &Data [X1 + Y1*Texture->USize];
-		Bright = Bright?0x00:0x40;
-		for (i=Y1; i<Y2; i++)
-			{
-			Dest = Dest1;
-			for (j=X1; j<X2; j++)
-				{
-				*Dest = 0x10 + Bright + (*Dest & 7) + ((*Dest & 0xf0) >> 1);
-				Dest++;
-				};
-			Dest1 += Texture->USize;
-			};
-		}
-	else if (Texture->ColorBytes==2)
-		{
-		WDest1    = (WORD *)&Data[2*(X1 + Y1*Texture->USize)];
-		for (i=Y1; i<Y2; i++)
-			{
-			WDest = WDest1;
-			if(Texture->CameraCaps & CC_RGB565)
-				{
-				WORD Temp = Bright ? (0x7800+0x03e0+0x000f) : 0;
-				for (j=X1; j<X2; j++) {*WDest = Temp + ((*WDest & (0x001e + 0x07c0 + 0x0f000))>>1); WDest++;};
-				}
-			else
-				{
-				WORD Temp = Bright ? (0x3C00+0x01e0+0x000f) : 0;
-				for (j=X1; j<X2; j++) {*WDest = Temp + ((*WDest & (0x001e + 0x03c0 + 0x07800))>>1); WDest++;};
-				};
-			WDest1 += Texture->USize;
-			};
-		}
-	else
-		{
-		DDest1  = (DWORD *)&Data[4*(X1 + Y1*Texture->USize)];
-		for (i=Y1; i<Y2; i++)
-			{
-			DDest = DDest1;
-			DWORD Temp = Bright ? 0x7f7f7f7f : 0;
-			for (j=X1; j<X2; j++)
-				{
-				*DDest = Temp + ((*DDest & 0xfefefefe)>>1);
-				DDest++;
-				};
-			DDest1 += Texture->USize;
-			};
-		};
-	UNGUARD("FGlobalGfx::BurnRect");
-	};
-
-void __inline FillDWORD(DWORD *Dest,DWORD D,int n)
-	{
-#if ASM
-	if (n>0) __asm
-		{
-		mov edi,[Dest]
-		mov esi,[n]
-		mov eax,[D]
-		;
-		FillLoop:
-		mov [edi],eax
-		add edi,4
-		dec esi
-		jg  FillLoop
-		};
-#else
-		while (n-- > 0) *Dest++ = D;
-#endif
-	};
-
-//
-// Clear the screen to a default palette color.
-//
-void FGlobalGfx::Clearscreen (ICamera *Camera,BYTE c)
-	{
-	int		Size4	= (Camera->SXR * Camera->ColorBytes) >> 2;
-	int		Fill;
-	//
-	if (Camera->ColorBytes==1)
-		{
-		Fill = (DWORD)c + (((DWORD)c)<<8) + (((DWORD)c)<<16) + (((DWORD)c)<<24);
-		}
-	else if ((Camera->ColorBytes==2) && (Camera->Caps & CC_RGB565))
-		{
-		int W = DefaultColors[c].HiColor565();
-		Fill = (W) + (W<<16);
-		}
-	else if (Camera->ColorBytes==2)
-		{
-		int W = DefaultColors[c].HiColor555();
-		Fill = (W) + (W<<16);
-		}
-	else
-		{
-		Fill = DefaultColors[c].TrueColor();
-		};
-	DWORD *Dest = (DWORD *)Camera->Screen;
-	for (int i=0; i<Camera->SYR; i++)
-		{
-		FillDWORD(Dest,Fill,Size4);
-		Dest += (Camera->ByteStride) >> 2;
-		};
-	};
-
-ICamera *GSavedCamera;
-void FGlobalGfx::PreRender(ICamera *Camera)
-	{
-	GUARD;
-	if (0 && (Camera->ColorBytes==4))
-		{
-		GSavedCamera=(ICamera *)GMem.Get(sizeof(ICamera));
-		memcpy(GSavedCamera,Camera,sizeof(ICamera));
-		//
-		Camera->Stride = (((Camera->SXR+1) >> 1)+3)&~3;
-		Camera->PrecomputeRenderInfo
-			(
-			Camera->Stride,
-			((Camera->SYR+1) >> 1)
-			);
-		Camera->Screen = (BYTE *)GMem.Get(Camera->ByteStride * Camera->SYR);
-		};
-	if (Smooth)
-		{
-		GSavedCamera=(ICamera *)GMem.Get(sizeof(ICamera));
-		memcpy(GSavedCamera,Camera,sizeof(ICamera));
-		Camera->Stride	 = Camera->SXR * 2;
-		Camera->SYR      = Camera->SYR * 2;
-		Camera->PrecomputeRenderInfo(Camera->Stride,Camera->SYR);
-		Camera->Screen   = (BYTE *)GMem.Get(Camera->ByteStride * Camera->SYR);
-		};
-	UNGUARD("FGlobalGfx::PreRender");
-	};
 
 //
 // Finalize the stuff in the frame based on the current camera mode.
 //
-void FGlobalGfx::PostRender(ICamera *Camera)
+void FGlobalGfx::PostRender( UCamera *Camera )
+{
+	guard(FGlobalGfx::PostRender);
+
+	// Experimental stuff.
+	if( 0 )
 	{
-	GUARD;
-	int 	i,j;
-	BYTE	*Dest,*Source1,*Source2;
-	//
-	if (0 && (Camera->ColorBytes==4))
+		DWORD *OldScreen = (DWORD *)Camera->Screen;
+		memcpy(Camera,&SavedCamera,sizeof(UCamera));
+		DWORD *Src0 = OldScreen;
+		DWORD *Src1 = OldScreen + Camera->Stride*2;
+		DWORD *Dest = (DWORD*)Camera->Screen + Camera->Stride;
+		for( int i=0; i<Camera->Y; i++ )
 		{
-		DWORD *Dest1 = (DWORD *)GSavedCamera->Screen;
-		DWORD *Src1  = (DWORD *)Camera->Screen;
-		int   n      = Camera->SXR;
-		int   m      = GSavedCamera->Stride;
-		for (int i=0; i<Camera->SYR; i++)
+			for( int i=0; i<Camera->X; i++ )
 			{
-			DWORD *Src  = Src1;
-			DWORD *Dest = Dest1;
-			for (int j=0; j<Camera->SXR; j++)
-				{
-				DWORD A=Src[0];
-				Dest[0]=A;
-				Dest[1]=A;
-				Dest[m]=A;
-				Dest[m+1]=A;
-				/*
-				DWORD A = (Src[0  ]&0xfcfcfcfc)>>2;
-				DWORD B = (Src[1  ]&0xfcfcfcfc)>>2;
-				DWORD C = (Src[n  ]&0xfcfcfcfc)>>2;
-				DWORD D = (Src[n+1]&0xfcfcfcfc)>>2;
-				//
-				Dest[0  ] = A*4 + B*2 + C*2 + D*1;
-				Dest[1  ] = A*2 + B*4 + C*1 + D*2;
-				Dest[m  ] = A*2 + B*1 + C*4 + D*2;
-				Dest[m+1] = A*1 + B*2 + C*2 + D*4;
-				*/
-				//
-				Dest += 2;
-				Src  += 1;
-				};
-			Src1  += Camera->Stride;
-			Dest1 += GSavedCamera->Stride << 1;
-			};
-		memcpy(Camera,GSavedCamera,sizeof(ICamera));
-		GMem.Release(GSavedCamera);
-		};
-	//
-	// Experimental stuff:
-	//
-	if (Smooth)
+				*Dest++ = 
+				+	((Src0[0] & 0xfcfcfc)>>2)
+				+	((Src0[1] & 0xfcfcfc)>>2)
+				+	((Src1[0] & 0xfcfcfc)>>2)
+				+	((Src1[1] & 0xfcfcfc)>>2);
+				Src0 += 2;
+				Src1 += 2;
+			}
+			Src0 += Camera->Stride*2;
+			Src1 += Camera->Stride*2;
+		}
+	}
+	if( Stretch )
+	{
+		RAINBOW_PTR Src = Camera->Screen;
+		*Camera = SavedCamera;
+		RAINBOW_PTR Dest = Camera->Screen;
+		for( int i=0; i<Camera->Y; i+=2 )
 		{
-		if (Camera->ColorBytes==1)
+			for( int ii=0; ii<2; ii++ )
 			{
-			Source1 = Camera->Screen;
-			Source2 = Camera->Screen + Camera->SXR;
-			int Stride = Camera->Stride;
-			memcpy(Camera,GSavedCamera,sizeof(ICamera));
-			Dest    = Camera->Screen;
-			for (i=0; i<Camera->SYR; i++)
-				{
-				for (j=0; j<Camera->SXR; j++)
-					{
-					*Dest++ = GGfx.Blender
-						[
-						GGfx.Blender[Source1[0] + ((int)Source1[1]<<8)] +
-						((int)GGfx.Blender[Source2[0] + ((int)Source2[1]<<8)]<<8)
-						];
-					Source1 += 2;
-					Source2 += 2;
-					};
-				Source1 += Stride;
-				Source2 += Stride;
-				Dest    += Camera->Stride - Camera->SXR;
-				};
-			};
-		};
-	UNGUARD("FGlobalGfx::PostRender");
-	};
+				if( Camera->ColorBytes==1 )
+					for( int j=0; j<Camera->X; j+=2 )
+						{Dest.PtrBYTE[0] = Dest.PtrBYTE[1] = *Src.PtrBYTE++; Dest.PtrBYTE+=2;}
+				else if( Camera->ColorBytes==2 )
+					for( int j=0; j<Camera->X; j+=2 )
+						{Dest.PtrWORD[0] = Dest.PtrWORD[1] = *Src.PtrWORD++; Dest.PtrWORD+=2;}
+				else if( Camera->ColorBytes==4 )
+					for( int j=0; j<Camera->X; j+=2 )
+						{Dest.PtrDWORD[0] = Dest.PtrDWORD[1] = *Src.PtrDWORD++; Dest.PtrDWORD+=2;}
+				Src.PtrBYTE -= Camera->ByteStride/2;
+			}
+			Src.PtrBYTE += Camera->ByteStride/2;
+		}
+	}
+	if( Smooth )
+	{
+		BYTE *OldScreen = Camera->Screen;
+		Camera->Screen  = SavedScreen;
+
+		DWORD *Screen = (DWORD *)Camera->Screen;
+		DWORD *Frame0 = (DWORD *)OldScreen + 0*Camera->Stride;
+		DWORD *Frame1 = (DWORD *)OldScreen + 1*Camera->Stride;
+		DWORD *Frame2 = (DWORD *)OldScreen + 2*Camera->Stride;
+		for( int i=1; i<Camera->Y-1; i++ )
+		{
+			for( int i=1; i<Camera->X-2; i++ )
+			{
+				Screen[i] = 
+				+	((Frame0[i+1] & 0xf8f8f8)>>3)
+				+	((Frame1[i+0] & 0xf8f8f8)>>3)
+				+	((Frame1[i+1] & 0xfefefe)>>1)
+				+	((Frame1[i+2] & 0xf8f8f8)>>3)
+				+	((Frame2[i+1] & 0xf8f8f8)>>3)
+				;
+			}
+			Screen += Camera->Stride;
+			Frame0  = Frame1;
+			Frame1  = Frame2;
+			Frame2 += Camera->Stride;
+		}
+	}
+	Mark.Pop();
+	unguard;
+}
 
 /*------------------------------------------------------------------------------
-	FGlobalGfx table functions
+	FGlobalGfx table functions.
 ------------------------------------------------------------------------------*/
 
+//
+// Lookup all graphics tables from existing objects.
+//
 void FGlobalGfx::LookupAllTables()
-	{
-	GUARD;
-	//
+{
+	guard(FGlobalGfx::LookupAllTables);
+
 	DefaultTexture		= new("Default",	FIND_Existing) UTexture;
 	BkgndTexture		= new("Bkgnd",		FIND_Existing) UTexture;
 	BadTexture			= new("Bad",		FIND_Existing) UTexture;
-	Logo				= new("Logo",		FIND_Existing) UTexture;
-	//
+
 	DefaultPalette		= new("Palette",	FIND_Existing) UPalette;
 	HugeFont			= new("f_huge",		FIND_Existing) UFont;
 	LargeFont			= new("f_large",	FIND_Existing) UFont;
 	MedFont				= new("f_tech",		FIND_Existing) UFont;
 	SmallFont			= new("f_small",	FIND_Existing) UFont;
-	ArrowBrush			= new("Arrow",		FIND_Existing) UModel;
-	RootHullBrush		= new("RootHull",	FIND_Existing) UModel;
-	//
+
+	if( GEditor )
+	{
+		ArrowBrush		= new("Arrow",		FIND_Existing) UModel;
+		RootHullBrush	= new("RootHull",	FIND_Existing) UModel;
+	}
+	else
+	{
+		ArrowBrush		= NULL;
+		RootHullBrush	= NULL;
+	}
+
 	MenuUp				= new("b_menuup",	FIND_Existing) UTexture;
 	MenuDn				= new("b_menudn",	FIND_Existing) UTexture;
 	CollOn				= new("b_collon",	FIND_Existing) UTexture;
@@ -841,36 +174,25 @@ void FGlobalGfx::LookupAllTables()
 	PlyrOff				= new("b_plyroff",	FIND_Existing) UTexture;
 	LiteOn				= new("b_liteon",	FIND_Existing) UTexture;
 	LiteOff				= new("b_liteoff",	FIND_Existing) UTexture;
-	//
-	DefaultColors		= DefaultPalette->GetData();
-	//
-	// Prevent cached resources from being relocated during file load:
-	//
-	DefaultPalette  ->SetFlags(RF_NoReplace); 
-	//
-	UNGUARD("FGlobalGfx::LookupAllTables");
-	};
 
+	unguard;
+}
+
+//
+// Lookup all rendering lookup tables.
+//
 void FGlobalGfx::LookupAllLuts()
-	{
-	GUARD;
-	//
-	ShadeTable					= new("Shade",		FIND_Existing) UBuffer;
-	BlendTable					= new("Blend",		FIND_Existing) UBuffer;
-	HueTable					= new("Hue",		FIND_Existing) UBuffer;
-	SincTable					= new("Sinc",		FIND_Existing) UBuffer;
-	ShadeData					= (BYTE *)ShadeTable->GetData();
-	Blender						= (BYTE *)BlendTable->GetData();
-	HueData						= (FVector *)HueTable->GetData();
-	SincData					= (FLOAT *)SincTable->GetData();
-	//
-	ShadeTable ->SetFlags(RF_NoReplace);
-	//
-	UNGUARD("FGlobalGfx::LookupAllLuts");
-	};
+{
+	guard(FGlobalGfx::LookupAllLuts);
+	RemapTable	= new("Remap",		FIND_Existing)UBuffer;
+	BlendTable	= new("Blend",		FIND_Existing)UBuffer;
+	HueTable	= new("Hue",		FIND_Existing)UVectors;
+	SincTable	= new("Sinc",		FIND_Existing)UFloats;
+	unguard;
+}
 
 /*------------------------------------------------------------------------------
-	FGlobalGfx Init & Exit
+	FGlobalGfx Init & Exit.
 ------------------------------------------------------------------------------*/
 
 //
@@ -883,6 +205,9 @@ void FGlobalGfx::Init()
 
 	FColor			Color,*C1,*C2;
 	int 			ShadeWeight[32],i,j;
+
+	// Init stuff required for importing.
+	DefaultPalette = (UPalette*)NULL;
 
 	// Init color table using non-Windows colors.
 	BlackColor				= 233;	// Pure non-Windows black
@@ -911,181 +236,170 @@ void FGlobalGfx::Init()
 	ActorFillColor			= COLOR(P_BROWN,24);
 	NonSolidWireColor		= COLOR(P_GREY,4);
 	SemiSolidWireColor		= COLOR(P_GREEN,4);
-	NormalFontColor			= COLOR(P_FIRE,1);
-	WireBackground			= COLOR(P_GREY,4);
+	WireBackground			= BlackColor;
 	WireGridAxis			= COLOR(P_GREY,12);
 	ActorArrowColor			= COLOR(P_RED,4);
 	ScaleBoxColor			= COLOR(P_FIRE,6);
 	ScaleBoxHiColor			= COLOR(P_FIRE,0);
 	ZoneWireColor			= COLOR(P_BLUE,0);
 	MoverColor				= COLOR(P_GREEN,2);
+	OrthoBackground			= COLOR(P_BLUE,23); //COLOR(P_GREY,4);
 
 	// Allocate global graphics array.
-	Graphics = new("Graphics",CREATE_Unique)UArray(256);
+	Graphics = new("Graphics",CREATE_Unique)UArray(0);
 
 	// Init misc.
 	DefaultCameraFlags = SHOW_Frame | SHOW_Actors | SHOW_MovingBrushes;
-
-	// Allocate all palettes.
-	GammaPalette = new("Gamma",CREATE_Unique)UPalette;
-	GammaColors  = GammaPalette->AllocData();
-	Graphics->Add(GammaPalette);
 
 	// Gamma parameters.
 	NumGammaLevels  = 8;
 	GammaLevel		= 4;
 
 	// Add graphics array to root.
-	GRes.AddToRoot(Graphics);
-	debug(LOG_Init,"Graphics initialized");
+	GObj.AddToRoot(Graphics);
+	debug( LOG_Init, "Graphics initialized" );
 
 	// Load graphics tables if present, otherwise regenerate.
-	GRes.AddFile ("Unreal.gfx");
+	GObj.AddFile("Unreal.gfx",NULL,1);
 	Tables = new("GfxTables",FIND_Optional)UArray;
 	if( !Tables )
 	{
 		GApp->BeginSlowTask("Building Unreal.gfx",1,0);
-		Tables = new("GfxTables",CREATE_Unique)UArray(256);
+		Tables = new("GfxTables",CREATE_Unique)UArray(0);
 		debug (LOG_Init,"Building Unreal.gfx");
 
 		//
 		// Regenerate all graphics tables.
 		//
 
-		DefaultColors  = NULL; // Required by palette importer
-		DefaultPalette = new("Palette",CREATE_Replace)UPalette;
-		if (!DefaultPalette->ImportFromFile(DEFAULT_PALETTE_FNAME))
+		DefaultPalette = new("Palette",DEFAULT_PALETTE_FNAME,IMPORT_Replace)UPalette;
+		if( !DefaultPalette )
 			appError ("Error loading default palette");
 
-		FixPalette (DefaultPalette);
-		DefaultColors	= DefaultPalette->GetData();
-		Tables->Add(DefaultPalette);
+		DefaultPalette->FixPalette();
+		Tables->AddItem(DefaultPalette);
 
 		// Call import script to load editor stuff (marker sprites, fonts, etc).
 		guard(GFX_BOOTSTRAP_FNAME)
-		if (!GEditor) appError("Can't find graphics resources");
+		if (!GEditor) appError("Can't find graphics objects");
 		GEditor->Exec("MACRO PLAY NAME=Startup FILE=" GFX_BOOTSTRAP_FNAME);
 		unguard;
 
 		// Finish & save new table to disk.
-		GApp->StatusUpdate ("Saving",0,0);
-		GRes.SaveDependent (Tables,"Unreal.gfx",FILE_NONE);
+		GApp->StatusUpdate( "Saving", 0, 0 );
+		GObj.SaveDependent( Tables, "Unreal.gfx" );
 		GApp->EndSlowTask();
 	}
 	LookupAllTables();
-	Graphics->Add(Tables);
+	Graphics->AddItem(Tables);
 
 	// Load lookup tables.
-	GRes.AddFile ("Unreal.tab");
+	GObj.AddFile("Unreal.tab",NULL,1);
 	Luts = new("GfxLuts",FIND_Optional)UArray;
 	if (!Luts)
 	{
 		GApp->BeginSlowTask("Building Unreal.tab",1,0);
-		Luts = new("GfxLuts",CREATE_Unique)UArray(16);
+		Luts = new("GfxLuts",CREATE_Unique)UArray(0);
 		debug (LOG_Init,"Building Unreal.tab");
 
-		ShadeTable   = new("Shade",      CREATE_Replace,RF_64KAlign)UBuffer(4*64*256,1);
-		BlendTable   = new("Blend",      CREATE_Replace,RF_64KAlign)UBuffer(256*256,1);
-		HueTable	 = new("Hue",        CREATE_Replace            )UBuffer(256*sizeof(FVector),1);
-		SincTable	 = new("Sinc",		 CREATE_Replace			   )UBuffer(256*sizeof(FLOAT),1);
+		RemapTable   = new("Remap",      CREATE_Replace)UBuffer(65536,1);
+		BlendTable   = new("Blend",      CREATE_Replace)UBuffer(256*256,1);
+		HueTable	 = new("Hue",        CREATE_Replace)UVectors(256,1);
+		SincTable	 = new("Sinc",		 CREATE_Replace)UFloats(256,1);
 
-		Luts->Add(ShadeTable);
-		Luts->Add(BlendTable);
-		Luts->Add(HueTable);
-		Luts->Add(SincTable);
+		Luts->AddItem(RemapTable);
+		Luts->AddItem(BlendTable);
+		Luts->AddItem(HueTable);
+		Luts->AddItem(SincTable);
 
 		LookupAllLuts();
 
 		// Shade weight table.
 		ShadeWeight[31] = 0;
 		for( i=1; i<32; i++ )
-		{
 			ShadeWeight[i] = (int)(65536.0 * exp (0.95 * log ((FLOAT)(31-i)/31.0)));
-		}
 
-		// Shade table.
-		for (i=0; i<256; i++)
+		// Remap table - table of nearest palette index for all 5-6-5 colors.
+		RemapTable->Lock(LOCK_ReadWrite);
+		BYTE *Ptr = &RemapTable->Element(0);
+		union
 		{
-			GApp->StatusUpdate ("Generating shade table",i,256);
-
-			C1 = &DefaultColors[i];
-
-			FVector C;
-			C.X = (FLOAT)C1->Red   / 255.0;
-			C.Y = (FLOAT)C1->Green / 255.0;
-			C.Z = (FLOAT)C1->Blue  / 255.0;
-
-			for( j=0; j<64; j++ )
-			{
-				FLOAT	F	= 2.6 * (FLOAT)j/63.0;
-				FVector D	= C * F;
-
-				Color.Red   = (int)Min(255.0 * D.X, 255.0);
-				Color.Green = (int)Min(255.0 * D.Y, 255.0);
-				Color.Blue  = (int)Min(255.0 * D.Z, 255.0);
-
-				ShadeData[i + j*256 + 0x0000] = DefaultPalette->BestMatch(Color);
-			}
+			struct{DWORD B:5; DWORD G:6; DWORD R:5;};
+			DWORD D;
+		} Count;
+		for( Count.D=0; Count.D<65536; Count.D++ )
+		{
+			if( (Count.D & 255)==0 )
+				GApp->StatusUpdate ("Generating remap table",Count.D,65536);
+			FColor Color(Count.R<<3,Count.G<<2,Count.B<<3);
+			*Ptr++ = GGfx.DefaultPalette->BestMatch(Color);
 		}
-		// Prevent mask from being remapped.
-		for (j=0; j<256; j++) 
-			ShadeData[j*256]=0;
+		RemapTable->Unlock(LOCK_ReadWrite);
 
 		// Hue table (for HSV color).
+		HueTable->Lock(LOCK_ReadWrite);
 		for( i=0; i<86; i++ )
 		{
 			FLOAT F = (FLOAT)i/85.0;
 
-			HueData[i		].X = 1.0 - F; // XYZ=RGB
-			HueData[i		].Y = F;
-			HueData[i		].Z = 0;
+			HueTable(i		).X = 1.0 - F; // XYZ=RGB
+			HueTable(i		).Y = F;
+			HueTable(i		).Z = 0;
 
-			HueData[i+85	].X = 0;
-			HueData[i+85	].Y = 1.0 - F;
-			HueData[i+85	].Z = F;
+			HueTable(i+85	).X = 0;
+			HueTable(i+85	).Y = 1.0 - F;
+			HueTable(i+85	).Z = F;
 
-			HueData[i+170	].X = F;
-			HueData[i+170	].Y = 0;
-			HueData[i+170	].Z = 1.0 - F;
+			HueTable(i+170	).X = F;
+			HueTable(i+170	).Y = 0;
+			HueTable(i+170	).Z = 1.0 - F;
 		}
+		HueTable->Unlock(LOCK_ReadWrite);
 
 		// Sinc tables.
+		SincTable->Lock(LOCK_ReadWrite);
 		for (int i=0; i<256; i++)
 		{
-			// Very rough sinc filter approximation.
+			// This is now just a bilinear scaling table.
 			//SincData[i] = 0.5 - 0.5 * cos(PI * i / 256.0);
-			//SincData[i] = 0.5 * (i/255.0 + (0.5 - 0.5 * cos(PI * i / 256.0)));
-			SincData[i] = (FLOAT)i/255.0; // Looks the best.
+			//SincData[i] = 0.6 * i/255.0 + 0.4 * (0.5 - 0.5 * cos(PI * i / 256.0));
+			SincTable(i) = i/255.0;
 		}
+		SincTable->Unlock(LOCK_ReadWrite);
 
 		// Blend table.
+		BlendTable->Lock(LOCK_ReadWrite);
 		for( i=0; i<256; i++ )
 		{
 			GApp->StatusUpdate ("Generating blend tables",i,256);
-			C1 = &DefaultColors[i];
+			DefaultPalette->Lock(LOCK_Read);
+			C1 = &DefaultPalette(i);
+			DefaultPalette->Unlock(LOCK_Read);
 			for( j=0; j<256; j++ )
 			{
-				C2 = &DefaultColors[j];
-
-				Color.Red	= (8*(int)C1->Red  +8*(int)C2->Red  ) >> 4;
-				Color.Green = (8*(int)C1->Green+8*(int)C2->Green) >> 4;
-				Color.Blue  = (8*(int)C1->Blue +8*(int)C2->Blue ) >> 4;
-				Blender[i*256+j] = DefaultPalette->BestMatchInRange(Color,j);
+				C2 = &DefaultPalette(j);
+				Color.R = ((int)C1->R + (int)C2->R) / 2;
+				Color.G = ((int)C1->G + (int)C2->G) / 2;
+				Color.B = ((int)C1->B + (int)C2->B) / 2;
+				//BlendTable(i*256+j) = DefaultPalette->BestMatchInRange(Color,j);
+				BlendTable(i*256+j) = DefaultPalette->BestMatch(Color);
 			}
 		}
-		// Force blending tables to leave masked color as-is.
 		for (i=0; i<256; i++)
 		{
-			Blender[i]=0;
-			Blender[i*256]=i;
+			// Force blending tables to leave masked color as-is.
+			BlendTable(i)=0;
+			BlendTable(i*256)=i;
 		}
-		GApp->StatusUpdate ("Saving",0,0);
-		GRes.SaveDependent (Luts,"Unreal.tab",FILE_NONE);
+		BlendTable->Unlock(LOCK_ReadWrite);
+
+		GApp->StatusUpdate( "Saving", 0, 0 );
+		GObj.SaveDependent( Luts, "Unreal.tab" );
 		GApp->EndSlowTask();
 	}
 	LookupAllLuts();
-	Graphics->Add(Luts);
-	SetPalette();
+	Graphics->AddItem(Luts);
+	GCameraManager->SetPalette(DefaultPalette);
 
 	unguard;
 }
@@ -1096,52 +410,10 @@ void FGlobalGfx::Init()
 void FGlobalGfx::Exit()
 {
 	guard(FGlobalGfx::Exit);
-	GRes.RemoveFromRoot(Graphics);
+	GObj.RemoveFromRoot(Graphics);
 	debug(LOG_Exit,"Graphics closed");
 	unguard;
 }
-
-/*------------------------------------------------------------------------------
-	UFont implementation
-------------------------------------------------------------------------------*/
-
-void UFont::Register(FResourceType *Type)
-{
-	guard(UFont::Register);
-	Type->HeaderSize    = sizeof (UFont);
-	Type->RecordSize    = sizeof (FFontCharacter);
-	Type->Version       = 1;
-	strcpy (Type->Descr,"Font");
-	unguard;
-}
-void UFont::InitHeader()
-{
-	guard(UFont::InitHeader);
-	Texture		= NULL;
-	Max			= 0;
-	Num			= 0;
-	unguard;
-}
-void UFont::InitData()
-{
-	guard(UFont::InitData);
-	Num = 0;
-	unguard;
-}
-void UFont::QueryHeaderReferences(FResourceCallback &Callback)
-{
-	guard(UFont::QueryHeaderReferences);
-	Callback.Resource(this,(UResource **)&Texture,0);
-	unguard;
-}
-void UFont::Flip()
-{
-	guard(UFont::Flip);
-	UDatabase::Flip();
-	//todo:
-	unguard;
-};
-AUTOREGISTER_RESOURCE(RES_Font,UFont,0xB2D90856,0xCCD211cf,0x91360000,0xC028B992);
 
 /*------------------------------------------------------------------------------
 	The End.

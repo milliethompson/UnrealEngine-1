@@ -105,16 +105,19 @@ FTexLatticeQ STRUCT
 	RoutineOfs	dd ?
 FTexLatticeQ ENDS
 
-FBlitMipInfo STRUCT
+IMip STRUCT
+	DataOffset	dd ?
+	USize		dd ?
+	VSize		dd ?
+	MipLevel	db ?
+	UBits		db ?
+	VBits		db ?
+	Pad3		db ?
 	VMask		dd ?
 	AndMask		dd ?
 	Data		dd ?
 	Dither		dd ?
-	MipLevel	db ?
-	UBits		db ?
-	VBits		db ?
-	Pad			db ?
-FBlitMipInfo ENDS
+IMip ENDS
 
 FSpan STRUCT
 	SpanStart	dd ?
@@ -153,7 +156,7 @@ FBlit ENDS
 ; Globals ;
 ;---------;
 
-extrn GBlit : FBlit
+extrn GBlit  : FBlit
 extrn GLight : DWORD
 
 ;-------------------------------------------------------------------------------;

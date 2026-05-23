@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnEdTran.cpp: Unreal transaction-tracking functions
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	The functions here are used for tracking modifications to the Bsp, editor
@@ -17,73 +17,94 @@
 #include "Unreal.h"
 
 /*-----------------------------------------------------------------------------
-	All transaction-related data types (only used by unedtran.c)
+	All transaction-related data types.
 -----------------------------------------------------------------------------*/
 
-class FTransaction				// Transaction (one entry per transaction)
-	{
-	public:
-	int	TransCount;				// Transaction number, starts at 0 when loaded and counts up
-	int	StartDataOffset;		// Data offset where transaction data starts
-	int	TotalDataSize;			// Total size of all data for the transaction
-	int	NumChanges;				// Number of changes thus far
-	char Name[80];				// Description of transaction
-	};
+class FTransaction			// Transaction (one entry per transaction).
+{
+public:
+	int	TransCount;			// Transaction number, starts at 0 when loaded and counts up.
+	int	StartDataOffset;	// Data offset where transaction data starts.
+	int	TotalDataSize;		// Total size of all data for the transaction.
+	int	NumChanges;			// Number of changes thus far.
+	char Name[80];			// Description of transaction.
+};
 
-class FTransChangeLog  				// Log of additions/deletions/modifications to records
-	{
-	public:
-	UResource		*Res;		// Resource operated on
-	EResourceType	ResType;	// Type of resource operated on, for checking
-	int				Index;		// Index of element
-	int				TransCount;	// Transaction number the change corresponds to
-	int				DataOffset;	// Offset of data in data buffer
-	int				DataSize;	// Size of this change's data in data buffer
-	};
-
-//
-// Globals:
-//
-char *GTransTypeNames[] = {"Actor","BrushLoc","BrushPoly","BspNode","BspSurf"};
+class FTransChangeLog  		// Log of additions/deletions/modifications to records.
+{
+public:
+	UObject		*Res;		// Object operated on.
+	int			Index;		// Index of element.
+	int			TransCount;	// Transaction number the change corresponds to.
+	int			DataOffset;	// Offset of data in data buffer.
+	int			DataSize;	// Size of this change's data in data buffer.
+};
 
 /*-----------------------------------------------------------------------------
-	Lock, Unlock, and Reset
+	UTransBuffer constructor.
+-----------------------------------------------------------------------------*/
+
+UTransBuffer::UTransBuffer
+(
+	int ThisMaxTrans,
+	int ThisMaxChanges,
+	int ThisMaxDataOffset
+)
+{
+	// Set values.
+	MaxTrans		= ThisMaxTrans;
+	MaxChanges		= ThisMaxChanges;
+	MaxDataOffset	= ThisMaxDataOffset;
+
+	// Allocate it.
+	Realloc();
+
+	// Subsystem init message.
+	debug (LOG_Init,"Transaction tracking system initialized");
+}
+
+/*-----------------------------------------------------------------------------
+	Lock, Unlock, and Reset.
 -----------------------------------------------------------------------------*/
 
 //
-// Lock the transaction tracking resource and get a local copy of its info
-// into TRANS.
+// Lock the transaction tracking object.
 //
-void UTransBuffer::Lock()
-	{
-	GUARD;
-	DWORD			TransactionSize	= MaxTrans 		* sizeof (FTransaction);
-	DWORD			ChangeLogSize	= MaxChanges	* sizeof (FTransChangeLog);
-	DWORD			DataSize		= MaxDataOffset;
-	//
-	if (!GApp->ServerAlive) return;
-	if (Locked) appError ("Already locked");
-	//
-	Locked 			= 1;
-	Transactions 	= (FTransaction		*)((BYTE *)Data + 0);
-	ChangeLog 		= (FTransChangeLog  *)((BYTE *)Data + TransactionSize);
-	Buffer 			= (BYTE				*)((BYTE *)Data + TransactionSize + ChangeLogSize);
-	//
-	UNGUARD("UTransBuffer::Lock");
-	};
+INT UTransBuffer::Lock(DWORD NewLockType)
+{
+	guard(UTransBuffer::Lock);
+	checkInput(NewLockType!=LOCK_None);
+	checkState(!IsLocked());
+	
+	DWORD	TransactionSize	= MaxTrans 		* sizeof (FTransaction);
+	DWORD	ChangeLogSize	= MaxChanges	* sizeof (FTransChangeLog);
+	DWORD	DataSize		= MaxDataOffset;
+
+	if( !GApp->ServerAlive )
+		return 1;
+
+	Transactions 	= (FTransaction		*)((BYTE *)GetData() + 0);
+	ChangeLog 		= (FTransChangeLog  *)((BYTE *)GetData() + TransactionSize);
+	Buffer 			= (BYTE				*)((BYTE *)GetData() + TransactionSize + ChangeLogSize);
+
+	return UObject::Lock(NewLockType);
+	unguard;
+}
 
 //
-// Copy the local TRANS stuff into the transaction tracking resource and
-// unlock it:
+// Unlock transaction buffer.
 //
-void UTransBuffer::Unlock ()
-	{
-	GUARD;
-	if (!GApp->ServerAlive) return;
-	if (!Locked) appError ("Not locked");
-	Locked = 0;
-	UNGUARD("UTransBuffer::Unlock");
-	};
+void UTransBuffer::Unlock(DWORD OldLockType)
+{
+	guard(UTransBuffer::Unlock);
+	checkState( IsLocked() );
+	
+	if( !GApp->ServerAlive )
+		return;
+
+	UObject::Unlock(OldLockType);
+	unguard;
+}
 
 //
 // Reset the transaction tracking system, clearing all transactions (so that
@@ -93,28 +114,25 @@ void UTransBuffer::Unlock ()
 //
 // Action = description of reason for reset (i.e. "loading level", "rebuilding Bsp")
 //
-void UTransBuffer::Reset (const char *Action)
-	{
-	GUARD;
-	//
-	if (!GApp->ServerAlive) return;
-	Lock();
-	//
+void UTransBuffer::Reset( const char *Action )
+{
+	guard(UTransBuffer::Reset);
+	if( !GApp->ServerAlive )
+		return;
+	
 	strcpy (ResetAction,Action);
-	//
-	Locked			= 0;
 	NumTrans		= 0;
 	NumChanges		= 0;
 	Overflow 		= 0;
 	TransCount		= 0;
 	UndoTransCount	= 0;
-	//
-	debugf (LOG_Trans,"Transaction buffer %s reset",Name);
-	UNGUARD("UTransBuffer::Reset");
-	};
+
+	debugf(LOG_Info,"Transaction buffer %s reset",GetName());
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Deletion
+	Deletion.
 -----------------------------------------------------------------------------*/
 
 //
@@ -122,845 +140,700 @@ void UTransBuffer::Reset (const char *Action)
 // from the change log and data tables, and scroll the list down.
 //
 void UTransBuffer::DeleteFirstTransaction()
-	{
-	GUARD;
+{
+	guard(UTransBuffer::DeleteFirstTransaction);
+
 	FTransaction 	*FirstTrans,*LastTrans;
 	int				MinTransCount;
 	int				MinDataOffset,MaxDataOffset;
 	int 			i,j;
-	//
-	if (!GApp->ServerAlive)	return;
-	if (!Locked)				appError ("Not locked");
-	if (NumTrans==0)			appError ("NumTrans==0");
-	//
-	// Remove from *Transactions:
-	//
-	for (i=1; i<NumTrans; i++) Transactions[i-1] = Transactions[i];
+
+	if( !GApp->ServerAlive )
+		return;
+	
+	checkState(IsLocked());
+	checkState(NumTrans!=0);	
+
+	// Remove from *Transactions.
+	for( i=1; i<NumTrans; i++ )
+		Transactions[i-1] = Transactions[i];
+	
 	NumTrans--;
-	//
-	if (NumTrans==0) // All transactions are gone, so just empty everything:
-		{
+
+	if( NumTrans == 0 )
+	{
+		// All transactions are gone, so just empty everything.
 		NumChanges = 0;
-		}
+	}
 	else
-		{
+	{
 		FirstTrans = &Transactions [0];
 		LastTrans  = &Transactions [NumTrans-1];
-		//
+
 		MinTransCount = FirstTrans->TransCount;
-		//
+
 		MinDataOffset = FirstTrans->StartDataOffset;
 		MaxDataOffset = LastTrans ->StartDataOffset + LastTrans->TotalDataSize;
-		//
-		// Move data and update data offsets for all remaining transactions:
-		//
+
+		// Move data and update data offsets for all remaining transactions.
 		memmove (Buffer, Buffer + MinDataOffset, MaxDataOffset-MinDataOffset);
-		for (i=0; i<NumTrans; i++) Transactions[i].StartDataOffset -= MinDataOffset;
-		//
-		// Delete all old entries from TRANS.ChangeLog:
-		//
+		for( i=0; i<NumTrans; i++ )
+			Transactions[i].StartDataOffset -= MinDataOffset;
+
+		// Delete all old entries from TRANS.ChangeLog.
 		j=0;
-		for (i=0; i<NumChanges; i++)
+		for( i=0; i<NumChanges; i++ )
+		{
+			if( ChangeLog[i].TransCount >= MinTransCount )
 			{
-			if (ChangeLog[i].TransCount >= MinTransCount)
-				{
-				if (j != i) ChangeLog[j] = ChangeLog[i];
+				if( j != i )
+					ChangeLog[j] = ChangeLog[i];
 				j++;
-				}
-			else {}; // The entry has been passed over (deleted)
-			};
+			}
+			else
+			{
+				// The entry has been passed over (deleted).
+			}
+		}
 		NumChanges = j;
-		};
-	UNGUARD("UTransBuffer::DeleteFirstTransaction");
-	};
+	}
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Begin, End, Rollback, Continue
+	Begin, End, Rollback, Continue.
 -----------------------------------------------------------------------------*/
 
 //
 // Begin a new transaction.  If any undone transactions haven't been redone,
 // they will be overwritten.
 //
-void UTransBuffer::Begin (ULevel *Level, const char *SessionName)
-	{
-	GUARD;
+void UTransBuffer::Begin( ULevel *Level, const char *SessionName )
+{
+	guard(UTransBuffer::Begin);
+
 	FTransaction	*Transaction;
 	int				Index,Count;
-	//
-	// Check existing transaction status:
-	//
+
+	// Check existing transaction status.
 	if (!GApp->ServerAlive) return;
-	if (Locked) appErrorf ("%s: Transaction already active",SessionName);
-	//
-	Lock();
+	checkState(!IsLocked());
+	debugf(LOG_Info,"Begin transaction %s",SessionName);
+
+	Lock(LOCK_ReadWrite);
 	Overflow = 0;
+
 	//
-	//debugf (LOG_Trans,"Begin trans %s",SessionName);
-	//
-	// If transaction list is full, must scroll it back by deleting first entry:
-	//
+	// If transaction list is full, must scroll it back by deleting first entry.
 	if (NumTrans >= MaxTrans) DeleteFirstTransaction();
-	//
-	// If undo without matching redo's, cut off the rest of the list:
-	//
+
+	// If undo without matching redo's, cut off the rest of the list.
 	Count = 0;
-	for (int i=0; i<NumTrans; i++)
+	for( int i=0; i<NumTrans; i++ )
+	{
+		if( Transactions[i].TransCount >= UndoTransCount )
 		{
-		if (Transactions[i].TransCount >= UndoTransCount)
-			{
 			NumTrans    = i;
 			TransCount  = UndoTransCount;
 			break;
-			}
+		}
 		else
-			{
+		{
 			Count += Transactions[i].NumChanges;
-			};
-		};
+		}
+	}
 	NumChanges = Count;
-	//
-	// Fill in *Transaction information:
-	//
+
+	// Fill in *Transaction information.
 	Index                	= NumTrans++;
 	Transaction				= &Transactions[Index];
 	Transaction->TransCount	= TransCount++;
 	Transaction->NumChanges = 0;
-	//
+
+	// Will be increased as changes are logged.
 	strcpy (Transaction->Name,SessionName);
-	Transaction->TotalDataSize = 0; // Will be increased as changes are logged
-	// 
-	// Set undo pointer to very top of transaction list:
-	//
+	Transaction->TotalDataSize = 0;
+
+	// Set undo pointer to very top of transaction list.
 	UndoTransCount    = TransCount;
-	//
-	// Calc starting data offset:
-	//
-	if (NumTrans==1)
-		{
+
+	// Calc starting data offset.
+	if( NumTrans==1 )
+	{
 		Transaction->StartDataOffset = 0;
-		}
+	}
 	else
-		{
+	{
 		Transaction->StartDataOffset =
 		Transactions [Index-1].StartDataOffset +
 		Transactions [Index-1].TotalDataSize;
-		};
-	//
-	// Save all resource headers related to this level for transactional undo/redo:
-	//
-	NoteResHeader (Level->Model);
-	NoteResHeader (Level->ActorList);
-	NoteResHeader (Level->Model->BspNodes);
-	NoteResHeader (Level->Model->BspSurfs);
-	NoteResHeader (Level->Model->Polys);
-	//
-	UNGUARD("UTransBuffer::Begin");
-	};
+	}
+	unguard;
+}
 
 //
 // End a transaction
 //
-void UTransBuffer::End ()
-	{
-	GUARD;
-	//
-	if (!GApp->ServerAlive) return;
-	//
-	// Check existing transaction status:
-	//
-	if (!Locked) appError ("No transaction is in progress");
-	//
-	Unlock();
-	if (Overflow)
-		{
-		debugf (LOG_Trans,"End overflowed transaction");
-		Reset("Undo buffer filled up");
-		}
-	else
-		{
-		//debugf (LOG_Trans,"End transaction");
-		};
-	UNGUARD("UTransBuffer::End");
-	};
+void UTransBuffer::End()
+{
+	guard(UTransBuffer::End);
+	if( !GApp->ServerAlive )
+		return;
 
-void UTransBuffer::ForceOverflow (const char *Reason)
+	checkState(IsLocked());
+
+	Unlock(LOCK_ReadWrite);
+	if( Overflow )
 	{
-	GUARD;
+		debugf(LOG_Info,"End overflowed transaction");
+		Reset("Undo buffer filled up");
+	}
+	else
+	{
+		//debugf (LOG_Trans,"End transaction");
+	}
+	unguard;
+}
+
+void UTransBuffer::ForceOverflow( const char *Reason )
+{
+	guard(UTransBuffer::ForceOverflow);
 	if (!GApp->ServerAlive) return;
 	Overflow = 1;
-	UNGUARD("UTransBuffer::ForceOverflow");
-	};
+	unguard;
+}
 
 //
 // Abort a transaction and restore original state
 //
-void UTransBuffer::Rollback(ULevel *Level)
+void UTransBuffer::Rollback( ULevel *Level )
+{
+	guard(UTransBuffer::Rollback);
+	checkState(IsLocked());
+
+	if( !GApp->ServerAlive )
+		return;
+	
+	if( Overflow )
 	{
-	GUARD;
-	//
-	if (!GApp->ServerAlive) return;
-	if (!Locked) appError ("transRollback: Not active");
-	//
-	if (Overflow)
-		{
-		End(); // Can't rollback overflowed transactions because data is gone
-		}
+		// Can't rollback overflowed transactions because data is gone.
+		End();
+	}
 	else
-		{
+	{
 		End();
 		Undo(Level);
-		//
-		// Prevent rolled-back transaction from being redone:
-		//
+
+		// Prevent rolled-back transaction from being redone.
 		if (NumTrans>0)		NumTrans--;
 		if (TransCount>0)	TransCount--;
-		//
+
 		UndoTransCount = TransCount;
-		//
-		// Wipe out the rolled-back transaction's changes:
-		//
+
+		// Wipe out the rolled-back transaction's changes.
 		NumChanges = 0;
-		for (int i=0; i<NumTrans; i++) NumChanges += Transactions[i].NumChanges;
-		};
-	UNGUARD("UTransBuffer::Rollback");
-	};
+		for( int i=0; i<NumTrans; i++ )
+			NumChanges += Transactions[i].NumChanges;
+	}
+	unguard;
+}
 
 //
 // Reopen the previous transaction and continue it
 //
-void UTransBuffer::Continue ()
-	{
-	GUARD;
-	//
-	if (!GApp->ServerAlive) return;
-	if (Locked) appError ("Already active");
-	//
-	debugf (LOG_Trans,"Continue previous transaction");
-	//
-	Lock();
-	//
+void UTransBuffer::Continue()
+{
+	guard(UTransBuffer::Continue);
+	checkState(!IsLocked());
+
+	if( !GApp->ServerAlive )
+		return;
+	
+	debugf(LOG_Info,"Continue previous transaction");
+
+	Lock(LOCK_ReadWrite);
 	if (NumTrans==0)	Overflow    = 1; // Assume previous transaction overflowed
 	else				Overflow 	= 0;
-	UNGUARD("UTransBuffer::Continue");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Applying Undo/Redo changes
+	Applying Undo/Redo changes.
 -----------------------------------------------------------------------------*/
 
 //
-// Swap memory in one small buffer with another
+// Swap memory in one buffer with another
 //
-void memswap (void *Ptr1, void *Ptr2, DWORD Size)
-	{
-	GUARD;
-	BYTE *Temp = (BYTE *)GMem.Get(Size);
+void memswap( void *Ptr1, void *Ptr2, DWORD Size )
+{
+	guard(memswap);
+
+	FMemMark Mark(GMem);
+	BYTE *Temp = new(GMem,Size)BYTE;
 	memcpy (Temp,Ptr1,Size);
 	memcpy (Ptr1,Ptr2,Size);
 	memcpy (Ptr2,Temp,Size);
-	GMem.Release(Temp);
-	UNGUARD("memswap");
-	};
+	Mark.Pop();
+
+	unguard;
+}
 
 //
 // Begin applying changes.
 //
-void UTransBuffer::BeginChanges (FTransaction *Trans)
+void UTransBuffer::BeginChanges( FTransaction *Trans )
+{
+	guard(UTransBuffer::BeginChanges);
+
+	// Tag all objects as "not affected by transaction tracking system".
+	UObject *Res;
+	FOR_ALL_OBJECTS(Res)
 	{
-	GUARD;
-	UResource *Res;
-	//
-	// Tag all resources as "not affected by transaction tracking system":
-	//
-	FOR_ALL_RES(Res)
-		{
-		Res->Flags &= ~(RF_TransHeader | RF_TransData);
-		}
-	END_FOR_ALL_RES;
-	//
-	UNGUARD("UTransBuffer::BeginChanges");
-	};
+		Res->ClearFlags( RF_TransHeader | RF_TransData );
+	}
+	END_FOR_ALL_OBJECTS;
+	unguard;
+}
 
 //
 // End applying changes and do any necessary cleanup work.
 //
-void UTransBuffer::EndChanges (FTransaction *Trans)
+void UTransBuffer::EndChanges( FTransaction *Trans )
+{
+	guard(UTransBuffer::EndChanges);
+
+	// Postload all objects.
+	UObject *Res;
+	FOR_ALL_OBJECTS(Res)
 	{
-	GUARD;
-	IModel ModelInfo;
-	//
-	// Cleanup any resources that need cleaning up:
-	//
-	UModel *Model;
-	FOR_ALL_TYPED_RES(Model,RES_Model,UModel)
+		if( Res->GetFlags() & RF_TransHeader )
 		{
-		if (Model->Flags & RF_TransHeader)
-			{
-			//
-			// If model's Bsp was changed, rebuild bounding boxes since changes to them
-			// aren't always logged in the transaction tracking system:
-			//
-			Model->Lock (&ModelInfo,LOCK_NoTrans);
-			if (ModelInfo.BspNodes && ModelInfo.BspSurfs)
-				{
-				UBspNodes *BspNodes = ModelInfo.BspNodesResource;
-				UBspSurfs *BspSurfs = ModelInfo.BspSurfsResource;
-				//
-				if ((BspNodes->Flags & RF_TransData) || (BspSurfs->Flags & RF_TransData))
-					{
-					GUnrealEditor.bspBuildBounds (&ModelInfo);
-					};
-				};
-			Model->Unlock(&ModelInfo);
-			};
+			// Call object postloader.
+			Res->PostLoadHeader( POSTLOAD_Trans );
+			Res->ClearFlags( RF_TransHeader );
 		}
-	END_FOR_ALL_RES;
-	//
-	UNGUARD("UTransBuffer::EndChanges");
-	};
+	}
+	END_FOR_ALL_OBJECTS;
+	unguard;
+}
 
 //
-// Apply one logged change, Undo = 1 (Undo), 0 (Redo):
+// Apply one logged change, Undo = 1 (Undo), 0 (Redo).
 //
-void UTransBuffer::ApplyChange (FTransChangeLog *Change, BYTE *SourcePtr, DWORD DataSize)
+void UTransBuffer::ApplyChange( FTransChangeLog *Change, BYTE *SourcePtr, DWORD DataSize )
+{
+	guard(UTransBuffer::ApplyChange);
+
+	if( Change->Index >= 0 )
 	{
-	GUARD;
-	UResource		*Res   	= Change->Res;
-	FResourceType	*Type  	= &GRes.GetType(Res->Type);
-	BYTE			*DestPtr;
-	//
-	// Validate everything and set up dest data pointer:
-	//
-	if (Res->Type != Change->ResType)  appError ("ResType mismatch");
-	//
-	if (Change->Index >= 0) // Change a data record
-		{
-		if (DataSize  != Type->RecordSize) appError ("DataSize mismatch");
-		//
-		DestPtr = ((BYTE *)Change->Res->GetData()) + Change->Index * Type->RecordSize;
-		//
-		Res->Flags |= RF_TransData;
-		}
-	else // Change resource header
-		{
-		if (DataSize  != Type->HeaderSize) appError ("HeaderSize mismatch");
-		//
-		DestPtr = (BYTE *)Change->Res;
-		//
-		Res->Flags |= RF_TransHeader;
-		//
-		// Special case cleanup required for particular kinds of resources:
-		//
-		switch (Res->Type)
-			{
-			case RES_ActorList:
-				((UActorList *)SourcePtr)->LockType = 0;
-				break;
-			case RES_Model:
-				((UModel *)SourcePtr)->LockType = 0;
-				break;
-			};
-		};
-	memswap (DestPtr,SourcePtr,DataSize);
-	UNGUARD("UTransBuffer::ApplyChange");
-	};
+		UDatabase	*Res   	= (UDatabase *)Change->Res;
+		UClass      *Class 	= Res->GetClass();
+		BYTE		*DestPtr;
+		checkLogic(DataSize==Class->ResRecordSize);
+		//debugf("Applying %s.%s %i",Res->GetClassName(),Res->GetName(),Change->Index);
 
-/*-----------------------------------------------------------------------------
-	Undo
------------------------------------------------------------------------------*/
+		// Lock the object.
+		Change->Res->Lock(LOCK_ReadWrite);
 
-//
-// Returns 1 if "undo" is possible, sets Str to name
-//
-int UTransBuffer::CanUndo (char *Str)
+		// Change a data record.
+		DestPtr = ((BYTE *)Change->Res->GetData()) + Change->Index * Class->ResRecordSize;
+
+		// Mark it.
+		Res->SetFlags(RF_TransData);
+
+		// Swap the memory.
+		memswap( DestPtr, SourcePtr, DataSize );
+		Change->Res->InitLocks();
+
+		// PostLoad it.
+		Change->Res->Lock(LOCK_ReadWrite);
+		Res->PostLoadItem( Change->Index, POSTLOAD_Trans );
+		Change->Res->Unlock(LOCK_ReadWrite);
+
+		// Unlock it.
+	}
+	else
 	{
-	GUARD;
-	//
-	if (!GApp->ServerAlive) return 0;
-	Lock();
-	//
-	if ((NumTrans==0) ||
-		(UndoTransCount <= Transactions[0].TransCount))
-		{
-		strcpy (Str,ResetAction);
-		Unlock();
-		return 0;
-		};
-	//
-	// Find transaction name:
-	//
-	for (int i=0; i < NumTrans; i++)
-		{
-		if (Transactions[i].TransCount == (UndoTransCount-1))
-			{
-			strcpy (Str,Transactions[i].Name);
-			Unlock();
-			return 1;
-			};
-		};
-	strcpy(Str,"aborted transaction");
-	Unlock();
-	return 1;
-	UNGUARD("UTransBuffer::CanUndo");
-	};
+		// Change object header.
+		UObject *Dest   = (UDatabase *)Change->Res;
+		UObject *Source	= (UDatabase *)SourcePtr;
+		checkState(DataSize == Dest->GetClass()->ResFullHeaderSize);
+		//debugf("Applying %s.%s",Dest->GetClassName(),Dest->GetName());
 
-//
-// Undo a transaction, 1 if undone, 0 if not possible
-//
-int UTransBuffer::Undo (ULevel *Level)
-	{
-	GUARD;
-	FTransaction	*Transaction;
-	FTransChangeLog	*Change;
-	char			Descr[256];
-	int 			i;
-	//
-	if (!GApp->ServerAlive) return 0;
-	//
-	// See if undo is possible:
-	//
-	if (!CanUndo(Descr))
+		// Remember that we have performed a transaction on this object.
+		DWORD DestFlags = RF_TransHeader | (Dest->GetFlags() & RF_TransData);
+
+		void *CurrentData=NULL;
+		int CurrentMax=0, NewMax;
+		if( Dest->GetClass()->ResRecordSize != 0 )
 		{
-		if (UndoTransCount == 0) // At beginning of transaction list
+			// Remember database's current data pointer.
+			Dest->InitLocks();
+			Dest->Lock(LOCK_ReadWrite);
+			CurrentData	= Dest->GetData();
+			CurrentMax  = ((UDatabase *)Dest  )->Max;
+			NewMax      = ((UDatabase *)Source)->Max;
+
+			// Reallocate data if max increased.
+			if( NewMax > CurrentMax )
 			{
-			debugf (LOG_Trans,"Can't undo after %s",Descr); // Print reason that undo isn't possible
+				CurrentData = appRealloc
+				(
+					CurrentData,
+					NewMax * Dest->GetClass()->ResRecordSize,
+					"Trans"
+				);
+				CurrentMax = NewMax;
 			}
-		else
-			{
-			debugf (LOG_Trans,"At end of undo buffer");
-			};
-		return 0; // Can't undo
-		};
-	debugf (LOG_Trans,"Undo %s",Descr); // Print name of what we're undoing
-	//
-	Lock();
-	UndoTransCount--;
-	//
-	// Find transaction corresponding to UndoTransCount:
-	//
-	Transaction = &Transactions [0];
-	for (i=0; i<NumTrans; i++)
+		}
+
+		// Swap the header.
+		memswap(Dest,Source,DataSize);
+
+		if( Dest->GetClass()->ResRecordSize != 0 )
 		{
-		if (Transaction->TransCount == UndoTransCount) goto Found;
-		Transaction++;
-		};
-	debugf(LOG_Info,"Not found");
-	Unlock();
-	return 0;
-	//
-	// Apply all "undo" changes corresponding to TRANS.UndoTransCount, in reverse order:
-	//
-	Found:
-	BeginChanges (Transaction);
-	for (i=NumChanges-1; i >= 0; i--)
-		{
-		Change = &ChangeLog[i];
-		if (Change->TransCount == UndoTransCount)
-			{
-			ApplyChange (Change,Buffer + Transaction->StartDataOffset + Change->DataOffset,Change->DataSize);
-			};
-		};
-	EndChanges (Transaction);
-	//
-	Unlock();
-	//
-	Level->ActorList->RelistActors();
-	//
-	return 1;
-	UNGUARD("UTransBuffer::Undo");
-	};
+			// Update the data pointer and max.
+			Dest->SetData(CurrentData);
+			((UDatabase *)Dest)->Max = CurrentMax;
+		}
+
+		// Mark the thing as unlocked.
+		Dest->InitLocks();
+		Dest->SetFlags(DestFlags);
+	}
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Redo
+	Undo.
 -----------------------------------------------------------------------------*/
 
 //
-// Returns 1 if "redo" is possible, sets Str to name
+// Returns 1 if "undo" is possible, sets Str to name.
 //
-int UTransBuffer::CanRedo (char *Str)
-	{
-	GUARD;
-	FTransaction	*Transaction;
-	int 			i;
-	//
-	if (!GApp->ServerAlive) return 0;
-	Lock();
-	//
-	if ((NumTrans==0) || (UndoTransCount >= TransCount))
-		{
-		strcpy (Str,"");
-		Unlock();
+int UTransBuffer::CanUndo( char *Str )
+{
+	guard(UTransBuffer::CanUndo);
+
+	if( !GApp->ServerAlive )
 		return 0;
-		};
-	//
-	// Find transaction name:
-	//
-	Transaction = &Transactions[0];
-	for (i=0; i<NumTrans; i++)
+	
+	Lock(LOCK_ReadWrite);
+
+	if( (NumTrans==0) ||
+		(UndoTransCount <= Transactions[0].TransCount) )
+	{
+		strcpy (Str,ResetAction);
+		Unlock(LOCK_ReadWrite);
+		return 0;
+	}
+
+	// Find transaction name.
+	for( int i=0; i < NumTrans; i++ )
+	{
+		if( Transactions[i].TransCount == (UndoTransCount-1) )
 		{
-		if (Transaction->TransCount ==  UndoTransCount)
-			{
-			strcpy (Str,Transaction->Name);
-			Unlock();
+			strcpy (Str,Transactions[i].Name);
+			Unlock(LOCK_ReadWrite);
 			return 1;
-			};
-		Transaction++;
-		};
+		}
+	}
 	strcpy(Str,"aborted transaction");
-	Unlock();
+	Unlock(LOCK_ReadWrite);
 	return 1;
-	UNGUARD("UTransBuffer::CanRedo");
-	};
+	unguard;
+}
 
 //
-// Redo a transaction, 1 if undone, 0 if not possible
+// Undo a transaction, 1 if undone, 0 if not possible.
 //
-int UTransBuffer::Redo (ULevel *Level)
-	{
-	GUARD;
+int UTransBuffer::Undo( ULevel *Level )
+{
+	guard(UTransBuffer::Undo);
+
 	FTransaction	*Transaction;
 	FTransChangeLog	*Change;
 	char			Descr[256];
 	int 			i;
-	//
-	if (!GApp->ServerAlive) return 0;
-	//
-	// See if redo is possible:
-	//
-	if (!CanRedo(Descr))
+
+	if( !GApp->ServerAlive )
+		return 0;
+
+	// See if undo is possible.
+	if( !CanUndo(Descr) )
+	{
+		if( UndoTransCount == 0 )
 		{
-		debugf (LOG_Trans,"Nothing to redo",Descr);
-		return 0; // Can't redo
-		};
-	debugf (LOG_Trans,"Redo %s",Descr); // Print name of what we're undoing
-	//
-	// Find transaction corresponding to UndoTransCount:
-	//
-	Lock();
-	//
-	Transaction = &Transactions [0];
-	for (i=0; i<NumTrans; i++)
+			// At beginning of transaction list.
+			debugf(LOG_Info,"Can't undo after %s",Descr);
+		}
+		else
 		{
+			debugf(LOG_Info,"At end of undo buffer");
+		}
+		return 0;
+	}
+	// Print name of what we're undoing.
+	debugf(LOG_Info,"Undo %s",Descr);
+
+	Lock(LOCK_ReadWrite);
+	UndoTransCount--;
+
+	// Find transaction corresponding to UndoTransCount.
+	Transaction = &Transactions[0];
+	for( i=0; i<NumTrans; i++ )
+	{
 		if (Transaction->TransCount == UndoTransCount) goto Found;
 		Transaction++;
-		};
+	}
 	debugf(LOG_Info,"Not found");
-	UndoTransCount++;
-	Unlock();
+	Unlock(LOCK_ReadWrite);
 	return 0;
-	//
-	// Apply all "redo" changes corresponding to TRANS.UndoTransCount:
-	//
+
+	// Apply all "undo" changes corresponding to UndoTransCount, in reverse order.
 	Found:
-	//
-	BeginChanges (Transaction);
-	for (i=0; i<NumChanges; i++)
-		{
+	BeginChanges(Transaction);
+	for( i=NumChanges-1; i >= 0; i-- )
+	{
 		Change = &ChangeLog[i];
-		if (Change->TransCount == UndoTransCount)
-			{
-			ApplyChange (Change,Buffer + Transaction->StartDataOffset + Change->DataOffset,Change->DataSize);
-			};
-		};
-	EndChanges (Transaction);
-	UndoTransCount++;
-	//
-	Level->ActorList->RelistActors();
-	//
-	Unlock();
+		if( Change->TransCount == UndoTransCount )
+		{
+			ApplyChange
+			(
+				Change,
+				Buffer + Transaction->StartDataOffset + Change->DataOffset,
+				Change->DataSize
+			);
+		}
+	}
+	EndChanges( Transaction );
+	Unlock(LOCK_ReadWrite);
 	return 1;
-	UNGUARD("UTransBuffer::Redo");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Logging individual transactions
+	Redo.
+-----------------------------------------------------------------------------*/
+
+//
+// Returns 1 if "redo" is possible, sets Str to name.
+//
+int UTransBuffer::CanRedo( char *Str )
+{
+	guard(UTransBuffer::CanRedo);
+
+	FTransaction	*Transaction;
+	int 			i;
+
+	if( !GApp->ServerAlive )
+		return 0;
+	
+	Lock(LOCK_ReadWrite);
+
+	if( (NumTrans==0) || (UndoTransCount >= TransCount) )
+	{
+		strcpy (Str,"");
+		Unlock(LOCK_ReadWrite);
+		return 0;
+	}
+
+	// Find transaction name.
+	Transaction = &Transactions[0];
+	for( i=0; i<NumTrans; i++ )
+	{
+		if( Transaction->TransCount ==  UndoTransCount )
+		{
+			strcpy (Str,Transaction->Name);
+			Unlock(LOCK_ReadWrite);
+			return 1;
+		}
+		Transaction++;
+	}
+	strcpy(Str,"aborted transaction");
+	Unlock(LOCK_ReadWrite);
+	return 1;
+	unguard;
+}
+
+//
+// Redo a transaction, 1 if undone, 0 if not possible.
+//
+int UTransBuffer::Redo( ULevel *Level )
+{
+	guard(UTransBuffer::Redo);
+
+	FTransaction	*Transaction;
+	FTransChangeLog	*Change;
+	char			Descr[256];
+	int 			i;
+
+	if( !GApp->ServerAlive )
+		return 0;
+
+	// See if redo is possible.
+	if( !CanRedo(Descr) )
+	{
+		debugf(LOG_Info,"Nothing to redo",Descr);
+		return 0; // Can't redo
+	}
+	
+	// Print name of what we're undoing.
+	debugf(LOG_Info,"Redo %s",Descr);
+
+	// Find transaction corresponding to UndoTransCount.
+	Lock(LOCK_ReadWrite);
+
+	Transaction = &Transactions [0];
+	for( i=0; i<NumTrans; i++ )
+	{
+		if (Transaction->TransCount == UndoTransCount) goto Found;
+		Transaction++;
+	}
+	debugf(LOG_Info,"Not found");
+	UndoTransCount++;
+	Unlock(LOCK_ReadWrite);
+	return 0;
+
+	// Apply all "redo" changes corresponding to TRANS.UndoTransCount.
+	Found:
+
+	BeginChanges (Transaction);
+	for( i=0; i<NumChanges; i++ )
+	{
+		Change = &ChangeLog[i];
+		if( Change->TransCount == UndoTransCount )
+			ApplyChange (Change,Buffer + Transaction->StartDataOffset + Change->DataOffset,Change->DataSize);
+	}
+	EndChanges (Transaction);
+	UndoTransCount++;
+	Unlock(LOCK_ReadWrite);
+	return 1;
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	Logging individual transactions.
 -----------------------------------------------------------------------------*/
 
 //
 // Notce a single record added, deleted, or changed during a transaction.  Index
-// is the index of the record in the resource Res, or -1 to note changes to stuff
-// in the resource's header.
+// is the index of the record in the object Res, or -1 to note changes to stuff
+// in the object's header.
 //
-void UTransBuffer::NoteSingleChange (UResource *Res, int Index)
-	{
-	GUARD;
-	FResourceType   *Type 		 = &GRes.GetType(Res->Type);
-	FTransaction	*Transaction = &Transactions [NumTrans-1];
+void UTransBuffer::NoteSingleChange( UObject *Res, int Index )
+{
+	guard(UTransBuffer::NoteSingleChange);
+
+	UClass 			*Class 		 = Res->GetClass();
+ 	FTransaction	*Transaction = &Transactions [NumTrans-1];
 	FTransChangeLog	*Changes;
 	BYTE			*SourcePtr,*DestPtr;
 	int				DataSize;
-	//
-	if (!GApp->ServerAlive)	return;
-	if ((!Res) || (!Locked)) 		return;
-	if (Overflow)					return;
-	//
+
+	if( !GApp->ServerAlive || !Res || !IsLocked() || Overflow )
+		return;
+
+	// There are more changes on file from past transactions than the system
+	// can hold, so delete the first one.
 	Transaction->NumChanges++;
-	while (NumChanges >= MaxChanges)
-		{
-		//
-		// There are more changes on file from past transactions than the system
-		// can hold, so delete the first one:
-		//
-		if (NumTrans==0)
-			{
-			Overflow:
-			//
-			// This single transaction had more changes than the system can hold; end
-			// transaction and mark it as "overflowed":
-			//
-			if (NumChanges != 0) appError ("NumChanges inconsistent");
-			NumChanges = 0;
-			Overflow   = 1;
-			return;
-			};
+	while( NumChanges>=MaxChanges && NumTrans>0 )
+	{
 		DeleteFirstTransaction();
-		Transaction = &Transactions [NumTrans-1];
-		};
-	//
-	// Add to index:
-	//
-	Changes = &ChangeLog [NumChanges++];
-	//
+		Transaction = &Transactions[NumTrans-1];
+	}
+
+	if( NumTrans == 0 )
+	{
+		Overflow:
+		debugf("Transaction overflow");
+
+		// This single transaction had more changes than the system can hold; end
+		// transaction and mark it as "overflowed".
+		if( NumChanges != 0 )
+			appError ("NumChanges inconsistent");
+		
+		NumChanges = 0;
+		Overflow   = 1;
+		return;
+	}
+
+	// Add to change log.
+	guard(1);
+	Changes				= &ChangeLog[NumChanges++];
 	Changes->TransCount	= TransCount - 1;
 	Changes->Res		= Res;
-	Changes->ResType	= Res->Type;
 	Changes->Index	 	= Index;
 	Changes->DataOffset	= Transaction->TotalDataSize;
-	//
-	if (Index >= 0)
-		{
-		//
-		// Save a record of the resource's data:
-		//
-		DataSize  = Type->RecordSize;
-		SourcePtr = ((BYTE *)Res->GetData()) + Index * Type->RecordSize;
-		}
+	unguardf(("%i/%i:%i/%i",NumChanges,MaxChanges,NumTrans-1,MaxTrans));
+
+	if( Index >= 0 )
+	{
+		// Save a record of the object's data.
+		DataSize  = Class->ResRecordSize;
+		SourcePtr = ((BYTE *)Res->GetData()) + Index * Class->ResRecordSize;
+		//debugf("Change %s.%s %i",Res->GetClassName(),Res->GetName(),Index);
+	}
 	else
-		{
-		//
-		// Save resource header:
-		//
-		DataSize  = Type->HeaderSize;
+	{
+		// Save object header.
+		DataSize  = Class->ResFullHeaderSize;
 		SourcePtr = (BYTE *)Res;
-		};
+		//debugf("Change %s.%s",Res->GetClassName(),Res->GetName());
+	}
 	Changes->DataSize = DataSize;
-	//
-	// If there's not enough room in the data buffer, make room:
-	//
-	while ((Transaction->StartDataOffset + Transaction->TotalDataSize + DataSize) > MaxDataOffset)
-		{
-		if (NumTrans==0) goto Overflow;
-		//
+
+	// If there's not enough room in the data buffer, make room.
+	guard(2);
+	while( NumTrans>0 && (Transaction->StartDataOffset + Transaction->TotalDataSize + DataSize) > MaxDataOffset )
+	{
 		DeleteFirstTransaction();
-		Transaction = &Transactions [NumTrans-1];
-		};
-	//
-	// Copy data
-	//
-	DestPtr   = Buffer + Transaction->StartDataOffset + Transaction->TotalDataSize;
-	memcpy (DestPtr,SourcePtr,DataSize);
-	//
-	// Update transaction's running data length:
-	//
+		Transaction = &Transactions[NumTrans-1];
+	}
+	if( NumTrans == 0 )
+		goto Overflow;
+	unguardf(("%i/%i",NumChanges,MaxChanges));
+
+	// Copy data.
+	guard(3);
+	DestPtr = Buffer + Transaction->StartDataOffset + Transaction->TotalDataSize;
+	memcpy( DestPtr, SourcePtr, DataSize );
+	unguard;
+
+	// Update transaction's running data length.
 	Transaction->TotalDataSize += DataSize;
-	//
-	// Handle special case resource types:
-	//
-	if (Index >= 0) // Resource data records:
-		{
-		if (Res->Type == RES_BspNodes)
-			{
-			((FBspNode *)DestPtr)->NodeFlags &= ~(NF_IsNew | NF_TagForEmpty); // Reset Bsp flags
-			};
-		};
-	UNGUARD("UTransBuffer::NoteSingleChange");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	All transaction functions for specific resources
+	Object header modification.
 -----------------------------------------------------------------------------*/
 
 //
-// Actors (iActor = index)
+// Object header.
 //
-void UTransBuffer::NoteActor (UActorList *Actors,INDEX iActor)
-	{
-	GUARD;
-	INDEX i;
-	//
-	if (!GApp->ServerAlive) return;
-	if (!Actors->Trans) return; // Not transaction-tracked
-	//
-	if (iActor==INDEX_NONE) // Wildcard
-		{
-		for (i=0; i<Actors->Max; i++)
-			{
-			if (Actors->Element(i).Class) NoteSingleChange (Actors,i);
-			};
-		}
-	else NoteSingleChange (Actors,iActor);
-	//
-	UNGUARD("UTransBuffer::NoteActor");
-	};
-
-void UTransBuffer::RecursiveTransBspNode (IModel *ModelInfo,INDEX iNode)
-	{
-	FBspNode		*Node  = &ModelInfo->BspNodes[iNode];
-	//
-	GUARD;
-	if (!GApp->ServerAlive) return;
-	NoteSingleChange (ModelInfo->BspNodesResource,iNode);
-	//
-	if (Node->iFront != INDEX_NONE) RecursiveTransBspNode (ModelInfo,Node->iFront);
-	if (Node->iBack  != INDEX_NONE) RecursiveTransBspNode (ModelInfo,Node->iBack );
-	if (Node->iPlane != INDEX_NONE) RecursiveTransBspNode (ModelInfo,Node->iPlane);
-	UNGUARD("UTransBuffer::RecursiveTransBspNode");
-	};
-
-//
-// Bsp Nodes (iNode = index)
-//
-void UTransBuffer::NoteBspNode (IModel *ModelInfo,INDEX iNode)
-	{
-	GUARD;
-	//
-	if (!GApp->ServerAlive) return;
-	if (!ModelInfo->Trans) return; // Not transaction-tracked
-	//
-	if (iNode==INDEX_NONE) // Wildcard
-		{
-		if (ModelInfo->NumBspNodes>0) RecursiveTransBspNode (ModelInfo,0);
-		}
-	else
-		{
-		NoteSingleChange (ModelInfo->BspNodesResource,iNode);
-		};
-	UNGUARD("UTransBuffer::NoteBspNode");
-	};
-
-//
-// Bsp Polys (iSurf = index).  Also saves information corresponding to Bsp polygon's
-// generating brush. (OLD:Call with MasterBrush=1 to note master brush change also)
-//
-void UTransBuffer::NoteBspSurf (IModel *ModelInfo,INDEX iSurf,int UpdateMaster)
-	{
-	GUARD;
-	//
-	if (!GApp->ServerAlive) return;
-	if (!ModelInfo->Trans) return; // Not transaction-tracked
-	//
-	if (iSurf==INDEX_NONE) // Wildcard (does all polys, even unused ones)
-		{
-		for (INDEX i=0; i<ModelInfo->NumBspSurfs; i++) NoteBspSurf(ModelInfo,i,UpdateMaster);
-		}
-	else
-		{
-		FBspSurf *Poly = &ModelInfo->BspSurfs[iSurf];
-		//
-		NoteSingleChange (ModelInfo->BspSurfsResource,iSurf);
-		//
-		if (UpdateMaster && Poly->Brush) NoteSingleChange (Poly->Brush->Polys,Poly->iBrushPoly);
-		};
-	UNGUARD("UTransBuffer::NoteBspSurf");
-	};
-
-void UTransBuffer::NoteSelectedBspSurfs (IModel *ModelInfo,int UpdateMasters)
-	{
-	GUARD;
-	FBspSurf 		*Poly;
-	int 			i,n;
-	//
-	if (!GApp->ServerAlive) return;
-	n    = ModelInfo->NumBspSurfs;
-	//
-	Poly = &ModelInfo->BspSurfs[0];
-	for (i=0; i<n; i++)
-		{
-		if (Poly->PolyFlags & PF_Selected)
-			{
-			NoteBspSurf (ModelInfo,i,UpdateMasters);
-			};
-		Poly++;
-		};
-	UNGUARD("UTransBuffer::NoteSelectedBspSurfs");
-	};
-
-
-//
-// FPolys (iSurf = index)
-//
-void UTransBuffer::NoteFPoly (IModel *ModelInfo,INDEX iSurf)
-	{
-	GUARD;
-	//
-	if (!GApp->ServerAlive) return;
-	if (!ModelInfo->Trans) return; // Not transaction-tracked
-	//
-	if (iSurf==INDEX_NONE)
-		{
-		for (INDEX i=0; i<ModelInfo->NumFPolys; i++) NoteSingleChange (ModelInfo->PolysResource,i);
-		}
-	else
-		{
-		NoteSingleChange (ModelInfo->PolysResource,iSurf);
-		};
-	UNGUARD("UTransBuffer::NoteFPoly");
-	};
-
-//
-// Brush array
-//
-void UTransBuffer::NoteBrushArray (TArray<UModel> *BrushArray)
-	{
-	GUARD;
-	if (!GApp->ServerAlive) return;
-	if (Locked)
-		{
-		NoteSingleChange (BrushArray,-1); // Save header
-		//
-		// Save all level brushes except #0 (the special-case current brush!)
-		//
-		for (int i=1; i<BrushArray->Num; i++)
-			{
-			NoteSingleChange (BrushArray,i); // Save data
-			};
-		};
-	UNGUARD("UTransBuffer::NoteBrushArray");
-	};
-
-//
-// Resource header
-//
-void UTransBuffer::NoteResHeader (UResource *Res)
-	{
-	GUARD;
-	if (!GApp->ServerAlive) return;
-	if (Res) NoteSingleChange (Res,-1);
-	UNGUARD("UTransBuffer::NoteResHeader");
-	};
-
-/*-----------------------------------------------------------------------------
-	UTransBuffer resource implementation
------------------------------------------------------------------------------*/
-
-void UTransBuffer::Register(FResourceType *Type)
+void UTransBuffer::NoteResHeader( UObject *Res )
 {
-	guard(UTransBuffer::Register);
-
-	Type->HeaderSize = sizeof (UTransBuffer);
-	Type->RecordSize = sizeof (BYTE);
-	Type->Version    = 1;
-	strcpy (Type->Descr,"TransBuffer");
+	guard(UTransBuffer::NoteResHeader);
+	
+	if( GApp->ServerAlive && Res )
+		NoteSingleChange( Res, -1 );
 	
 	unguard;
 }
+
+/*-----------------------------------------------------------------------------
+	UTransBuffer object implementation.
+-----------------------------------------------------------------------------*/
+
 void UTransBuffer::InitHeader()
 {
 	guard(UTransBuffer::InitHeader);
 
-	// Init resource header to defaults.
-	Locked			= 0;
+	// Call parent.
+	UObject::InitHeader();
+
+	// Init object header to defaults.
 	Overflow		= 0;
 	TransCount		= 0;
 	UndoTransCount	= 0;
@@ -970,19 +843,7 @@ void UTransBuffer::InitHeader()
 	MaxChanges		= 0;
 	MaxDataOffset	= 0;
 
-	strcpy (ResetAction,"create");
-
-	unguard;
-}
-void UTransBuffer::InitData()
-{
-	guard(UTransBuffer::InitData);
-
-	Overflow		= 0;
-	TransCount		= 0;
-	UndoTransCount	= 0;
-	NumTrans		= 0;
-	NumChanges		= 0;
+	strcpy (ResetAction,"startu[");
 
 	unguard;
 }
@@ -1004,23 +865,22 @@ int UTransBuffer::QueryMinSize()
 	return QuerySize();
 	unguard;
 }
-void UTransBuffer::QueryDataReferences(FResourceCallback &Callback)
+void UTransBuffer::SerializeData(FArchive &Ar)
 {
-	guard(UTransBuffer::QueryDataReferences);
+	guard(UTransBuffer::SerializeData);
+
+	//Note: Since this object is not saveable, we only
+	// need to serialize our object and name references.
 	FTransChangeLog *Changes = (FTransChangeLog  *)((BYTE *)GetData() + MaxTrans * sizeof (FTransaction));
-	for (int i=0; i<NumChanges; i++)
-		{
-		if (Changes[i].Index == -1)
-			{
-			Callback.Resource(this,&Changes[i].Res,0);
-			};
-		};
-	unguard;
-	};
-void UTransBuffer::Flip()
-{
-	guard(UTransBuffer::Flip);
-	appError("Not implemented; resource type not saveable.");
+	for( int i=0; i<NumChanges; i++ )
+	{
+		if( Changes[i].Index == -1 )
+			Ar << Changes[i].Res;
+	}
 	unguard;
 }
-AUTOREGISTER_RESOURCE(RES_TransBuffer,UTransBuffer,0xB2D90854,0xCCD211cf,0x91360000,0xC028B992);
+IMPLEMENT_CLASS(UTransBuffer);
+
+/*-----------------------------------------------------------------------------
+	The End.
+-----------------------------------------------------------------------------*/

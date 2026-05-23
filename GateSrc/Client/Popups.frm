@@ -1,18 +1,15 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form Popups 
    Caption         =   "Form1"
    ClientHeight    =   525
    ClientLeft      =   3420
    ClientTop       =   2805
    ClientWidth     =   5145
-   Height          =   1125
    Icon            =   "Popups.frx":0000
-   Left            =   3360
    LinkTopic       =   "Form1"
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   525
    ScaleWidth      =   5145
-   Top             =   2265
-   Width           =   5265
    Begin VB.Menu Level 
       Caption         =   "Level"
       Begin VB.Menu LevelProperties 
@@ -60,7 +57,9 @@ Begin VB.Form Popups
    End
 End
 Attribute VB_Name = "Popups"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' Popups.frm: GateClient popup menus.

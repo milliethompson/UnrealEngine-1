@@ -1,34 +1,33 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmParSolHeightMap 
    Appearance      =   0  'Flat
    BackColor       =   &H80000005&
-   BorderStyle     =   3  'Fixed Dialog
+   BorderStyle     =   4  'Fixed ToolWindow
    Caption         =   "Build Landscape"
    ClientHeight    =   5535
    ClientLeft      =   1365
    ClientTop       =   4035
-   ClientWidth     =   11550
+   ClientWidth     =   11565
    ControlBox      =   0   'False
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   5895
    Icon            =   "PsHMap.frx":0000
-   Left            =   1305
    LinkTopic       =   "Form6"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
+   MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   5535
-   ScaleWidth      =   11550
+   ScaleWidth      =   11565
    ShowInTaskbar   =   0   'False
-   Top             =   3735
-   Width           =   11670
    Begin VB.CommandButton Command10 
       Appearance      =   0  'Flat
       BackColor       =   &H80000005&
@@ -417,13 +416,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Import Options"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -438,13 +437,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Import Scale"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -459,13 +458,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Fractal base level"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -492,13 +491,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Magnitude"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -513,13 +512,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Options"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -546,13 +545,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Scale"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -567,13 +566,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Apply Filter"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -588,13 +587,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Filter Magnitude"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -609,13 +608,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Area to filter"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -630,13 +629,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Radius of editing range"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -651,13 +650,13 @@ Begin VB.Form frmParSolHeightMap
       BackStyle       =   0  'Transparent
       Caption         =   "Editing range falloff"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   12
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   12
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H80000008&
       Height          =   375
@@ -771,7 +770,9 @@ Begin VB.Form frmParSolHeightMap
    End
 End
 Attribute VB_Name = "frmParSolHeightMap"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 

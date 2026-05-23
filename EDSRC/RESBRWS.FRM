@@ -1,61 +1,59 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{BE4F3AC8-AEC9-101A-947B-00DD010F7B46}#1.0#0"; "MSOUTL32.OCX"
 Begin VB.Form frmResBrowse 
    BorderStyle     =   1  'Fixed Single
    Caption         =   "Resource Browser"
-   ClientHeight    =   4710
-   ClientLeft      =   4275
-   ClientTop       =   5640
-   ClientWidth     =   3750
+   ClientHeight    =   5730
+   ClientLeft      =   1935
+   ClientTop       =   2820
+   ClientWidth     =   4065
    ClipControls    =   0   'False
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   5070
    HelpContextID   =   122
    Icon            =   "ResBrws.frx":0000
-   Left            =   4215
    LinkTopic       =   "Form8"
    MaxButton       =   0   'False
    MinButton       =   0   'False
-   ScaleHeight     =   4710
-   ScaleWidth      =   3750
+   PaletteMode     =   1  'UseZOrder
+   ScaleHeight     =   5730
+   ScaleWidth      =   4065
    ShowInTaskbar   =   0   'False
-   Top             =   5340
-   Width           =   3870
    Begin VB.PictureBox Picture1 
-      Height          =   4275
+      Height          =   5355
       Left            =   0
-      ScaleHeight     =   4215
-      ScaleWidth      =   3675
-      TabIndex        =   4
+      ScaleHeight     =   5295
+      ScaleWidth      =   3975
+      TabIndex        =   3
       Top             =   0
-      Width           =   3735
+      Width           =   4035
       Begin MSOutl.Outline List 
-         Height          =   4215
+         Height          =   5295
          Left            =   0
-         TabIndex        =   5
+         TabIndex        =   4
          Top             =   0
-         Width           =   3675
+         Width           =   3975
          _Version        =   65536
-         _ExtentX        =   6482
-         _ExtentY        =   7435
+         _ExtentX        =   7011
+         _ExtentY        =   9340
          _StockProps     =   77
          BackColor       =   -2147483643
          BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          BorderStyle     =   0
          PicturePlus     =   "ResBrws.frx":030A
@@ -65,40 +63,21 @@ Begin VB.Form frmResBrowse
    Begin VB.CommandButton Command4 
       Appearance      =   0  'Flat
       BackColor       =   &H00C0C0C0&
-      Caption         =   "&Purge"
+      Caption         =   "&Collect Garbage"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
-      Height          =   375
-      Left            =   1920
-      TabIndex        =   3
-      Top             =   4320
-      Width           =   855
-   End
-   Begin VB.CommandButton Command3 
-      Appearance      =   0  'Flat
-      BackColor       =   &H00C0C0C0&
-      Caption         =   "&Debug"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   375
-      Left            =   960
+      Height          =   315
+      Left            =   1320
       TabIndex        =   2
-      Top             =   4320
-      Width           =   855
+      Top             =   5400
+      Width           =   1455
    End
    Begin VB.CommandButton Command2 
       Appearance      =   0  'Flat
@@ -106,42 +85,44 @@ Begin VB.Form frmResBrowse
       Cancel          =   -1  'True
       Caption         =   "&Close"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
-      Height          =   375
-      Left            =   2880
+      Height          =   315
+      Left            =   3120
       TabIndex        =   1
-      Top             =   4320
-      Width           =   855
+      Top             =   5400
+      Width           =   915
    End
    Begin VB.CommandButton Refresh 
       Appearance      =   0  'Flat
       BackColor       =   &H00C0C0C0&
       Caption         =   "&Refresh"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
-      Height          =   375
-      Left            =   0
+      Height          =   315
+      Left            =   60
       TabIndex        =   0
-      Top             =   4320
-      Width           =   855
+      Top             =   5400
+      Width           =   915
    End
 End
 Attribute VB_Name = "frmResBrowse"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 
@@ -155,7 +136,7 @@ Private Sub Command3_Click()
 End Sub
 
 Private Sub Command4_Click()
-    Ed.Server.Exec "RES PURGE"
+    Ed.Server.Exec "RES GARBAGE"
     Refresh_Click
 End Sub
 
@@ -178,7 +159,9 @@ Private Sub List_Expand(ListIndex As Integer)
     ResType = GrabString(Text)
     Name = GrabString(Text)
     '
-    Call ExpandOutline(List, "Res", "QueryRes", "RES QUERY TYPE=" & ResType & " NAME=" & Name, ListIndex, 0)
+    Call ExpandOutline(List, Ed.Server.GetProp( _
+        "RES", "QUERY TYPE=" & ResType & " NAME=" & Name), _
+        ListIndex, False)
 End Sub
 
 Private Sub List_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
@@ -194,6 +177,7 @@ Private Sub Refresh_Click()
     List.ListIndex = 0
     '
     QuerySource = List.ListIndex
-    Ed.Server.Exec "RES QUERY NAME=ACTOR TYPE=Array"
-    Call UpdateOutline(List, "Res", "QueryRes")
+    Call UpdateOutline(List, Ed.Server.GetProp("RES", "QUERY NAME=Root TYPE=Array"))
+    List.ListIndex = 0
+    List.Expand(0) = True
 End Sub

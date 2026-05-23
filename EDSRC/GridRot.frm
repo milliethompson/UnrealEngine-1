@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmRotGrid 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Rotation Grid Settings"
@@ -8,36 +8,34 @@ Begin VB.Form frmRotGrid
    ClientWidth     =   4350
    ControlBox      =   0   'False
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   2955
    HelpContextID   =   112
    Icon            =   "GridRot.frx":0000
-   Left            =   3465
    LinkTopic       =   "Form8"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   2595
    ScaleWidth      =   4350
    ShowInTaskbar   =   0   'False
-   Top             =   2205
-   Width           =   4470
    Begin VB.Frame Frame1 
       Caption         =   "Size"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   2055
       Left            =   120
@@ -47,13 +45,13 @@ Begin VB.Form frmRotGrid
       Begin VB.OptionButton G1 
          Caption         =   "1   (1/256 circle)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -64,13 +62,13 @@ Begin VB.Form frmRotGrid
       Begin VB.OptionButton G2 
          Caption         =   "2   (1/128 circle)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -81,13 +79,13 @@ Begin VB.Form frmRotGrid
       Begin VB.OptionButton G4 
          Caption         =   "4   (1/64 circle)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -99,13 +97,13 @@ Begin VB.Form frmRotGrid
       Begin VB.OptionButton G8 
          Caption         =   "8   (1/32 circle)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   2160
@@ -116,13 +114,13 @@ Begin VB.Form frmRotGrid
       Begin VB.OptionButton G32 
          Caption         =   "32 (1/8 circle)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   2160
@@ -133,13 +131,13 @@ Begin VB.Form frmRotGrid
       Begin VB.OptionButton G16 
          Caption         =   "16 (1/16 circle)"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   2160
@@ -150,13 +148,13 @@ Begin VB.Form frmRotGrid
       Begin VB.TextBox Roll 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   3360
@@ -168,13 +166,13 @@ Begin VB.Form frmRotGrid
       Begin VB.TextBox Yaw 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   2040
@@ -186,13 +184,13 @@ Begin VB.Form frmRotGrid
       Begin VB.TextBox Pitch 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   720
@@ -204,13 +202,13 @@ Begin VB.Form frmRotGrid
       Begin VB.OptionButton Option6 
          Caption         =   "Irregular Size"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -222,13 +220,13 @@ Begin VB.Form frmRotGrid
          Alignment       =   1  'Right Justify
          Caption         =   "Roll"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   2805
@@ -240,13 +238,13 @@ Begin VB.Form frmRotGrid
          Alignment       =   1  'Right Justify
          Caption         =   "Yaw"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   1485
@@ -258,13 +256,13 @@ Begin VB.Form frmRotGrid
          Alignment       =   1  'Right Justify
          Caption         =   "Pitch"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   150
@@ -284,13 +282,13 @@ Begin VB.Form frmRotGrid
       Cancel          =   -1  'True
       Caption         =   "&Close"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   3240
@@ -301,13 +299,13 @@ Begin VB.Form frmRotGrid
    Begin VB.Label Label1 
       Caption         =   "There are 256 degrees in a circle."
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   120
@@ -317,7 +315,9 @@ Begin VB.Form frmRotGrid
    End
 End
 Attribute VB_Name = "frmRotGrid"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 

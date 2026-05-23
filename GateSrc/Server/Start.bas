@@ -17,7 +17,7 @@ Option Explicit
 
 Sub Main()
     If InStr(UCase(Command), "-TEST") <> 0 Then
-        ChDrive "U"
+        ChDrive "f"
         ChDir "\Unreal\Gate"
         Dim Keeper As New Gatekeeper
         Keeper.Startup (False)

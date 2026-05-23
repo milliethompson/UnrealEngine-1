@@ -1,13 +1,4 @@
 SCC = This is a Source Code Control file
 
-[UNREALSV.VBP]
-SCC_Project_Name = "$/Unreal/UnrealSv", KGBAAAAA
-SCC_Aux_Path=E:\VSS,
-
-[UnGate.vbp]
-SCC_Project_Name = "$/Unreal/UnrealGate/GateClient", KGBAAAAA
-SCC_Aux_Path=E:\VSS,
-
 [GateCli.vbp]
-SCC_Project_Name = "$/Unreal/UnrealGate/GateClient", KGBAAAAA
-SCC_Aux_Path=E:\VSS,
+SCC_Project_Name = "$/Unreal/GateSrc/Client", ITAAAAAA

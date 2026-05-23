@@ -1,7 +1,7 @@
 /*=============================================================================
 	NetINet.h: Unreal Windows/WinSock Internet networking
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -47,12 +47,7 @@ class NInternetDriver : public NDriver
 	NSocket *ClientOpenServer(char *ServerURL,char *ErrorMessage);
 	void BeginAdvertising(NServerAd *Ad);
 	void EndAdvertising(NServerAd *Ad);
-	//
-	// FTask implementation:
-	//
-	void TaskTick();
-	virtual void TaskExit();
-	virtual char *TaskStatus(char *Name,char *Desc);
+	void Tick();
 	//
 	// Custom variables:
 	//
@@ -63,7 +58,6 @@ class NInternetDriver : public NDriver
 	HWND hWndAsyncResults;
 	char HostName[256];
 	WSADATA WSAData;
-	SOCKET TelnetListener;
 	FInetAddr HostAddr;
 	//
 	// Custom functions:
@@ -82,39 +76,6 @@ class NInternetDriver : public NDriver
 class NInternetSocket : public NSocket
 	{
 	public:
-	};
-
-//
-// A telnet task; enables a remote person to connect to
-// an UnrealServer via telnet and access the command
-// line.
-//
-class FTaskTelnet : public FTask, public FOutputDevice
-	{
-	public:
-	//
-	// FTask interface:
-	//
-	void TaskTick();
-	void TaskExit();
-	char *TaskStatus(char *Name,char *Desc);
-	//
-	// FOutputDevice interface:
-	//
-	void Log(ELogType MsgType, const char *Text);
-	//
-	// Custom interface:
-	//
-	int Guest;
-	char UserName[NET_NAME_SIZE];
-	SOCKET Socket;
-	SOCKADDR_IN SockAddr;
-	enum {MAX_INPUT_LEN=255};
-	char Input[MAX_INPUT_LEN+1];
-	//
-	int Exec(const char *Cmd,FOutputDevice *Out=GApp);
-	void Send(const char *Str);
-	void Init(SOCKET NewSocket,SOCKADDR_IN SockAddr);
 	};
 
 //

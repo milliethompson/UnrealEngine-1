@@ -1,0 +1,305 @@
+	How the UnrealScript inventory code works
+	-----------------------------------------
+
+	All pawns in Unreal are capable of carrying inventory around. Each item in
+	a pawns's inventory is a separate, invisible actor which exists in the world.
+	Using actors for inventory items is a flexible, object oriented approach, because 
+	it enables scripts for items such as weapons to be written modularly and exist 
+	independently of the actor which uses them.
+
+	A pawn communicates with its inventory by calling functions in his inventory
+	actors and by accessing their variables. Inventory can communicate with the pawn
+	by calling the owning pawn's functions.
+
+	This creates a lot of interesting possibilities, such as enemies and bots which 
+	use the same kinds of weapons as players, the ability for enthusiasts to add new
+	kinds of weapons to the game modularly.
+
+	Since each inventory item is an actor, things like weapon animations are very
+	easy to set up: just program the appropriate functionality in the weapon's script.
+	This separates the weapon logic from the carrier logic, since they conceptually
+	execute as separate threads.
+
+	Actor interrelationships
+	------------------------
+
+	All pawns are capable of carrying inventory. A pawn's inventory is connected together
+	in a linked list through the "Inventory" variable, which the pawn can iterate through 
+	as follows:
+
+	// Pawn class.
+	function LogInventory
+	{
+		local inventory Inv;
+		for( Inv=Inventory; Inv!=None; Inv=Inv.Inventory )
+			log( "Inventory item: " $ Inv.Class );
+	}
+
+	All items in a pawn's inventory chain are owned by the pawn; when the pawn is
+	destroyed, so are his inventory items. Here "owned" has a specific meaning: the
+	inventory item's "Owner" variable is set to the pawn that's carrying the item.
+	When an actor is destroyed, all actors which it owns are destroyed along with it.
+	However, the "Owner" relationship is not permanent: you can call the SetOwner
+	function at any time to change the owner of an actor. This makes it possible, for
+	example, for a pawn to pick up an inventory item (set its own to itself) and to
+	drop it (set its owner to None). An actor which has its owner set to None is 
+	independent.
+
+	Each pawn has a "weapon" variable which references his current active weapon.
+	If he has no active weapon, this is set to None. This is the weapon the pawn uses
+	when he wants to fire.
+
+	The inventory class
+	-------------------
+
+	Inventory actors serve a dual purpose; inventory actors exist in the world in one
+	of two very different states:
+	
+	* Sitting on the ground unowned as a pickup item.
+	* Being carried around and owned by a pawn.
+
+	The inventory class is an "abstract" class, meaning that it doesn't correspond to
+	a real thing which can exist in the world: you can't add an "inventory" actor to the
+	world. To create usable inventory items, you need to create a child class, for example
+	a "HealthPickup" item which expands the inventory class and adds custom functionality.
+
+	The weapon class
+	----------------
+
+	The weapon class is a child class of inventory. All actual weapons are child classes
+	of weapon rather than inventory.
+
+	Class hierarchy example
+	-----------------------
+
+	To sum up, here's a layout of the classes relating to inventory:
+
+	Actor               The base class of all actors
+	   Inventory        The base class of all inventory items
+	      Weapon        The base class of all weapons
+		     AutoMag    A specific kind of weapon
+	      HealthPickup  A specific kind of inventory
+       Pawn             The base class of all players and monsters
+	      Skaarj        A specific kind of monster
+
+	Summary of the design goals
+	---------------------------
+
+	Before describing the actual implementation of the inventory system, which can be
+	found in the Pawn, Inventory, and Weapon classes, some background on the design goals
+	of the inventory system are necessary:
+
+	* Inventory should be totally encapsulated into actor classes, so that new kinds of
+	  items and weapons can be added solely by adding new classes. One of the major drawbacks
+	  to creating weapons in QuakeC is the hardcoding of weapons via bit flags and switch
+	  statements. That requires every player and bot script to know about every kind of actor.
+
+    * The inventory system should handle obvious kinds of inventory, like weapons and pickup
+	  items, extremely cleanly.
+	 
+	* Needs to be flexible enough that far more advanced kinds of inventory can be added, such
+	  as complex devices which might consist of multiple actors.
+
+    * Needs to be able to handle the general case of weapons which share ammo and weapons
+	  which contain their own unique ammo, all without hardcoding ammo.
+
+    * Needs to be able to work with pawns in general, so that non-players like monsters and
+	  bots can tote inventory around.
+
+	* Weapons and inventory items need to expose enough information about themselves that
+	  bots can make intelligent decisions about what items to gather and what weapons to use
+	  in various situtation. So, if a new kind of weapon is added properly, a bot should be
+	  able to pick it up and use it somewhat smartly. This also ties into the need for players
+	  to automaticallt switch weapons to a "reasonble" other weapon, i.e. one that's not going
+	  to toast them by mistake, when their current weapon gets exausted.
+
+	Inventory class functions
+	-------------------------
+	
+	function bool Fire( float Value )
+		Attempts to use the inventory item; if it's a weapon, that means firing the
+		weapon. Otherwise, the meaning of "fire" is item-dependent.
+		Returns true if firing succeeded, false if failed.
+		Value is currently unused.
+
+	function bool AltFire( float Value )
+		Attempts to use the alternate firing mode or alternate use of the item.
+		Returns true if firing succeeded, false if failed.
+		Value is currently unused.
+
+	function bool PreemptPickup( inventory Item )
+		Note: This is an advanced function which seldom needs to be implemented.
+		The function enables pre-existing items in a pawn's inventory to prevent
+		the pawn from picking up a particular item. When a pawn touches an inventory
+		item, he sends this message to each of his existing inventory items. If one returns
+		true (to preempt the pickup), the pawn doesn't try to pick up the item. This enables
+		weapons to prevent other weapons from being picked up, for example.
+
+	function PickupNotify( inventory NewItem )
+		Note: This is an advanced function which seldom needs to be implemented.
+		This is sent to each item in a pawn's inventory when a new item is picked up.
+		It enables existing inventory items to perform any housekeeping or upgrading functions
+		that are needed.
+
+	function float InventoryCapsFloat( name Property )
+	function string[255] InventoryCapsString( name Property )
+
+		These are general "capabilities" querying function which lets bots obtain hints
+		about an item, info which directly accessible from the item's variables. Having a
+		querying function like this enables new bot-related properties to be added without
+		altering the base Inventory Weapon scripts.
+
+		If these functions don't recognize "Property", they return nothing.
+
+		Sample properties:
+
+		Return type Property   Description
+		----------- ---------- ----------------------------------------------------------
+		float       Latency    Weapon firing latency in seconds.
+		float       Range      Weapon firing range in world units.
+		float       Spread     Cosine of spread angle, 0.0=no spread.
+		float       ReloadTime Reload time in seconds.
+		float       Power      A general measure of how powerful a weapon is.
+
+	Weapon class functions
+	----------------------
+
+	function bool Activate()
+		Attempts to activate this weapon. The weapon returns true if it activates itself,
+		or false if it refuses (for example if it is out of ammo).
+
+	function Deactivate()
+		Deactivates the weapon.
+
+	Pawn class functions (related to inventory/weapons)
+	---------------------------------------------------
+
+	function bool AddInventory( inventory NewItem )
+		Adds an item to the pawn's inventory and sends the appropriate PickupNotify messages.
+		Returns true if successfully added, false if not.
+
+	function bool DeleteInventory( inventory Item )
+		Removes the specified item from the pawn's inventory, if it exists.
+		Returns true if it existed and was deleted, false if it did not exist.
+
+	function bool PickupQuery( inventory Item )
+		This is sent to a pawn when he has a chance to pick an item up (i.e. when the pawn
+		touches a weapon pickup). The pawn should return true if he wants to pick it up,
+		false if he does not want it.
+
+		Note that Item does *not* in the pawn's inventory when this function is called, and the
+		pawn should not do anything with the item.
+
+	function bool ActivateWeapon( weapon NewWeapon )
+		Activates the specified weapon in the pawn's inventory.
+		If NewWeapon is None, deactivates the weapon.
+		Returns true if activated, false if not.
+
+	function weapon ChooseWeapon()
+		Returns the best weapon for the pawn to use. This is called, for example, when the current
+		weapon runs out and a new one needs to be selected.
+
+	Pawn class input system notifications
+	-------------------------------------
+
+	ServerWeapon( int I, name N, string[255] S )
+		The player wants to switch to weapon group numer I (N, S unused).
+	
+	ServerPrevWeapon( int I, name N, string[255] S )
+	ServerNextWeapon( int I, name N, string[255] S )
+		The server wants to switch to the next or previous weapon (I, N, S unused).
+
+	ServerFire( int I, name N, string[255] S )
+	ServerAltFire( int I, name N, string[255] S )
+		The player wants to fire. This message is sent when the fire button is first
+		pressed. There are also two boolean variables, bFire and bAltFire which indicate
+		whether the fire button is held down. In general, one-shot weapons will want to
+		use ServerFire function calls, and repeat-fire weapons will want to look at the
+		values of bFire and bAltFire to perform auto-firing.
+
+	Inventory states
+	----------------
+	
+	The inventory class defines three standard states:
+
+	state Pickup:
+		Indicates that the inventory item is sitting on the ground, unowned, waiting
+		to be picked up.
+
+	state Inactive:
+		The inventory item is in a pawn's inventory and is inactive.
+
+	state Active:
+		The inventory item is in a pawn's inventory and is active.
+
+	Inventory interaction with the status bar
+	-----------------------------------------
+
+	The status bar needs to show the contents of the player's inventory, the player's
+	ammo count, and perhaps custom weapon information. The player's status bar is also
+	defined by an actor, of the StatusInfo class. The status bar layout is modular and
+	is separated from the inventory code, to the extent that the inventory code doesn't
+	define the layout of the status bar. The inventory code can only communicate information
+	to the status bar code about what information it wants to display, and the status bar
+	code determines the layout and what information it chosses to display.
+
+	See the Inventory script for a list of variables which affect the inventory's display
+	on the status bar.
+
+	Note that, while weapons should not be hardcoded to assume a particular status bar
+	implementation, the status bar code could be hardcoded to recognize certain kinds of
+	weapons. This line of thought lead to creating a general StatusInfo class for the generic
+	status bar implementation, and the UnrealStatusInfo class for the Unreal game-specific status
+	bar.
+
+	General thoughts
+	----------------
+
+	* A weapon script could perform autotargetting, i.e. finding an appropriate target to
+	  go after, and then play a sound, and light up a light, to signify that it's locked on.
+
+	* The best way to handle repeat-fire timing is probably to divide the shooting animations 
+	  up into several parts, like:
+	    - Stationary, weapon not animating.
+		- Beginning to fire. Smoothly transitions into Looping.
+		- Looping. Fires one shot. Played once or more. Smoothly loops, smoothly 
+		  transitions into Stopping.
+		- Stopping. Weapon stops firing.
+	  This approach enables you to write all of the firing code using latent animation
+	  functions, which keeps the code super clean and simple.
+
+    * Weapons which have a special close-up attack can be custom programmed in UnrealScript.
+	  They can detect all of the nearby actors when fired, and go into the closeup routine if
+	  a suitable target is close enough. This is a weapon-specific idea and not part of the
+	  weapon system in general.
+
+	How to
+	------
+		Automatic respawn support.
+			If an item is capable of respawning, it duplicates itself rather than allowing
+			itself to respawn directly. When it duplicates itself, it sets its respawn flag to
+			false so that duplicated items don't try to respawn!
+		Handle destroying inventory items and smoothly unlinking them.
+			Inventory needs to delete itself from owner - call DeleteInventory.
+		Expose whether an inventory item repeat-fires.
+			bRepeatFires: Pawn needs to look at this and call Fire multiple times if
+			   his fire button is held.
+		Player autoswitch upon depletion
+			bSafeAutoSwitch property, so players don't toast themselves by mistake
+
+		Handle ammo pools shared among weapons.
+			PreemptPickupQuery message sent to weapons.
+			?? How to collect shared ammo - need to use shared ammo inventory actors
+			?? Ammo can't be cached in weapons themselves, because you might pick up ammo before
+				a weapon.
+
+		Status bar text injection? I,e, for autotarget notifys.
+		Communicate info to the status bar.
+			texture ItemIcon;
+			int IconCount; // 0-999
+			bool bShowItemIcon
+			bool bShowItemCount
+			float TextureValue ; brightness or whatever
+			// ability for weapon to have its own descriptor which latches onto the status bar at times?
+
+//////////////////////////////////////////////////////////////////////////////

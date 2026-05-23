@@ -1,7 +1,7 @@
 /*=============================================================================
 	NetDPlay.cpp: Unreal Windows DirectPlay networking
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -40,8 +40,8 @@ static const GUID GUnrealDirectPlayGUID =
 //
 int NDirectPlayDriver::Init(char *ParamBuffer,char *Error)
 	{
-	GUARD;
-	debug(LOG_Net,"DirectPlay Init");
+	guard(NDirectPlayDriver::Init);
+	debug(LOG_Init,"DirectPlay Init");
 	//
 	// Try to initialize generic properties:
 	//
@@ -74,7 +74,7 @@ int NDirectPlayDriver::Init(char *ParamBuffer,char *Error)
 	//
 	return 1; // Success
 	//
-	UNGUARD("NDirectPlayDriver::Init");
+	unguard;
 	};
 
 //
@@ -82,8 +82,8 @@ int NDirectPlayDriver::Init(char *ParamBuffer,char *Error)
 //
 void NDirectPlayDriver::Exit()
 	{
-	GUARD;
-	debug(LOG_Net,"DirectPlay Exit");
+	guard(NDirectPlayDriver::Exit);
+	debug(LOG_Exit,"DirectPlay Exit");
 	AssertInitialized();
 	//
 	// Shut down generic info, and any remaining sockets:
@@ -94,11 +94,11 @@ void NDirectPlayDriver::Exit()
 	//
 	if (DirectPlay)
 		{
-		debugf(LOG_Net,"Releasing DirectPlay driver");
+		debugf(LOG_Exit,"Releasing DirectPlay driver");
 		DirectPlay->Release();
 		DirectPlay = NULL;
 		};
-	UNGUARD("NDirectPlayDriver::Exit");
+	unguard;
 	};
 
 //
@@ -107,7 +107,7 @@ void NDirectPlayDriver::Exit()
 //
 int NDirectPlayDriver::CanHandleURL(char *ServerURL)
 	{
-	GUARD;
+	guard(NDirectPlayDriver::CanHandleURL);
 	AssertInitialized();
 	//
 	// DirectPlay doesn't have the intelligence to handle URL's now.
@@ -115,7 +115,7 @@ int NDirectPlayDriver::CanHandleURL(char *ServerURL)
 	//
 	return 0;
 	//
-	UNGUARD("NDirectPlayDriver::CanHandleURL");
+	unguard;
 	};
 
 //
@@ -126,12 +126,12 @@ int NDirectPlayDriver::CanHandleURL(char *ServerURL)
 //
 NSocket *NDirectPlayDriver::ServerAcceptConnection(int ServerID)
 	{
-	GUARD;
+	guard(NDirectPlayDriver::ServerAcceptConnection);
 	AssertInitialized();
 	//
 	return NULL;
 	//
-	UNGUARD("NDirectPlayDriver::ServerAcceptConnection");
+	unguard;
 	};
 
 //
@@ -140,7 +140,7 @@ NSocket *NDirectPlayDriver::ServerAcceptConnection(int ServerID)
 //
 NSocket *NDirectPlayDriver::ClientOpenServer(char *ServerURL,char *Error)
 	{
-	GUARD;
+	guard(NDirectPlayDriver::ClientOpenServer);
 	AssertInitialized();
 	//
 	// DirectPlay can only be opened by ClientOpenServerByUI.
@@ -148,7 +148,7 @@ NSocket *NDirectPlayDriver::ClientOpenServer(char *ServerURL,char *Error)
 	strcpy(Error,"ClientOpenServer not supported by DirectPlay");
 	return NULL;
 	//
-	UNGUARD("NDirectPlayDriver::ClientOpenServer");
+	unguard;
 	};
 
 //
@@ -156,12 +156,12 @@ NSocket *NDirectPlayDriver::ClientOpenServer(char *ServerURL,char *Error)
 //
 void NDirectPlayDriver::BeginAdvertising(NServerAd *Ad)
 	{
-	GUARD;
+	guard(NDirectPlayDriver::BeginAdvertising);
 	AssertInitialized();
 	//
 	// Does nothing, by design.
 	//
-	UNGUARD("NDirectPlayDriver::BeginAdvertising");
+	unguard;
 	};
 
 //
@@ -169,12 +169,12 @@ void NDirectPlayDriver::BeginAdvertising(NServerAd *Ad)
 //
 void NDirectPlayDriver::EndAdvertising(NServerAd *Ad)
 	{
-	GUARD;
+	guard(NDirectPlayDriver::EndAdvertising);
 	AssertInitialized();
 	//
 	// Does nothing, by design.
 	//
-	UNGUARD("NDirectPlayDriver::EndAdvertising");
+	unguard;
 	};
 
 //
@@ -182,59 +182,26 @@ void NDirectPlayDriver::EndAdvertising(NServerAd *Ad)
 //
 int NDirectPlayDriver::Exec(const char *Cmd,FOutputDevice *Out)
 	{
-	GUARD;
+	guard(NDirectPlayDriver::Exec);
 	const char *Str = Cmd;
 	//
-	if (NetGetCMD(&Str,"STATUS"))
-		{
-		if (NetGetCMD(&Str,"DPLAY") || !Str[0])
-			{
-			Out->Logf("   DPLAY - Not implemented");
-			return Str[0]!=0;
-			}
-		else return 0;
-		}
-	else if (NetGetCMD(&Str,"DPLAY"))
+	if (NetGetCMD(&Str,"DPLAY"))
 		{
 		return 0;
 		}
 	else return 0;
 	//
-	UNGUARD("NDirectPlayDriver::Exec");
+	unguard;
 	};
 
 //
-// DirectPlay task tick.
+// DirectPlay tick.
 //
-void NDirectPlayDriver::TaskTick()
+void NDirectPlayDriver::Tick()
 	{
-	GUARD;
+	guard(NDirectPlayDriver::Tick);
 	//
-	UNGUARD("NDirectPlayDriver::Tick");
-	};
-
-//
-// DirectPlay task exit.
-//
-void NDirectPlayDriver::TaskExit()
-	{
-	GUARD;
-	//
-	UNGUARD("NDirectPlayDriver::TaskExit");
-	};
-
-//
-// DirectPlay task status.
-//
-char *NDirectPlayDriver::TaskStatus(char *Name,char *Desc)
-	{
-	GUARD;
-	//
-	sprintf(Name,"DirectPlay");
-	sprintf(Desc,"");
-	return Name;
-	//
-	UNGUARD("NDirectPlayDriver::TaskStatus");
+	unguard;
 	};
 
 /*------------------------------------------------------------------------------
@@ -249,12 +216,12 @@ char *NDirectPlayDriver::TaskStatus(char *Name,char *Desc)
 //
 int NDirectPlaySocket::GetPacket(NPacket *PacketToGet)
 	{
-	GUARD;
+	guard(NDirectPlaySocket::GetPacket);
 	AssertInitialized();
 	//
 	return 0;
 	//
-	UNGUARD("NDirectPlaySocket::GetPacket");
+	unguard;
 	};
 
 //
@@ -262,11 +229,11 @@ int NDirectPlaySocket::GetPacket(NPacket *PacketToGet)
 //
 void NDirectPlaySocket::SendPacket(NPacket *PacketToSend)
 	{
-	GUARD;
+	guard(NDirectPlaySocket::SendPacket);
 	AssertInitialized();
 	//
 	//
-	UNGUARD("NDirectPlaySocket::SendPacket");
+	unguard;
 	};
 
 //
@@ -278,12 +245,12 @@ void NDirectPlaySocket::SendPacket(NPacket *PacketToSend)
 //
 int NDirectPlaySocket::MaxPacketSize()
 	{
-	GUARD;
+	guard(NDirectPlaySocket::MaxPacketSize);
 	AssertInitialized();
 	//
 	return MAX_PACKET_SIZE;
 	//
-	UNGUARD("NDirectPlaySocket::MaxPacketSize");
+	unguard;
 	};
 
 //
@@ -291,14 +258,14 @@ int NDirectPlaySocket::MaxPacketSize()
 //
 void NDirectPlaySocket::Tick()
 	{
-	GUARD;
+	guard(NDirectPlaySocket::Tick);
 	AssertInitialized();
 	//
 	// Call parent tick routine to handle standard work (file transfer, timeouts, etc).
 	// 
 	NSocket::Tick();
 	//
-	UNGUARD("NDirectPlaySocket::Tick");
+	unguard;
 	};
 
 //
@@ -306,7 +273,7 @@ void NDirectPlaySocket::Tick()
 //
 void NDirectPlaySocket::Init(NDriver *CreatingDriver)
 	{
-	GUARD;
+	guard(NDirectPlaySocket::Init);
 	//
 	// Call parent init routine to init all standard info:
 	//
@@ -314,7 +281,7 @@ void NDirectPlaySocket::Init(NDriver *CreatingDriver)
 	//
 	// Init items specific to this socket type:
 	//
-	UNGUARD("NDirectPlaySocket::Init");
+	unguard;
 	};
 
 //
@@ -322,7 +289,7 @@ void NDirectPlaySocket::Init(NDriver *CreatingDriver)
 //
 void NDirectPlaySocket::Delete()
 	{
-	GUARD;
+	guard(NDirectPlaySocket::Delete);
 	AssertInitialized();
 	//
 	// Do custom close code:
@@ -334,7 +301,7 @@ void NDirectPlaySocket::Delete()
 	//
 	NSocket::Delete();
 	//
-	UNGUARD("NDirectPlaySocket::Exit");
+	unguard;
 	};
 
 /*------------------------------------------------------------------------------
@@ -359,7 +326,7 @@ class FDirectPlayEnumInfo
 BOOL CALLBACK DirectPlayServicesCallback(LPGUID lpSPGuid, LPSTR lpFriendlyName,
     DWORD  dwMajorVersion, DWORD dwMinorVersion, LPVOID lpContext)
 	{
-	GUARD;
+	guard(DirectPlayServicesCallback);
 	//
 	FDirectPlayEnumInfo *Info = (FDirectPlayEnumInfo *)lpContext;
 	//
@@ -368,7 +335,7 @@ BOOL CALLBACK DirectPlayServicesCallback(LPGUID lpSPGuid, LPSTR lpFriendlyName,
 	//
 	return TRUE; // Continue enumeration
 	//
-	UNGUARD("DirectPlayEnumCallback");
+	unguard;
 	};
 
 //
@@ -384,7 +351,7 @@ BOOL CALLBACK DirectPlayProviderDialogProc
     LPARAM  lParam
 	)
 	{
-	GUARD;
+	guard(DirectPlayProviderDialogProc);
 	static HWND hWndReturn;
 	static FDirectPlayEnumInfo Info;
 	HWND hWndListBox = GetDlgItem(hDlg,IDC_PROVIDERS);
@@ -414,7 +381,7 @@ BOOL CALLBACK DirectPlayProviderDialogProc
 			char Name[256];
 			//
 			ListBox_GetText(hWndListBox,Index,Name);
-			debugf(LOG_Net,"Creating DirectPlay driver %i: %s",Index,Name);
+			debugf(LOG_Info,"Creating DirectPlay driver %i: %s",Index,Name);
 			//
 			if (NetManager.DirectPlayDriver->DirectPlayCreate
 				(
@@ -479,7 +446,7 @@ BOOL CALLBACK DirectPlayProviderDialogProc
 				//
 				Info.Num			= 0;
 				Info.hWndListBox	= hWndListBox;
-				debug(LOG_Net,"Enumerating DirectPlay drivers");
+				debug(LOG_Info,"Enumerating DirectPlay drivers");
 				NetManager.DirectPlayDriver->DirectPlayEnumerate(DirectPlayServicesCallback,(LPVOID)&Info);
 				//
 				ListBox_SetCurSel(hWndListBox,0);
@@ -495,7 +462,7 @@ BOOL CALLBACK DirectPlayProviderDialogProc
 		default:
 			return FALSE;
 		};
-	UNGUARD("DirectPlayProviderDialogProc");
+	unguard;
 	};
 
 /*------------------------------------------------------------------------------
@@ -508,7 +475,7 @@ BOOL CALLBACK DirectPlayProviderDialogProc
 BOOL CALLBACK EnumSessionsCallback(LPDPSESSIONDESC lpDPSGameDesc,
     LPVOID lpContext, LPDWORD lpdwTimeOut, DWORD dwFlags)
 	{
-	GUARD;
+	guard(EnumSessionsCallback);
 	if (!(dwFlags & DPESC_TIMEDOUT))
 		{
 		FDirectPlayEnumInfo *Info = (FDirectPlayEnumInfo *)lpContext;
@@ -533,7 +500,7 @@ BOOL CALLBACK EnumSessionsCallback(LPDPSESSIONDESC lpDPSGameDesc,
 		return TRUE; // Continue enumeration
 		}
 	return FALSE; // Timed out, stop the enumeration
-	UNGUARD("EnumSessionsCallback");
+	unguard;
 	};
 //
 // DirectPlay session dialog procedure.
@@ -548,7 +515,7 @@ BOOL CALLBACK DirectPlaySessionDialogProc
     LPARAM  lParam
 	)
 	{
-	GUARD;
+	guard(DirectPlaySessionDialogProc);
 	static FDirectPlayEnumInfo Info;
 	static HWND hWndReturn;
 	static int Success = 0;
@@ -624,7 +591,7 @@ BOOL CALLBACK DirectPlaySessionDialogProc
 			SessionDesc.dwUser3				= 0;
 			SessionDesc.dwUser4				= 0;
 			//
-			debug(LOG_Net,"Enumerating DirectPlay sessions");
+			debug(LOG_Info,"Enumerating DirectPlay sessions");
 			//
 			NetManager.DirectPlayDriver->DirectPlay->EnumSessions
 				(
@@ -657,7 +624,7 @@ BOOL CALLBACK DirectPlaySessionDialogProc
 		default:
 			return FALSE;
 		};
-	UNGUARD("DirectPlaySessionDialogProc");
+	unguard;
 	};
 
 /*------------------------------------------------------------------------------

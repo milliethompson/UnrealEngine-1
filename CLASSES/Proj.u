@@ -1,0 +1,656 @@
+DeclareClass Name=Script
+DeclareClass Name=Class
+DeclareClass Name=Projectile
+DeclareClass Name=TentacleProjectile
+DeclareClass Name=EightBall
+DeclareClass Name=Fireball
+DeclareClass Name=Fireball2
+DeclareClass Name=BulletProjectile
+DeclareClass Name=ShellProjectile
+DeclareClass Name=StingerProjectile
+DeclareClass Name=BruteProjectile
+DeclareClass Name=SkaarjProjectile
+DeclareClass Name=beam
+DeclareClass Name=rocket
+DeclareClass Name=BigRock
+
+Begin Class Name=Projectile
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Projectile.
+//
+// A delayed-hit projectile moves around for some time after it is created.
+// An instant-hit projectile acts immediately. 
+//=============================================================================
+class Projectile expands Actor
+	abstract
+	package(UnEngine);
+
+#exec Texture Import File=..\Graphics\S_Camera.pcx Name=S_Camera Palette=Palette Mips=Off Flags=2
+
+//-----------------------------------------------------------------------------
+// Projectile variables.
+
+// Projectile flags.
+var() bool     bVerticalSeek;       // Automatically seek target vertically.
+var() bool     bFollowFloor;        // Follow the floor as we move.
+var() bool     bIsInstantHit;       // Is the projectile instant-hit?
+
+// Effects on impact or at the end of the projectiles life (only 1 is selected).
+var() class    EffectAtLifeSpan;    // Explosion or pyrotechnic when projectile expires.
+var() class    EffectOnWallImpact;  // Explosion or pyrotechnic when projectile hits a wall.
+var() class    EffectOnPawnImpact;  // Explosion or pyrotechnic when projectile hits a pawn.
+var() class    EffectOnImpact;      // Default explosion or pyrotechnic on impact (when other effects do not apply).
+
+// Motion information.
+var() float    Speed;               // Initial speed of projectile.
+var() float    MaxSpeed;            // Limit on speed of projectile (0 means no limit)
+var() float    BounceIncidence;     // If bBounce, cosine of smallest incident angle (measured to normal) which causes bouncing. 0 for no restriction.
+var() float    FollowFloorHeight;   // If bFollowFloor.
+var() byte     MaxBounceCount;      // If bBounce, limit on number of bounces, or 0 for unlimited.
+var byte       BounceCount;         // Number of times projectile has bounced.
+
+// Damage attributes.
+// DamageDecay() identifies the damage lost per tick (for a delayed-hit projectile)
+// or the damage lost per unit distance travelled (for an instant-hit projectile).
+var() float    Damage[4];           // Indexed by EDamageType.
+var() float    DamageDecay[4];      // Damage lost per tick or distance.
+var() byte     ExplosiveTransfer;   // Amount of explosive charge transfered to target (makes target volatile).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bVerticalSeek=False
+      bFollowFloor=False
+      bIsInstantHit=False
+	  bMeshCurvy=False
+      EffectAtLifeSpan=None
+      EffectOnWallImpact=None
+      EffectOnPawnImpact=None
+      EffectOnImpact=None
+      Speed=+00000.000000
+      MaxSpeed=+00000.000000
+      BounceIncidence=+00000.000000
+      FollowFloorHeight=+00000.000000
+      MaxBounceCount=0
+      BounceCount=0
+      Damage(0)=+00000.000000
+      Damage(1)=+00000.000000
+      Damage(2)=+00000.000000
+      Damage(3)=+00000.000000
+      DamageDecay(0)=+00000.000000
+      DamageDecay(1)=+00000.000000
+      DamageDecay(2)=+00000.000000
+      DamageDecay(3)=+00000.000000
+      ExplosiveTransfer=0
+      bDirectional=True
+      bCollideActors=True
+      bCollideWorld=True
+      Texture=S_Camera
+      SoundVolume=0
+      CollisionRadius=+00016.000000
+      CollisionHeight=+00016.000000
+      Physics=PHYS_Flying
+      bMomentum=True
+      bEnginePhysics=True
+      LifeSpan=+00140.000000
+      DefaultEdCategory=Projectile
+   End DefaultProperties
+End Class
+
+Begin Class Name=TentacleProjectile
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// TentacleProjectile.
+//=============================================================================
+class TentacleProjectile expands Projectile
+	package(UnGame);
+
+#call ..\Models\Tarydium.mac
+#exec AUDIO IMPORT FILE="..\Sounds\NAILGUN.UFX" NAME="NAILGUN" FAMILY="Weapons"
+
+function Spawned()
+{
+//	PlaySound(Sound 'NailGun');
+	Velocity = vector(Rotation) * 360.0;
+}
+
+function Tick( float DeltaTime )
+{
+	Move(Velocity * DeltaTime);
+	Rotation.Yaw += 100000 * DeltaTime;
+	Velocity = Velocity >> (rot(0,20000,0)*DeltaTime);
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Speed=+00040.000000
+      Damage(0)=+00012.000000
+      DamageDecay(0)=+00000.050000
+      DrawType=DT_Mesh
+      Mesh=TarydiumProjectile
+      CollisionRadius=+00005.000000
+      CollisionHeight=+00005.000000
+      Mass=+00002.000000
+      bEnginePhysics=False
+      LifeSpan=+00050.000000
+      AnimRate=+00001.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=EightBall
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// EightBall.
+//=============================================================================
+class EightBall expands Projectile;
+
+#call ..\Models\Tarydium.mac
+#exec AUDIO IMPORT FILE="..\Sounds\NAILGUN.UFX" NAME="NAILGUN" FAMILY="Weapons"
+
+engine function Spawned()
+{
+	local vector X,Y,Z;
+	getaxes(Rotation,X,Y,Z);
+	Velocity = X * 500.0 + Z * 500.0;
+}
+
+auto state Ejecting
+{
+engine function Touch (Actor Other)
+{
+	//bounce off actor
+	local vector HitNormal;
+	if (Other != instigator)
+	{
+		HitNormal = Normal(Location - Other.Location);
+		HitWall(HitNormal);
+	}
+}
+
+engine function Landed()
+{
+	local vector HitNormal;
+	HitNormal = vect(0,0,1);
+	HitWall(HitNormal);
+}
+
+engine function HitWall (vector HitNormal)
+{
+	//bounce off wall (reflect about HitNormal)
+	local vector veldir;
+	log("eightball bounced off wall normal "$HitNormal);
+	log("Rotation is "$Vector(Rotation)); 
+	veldir = Normal(Velocity);
+	veldir = veldir - 2 * HitNormal * (veldir Dot HitNormal);
+	Velocity = Size(Velocity) * veldir;
+	log("New rotation = "$veldir);
+	veldir.Z = 0;
+	Rotation = Rotation(veldir);
+}
+
+engine function Timer( int TimerTicks )
+{
+	GotoState(Flying);
+}
+
+	
+Begin:
+	Physics = PHYS_Falling;
+	bBounce = true; //bounce, don't move along objects
+	Log("missile ejecting");
+	SetTimer(0.5,false); //ignite after 0.5 seconds
+	bBounce = true; //bounce, don't move along objects
+
+}
+
+state Flying
+{
+engine function Timer( int TimerTicks )
+{
+	GoToState(Exploding);
+}
+
+engine function Touch (Actor Other)
+{
+	local int hitdamage;
+
+	log(Other.Class$" touched missile");
+	hitdamage = 30;
+	Other.Damage(hitdamage, instigator,Other.Location,
+		(1500.0 * float(hitdamage) * (Normal(Other.Location - Location) + vect(0,0,1))));
+	GotoState(Exploding);
+}
+
+engine function HitWall (vector HitNormal)
+{
+	log("eightball impacted wall");
+	GotoState(Exploding);
+}
+
+Begin:
+	Physics = PHYS_Projectile;
+	Velocity = Vector(Rotation) * 300.0;
+	Acceleration = vector(Rotation) * 1000.0;
+	SetTimer(5.0,false); //self destruct after 5.0 seconds
+	LightType = LT_Steady;
+	LightBrightness = 128;
+	LightSaturation = 255;
+	LightRadius = 64;
+	VolumeBrightness =  128;
+	VolumeRadius = 16;
+	Log("missile ignited");
+	Log("instigator "$instigator.name);
+}
+
+state Exploding
+{
+engine function Timer( int TimerTicks )
+{
+ 	LightType = LT_None;
+ 	Destroy();
+}
+
+engine function Tick (Float deltaTime)
+{
+	LightBrightness *= (1 - 0.5 * deltaTime);
+	LightSaturation *= (1 - 0.5 * deltaTime);
+	LightRadius *= (1 - 0.5 * deltaTime);
+	VolumeBrightness *=  (1 - 0.5 * deltaTime);
+	VolumeRadius *= (1 - 0.5 * deltaTime);
+}
+
+			
+Begin:
+	Physics = PHYS_None;
+	LightBrightness = 255;
+	LightSaturation = 255;
+	LightRadius = 255;
+	VolumeBrightness =  255;
+	VolumeRadius = 255;
+	SetTimer(0.3,false); //end explosion after 2 seconds
+	//playsound(...
+	MakeNoise(1.0); //FIXME - set appropriate loudness
+ 	Log("missile exploded");
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      MaxSpeed=+00600.000000
+      DrawType=DT_Mesh
+      Mesh=TarydiumProjectile
+   End DefaultProperties
+End Class
+
+Begin Class Name=Fireball
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Fireball.
+//=============================================================================
+class Fireball expands Projectile
+	package(UnGame);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Speed=+00015.000000
+      Damage(2)=+00015.000000
+      DamageDecay(2)=+00000.070000
+      CollisionRadius=+00010.000000
+      CollisionHeight=+00010.000000
+      LightType=LT_Steady
+      LightBrightness=110
+      LightHue=80
+      LightSaturation=128
+      LightRadius=20
+      LightPeriod=32
+      bEnginePhysics=False
+      LifeSpan=+00180.000000
+      AnimRate=+00001.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Fireball2
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Fireball2.
+//=============================================================================
+class Fireball2 expands Projectile
+	package(UnGame);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Speed=+00015.000000
+      Damage(2)=+00030.000000
+      DamageDecay(2)=+00000.050000
+      CollisionRadius=+00010.000000
+      CollisionHeight=+00010.000000
+      LightType=LT_Pulse
+      LightBrightness=200
+      LightHue=100
+      LightSaturation=128
+      LightRadius=30
+      LightPeriod=32
+      bEnginePhysics=False
+      LifeSpan=+00180.000000
+      AnimRate=+00001.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=BulletProjectile
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// BulletProjectile.
+//=============================================================================
+class BulletProjectile expands Projectile
+	package(UnGame);
+
+	
+auto state Flying
+{
+
+Begin:
+	Physics = PHYS_Projectile;
+	Acceleration = vect(0,0,0);
+	Velocity = Vector(Rotation) * 300.0;
+	SetTimer(7.0,false); //self destruct after 7.0 seconds
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bIsInstantHit=True
+      Speed=+200000.000000
+      Damage(0)=+00010.000000
+      DamageDecay(0)=+00000.010000
+      CollisionRadius=+00000.000000
+      CollisionHeight=+00000.000000
+      Mass=+00000.002000
+      bEnginePhysics=False
+   End DefaultProperties
+End Class
+
+Begin Class Name=ShellProjectile
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// ShellProjectile.
+//=============================================================================
+class ShellProjectile expands Projectile
+	package(UnGame);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bIsInstantHit=True
+      Speed=+50000.000000
+      Damage(0)=+00011.000000
+      DamageDecay(0)=+00000.013000
+      CollisionRadius=+00000.000000
+      CollisionHeight=+00000.000000
+      Mass=+00000.020000
+      bEnginePhysics=False
+   End DefaultProperties
+End Class
+
+Begin Class Name=StingerProjectile
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// StingerProjectile.
+//=============================================================================
+class StingerProjectile expands Projectile
+	package(UnGame);
+
+#call ..\Models\Tarydium.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Speed=+00060.000000
+      BounceIncidence=+00000.870000
+      MaxBounceCount=3
+      Damage(0)=+00002.000000
+      DamageDecay(0)=+00000.059000
+      ExplosiveTransfer=10
+      DrawType=DT_Mesh
+      Mesh=TarydiumProjectile
+      CollisionRadius=+00005.000000
+      CollisionHeight=+00005.000000
+      LightType=LT_Steady
+      LightBrightness=100
+      LightHue=188
+      LightSaturation=64
+      LightRadius=10
+      LightPeriod=32
+      Mass=+00002.000000
+      bBounce=True
+      bEnginePhysics=False
+      LifeSpan=+00034.000000
+      AnimRate=+00001.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=BruteProjectile
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// BruteProjectile.
+//=============================================================================
+class BruteProjectile expands Projectile;
+
+#call ..\Models\Tarydium.mac
+#exec AUDIO IMPORT FILE="..\Sounds\NAILGUN.UFX" NAME="NAILGUN" FAMILY="Weapons"
+
+/*engine function Spawned()
+{
+	PlaySound(sound(NailGun));
+} */
+
+auto state Flying
+{
+engine function Timer( int TimerTicks )
+{
+	GoToState(Exploding);
+}
+
+engine function Touch (Actor Other)
+{
+	local int hitdamage;
+	log(Other.Class$" touched missile");
+
+	if (Other != instigator)
+	{
+		hitdamage = 10;
+		Other.Damage(hitdamage, instigator,Other.Location,
+			(1500.0 * float(hitdamage) * (Normal(Other.Location - Location) + vect(0,0,1))));
+		GotoState(Exploding);
+	}
+}
+
+engine function HitWall (vector HitNormal)
+{
+	log("missile hit wall");
+	GotoState(Exploding);
+}
+
+Begin:
+	Physics = PHYS_Projectile;
+	Acceleration = vect(0,0,0);
+	Velocity = Vector(Rotation) * 700.0;
+	SetTimer(7.0,false); //self destruct after 7.0 seconds
+}
+
+state Exploding
+{
+engine function Timer( int TimerTicks )
+{
+  	Destroy();
+}
+
+Begin:
+	Physics = PHYS_None; 
+	MakeNoise(1.0); //FIXME - set appropriate loudness
+	SetTimer(0.1,false); 
+ 	Log("missile exploded");
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      MaxSpeed=+01000.000000
+      DrawScale=+00000.200000
+   End DefaultProperties
+End Class
+
+Begin Class Name=SkaarjProjectile
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// SkaarjProjectile.
+//=============================================================================
+class SkaarjProjectile expands Projectile;
+
+#call ..\Models\Tarydium.mac
+#exec AUDIO IMPORT FILE="..\Sounds\NAILGUN.UFX" NAME="NAILGUN" FAMILY="Weapons"
+
+/*engine function Spawned()
+{
+	PlaySound(sound(NailGun));
+} */
+
+auto state Flying
+{
+engine function Timer( int TimerTicks )
+{
+	GoToState(Exploding);
+}
+
+engine function Touch (Actor Other)
+{
+	local int hitdamage;
+	log(Other.Class$" touched missile");
+
+	if (Other != instigator)
+	{
+		hitdamage = 10;
+		Other.Damage(hitdamage, instigator,Other.Location,
+			(1500.0 * float(hitdamage) * (Normal(Other.Location - Location) + vect(0,0,1))));
+		GotoState(Exploding);
+	}
+}
+
+engine function HitWall (vector HitNormal)
+{
+	log("missile hit wall");
+	GotoState(Exploding);
+}
+
+Begin:
+	Physics = PHYS_Projectile;
+	Acceleration = vect(0,0,0);
+	Velocity = Vector(Rotation) * 700.0;
+	SetTimer(7.0,false); //self destruct after 7.0 seconds
+}
+
+state Exploding
+{
+engine function Timer( int TimerTicks )
+{
+  	Destroy();
+}
+
+Begin:
+	Physics = PHYS_None; 
+	MakeNoise(1.0); //FIXME - set appropriate loudness
+	SetTimer(0.1,false); 
+ 	Log("missile exploded");
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      MaxSpeed=+01000.000000
+      DrawType=DT_Mesh
+      Mesh=TarydiumProjectile
+   End DefaultProperties
+End Class
+
+Begin Class Name=beam
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// beam
+//=============================================================================
+class beam expands Projectile;
+
+#exec MESH IMPORT MESH=beam ANIVFILE=..\MODELS\beam_a.3D DATAFILE=..\MODELS\beam_d.3D X=0 Y=0 Z=0
+#alwaysexec MESH ORIGIN MESH=beam X=0 Y=700 Z=-0 YAW=64
+
+#exec MESH SEQUENCE MESH=beam SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=beam SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JRifle1 FILE=..\MODELS\Rifle.PCX FAMILY=!Skins PALETTE=JRifle1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=beam MESH=beam
+#alwaysexec MESHMAP SCALE MESHMAP=beam X=0.005 Y=0.02 Z=0.01
+
+#exec MESHMAP SETTEXTURE MESHMAP=beam NUM=1 TEXTURE=JRifle1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=beam
+   End DefaultProperties
+End Class
+
+Begin Class Name=rocket
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// rocket.
+//=============================================================================
+class rocket expands Projectile;
+
+#exec MESH IMPORT MESH=rocket ANIVFILE=..\MODELS\rocket_a.3D DATAFILE=..\MODELS\rocket_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=rocket X=0 Y=0 Z=0 YAW=64
+
+#exec MESH SEQUENCE MESH=rocket SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=rocket SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jrocket1 FILE=..\MODELS\rocket.PCX FAMILY=!Skins PALETTE=Jrocket1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=rocket MESH=rocket
+#exec MESHMAP SCALE MESHMAP=rocket X=0.03 Y=0.03 Z=0.06
+
+#exec MESHMAP SETTEXTURE MESHMAP=rocket NUM=1 TEXTURE=Jrocket1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=rocket
+   End DefaultProperties
+End Class
+
+Begin Class Name=BigRock
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// BigRock.
+//=============================================================================
+class BigRock expands Projectile;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      MaxSpeed=+00500.000000
+      DrawType=DT_Mesh
+      Mesh=Vase
+      Physics=PHYS_Falling
+      bBounce=True
+      bPitch=True
+      bYaw=True
+      bRoll=True
+   End DefaultProperties
+End Class
+

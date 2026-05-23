@@ -1,7 +1,7 @@
 /*=============================================================================
 	NetINet.cpp: Unreal Windows/WinSock Internet networking
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -12,7 +12,6 @@
 #include <windows.h>
 #include <windowsx.h>
 #include "UnBuild.h"
-#include "UnPlatfm.h"
 #include "Net.h"
 #include "NetPrv.h"
 #include "NetINet.h"
@@ -117,16 +116,16 @@ LRESULT CALLBACK AsyncResultsWndProc(HWND hwnd,UINT uMsg,WPARAM wParam,LPARAM lP
 				//
 				if (Error)
 					{
-					debugf(LOG_Net,"WinSock: WSAAsyncGetHostByName failed");
+					debugf(LOG_Info,"WinSock: WSAAsyncGetHostByName failed");
 					}
 				else if (GHostEnt.HostEnt.h_addrtype!=PF_INET)
 					{
-					debugf(LOG_Net,"WinSock: WSAAsyncGetHostByName returned non-Internet address");
+					debugf(LOG_Info,"WinSock: WSAAsyncGetHostByName returned non-Internet address");
 					}
 				else
 					{
 					This->HostAddr = *(FInetAddr *)(*GHostEnt.HostEnt.h_addr_list);
-					debugf(LOG_Net,"WinSock: I am %s (%i.%i.%i.%i)", This->HostName,
+					debugf(LOG_Info,"WinSock: I am %s (%i.%i.%i.%i)", This->HostName,
 						This->HostAddr.B1, This->HostAddr.B2, This->HostAddr.B3, This->HostAddr.B4);
 					};
 				This->hGetHostByName=NULL;
@@ -148,7 +147,7 @@ LRESULT CALLBACK AsyncResultsWndProc(HWND hwnd,UINT uMsg,WPARAM wParam,LPARAM lP
 //
 int NInternetDriver::Init(char *ParamBuffer,char *ErrorMessage)
 	{
-	GUARD;
+	guard(NInternetDriver::Init);
 	if (Initialized) appError("Internet already initialized");
 	//
 	// Create window class for async call results window
@@ -182,7 +181,6 @@ int NInternetDriver::Init(char *ParamBuffer,char *ErrorMessage)
 		return 0;
 		};
 	Initialized=1;
-	TelnetListener=NULL;
 	strcpy(HostName,"");
 	//
 	debugf
@@ -210,73 +208,25 @@ int NInternetDriver::Init(char *ParamBuffer,char *ErrorMessage)
 		return 0;
 		};
 	//
-	// Listen for telnet connections:
-	//
-	TelnetListener = socket(PF_INET,SOCK_STREAM,0);
-	if (TelnetListener==INVALID_SOCKET)
-		{
-		debugf(LOG_Init,"WinSock: Telnet listener socket failed (%s)",wsaError());
-		TelnetListener=NULL;
-		};
-	if (TelnetListener!=NULL)
-		{
-		SOCKADDR_IN SockAddr;
-		SockAddr.sin_family			= AF_INET;
-		SockAddr.sin_port			= htons(IPPORT_TELNET);
-		SockAddr.sin_addr.s_addr	= 0;
-		if (bind(TelnetListener,(SOCKADDR *)&SockAddr,sizeof(SOCKADDR_IN))!=0)
-			{
-			debugf(LOG_Init,"WinSock: Telnet listener bind failed (%s)",wsaError());
-			closesocket(TelnetListener);
-			TelnetListener=NULL;
-			};
-		};
-	if (TelnetListener!=NULL)
-		{
-		u_long NoBlocking=1;
-		if (ioctlsocket(TelnetListener,FIONBIO,&NoBlocking))
-			{
-			debugf(LOG_Init,"WinSock: Telnet listener ioctlsocket failed (%s)",wsaError());
-			closesocket(TelnetListener);
-			TelnetListener=NULL;
-			};
-		};
-	if (TelnetListener!=NULL)
-		{
-   		if (listen(TelnetListener,4)!=0)
-			{
-			debugf(LOG_Init,"WinSock: Telnet listener listen failed (%s)",wsaError());
-			closesocket(TelnetListener);
-			TelnetListener=NULL;
-			};
-		};
-	if (TelnetListener!=NULL) debugf(LOG_Init,"WinSock: Listening for telnet on port %i",IPPORT_TELNET);
-	//
 	// Start task:
 	//
-	GTaskManager->AddTask(this,NULL,GApp,PRIORITY_Realtime,TASK_NoUserKill);
 	NetManager.RegisterDriver(this);
 	//
 	// Success:
 	//
 	return 1;
 	//
-	UNGUARD("NInternetDriver::Init");
+	unguard;
 	};
 
 void NInternetDriver::Exit()
 	{
-	GUARD;
+	guard(NInternetDriver::Exit);
 	AssertInitialized();
 	//
-	GTaskManager->KillTask(this);
 	if (hGetHostByName)
 		{
 		if (WSACancelAsyncRequest(hGetHostByName)) debugf(LOG_Exit,"WSACancelAsyncRequest failed (%s)",wsaError());
-		};
-	if (TelnetListener && closesocket(TelnetListener))
-		{
-		debugf(LOG_Exit,"WinSock closesocket error(%s)",wsaError());
 		};
 	if (WSACleanup())
 		{
@@ -286,60 +236,22 @@ void NInternetDriver::Exit()
 	//
 	if (!DestroyWindow(hWndAsyncResults)) appError("DestroyWindow failed");
 	//
-	UNGUARD("NInternetDriver::Exit");
+	unguard;
 	};
 
-void NInternetDriver::TaskExit()
+void NInternetDriver::Tick()
 	{
-	GUARD;
-	//
-	UNGUARD("NInternetDriver::TaskExit");
-	};
-
-char *NInternetDriver::TaskStatus(char *Name, char *Desc)
-	{
-	GUARD;
-	//
-	sprintf(Name,"Internet");
-	sprintf(Desc,"");
-	return Name;
-	//
-	UNGUARD("NInternetDriver::TaskStatus");
-	};
-
-void NInternetDriver::TaskTick()
-	{
-	GUARD;
+	guard(NInternetDriver::Tick);
 	AssertInitialized();
-	//
-	SOCKADDR_IN SockAddr;
-	int Size = sizeof(SOCKADDR_IN);
-	//
-	SOCKET Result = accept(TelnetListener,(SOCKADDR *)&SockAddr,&Size);
-	if (Result!=INVALID_SOCKET)
-		{
-		FTaskTelnet *Telnet = new FTaskTelnet;
-		Telnet->Init(Result,SockAddr);
-		};
-	UNGUARD("NInternetDriver::Tick");
+	unguard;
 	};
 
 int NInternetDriver::Exec(const char *Cmd,FOutputDevice *Out)
 	{
-	GUARD;
+	guard(NInternetDriver::Exec);
 	const char *Str = Cmd;
 	//
-	if (NetGetCMD(&Str,"STATUS"))
-		{
-		if (NetGetCMD(&Str,"INTERNET") || !Str[0])
-			{
-			Out->Logf("   INTERNET - Ok");
-			//
-			return !Str[0];
-			}
-		else return 0;
-		}
-	else if (NetGetCMD(&Str,"PING"))
+	if (NetGetCMD(&Str,"PING"))
 		{
 		Out->Log("Ping not yet implemented");
 		return 1;
@@ -350,49 +262,48 @@ int NInternetDriver::Exec(const char *Cmd,FOutputDevice *Out)
 		return 1;
 		}
 	else return 0;
-	//
-	UNGUARD("NInternetDriver::Exec");
+	unguard;
 	};
 
 int NInternetDriver::CanHandleURL(char *ServerURL)
 	{
-	GUARD;
+	guard(NInternetDriver::CanHandleURL);
 	//
 	return 0;
 	//
-	UNGUARD("NInternetDriver::CanHandleURL");
+	unguard;
 	};
 
 NSocket *NInternetDriver::ServerAcceptConnection(int ServerID)
 	{
-	GUARD;
+	guard(NInternetDriver::ServerAcceptConnection);
 	//
 	return NULL;
 	//
-	UNGUARD("NInternetDriver::ServerAcceptConnection");
+	unguard;
 	};
 
 NSocket *NInternetDriver::ClientOpenServer(char *ServerURL,char *ErrorMessage)
 	{
-	GUARD;
+	guard(NInternetDriver::ClientOpenServer);
 	//
 	return NULL;
 	//
-	UNGUARD("NInternetDriver::ClientOpenServer");
+	unguard;
 	};
 
 void NInternetDriver::BeginAdvertising(NServerAd *Ad)
 	{
-	GUARD;
+	guard(NInternetDriver::BeginAdvertising);
 	//
-	UNGUARD("NInternetDriver::BeginAdvertising");
+	unguard;
 	};
 
 void NInternetDriver::EndAdvertising(NServerAd *Ad)
 	{
-	GUARD;
+	guard(NInternetDriver::EndAdvertising);
 	//
-	UNGUARD("NInternetDriver::EndAdvertising");
+	unguard;
 	};
 
 /*------------------------------------------------------------------------------
@@ -405,7 +316,7 @@ void NInternetDriver::EndAdvertising(NServerAd *Ad)
 
 BOOL CALLBACK JoinInternetDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
-	GUARD;
+	guard(JoinInternetDialogProc);
 	//
 	HWND hWndHost = GetDlgItem(hDlg,IDC_HOST);
 	static HWND hWndReturn;
@@ -436,7 +347,7 @@ BOOL CALLBACK JoinInternetDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM
 			Edit_SetText(hWndHost,URL_GAME);
 			return TRUE;
 		case IDC_DIRECTORY:
-			GApp->LaunchURL(WEB_LINK_FNAME,"");
+			GApp->LaunchURL(URL_WEB,"");
 			return TRUE;
 		default:
 			return FALSE;
@@ -468,7 +379,7 @@ BOOL CALLBACK JoinInternetDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM
 		default:
 			return FALSE;
 		};
-	UNGUARD("JoinInternetDialogProc");
+	unguard;
 	};
 
 /*------------------------------------------------------------------------------

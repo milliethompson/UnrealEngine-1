@@ -1,43 +1,40 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmTexImport 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Import Texture"
    ClientHeight    =   3135
-   ClientLeft      =   2565
-   ClientTop       =   2910
+   ClientLeft      =   2295
+   ClientTop       =   3015
    ClientWidth     =   4920
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   3495
    HelpContextID   =   125
    Icon            =   "TexImprt.frx":0000
-   Left            =   2505
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   3135
    ScaleWidth      =   4920
    ShowInTaskbar   =   0   'False
-   Top             =   2610
-   Width           =   5040
    Begin VB.CommandButton OkAll 
       Caption         =   "Ok to &All"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   1260
@@ -48,29 +45,65 @@ Begin VB.Form frmTexImport
    Begin VB.Frame Frame2 
       Caption         =   "Properties"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   975
       Left            =   60
       TabIndex        =   13
       Top             =   1620
       Width           =   4755
+      Begin VB.CheckBox Blur 
+         Caption         =   "Blur the texture"
+         BeginProperty Font 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         Height          =   195
+         Left            =   2520
+         TabIndex        =   15
+         Tag             =   "2"
+         Top             =   600
+         Width           =   1875
+      End
+      Begin VB.CheckBox BumpMap 
+         Caption         =   "Import as bump map"
+         BeginProperty Font 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         Height          =   195
+         Left            =   2520
+         TabIndex        =   14
+         Tag             =   "2"
+         Top             =   360
+         Width           =   1875
+      End
       Begin VB.CheckBox DoMips 
          Caption         =   "Generate Mipmaps"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   195
          Left            =   240
@@ -82,13 +115,13 @@ Begin VB.Form frmTexImport
       Begin VB.CheckBox DoMasked 
          Caption         =   "Masked"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   195
          Left            =   240
@@ -100,13 +133,13 @@ Begin VB.Form frmTexImport
    Begin VB.Frame Frame1 
       Caption         =   "Name"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   1455
       Left            =   60
@@ -116,13 +149,13 @@ Begin VB.Form frmTexImport
       Begin VB.TextBox TexName 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   2040
@@ -132,16 +165,16 @@ Begin VB.Form frmTexImport
          Top             =   660
          Width           =   2415
       End
-      Begin VB.TextBox TexFamily 
+      Begin VB.TextBox TexSet 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   2040
@@ -155,13 +188,13 @@ Begin VB.Form frmTexImport
          Alignment       =   1  'Right Justify
          Caption         =   "File:"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -172,13 +205,13 @@ Begin VB.Form frmTexImport
       Begin VB.Label Fname 
          Caption         =   "Fname"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   960
@@ -190,13 +223,13 @@ Begin VB.Form frmTexImport
          Alignment       =   1  'Right Justify
          Caption         =   "Texture Name:"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   600
@@ -206,15 +239,15 @@ Begin VB.Form frmTexImport
       End
       Begin VB.Label Label4 
          Alignment       =   1  'Right Justify
-         Caption         =   "Texture Family:"
+         Caption         =   "Texture Set:"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   480
@@ -227,13 +260,13 @@ Begin VB.Form frmTexImport
       BackColor       =   &H00C0C0C0&
       Caption         =   "&Skip"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   2580
@@ -246,13 +279,13 @@ Begin VB.Form frmTexImport
       Caption         =   "&Ok"
       Default         =   -1  'True
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   60
@@ -265,13 +298,13 @@ Begin VB.Form frmTexImport
       Cancel          =   -1  'True
       Caption         =   "&Cancel"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   3720
@@ -281,9 +314,12 @@ Begin VB.Form frmTexImport
    End
 End
 Attribute VB_Name = "frmTexImport"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
+
 Dim ThisFname
 Dim AutoOk As Integer
 
@@ -295,25 +331,25 @@ End Sub
 
 Public Sub DoNext()
     Fname = GrabFname(GString)
-    If frmTexImport.Fname = "" Then
+    If Fname = "" Then
         GlobalAbortedModal = 0
         AutoOk = 0
         Hide
     End If
-    '
-    frmTexImport.TexName = GetFileNameOnly(Fname)
-    If frmTexImport.TexName = AllString Then
-        frmTexImport.TexName = "Untitled"
+    
+    TexName = GetFileNameOnly(Fname)
+    If TexName = AllString Then
+        TexName = "Untitled"
     End If
-    '
+    
     If AutoOk = 1 Then Ok_Click
 End Sub
 
 Private Sub Form_Activate()
-    TexFamily.SelStart = 0
-    TexFamily.SelLength = Len(TexFamily.Text)
-    TexFamily.SetFocus
-    '
+    TexSet.SelStart = 0
+    TexSet.SelLength = Len(TexSet.Text)
+    TexSet.SetFocus
+    
     DoNext
 End Sub
 
@@ -323,28 +359,32 @@ Private Sub Form_Load()
 End Sub
 
 Private Sub Ok_Click()
-    '
     Dim TexFname As String
     Dim TexName As String
-    Dim TexFamily As String
-    '
-    TexFname = frmTexImport.Fname
+    Dim TexSet As String
+    Dim TexFlags As Long
+    
+    TexFname = Fname
     TexName = Trim(frmTexImport.TexName)
-    TexFamily = Trim(frmTexImport.TexFamily)
-    '
+    TexSet = Trim(frmTexImport.TexSet)
+    
     GlobalAbortedModal = 0
-    '
-    If Len(TexName) = 0 Or Len(TexName) > 15 Or Len(TexFamily) = 0 Or Len(TexFamily) > 15 Then
-        MsgBox "Texture name and family name must be given, and must be 1-31 characters each", 16
+
+    If Len(TexName) = 0 Or Len(TexName) > 15 Or Len(TexSet) = 0 Or Len(TexSet) > 15 Then
+        MsgBox "Texture name and Set name must be given, and must be 1-31 characters each", 16
     Else
+        TexFlags = 0
+        If BumpMap.Value Then TexFlags = TexFlags + TF_BumpMap
+        If Blur.Value Then TexFlags = TexFlags + TF_Blur
         Ed.Server.Exec "TEXTURE IMPORT FILE=" & Quotes(TexFname) & _
             " NAME=" & Quotes(TexName) & _
-            " FAMILY=" & Quotes(TexFamily) & _
+            " Set=" & Quotes(TexSet) & _
             " MIPS=" & OnOff(Int(DoMips.Value)) & _
-            " FLAGS=" & Trim(Str(IIf(DoMasked.Value, PF_MASKED, 0)))
+            " FLAGS=" & Trim(Str(IIf(DoMasked.Value, PF_MASKED, 0))) & _
+            " TEXFLAGS=" & Trim(Str(TexFlags))
         DoNext
     End If
-    '
+
 End Sub
 
 Private Sub OkAll_Click()

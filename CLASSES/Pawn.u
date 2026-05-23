@@ -1,0 +1,4595 @@
+DeclareClass Name=Sound
+DeclareClass Name=Player
+DeclareClass Name=Script
+DeclareClass Name=Pawn
+DeclareClass Name=Object
+DeclareClass Name=Class
+DeclareClass Name=Camera
+DeclareClass Name=Inventory
+DeclareClass Name=Projectile
+DeclareClass Name=StatusInfo
+DeclareClass Name=Weapon
+DeclareClass Name=PlayerStart
+DeclareClass Name=SkaarjProjectile
+DeclareClass Name=PathNode
+DeclareClass Name=ScriptedPawn
+DeclareClass Name=WayBeacon
+DeclareClass Name=Skaarj
+DeclareClass Name=Brute
+DeclareClass Name=Gasbag
+DeclareClass Name=RazorFish
+DeclareClass Name=Manta
+DeclareClass Name=Krall
+DeclareClass Name=Titan
+DeclareClass Name=Male
+DeclareClass Name=Female
+DeclareClass Name=Cow
+DeclareClass Name=Pupae
+DeclareClass Name=Mercenary
+DeclareClass Name=Queen
+DeclareClass Name=Squid
+DeclareClass Name=Slith
+DeclareClass Name=Warlord
+DeclareClass Name=Nali
+DeclareClass Name=Turret
+DeclareClass Name=Hawk
+DeclareClass Name=Fly
+DeclareClass Name=Blob
+DeclareClass Name=Firefly
+DeclareClass Name=FireflySwarm
+DeclareClass Name=Tentacle
+DeclareClass Name=Scout
+DeclareClass Name=View
+DeclareClass Name=Human
+DeclareClass Name=Patrolpoint
+DeclareClass Name=Ambushpoint
+DeclareClass Name=Dragon
+DeclareClass Name=ArchAngel
+
+Begin Class Name=Pawn
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Pawn, the base class of all actors that can be controlled by players or AI.
+// This is a built-in Unreal class and it shouldn't be modified.
+// Note that Pawns which implement functions for the Tick and PlayerTick messages
+// must handle player control and player/pawn physics in these functions
+// this can either be done with scripting, or by calling the intrinsic
+// controlplayer() and standardphysics() methods.
+// these are called automatically if there is no script implementation of the Tick
+// and PlayerTick messages
+//=============================================================================
+class Pawn expands Actor 
+	abstract
+	intrinsic
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// Pawn variables
+
+// Player info.
+var const camera Camera;        // Camera, if under local player control.
+var const player Player;        // Player, if controlled by a player.
+var string[32]   PlayerName;    // Player name, or blank if none.
+var string[32]   Team;      // Player Team, or blank if none.
+var StatusInfo   StatusBar;     // Status bar actor.
+var Weapon       Weapon;        // The pawn's current weapon.
+
+// Movement.
+var rotation     ViewRotation;  // View rotation.
+var(Movement) int	MaxPitch; //maximum pitch/roll (0 to 65536)
+var() float      BaseEyeHeight; // Base eye height above collision center.
+var float        EyeHeight;     // Current eye height, adjusted for bobbing.
+var(Movement) float     Bob;           // How much to bob the view.
+
+// Camera status.
+var float        OrthoZoom;     // Orthogonal/map view zoom factor.
+var() float        FovAngle;      // X field of view angle in degrees, usually 90.
+var int          ShowFlags;     // Camera flags.       (internal engine use)
+var int          RendMap;       // Map rendering type. (internal engine use)
+var int          Misc1;         // Miscellaneous.      (internal engine use)
+var int          Misc2;         // Miscellaneous.      (internal engine use)
+
+//OLD Player game statistics.
+var byte DieCount, ItemCount, KillCount, SecretCount;
+
+// Ammo.
+var int          AmmoCount   [10]; //OLD How much we have.
+var() int        AmmoCapacity[10]; //OLD How much we can carry.
+
+// Armor.
+var() float      NaturalArmor[4]; //OLD Indexed by EDamageType, from 0.0 to 1.0.
+var() float      Armor[4];        //OLD Indexed by EDamageType
+var float      HealRate;        //OLD Rate that pawn heals per second, 0.0=none, 1.0=fully.
+
+// General flags.
+var() bool       bCanPossess;     // Players can possess this pawn.
+var bool         bLocalMovement;  // Client side movement prediction in netgames.
+var bool         bLocalRotation;  // Client side rotation prediction in netgames.
+var bool         bBehindView;     // Outside-the-player view.
+var bool          bIsPlayer;       // Pawn is a player or a player-bot.
+
+//AI flags
+var	 	bool   		bReadyToAttack;		// can attack again 
+var(AI) bool		bHasRangedAttack;	// can attack from beyond melee range
+var(AI) bool		bMovingRangedAttack; //can perform ranged attack while moving
+var(AI) bool		bCanStrafe;
+
+// AI basics.
+var(AI) float      SightRadius;     //Maximum seeing distance.
+var(AI) float      PeripheralVision;//Cosine of limits of peripheral vision.
+var(AI) float      Noise;           //The amount of noise being made by the pawn.
+var(AI) float	   HearingThreshold;  //Minimum noise loudness for hearing
+var(AI) byte       Visibility;      //How visible is the pawn? 0 = invisible. 
+									// 128 = normal.  255 = highly visible.
+var(AI) name		Orders;			//orders a creature is carrying out 
+									// will be initial state, plus creature will attenmpt
+									//to return to this state
+var(AI) name		OrderTag;		// tag of object referred to by orders
+var		actor		OrderObject;		// object referred to by orders (if applicable)
+var		vector		LastSeenPos; 		// position where I last saw enemy (auto updated)
+var(AI) float		TimeBetweenAttacks;  // seconds - modified by difficulty
+static(AI) float	MeleeRange; // Max range for melee attack (not including collision radii)
+var		float		Alertness; //-1 to 1 ->Used within specific states for varying reaction to stimuli 
+var 	name		NextAnim; // used in states with multiple, sequenced animations	
+var		float		SightCounter;	//Used to keep track of when to check player visibility
+var		float 		Stimulus; //Strenght of stimulus - Set when stimulus happens, used in Acquisition state 
+var(AI) Pawn    	Enemy;
+var(AI) float		Aggressiveness; //-1.0 to 1.0 modifies BaseAggressiveness
+static(AI) float	BaseAggressiveness; //-1.0 to 1.0 likelihood to charge, snipe, or run away
+
+var(AI) enum EAttitude  //important - order in decreasing importance
+{
+	ATTITUDE_Fear,		//will try to run away
+	ATTITUDE_Hate,		// will attack enemy
+	ATTITUDE_Frenzy,	//will attack anything, indiscriminately
+	ATTITUDE_Threaten,	// animations, but no attack
+	ATTITUDE_Ignore,
+	ATTITUDE_Friendly,
+	ATTITUDE_Follow 	//accepts player as leader
+} AttitudeToPlayer;	//determines how creature will react on seeing player (if in human form)
+
+static(AI) enum EIntelligence //important - order in increasing intelligence
+{
+	BRAINS_NONE, //ameoba like - only reacts to immediate stimulus
+	BRAINS_REPTILE, //follows to last seen position
+	BRAINS_MAMMAL, //simple navigation (limited path length)
+	BRAINS_HUMAN   //complex navigation, team coordination, use environment stuff (triggers, etc.)
+}	Intelligence;
+
+	
+var   	Pawn		OldEnemy;
+var   	Actor		MoveTarget;		//set by movement intrinsics
+var 	name		NextState;		// next state to enter (after animation completes) 
+var 	vector 		Destination;	// set by Movement intrinsics
+var		vector		Focus;			// set by StrafeTo()
+var		float		DesiredSpeed;
+
+//Basic Animation Transitions
+static(Animation) name  SeqWaitingToFighter;
+static(Animation) name  SeqFighterToWaiting;
+static(Animation) name  SeqFighterToMoving;
+static(Animation) name  SeqMovingToFighter;
+		
+// Player and enemy movement.
+var(Movement) float      GroundSpeed;     // The maximum ground speed.
+var(Movement) float      WaterSpeed;      // The maximum swimming speed.
+var(Movement) float      AirSpeed;        // The maximum flying speed.
+var() float      Health;          // Health: 0.0=dead, 1.0=normal maximum.
+var(Movement) float		 AccelRate;		  // time (in seconds) to max speed
+var(Movement) float		 JumpZ;      		// vertical acceleration w/ jump
+var(Movement) float      MaxStepHeight;   // Maximum size of upward/downward step.
+
+// Status of usually temporary effects.
+var int          InvisibilityTime;  // Ticks left before invisibility wears off.
+var int          SuperShieldTime;   // Ticks left before super-stamina wears off.
+var int          SuperStrengthTime; // Ticks left before super-strength wears off.
+
+// Input buttons.
+var bool 
+	bZoom, bRun, bLook, bDuck,
+	bStrafe, bFire, bAltFire, bJump,
+	bExtra3, bExtra2, bExtra1, bExtra0;
+
+// Input axes.
+var float 
+	aForward, aTurn, aStrafe, aUp, 
+	aLookUp, aExtra4, aExtra3, aExtra2,
+	aExtra1, aExtra0;
+
+// Force feedback.
+var enum ESurfaceForceType
+{
+	SFT_None,				    // No surface forces.
+	SFT_CalmWater,			    // Swimming through calm water.
+	SFT_TurbulentWater,         // Swimming through turbulent water.
+} SurfaceForceType;
+var byte SurfaceForcePeriod;    // Period of surface force, +128 means velocity-scaled.
+var byte SurfaceForceMagnitude; // Magnitude of surface force.
+
+// PlayForce function parameter.
+enum EPlayForceType
+{
+	PFT_Full,		// Play force at full impulse for the entire time.
+	PFT_RampUp,		// Ramp force up then go away.
+	PFT_RampDown,   // Start full-on then ramp force down.
+	PFT_Smooth,     // Smoothly ramp force up then down.
+	PFT_Decay,      // Decay exponentially.
+	PFT_Instant,    // Apply for shortest instant possible.
+};
+
+// Latent Movement.
+//Note that MoveTo sets the actor's Destination, and MoveToward sets the
+//actor's MoveTarget.  Actor will rotate towards destination
+
+intrinsic(500) final latent function MoveTo( vector NewDestination, optional float speed);
+intrinsic(502) final latent function MoveToward(actor NewTarget, optional float speed);
+intrinsic(504) final latent function StrafeTo(vector NewDestination, vector NewFocus);
+intrinsic(506) final latent function StrafeFacing(vector NewDestination, actor NewTarget);
+intrinsic(508) final latent function TurnTo(vector NewFocus);
+intrinsic(510) final latent function TurnToward(actor NewTarget);
+
+// Intrinsic AI functions
+//LineOfSightTo() returns true if any of several points of Other is visible 
+// (origin, top, bottom)
+intrinsic(514) final function bool LineOfSightTo(actor Other); //FIXME - move to actor
+intrinsic(518) final function actor FindPathTo(vector aPoint, optional float maxweight,
+										optional bool bClearPaths);
+intrinsic(522) final function ClearPaths();
+intrinsic(523) final function vector JumpLanding();
+
+//FloorZ() returns the floor height below the point (for a given actor's collision)
+intrinsic(516) final function float FloorZ(vector point);
+
+//Reachable returns what part of direct path from Actor to aPoint is traversable
+//using the current locomotion method
+intrinsic(521) final function bool pointReachable(vector aPoint);
+intrinsic(520) final function bool actorReachable(actor anActor);
+
+//FIXME - CanSee redundant?
+
+// Intrinsic force feedback functions.
+intrinsic(295) final function PlayForce( EPlayForceType Type, vector Force, float Time );
+
+//==============
+// Temp findpath tests
+function ServerFind( float F, name N, string[255] S )
+{
+	//find next path to remembered spot
+	local pathnode node;
+	node = pathnode(FindPathTo(Destination));
+	if (node != None)
+	{
+		log("found path");
+		Spawn(WayBeacon, self, Noname, node.location);
+	}
+	else
+		log("didn't find path");
+}
+
+function ServerRemember( float F, name N, string[255] S )
+{
+	//remember spot
+	Destination = Location;
+}
+
+		
+//=============================================================================
+// Engine functions.
+
+// This pawn was possessed by a player.
+Engine Function Possess()
+{
+	bIsPlayer = true;
+	serverwalk(0.0,NoName,"");
+}
+
+// This pawn was unpossessed by a player.
+Engine Function UnPossess()
+{
+	bIsPlayer = false;
+	gotostate(waiting); //fixme goto state auto
+}
+
+Engine Function PlayerTick( float Time );
+
+//
+// Direct a message to the player's console..
+//
+intrinsic(269) engine function Message( coerce string[255] S );
+
+//
+// Called immediately before gameplay begins.
+//
+function PreBeginPlay()
+{
+	// Set instigator to self.
+	Instigator = Self;
+
+	SightCounter = 0.1 * FRand();  //offset randomly 
+	bReadyToAttack = false;
+
+	// If no monsters allowed in level, destroy this.
+	if( Level.bNoMonsters && !bIsPlayer )
+		Destroy();
+	else 
+		{
+		//if patroling, roaming, or ambushing, preset location
+		/*if (!bFixedStart)
+		//	{
+			if (Orders == 'Patroling')
+				InitPatrolLoc();
+			else if (Orders == 'Roaming')
+				InitRoamLoc();
+			else if (Orders == 'Ambushing')
+				InitAmbushLoc();
+			} */
+		CallParent.PreBeginPlay();
+		}
+}
+
+function SetAmbush(Ambushpoint newspot)
+{
+	if (!newspot.taken) // && (Clan == newspot.OwnerClan))
+		ChooseAmbushSpot(newspot, Ambushpoint(OrderObject));
+}
+
+function ChooseAmbushSpot(Ambushpoint newpoint, Ambushpoint oldpoint)
+{
+	local Float odds;
+	local byte count;
+	odds = 0.5;
+	count = 1;
+	if (pointReachable(newpoint.Location))
+		{
+		log("Found another ambushpoint");
+		if (oldpoint != None)
+			{
+			oldpoint.survivecount += 1;
+			count = oldpoint.survivecount;
+			odds = 1.0/(oldpoint.survivecount + 1.0);
+			}
+		if (FRand() < odds)
+			{		
+			OrderObject = newpoint;
+			newpoint = Ambushpoint(OrderObject);
+			newpoint.survivecount = count;
+			newpoint.taken = true;
+			}
+		}
+}
+
+function InitAmbushLoc()
+{
+	Broadcast(NoName,AmbushPoint).TellAboutTo(Self);
+}
+
+function SetPatrol(Patrolpoint Other)
+{
+	if (Other.tag == OrderTag)
+		{
+		log("Found next patrol point");		
+		OrderObject = Other;
+		}
+}
+	
+function InitPatrolLoc()
+{
+	local Patrolpoint newspot;
+	local float odds;
+	odds = 0.2;
+	log ("Set initial patrol point");
+	Broadcast(NoName, Patrolpoint).TellAboutTo(Self);
+	newspot = Patrolpoint(OrderObject);
+	
+	while (newspot != None)
+		{
+		OrderTag = newspot.Nextpatrol;
+		Broadcast(NoName, Patrolpoint).TellAboutTo(Self);
+		odds += 0.1;
+		if (FRand() < odds)
+			newspot = none;	
+		else
+			{
+			newspot = Patrolpoint(OrderObject);
+			SetLocation(newspot.Location);
+			}
+		}
+	log("initial patrol point = "$OrderObject.tag);
+}
+
+function InitRoamLoc()
+{
+	local vector pick;
+	//FIXME - pick pathnode locations (make sure there is a routed path to them)
+	
+	pick = 500 * VRand();
+	//pick = Location + Reachable(pick) * (pick - Location);
+	pick.Z = FloorZ(pick);
+	if (Size(pick - Location) < 2 * CollisionRadius)
+		pick = Location + CollisionRadius * vector(Rotation);	
+		
+	SetLocation(pick);
+}
+		
+//=============================================================================
+// Animation playing - should be implemented in subclass, 
+//
+// PlayWaiting, PlayFighter, PlayRunning, and PlayTakeHit, PlayMovingAttack (if used)
+// and PlayDying are required to be implemented in the subclass
+
+function PlayRunning()
+{
+	log("Error - PlayRunning should be implemented in subclass of "$class);
+}
+
+function PlayRetreating() //backwards walk
+{
+	PlayRunning(); 
+}
+
+function PlayWalking()
+{
+	PlayRunning(); 
+}
+
+function PlayStrafing()
+{
+	PlayRunning(); //fixme - in subclasses, check dir and play appropriate strafe anim
+}
+
+function PlayWaiting()
+{
+	log("Error - PlayWaiting should be implemented in subclass");
+}
+
+function PlayMovingAttack()
+{
+	log("Error - PlayMovingAttack should be implemented in subclass");
+	//Note - must restart attack timer when done with moving attack
+}
+
+function PlayWaitingGuard()
+{
+	PlayWaiting();
+}
+
+function PlayWaitingAmbush()
+{
+	PlayWaiting();
+}
+
+//FIXME - is fighter always one anim, if so, make it a variable (no need to call func)
+//Same for running
+function PlayFighter()
+{
+	log("Error - PlayFighter should be implemented in subclass of "$class);
+}
+
+function PlayThreatening()
+{
+	PlayFighter();
+}
+
+function PlayPatrolStop()
+{
+	PlayWaiting();
+}
+
+function PlayTurning()
+{
+	PlayFighter();
+}
+
+function PlayDying()
+{
+	log("Error - PlayDying should be implemented in subclass of "$class);
+}
+
+function PlayTakeHit()
+{
+	log("Error - PlayTakeHit should be implemented in subclass of "$class);
+}
+
+function PlayVictoryDance()
+{
+	PlayFighter();
+}
+
+//=============================================================================
+// Inventory related functions.
+
+// Add Item to this pawn's inventory and send the appropriate 
+// PickupNotify messages. Returns true if successfully added, false if not.
+function bool AddInventory( inventory NewItem )
+{
+	// Skip if already in the inventory.
+	local inventory Inv;
+	for( Inv=Inventory; Inv!=None; Inv=Inv.Inventory )
+		if( Inv == NewItem )
+			return false;
+
+	// Notify each of our existing inventory items of the pickup.
+	// An item may choose to destroy the newly-picked up item.			
+	for( Inv=Inventory; Inv!=None; Inv=Inv.Inventory )
+		if( Inv.PickupNotify(NewItem) )
+			return false;
+
+	// The item should not have been destroyed if we get here.
+	assert(NewItem!=None);
+
+	// Add to front of inventory chain.
+	NewItem.SetOwner(Self);
+	NewItem.Inventory = Inventory;
+	Inventory = NewItem;
+	return true;
+}
+
+// Remove Item from this pawn's inventory, if it exists.
+// Returns true if it existed and was deleted, false if it did not exist.
+function bool DeleteInventory( inventory Item )
+{
+	// If this item is in our inventory chain, unlink it.
+	local actor Link;
+	for( Link = Self; Link!=None; Link=Link.Inventory )
+	{
+		if( Link.Inventory == Item )
+		{
+			Link.Inventory = Item.Inventory;
+			break;
+		}
+	}
+}
+
+// Called when this pawn he has a chance to pick Item up (i.e. when 
+// the pawn touches a weapon pickup). The pawn should return true if 
+// he wants to pick it up, false if he does not want it.
+//
+// Note that Item is not in this pawn's inventory when this function is 
+// called, and this pawn should not do anything with Item.
+function bool PickupQuery( inventory Item )
+{
+	// Don't accept it if we already have one.
+	local inventory Inv;
+	for( Inv=Inventory; Inv!=None; Inv=Inv.Inventory )
+		if( Inv.Class == Item.Class )
+			return false;
+
+	// Allow any of our inventory items to preempt the pickup.			
+	for( Inv=Inventory; Inv!=None; Inv=Inv.Inventory )
+		if( Inv.PreemptPickupQuery(Item) )
+			return false;
+
+	// Accept it.
+	return true;
+}
+
+// Activate NewWeapon in this pawn's inventory.
+// If NewWeapon is None, just deactivates the current weapon.
+// Returns true if activated, false if not.
+function bool ActivateWeapon( weapon NewWeapon )
+{
+return false;
+}
+
+// Return the best weapon for this pawn to use. This is called when the 
+// current weapon runs out and a new one needs to be selected.
+function weapon ChooseWeapon()
+{
+log("choose weapon");
+}
+
+//=============================================================================
+// Inventory-related input notifications.
+
+// The player wants to switch to weapon group numer I.
+function ServerWeapon( float F, name N, string[255] S )
+{
+	log( Class $ ": ServerWeapon" );
+}
+	
+// The player wants to switch to the previous weapon group.
+function ServerPrevWeapon( float F, name N, string[255] S )
+{
+	log( Class $ ": ServerPrevWeapon" );
+}
+
+// The player wants to switch to the next weapon group.
+function ServerNextWeapon( float F, name N, string[255] S )
+{
+	log( Class $ ": ServerNextWeapon" );
+}
+
+// The player wants to fire.
+function ServerFire( float F, name N, string[255] S )
+{
+	if( Weapon!=None )
+		Weapon.Fire(1.0);
+	//else - if I've possessed a creature, use its attack
+}
+
+// The player wants to alternate-fire.
+function ServerAltFire( float F, name N, string[255] S )
+{
+	if( Weapon!=None )
+		Weapon.AltFire(1.0);
+}
+
+// Display inventory.
+function ServerDebugInv( float F, name N, string[255] S )
+{
+	local inventory Inv;
+	log( "DebugInv " $ Class );
+	log( "   Weapon: " $ Weapon.Class );
+	for( Inv=Inventory; Inv!=None; Inv=Inv.Inventory )
+		log( "   Inventory: " $ Inv.Class );
+}
+
+engine function Bump(actor Other)
+{
+	log(Other.class$" bumped "$class);
+	if (Enemy == Other)
+		bReadyToAttack = True; //can melee right away
+	SetEnemy(Pawn(Other));
+}
+
+engine function HearNoise(float Loudness, Actor NoiseMaker)
+{
+	local Vector HearingError;
+	if(NoisePerceived(NoiseMaker,Loudness))
+		{
+		HearingError = Max(500 - Stimulus, 0.0) * VRand();
+		HearingError.Z = 0.0;
+		if (Pawn(NoiseMaker) != None)
+			{
+			if (SetEnemy(Pawn(NoiseMaker)))
+				LastSeenPos = NoiseMaker.Location + HearingError; 
+			}
+		else if (NoiseMaker.instigator != None) 
+			{
+			if (SetEnemy(NoiseMaker.instigator))
+				LastSeenPos = NoiseMaker.Location + HearingError;
+			} 
+		}
+					
+}
+
+engine function SeePlayer(Actor SeenPlayer)
+{
+	//Check if in FOV
+	Log(class$" has line of sight to player");
+	
+	if (Pawn(SeenPlayer).Health > 0)
+		{
+		InFieldOfView(SeenPlayer); // set stimulus
+		if (stimulus > 0.0)
+			{
+			Log(class$" sees player!");
+			if (SetEnemy(Pawn(SeenPlayer)))
+				LastSeenPos = SeenPlayer.Location;
+			}
+		}
+	Enable('AnimEnd');		
+}
+
+engine function Die()
+{
+	Log(class$" got a message to die");
+	GoToState(Dying);			
+}
+
+engine function Damage( int Damage, Actor instigatedBy, Vector hitlocation, 
+						Vector momentum)
+{
+	Enable('AnimEnd'); //FIXME - smoothly go back to next animation 
+	//e.g. check in state's animend if current sequence is SeqTakeHit, if so do transition
+	//(only in subclass implementations)
+	  
+	Stimulus = 1.0;
+	Health -= Damage;
+	Log(class$" took damage - health is "$health);
+	Velocity += momentum/Mass; 
+	Physics = PHYS_Falling;  
+	NextAnim = NoName;
+	if (Health <= 0) GoToState(Dying);
+	else 
+	{
+	if (Pawn(instigatedBy) != None)
+		{
+		if(Pawn(instigatedBy).bIsPlayer) //change attitude to player
+			{ //FIXME - also frenzy or run away against non-players
+			if ((Health < 30) && 
+					(Aggressiveness * FRand() + BaseAggressiveness * FRand() > 0.5))	
+				{
+				AttitudeToPlayer = ATTITUDE_Frenzy;
+				Aggressiveness = 1.0;
+				}
+			else if (AttitudeToPlayer == ATTITUDE_Ignore) AttitudeToPlayer = ATTITUDE_Hate;
+			else if (AttitudeToPlayer == ATTITUDE_Threaten) AttitudeToPlayer = ATTITUDE_Hate;
+			else if (AttitudeToPlayer == ATTITUDE_Friendly) AttitudeToPlayer = ATTITUDE_Threaten;
+			}
+		SetEnemy(Pawn(instigatedBy)); 
+		}
+
+	if (Damage > 0.1 * Health)
+		{
+		NextAnim = 'TakeHit';
+		PlayTakeHit(); 
+		}
+	}	
+	MakeNoise(1.0); //FIXME - set appropriate loudness 
+
+}
+
+engine function Falling()
+	{
+		Physics = PHYS_Falling;
+		log(class$" Falling");
+	}
+	
+engine function Landed()
+	{
+		Physics = PHYS_Walking;
+		log(class$" Landed");
+	}
+
+engine function HitWall(vector HitNormal)
+	{
+		Log(class$" hit wall with normal "$HitNormal);
+	}
+		
+function bool SetEnemy( Pawn NewEnemy )
+{
+	local bool result;
+	local eAttitude newAttitude;
+	local bool noOldEnemy;
+	noOldEnemy = (Enemy == None);
+	
+	result = false;
+	newAttitude = AttitudeTo(NewEnemy);
+	log ("Attitude to potential enemy is "$newAttitude);
+	if ((noOldEnemy) && (newAttitude < ATTITUDE_Ignore))
+		{
+		result = true;
+		Enemy = NewEnemy;
+		}
+	else if (newAttitude == ATTITUDE_Friendly) //your enemy is my enemy
+		{
+		log("noticed a friend");
+		if (bool(NewEnemy.Enemy) && (noOldEnemy || (AttitudeTo(Enemy) > ATTITUDE_Frenzy)))
+			{
+			result = true;
+			log("his enemy is my enemy");
+			Enemy = NewEnemy.Enemy;
+			if (Enemy.bIsPlayer)
+				AttitudeToPlayer = NewEnemy.AttitudeTo(Enemy);
+			}
+		}
+	else if (Enemy == NewEnemy)
+		result = true;
+	else if (newAttitude < AttitudeTo(Enemy))
+		{
+		result = true;
+		OldEnemy = Enemy;
+		Enemy = NewEnemy;
+		}
+
+	if (result)
+		{
+		log(class$" has new enemy - "$enemy.class);
+		if (NoOldEnemy) //just acquired an enemy	
+			{
+			log(Class$" just acquired an enemy");
+			NextState = Acquisition;
+			Disable('SeePlayer');
+			Disable('HearNoise');
+			Enable('AnimEnd');
+			MakeNoise(1.0);
+			}
+		}
+	return result;
+}
+	
+/* InFieldOfView
+ Check if actor is in field of view (adjusted for sightradius and alertness)
+Note - be sure to initialize Alertness to appropriate value in any state which calls this
+function
+*/
+
+function int InFieldOfView(Actor seen)
+{
+	local int result;
+	local float FOV;
+	local float viewDist;
+	local float sightDist;
+	if (Enemy == seen)
+		sightDist = SightRadius * ((Pawn(seen)).visibility + 32) * 0.015;
+	else
+		sightDist = SightRadius * (Pawn(seen)).visibility * 0.0083125;
+		
+	result = 0;
+	//FIXME -try to just check sign first
+	//reduce up/down visibility
+	viewDist = size(seen.Location - Location);
+	if (viewDist > SightDist)
+		Stimulus = 0.0;
+	else
+		{
+		FOV = Normal(seen.Location - Location) Dot Vector(Rotation);
+		Stimulus = FOV - PeripheralVision + 0.707 * (Alertness + SightRadius/(viewDist * viewDist)); //FIXME - assumes excellent sightradius = 4000
+		Stimulus = Stimulus - viewDist/SightRadius; 
+		}
+	//log(class$" FOV = "$FOV);
+	if (Stimulus > 0.0)
+ 		result = 1;
+ 		
+ 	if (result == 1) 
+ 		log("target in FOV "$FOV);
+ 
+ 	return result;
+}
+
+/* NoisePerceived
+//FIXME - provide some hearing out of line of sight? (maybe PVS)
+// Reaction depends on creature hearing, distance to noise, noise loudness
+Note - be sure to initialize Alertness to appropriate value in any state which calls this
+function
+//add randomness
+*/
+function bool NoisePerceived(Actor Noisemaker, Float loudness)
+{
+	local float perceived;
+	local bool result;
+	result = false;
+
+	log(class$" listening for noise");	
+	perceived =  Loudness/Size(NoiseMaker.Location - Location); //FIXME use square of distance?
+	Stimulus = perceived - (1 - Alertness) * HearingThreshold;	
+	if (Stimulus > 0.0)
+		result = true;
+	
+	return result;	
+}
+
+/* RelativeStrength()
+returns a value indicating the relative strength of other
+0.0 = equal to self
+> 0 stronger than self
+< 0 weaker than self
+
+Since the result will be compared to the creature's aggressiveness, it should have a magnitude
+on the order of 0 to 2
+
+Assess based on health, armor, weapon, location, presence of teammates
+(but NOT aggressiveness)
+FIXME - add other components
+*/
+
+function float RelativeStrength(Pawn Other)
+{
+	local float compare;
+	
+	compare = (Other.health - health) * 0.01;
+	log(other.class$" relative strength to "$class$" is "$compare);
+	return compare;
+}
+	
+/* AttitudeTo
+Returns the creature's attitude towards another Pawn
+FIXME - add support for team membership in determination of attitude
+*/
+
+final function eAttitude AttitudeTo(Pawn Other)
+{
+	if (Other.bIsPlayer)
+		{
+		if (Intelligence > BRAINS_None)
+		if ((AttitudeToPlayer == ATTITUDE_Hate) || (AttitudeToPlayer == ATTITUDE_Threaten) 
+				|| (AttitudeToPlayer == ATTITUDE_Fear)) //check if afraid 
+			{
+			if (RelativeStrength(Other) > BaseAggressiveness + 0.2)
+				AttitudeToPlayer = ATTITUDE_Fear;
+			else if (AttitudeToPlayer == ATTITUDE_Fear)
+				AttitudeToPlayer = ATTITUDE_Hate;
+			}
+		return AttitudeToPlayer;
+		}
+	else if (bIsPlayer)
+		return Other.AttitudeToPlayer;
+	else
+		return AttitudeToCreature(Other); 
+}
+
+/* AttitudeToCreature
+Typically implemented in subclass
+*/
+
+function eAttitude AttitudeToCreature(Pawn Other)
+{
+	if (Other.Class == Class)
+		return ATTITUDE_Friendly;
+	else
+		return ATTITUDE_Ignore;
+}
+
+
+//=============================================================================
+// Player Control
+
+// Player view.
+// Compute the rendering viewpoint for the player.
+//
+engine function PlayerCalcView( out vector CameraLocation, out rotation CameraRotation )
+{
+	local Actor HitActor;
+	local vector View,HitLocation,HitNormal, Vel2D;
+	local float ViewDist, WallOutDist;
+	local float speed;
+
+	// View rotation.
+	CameraRotation = ViewRotation;
+
+	if( bBehindView ) //up and behind (for death scene)
+	{
+	    ViewDist    = 100;
+		WallOutDist = 30;
+		View = vect(1,0,0) >> CameraRotation;
+		if( Trace( HitLocation, HitNormal, Location - (ViewDist+WallOutDist) * vector(CameraRotation), Location ) != None )
+			ViewDist = Min( (Location - HitLocation) Dot View, ViewDist );
+		CameraLocation -= (ViewDist - WallOutDist) * View;
+	}
+	else
+	{
+		// First-person view.
+		CameraLocation = Location;
+		CameraLocation.Z += EyeHeight;
+
+		If (Physics == PHYS_Walking)
+		{
+			//add bobbing when walking
+			//FIXME - bob amplitude and rate should be pawn vars (for different creatures)
+			Vel2D = Velocity;
+			Vel2D.Z = 0.0;
+			speed = Size(Vel2D);
+			CameraLocation.Z += Bob * speed * speed * sin(8.0 *
+			 						Level.TimeSeconds );
+	
+			//FIXME - if walking, look up/down stairs
+		}
+	}
+}
+
+//Player Jumped
+engine function ServerJump( float F, name N, string[255] S )
+	{
+		if (Physics == PHYS_Walking)
+		{
+			Physics = PHYS_Falling;
+			Velocity.Z = JumpZ; 
+			log("Player Jumped! "$JumpZ);
+		}
+		//else if (Physics == PHYS_Swimming) //move up
+			
+	}
+
+engine function ServerFly( float F, name N, string[255] S )
+{
+	GotoState(CheatFlying);
+}
+
+engine function ServerWalk( float F, name N, string[255] S )
+{	
+	SetCollision(true, true , true);
+	Physics = PHYS_Falling;
+	bCollideWorld = true;
+	GotoState(PlayerWalking);	
+}
+
+engine function ServerGhost( float F, name N, string[255] S )
+{
+	SetCollision(false, false, false);
+	bCollideWorld = false;
+	GotoState(CheatFlying);
+}
+
+/* UpdateEyeHeight()
+Called separately from player tick because physics is done after player tick
+(to optimize responsiveness)
+*/
+engine function UpdateEyeHeight(float DeltaTime)
+{
+		local float smooth;
+		smooth = 8.0;
+		// Update eye height.
+		// smooth up stairs
+		If (Physics == PHYS_Walking)
+			EyeHeight = (EyeHeight - Location.Z + OldLocation.Z) * (1 - smooth * deltaTime) +
+							BaseEyeHeight * smooth * deltaTime;
+		else
+			EyeHeight = EyeHeight * ( 1 - smooth * deltaTime) +
+							BaseEyeHeight * smooth * deltaTime;
+	
+		//FIXME - clamp max eyeheight
+		if (EyeHeight < -0.5 * CollisionHeight)
+			EyeHeight = -0.5 * CollisionHeight;
+}
+
+// Player movement.
+// Player Standing, walking, running, falling.
+state PlayerWalking
+{
+ignores SeePlayer, HearNoise;
+		
+	engine function AnimEnd()
+	{
+	local vector X,Y,Z;
+	local float dir;
+	local rotation ViewYaw;
+	ViewYaw = Rotation;
+	ViewYaw.Pitch = 0;
+	GetAxes(ViewYaw,X,Y,Z);
+	
+	dir = Normal(Velocity) Dot X;
+	if (dir > 0.9)
+		{
+		if (Size(Velocity) < 0.5 * GroundSpeed)
+			PlayWalking();
+		else
+			PlayRunning();
+		}
+	else if (dir < -0.9)
+		PlayRetreating();
+	else //fixme - pick strafe direction here, since I've already got axes
+		PlayStrafing(); 
+	}
+	
+	function PlayerTick( float DeltaTime )
+	{
+		// Update acceleration.
+		local vector X,Y,Z;
+		GetAxes(Rotation,X,Y,Z);
+
+		aForward *= 0.1;
+		aStrafe  *= 0.1;
+		aLookup  *= 0.3;
+		aTurn    *= 0.3;
+
+		Acceleration = aForward*X + aStrafe*Y;  
+			
+		// Update rotation.
+		ViewRotation.Pitch += 32.0 * DeltaTime * aLookUp;
+		ViewRotation.Pitch = ViewRotation.Pitch & 65535;
+		If ((ViewRotation.Pitch > 18000) && (ViewRotation.Pitch < 49152))
+			{
+			If (aLookUp > 0) 
+				ViewRotation.Pitch = 18000;
+			else
+				ViewRotation.Pitch = 49152;
+			}
+		ViewRotation.Yaw += 32.0 * DeltaTime * aTurn;
+		Rotation.Yaw = ViewRotation.Yaw;
+	}
+
+Begin:
+	EyeHeight = BaseEyeHeight;
+	if (Physics != PHYS_Falling) Physics = PHYS_Walking;
+	NextState = PlayerWalking; 
+	if  (AnimRate == 0.0) PlayWalking();
+	Log("player walking");
+}
+
+state PlayerFlying
+{
+ignores SeePlayer, HearNoise;
+		
+	engine function AnimEnd()
+	{
+	local vector X,Y,Z;
+	local float dir;
+	local rotation ViewYaw;
+	ViewYaw = Rotation;
+	ViewYaw.Pitch = 0;
+	GetAxes(ViewYaw,X,Y,Z);
+	
+	dir = Normal(Velocity) Dot X;
+	if (dir > 0.9)
+		{
+		if (Size(Velocity) < 0.5 * GroundSpeed)
+			PlayWalking();
+		else
+			PlayRunning();
+		}
+	else if (dir < -0.9)
+		PlayRetreating();
+	else //fixme - pick strafe direction here, since I've already got axes
+		PlayStrafing(); 
+	}
+	
+	function PlayerTick( float DeltaTime )
+	{
+		// Update acceleration.
+		local vector X,Y,Z;
+		GetAxes(Rotation,X,Y,Z);
+
+		aForward *= 0.1;
+		aStrafe  *= 0.1;
+		aLookup  *= 0.3;
+		aTurn    *= 0.3;
+
+		Acceleration = aForward*X + aStrafe*Y;  
+		// Update rotation.
+		ViewRotation.Pitch += 32.0 * DeltaTime * aLookUp;
+		ViewRotation.Pitch = ViewRotation.Pitch & 65535;
+		If ((ViewRotation.Pitch > 18000) && (ViewRotation.Pitch < 49152))
+			{
+			If (aLookUp > 0) 
+				ViewRotation.Pitch = 18000;
+			else
+				ViewRotation.Pitch = 49152;
+			}
+		ViewRotation.Yaw += 32.0 * DeltaTime * aTurn;
+		Rotation.Yaw = ViewRotation.Yaw;
+	}
+
+Begin:
+	EyeHeight = BaseEyeHeight;
+	Physics = PHYS_Flying;
+	NextState = PlayerFlying; 
+	if  (AnimRate == 0.0) PlayWalking();
+	Log("player flying");
+}
+
+state CheatFlying
+{
+ignores SeePlayer, HearNoise;
+		
+	engine function AnimEnd()
+	{
+	local vector X,Y,Z;
+	local float dir;
+	local rotation ViewYaw;
+	ViewYaw = Rotation;
+	ViewYaw.Pitch = 0;
+	GetAxes(ViewYaw,X,Y,Z);
+	
+	dir = Normal(Velocity) Dot X;
+	if (dir > 0.9)
+		{
+		if (Size(Velocity) < 0.5 * GroundSpeed)
+			PlayWalking();
+		else
+			PlayRunning();
+		}
+	else if (dir < -0.9)
+		PlayRetreating();
+	else //fixme - pick strafe direction here, since I've already got axes
+		PlayStrafing(); 
+	}
+	
+	function PlayerTick( float DeltaTime )
+	{
+		// Update acceleration.
+		local vector X,Y,Z;
+		GetAxes(ViewRotation,X,Y,Z);
+
+		aForward *= 0.1;
+		aStrafe  *= 0.1;
+		aLookup  *= 0.3;
+		aTurn    *= 0.3;
+		aUp		 *= 0.1;
+	
+		Acceleration = aForward*X + aStrafe*Y + aUp*vect(0,0,1);  
+		MoveSmooth(Acceleration * DeltaTime);
+		// Update rotation.
+		ViewRotation.Pitch += 32.0 * DeltaTime * aLookUp;
+		ViewRotation.Pitch = ViewRotation.Pitch & 65535;
+		If ((ViewRotation.Pitch > 18000) && (ViewRotation.Pitch < 49152))
+			{
+			If (aLookUp > 0) 
+				ViewRotation.Pitch = 18000;
+			else
+				ViewRotation.Pitch = 49152;
+			}
+		ViewRotation.Yaw += 32.0 * DeltaTime * aTurn;
+		Rotation.Yaw = ViewRotation.Yaw;
+	}
+
+Begin:
+	EyeHeight = BaseEyeHeight;
+	Physics = PHYS_None;
+	NextState = CheatFlying; 
+	if  (AnimRate == 0.0) PlayWalking();
+	Log("cheat flying");
+}
+
+//===============================================================================
+// Common states for players and monsters (dying and death)
+		
+state Dying
+{
+ignores SeePlayer, HearNoise, Die;
+
+engine function Damage( int Damage, Actor instigatedBy, Vector hitlocation, 
+						Vector momentum)
+	{
+	Velocity += momentum/Mass;
+	Physics = PHYS_Falling;  
+	}
+
+engine function Landed()
+	{
+		Physics = PHYS_None;
+		log(class$" Landed while dying");
+	}
+
+Begin:
+	Log(class$" dying");
+	Physics = PHYS_Falling;
+	if (bIsPlayer) //play death scene in third person 
+		bBehindView = true;
+	NextState = 'Dead';
+	if (Owner != None)
+		Owner.Trigger(Self);
+	Disable('ServerJump');
+	Disable('ServerFire');
+	PlayDying();
+	FinishAnim();
+	GotoState(Dead);
+}
+
+state Dead
+{
+ignores Die, SeePlayer, HearNoise;
+
+engine function Damage( int Damage, Actor instigatedBy, Vector hitlocation, 
+						Vector momentum)
+	{
+	Velocity += momentum/Mass;   
+	Physics = PHYS_Falling;  
+
+	}
+
+function Callback(object Other)
+	{
+		Target = Actor(Other);
+	}
+	
+engine function Landed()
+	{
+		Physics = PHYS_None;
+		log(class$" Landed while dead");
+	}
+
+function ReStartPlayer()
+{
+	Broadcast(NoName,PlayerStart).Callme(Self);
+	SetLocation(Target.Location);
+	Velocity = vect(0,0,0);
+	Acceleration = vect(0,0,0);
+	Rotation = rot(0,0,0);
+	Health = 100;
+	bBehindView = false;
+	SetCollision(true, true , true);
+	GotoState(PlayerWalking);
+	//FIXME - should set rotation based on playerstart
+}
+
+engine function ServerJump( float F, name N, string[255] S )
+	{
+	if (bIsPlayer)
+		ReStartPlayer();
+	}
+
+engine function Timer( int TimerTicks )
+	{
+	if (bIsPlayer)
+		ReStartPlayer();
+	else
+		{
+		Destroy();
+		}	
+	}
+
+Begin:
+	Log(class$" died");
+	SetTimer(30.0,false); //remove creature or respawn player after 30 seconds
+	SetCollision(false, false, false);
+}
+
+//**********************************************************************************
+//Base Monster AI
+
+//Waiting:  default state for monsters
+//FIXME - need SeeMonster for other creatures
+auto state Waiting
+{	
+engine function AnimEnd()
+	{
+	Disable('AnimEnd');
+	if (NextState == 'Acquisition')
+		{
+		playAnim(SeqWaitingToFighter,0.2); //FIXME - speed based on skill
+		GotoState(Acquisition);
+		}
+	else if (NextState == 'WaitingGuard')
+		PlayWaitingGuard();
+	else if (NextState == 'WaitingAmbush')
+		PlayWaitingAmbush();
+	else if(NextState == 'Waiting')
+		PlayWaiting();
+	}
+ 
+engine function Landed()
+	{
+		Physics = PHYS_None;
+		log(class$" Landed");
+	}
+
+
+Begin:
+		Physics = PHYS_Falling; //make sure on ground
+		if (bIsPlayer) 
+			GotoState(PlayerWalking);  
+		if (Orders != NoName)
+			GotoState(Orders);
+		NextState = Waiting;
+		NextAnim = NoName;
+		Alertness = 0.0;
+		bReadyToAttack = false;
+		Log(class$" Waiting");
+
+AllWaiting:	
+		Enemy = None; 
+		Rotation.Pitch = 0;
+		Rotation.Roll = 0;
+		if (Physics != PHYS_Falling) Physics = PHYS_None;
+		if (AnimRate == 0.0) PlayWaiting();
+}
+
+
+
+state Roaming
+{
+engine function AnimEnd()
+	{
+	Disable('AnimEnd');
+	if (NextState == 'Acquisition')
+		{
+		playAnim(SeqWaitingToFighter,0.2);
+		GotoState(Acquisition);
+		}
+	else if (NextState == 'Roaming')
+		PlayWalking();
+	}
+
+/* PickedDestination()
+*/
+function vector PickedDestination()
+	{
+	local vector pick;
+	//FIXME - pick pathnode locations (make sure there is a routed path to them)
+	
+	pick = 500 * VRand();
+	//pick = Location + Reachable(pick) * (pick - Location);
+	pick.Z = FloorZ(pick);
+	if (Size(pick - Location) < 2 * CollisionRadius)
+		pick = Location + CollisionRadius * vector(Rotation);	
+	return pick;
+	}
+
+Begin:
+	NextState = Roaming; 
+	Alertness = 0.0;
+	bReadyToAttack = false;
+	Log(class$" Roaming");
+
+Roam: //FIXME -add stasis mode? - also set random start point in roam area
+	//FIXME - use routing to make roam successful
+	//FIXME - walk (1/3 speed), don't run
+	if (AnimRate == 0.0) PlayWalking();
+	MoveTo(PickedDestination());
+	Goto(Roam);
+}
+
+state Patroling
+{
+function GoAcquire()
+	{
+		playAnim(SeqWaitingToFighter,0.2);
+		GotoState(Acquisition);
+	}
+engine function AnimEnd()
+	{
+	Disable('AnimEnd');
+	if (NextState == 'Acquisition')
+		GoAcquire();
+	else if (NextState == 'Patroling')
+		PlayWalking();
+	else if (NextState == 'PatrolTurn')
+		PlayTurning();
+	else if (NextState == 'PatrolLook')
+		{
+		Enable('AnimEnd');
+		PlayPatrolStop();
+		}
+	
+	}
+
+Begin:
+	NextState = Patroling; 
+	Alertness = 0.0;
+	bReadyToAttack = false;
+	Log(class$" Patroling");
+	
+		
+
+Patrol: //FIXME -add stasis mode? - also set random start point in roam area
+	//FIXME - make patrol a special case of roam?
+	//FIXME - use routing to make roam successful
+	//FIXME - walk (1/3 speed), don't run
+	Broadcast(NoName, Patrolpoint).TellAboutTo(Self);
+	if (OrderObject != None)
+		{
+		log("Move to next patrol point");
+		if (AnimRate == 0.0) PlayWalking();
+		else
+			{
+			NextState = Patroling;
+			Enable('AnimEnd');
+			}
+		MoveTo(OrderObject.Location);
+		if (Patrolpoint(OrderObject) != None)
+			{
+			OrderTag = (Patrolpoint(OrderObject)).Nextpatrol;
+			if ((Patrolpoint(OrderObject)).pausetime > 0.0)
+				{
+				Enable('AnimEnd');
+				NextState = PatrolTurn;
+				TurnTo(Location + (Patrolpoint(OrderObject)).lookdir);
+				Enable('AnimEnd');
+				NextState = PatrolLook;
+				log("stop here for "$(Patrolpoint(OrderObject)).pausetime);
+				Sleep((Patrolpoint(OrderObject)).pausetime);
+				PlayWalking(); //FIXME play interpolated transition
+				}
+			Goto(Patrol);
+			}
+		}
+	else
+		{
+		NextState = PatrolLook;
+		if (AnimRate == 0.0) PlayPatrolStop();
+		Enable('AnimEnd');
+		}
+	}
+
+state Guarding
+{
+engine function AnimEnd()
+	{
+	Disable('AnimEnd');
+	if (NextState == 'Acquisition')
+		{
+		playAnim(SeqWaitingToFighter,0.2);
+		GotoState(Acquisition);
+		}
+	else if (NextState == 'MovingGuard')
+		PlayWalking();
+	else if (NextState == 'TurningGuard')
+		PlayTurning();
+	else if(NextState == 'Guarding')
+		{
+		Log("bad nextstate for guarding animend");
+		PlayFighter();
+		}
+	}
+
+ResumeGuarding: //get back in position to guard OrderObject
+	
+	if (LineOfSightTo(OrderObject))
+		if (size(Location - OrderObject.Location) < CollisionRadius + OrderObject.CollisionRadius + 200)
+			Goto('Turn');
+
+	NextState = MovingGuard;
+	PlayAnim(SeqFighterToMoving);			
+	MoveTo(0.5 * (Location + OrderObject.Location));
+	Goto(ResumeGuarding);
+	
+Turn:
+	if (bool(Enemy))
+		{
+		NextState = TurningGuard;
+		TurnTo(LastSeenPos);
+		}
+Begin:
+	NextState = WaitingGuard; 
+	Alertness = 0.0;
+	bReadyToAttack = false;
+	Log(class$" Guarding"$OrderObject.class);
+	GotoState(Waiting, 'AllWaiting'); 
+}
+
+state Ambushing
+{
+engine function AnimEnd()
+	{
+	local Ambushpoint oldspot;
+	Disable('AnimEnd');
+	if (NextState == 'Ambushing')
+		{
+		playFighter();
+		}
+	else if (NextState == 'AmbushMove')
+		PlayWalking();
+	else if (NextState == 'AmbushTurn')
+		PlayTurning();
+	else if(NextState == 'Acquisition')
+		{
+		oldspot = Ambushpoint(OrderObject);
+		if (oldspot != None)
+			oldspot.taken = false;
+		playAnim(SeqWaitingToFighter,0.2);
+		GotoState(Attacking);
+		}
+	}
+
+FindAmbushSpot:
+	OrderObject = None; //clear old ambush point
+	if ((Enemy == None) || (FRand() < 0.7))
+		Broadcast(NoName, Ambushpoint).TellAboutTo(Self);
+
+Begin:
+	
+	if (OrderObject != None)
+		{
+		Physics = PHYS_Walking;
+		NextState = AmbushMove;
+		Enable('AnimEnd');
+		MoveTo(OrderObject.Location);
+		NextState = AmbushTurn;
+		Enable('AnimEnd');	
+		TurnTo(Location + (Ambushpoint(OrderObject)).lookdir);
+		Enemy = None; 
+		}
+	else if (Enemy != None)
+		{
+		Physics = PHYS_Walking;
+		NextState = AmbushTurn;
+		Enable('AnimEnd');
+		TurnTo(0.5 * (Enemy.Location + LastSeenPos));
+		Enemy = None; 
+		}
+	
+	NextState = WaitingAmbush;
+	Alertness = 1.0;
+	bReadyToAttack = true;
+	Log(class$" waiting in ambush");
+	GotoState(Waiting, 'AllWaiting'); 
+}
+	
+/* Acquisition - 
+Creature has just reacted to stimulus, and set an enemy
+- depending on strength of stimulus, and ongoing stimulii, vary time to focus on target and start attacking (or whatever.  FIXME - need some acquisition specific animation
+HearNoise and SeePlayer used to improve/change stimulus
+*/
+
+state Acquisition
+{
+engine function HearNoise(float Loudness, Actor NoiseMaker)
+{
+	local float OldStimulus;
+	local Vector HearingError;
+
+	OldStimulus = Stimulus;
+	if(NoisePerceived(NoiseMaker,Loudness))
+		{
+		HearingError = Max(500 - Stimulus, 0.0) * VRand();
+		HearingError.Z = 0.0;
+		if (Stimulus > OldStimulus)
+			{
+			if (Pawn(NoiseMaker) != None)
+				{ 
+				if (SetEnemy(Pawn(NoiseMaker)))
+					LastSeenPos = NoiseMaker.Location + HearingError;
+				}				
+			else if (NoiseMaker.instigator != None)
+				{
+				if (SetEnemy(NoiseMaker.instigator))
+					LastSeenPos = NoiseMaker.Location + HearingError;
+				}				
+			} 
+		else  Stimulus = OldStimulus;			
+	}
+}
+
+engine function SeePlayer(Actor SeenPlayer)
+{
+	local float OldStimulus;
+
+	OldStimulus = Stimulus;
+		
+	if (Pawn(SeenPlayer).Health > 0)
+		{  
+		InFieldOfView(SeenPlayer);
+		if (Stimulus > 0.0)
+			{
+			if (Stimulus > OldStimulus)
+				{
+				if (SetEnemy(Pawn(SeenPlayer)))
+					LastSeenPos = SeenPlayer.Location;
+				}
+			}
+		else
+			Stimulus = OldStimulus;
+		}
+	SightCounter = SightCounter + 0.2; //longer interval when acquiring
+		
+} 
+
+engine function AnimEnd()
+{
+	if (NextState == 'Attacking')
+		{
+		PlayFighter();
+		GotoState(Attacking, SetAttackTimer);
+		}
+	else if (NextState == 'Ambushing')
+		{
+		PlayFighter();
+		GotoState(Ambushing);
+		}
+	else
+		{
+		PlayTurning(); 
+		Disable('AnimEnd');
+		}
+}
+
+Begin:
+	Alertness = -1.0; //acquire only when extremely visible
+	Log("Acquiring enemy");
+	Physics = PHYS_Walking;
+	Log("Enemy position = "$Enemy.Location);
+	Log("Last seen position = "$LastSeenPos);
+	TurnTo(LastSeenPos); 
+	Sleep(0.5); //FIXME - base on difficulty
+	Log("Focus = "$Focus);
+	Log("Stimulus = "$Stimulus);
+	if (LineOfSightTo(Enemy))
+		{
+		InFieldOfView(Enemy); 
+		LastSeenPos = Enemy.Location; 
+		If (stimulus <= 0.0)
+			{
+			LastSeenPos.X = LastSeenPos.X + 200 * FRand();
+			LastSeenPos.Y = LastSeenPos.Y + 200 * FRand();
+			Goto(Begin);
+			}
+		else
+			{
+			Log("Enemy Acquired!");
+			NextState = Attacking;
+			Enable('AnimEnd');
+			}
+		}
+	else
+		{
+		if (AttitudeTo(Enemy) == ATTITUDE_Fear)  //will run away from noise
+			{
+			Log("Run away from noise");
+			NextState = Attacking;
+			Enable('AnimEnd');
+			}
+		else if (BaseAggressiveness + Aggressiveness < 0.0)
+			{
+			Log("try to ambush noisemaker");
+			TurnTo(0.5 * (Enemy.Location + LastSeenPos));
+			NextState = Ambushing;
+			Enable('AnimEnd');
+			}
+		else if ((Intelligence > BRAINS_Reptile) && (FRand() > 0.5)) 
+			{ //smart, aggressive creatures may ambush or investigate
+			Log("ambush noisemaker");
+			TurnTo(0.5 * (Enemy.Location + LastSeenPos));
+			NextState = Ambushing;
+			Enable('AnimEnd');
+			}
+		else //investigate noise
+			{
+			Log("investigate noise");
+			MoveTo(LastSeenPos);
+			LastSeenPos = Enemy.Location;
+			Goto(Begin);
+			}
+		}
+}
+
+/* Attacking
+Master attacking state - choose which type of attack to do from here
+*/
+state Attacking
+{
+ignores SeePlayer, HearNoise;
+
+function ChooseAttackMode()
+	{
+	local bool bFoundState;
+	local eAttitude AttitudeToEnemy;
+	local float Aggression;
+	bFoundState = false;
+	AttitudeToEnemy = AttitudeTo(Enemy);
+
+	//play transition from base attack position to appropriate for chosen attack state
+	if (Enemy.Health <= 0)
+		{
+		bFoundState = true;
+		if (bool(OldEnemy)) 
+			{
+			Enemy = OldEnemy;
+			OldEnemy = None;
+			PlayAnim(SeqFighterToMoving);
+			NextState = Hunting;
+			GotoState(Hunting);
+			}
+		else
+			{
+			NextState = VictoryDance;
+			GotoState(VictoryDance);
+			}
+		}
+		
+		
+	else if (AttitudeToEnemy == ATTITUDE_Fear)
+		{
+		bFoundState = true;
+		PlayAnim(SeqFighterToMoving);
+		NextState = Retreating;
+		GotoState(Retreating);
+		}
+
+	else if (AttitudeToEnemy == ATTITUDE_Threaten)
+		{
+		bFoundState = true;
+		PlayFighter();
+		NextState = Threatening;
+		GotoState(Threatening);
+		}
+
+	//FIXME - can I get enemy not visible info from engine function? not guaranteed?
+	else if (!LineOfSightTo(Enemy))
+		{
+		bFoundState = true;
+		if (Orders == 'Guarding')
+			{
+			PlayFighter();
+			GotoState(Guarding, 'ResumeGuarding');
+			}
+		else if (Aggressiveness + BaseAggressiveness > FRand() - 1.0)
+			{ //hunt, or if smart, decide if to ambush - FIXME also base on skill
+			if ((Intelligence > BRAINS_REPTILE) &&
+				(RelativeStrength(Enemy) 
+					> Aggressiveness + BaseAggressiveness - FRand() + 1.0))
+				{
+				PlayFighter();
+				NextState = Ambushing;
+				GotoState(Ambushing, 'FindAmbushSpot');
+				}
+			else
+				{
+				PlayAnim(SeqFighterToMoving);
+				NextState = Hunting;
+				GotoState(Hunting);
+				}
+			}
+		else
+			{
+			PlayFighter();
+			NextState = Ambushing;
+			GotoState(Ambushing, 'FindAmbushSpot');
+			}	
+		}	
+	
+	else if (bReadyToAttack)
+		{
+		bFoundState = true;
+		bReadyToAttack = false;
+		Log("Attack!");
+		Target = Enemy;
+		If (Size(Enemy.Location - Location) <= (MeleeRange + Enemy.CollisionRadius + 			CollisionRadius))
+			{
+			NextState = MeleeAttack;
+			GotoState(MeleeAttack);
+			}
+		else if (bHasRangedAttack)
+			{
+			NextState = RangedAttack;
+			GotoState(RangedAttack);
+			}
+		else
+			{
+			log("can't attack");
+			bReadyToAttack = true;
+			bFoundState = false;
+			}
+		}
+		
+	if (!bFoundState) //decide whether to snipe, charge, or make a tactical move
+		{
+		Aggression = Aggressiveness + BaseAggressiveness + 2 * FRand() - 1.0;
+		if (!bHasRangedAttack) 
+			Aggression = 2.0;
+		else if (Location.Z > Enemy.Location.Z + 160) //tactical height advantage
+			Aggression -= 1.0;
+		//FIXME - also base decision on enemy weapon, if human intelligence
+		//FIXME - also check if enemy is retreating
+		if (Aggression < 0.5) //Snipe or Tactical move, depending on skill level
+			{ 
+			if (Frand() < 0.3) //FIXME- should be based on skill level (higher skills move more)
+				{
+				NextState = Sniping;
+				PlayAnim(SeqFighterToMoving);
+				GotoState(Sniping);
+				}
+			else
+				{
+				NextState = TacticalMove;
+				PlayAnim(SeqFighterToMoving);
+				GotoState(TacticalMove);
+				}
+			}
+		else //charge!
+			{
+			NextState = Charging;
+			PlayAnim(SeqFighterToMoving);
+			GotoState(Charging);
+			}
+		}
+	Log("Next state is "$NextState);
+	}
+
+engine function AnimEnd()
+	{
+	ChooseAttackMode();
+	}
+
+//EnemyNotVisible implemented so engine will update LastSeenPos
+function EnemyNotVisible()
+	{
+	Log("enemy not visible");
+	}
+
+engine function Timer( int TimerTicks )
+	{
+	bReadyToAttack = True;
+	}
+
+SetAttackTimer:
+	Log(class$" set attack timer");
+	SetTimer(TimeBetweenAttacks  * (1.0 + FRand()),false); //FIXME vary based on skill level
+	
+Begin:
+	if (TimerCounter >= TimerRate) Log("attack timer not reset");
+	Log(class$" Attacking");
+	if (Physics != PHYS_Falling) Physics = PHYS_Walking;
+	Acceleration = vect(0,0,0);
+	if (AnimRate == 0.0) ChooseAttackMode();
+	TurnToward(Enemy);
+}
+
+state Threatening
+{
+//ignores SeePlayer if enemy is a player //but not hear noise
+engine function AnimEnd() 
+	{
+	if (AttitudeTo(Enemy) != ATTITUDE_Threaten)
+		{
+		PlayFighter();
+		GotoState(Attacking, SetAttackTimer);
+		}
+	else if (NextState == 'Ambushing')
+		{
+		PlayFighter();
+		GotoState(Ambushing);
+		}
+	else if (NextState == 'Threatening')
+		PlayThreatening();
+	else if (NextState == 'ThreatenAdvance')
+		PlayWalking();
+	}
+
+function EnemyNotVisible()
+	{
+	Log("enemy not visible");
+	NextState = 'Ambushing';
+	Enable('AnimEnd'); 
+	}
+
+
+Begin:
+	if (Enemy.bIsPlayer)
+		Disable('SeePlayer'); //but not hear noise
+	//FIXME - if guarding, get mad if enemy gets too close to order object
+	//also, if guarding, stay between guard object and enemy
+	TurnToward(Enemy);
+	Sleep(1.0);
+	if (Orders == 'Guarding')
+		{ //stay between enemy and guard object
+		If (Enemy.bIsPlayer &&
+			(Size(Enemy.Location - OrderObject.Location) < OrderObject.CollisionRadius + 3 * CollisionRadius + MeleeRange))
+				{
+				AttitudeToPlayer = ATTITUDE_Hate;
+				Goto(Begin);
+				}
+		}
+	else if (FRand() < 1.4 - Aggressiveness - BaseAggressiveness) //mostly just turn
+		Goto(Begin);
+	else if (Size(Enemy.Location - Location) < 2.5 * (CollisionRadius + Enemy.CollisionRadius + MeleeRange))
+		Goto(Begin);
+	Disable('AnimEnd');
+	FinishAnim();
+	NextState = ThreatenAdvance;
+	PlayAnim(SeqFighterToMoving); 
+	FinishAnim();
+	NextState = ThreatenAdvance;
+	PlayWalking();
+	Enable('AnimEnd');
+	if (Orders == 'Guarding') //stay between enemy and guard object
+		MoveTo(OrderObject.Location + (OrderObject.CollisionRadius + 2.5 * CollisionRadius) * Normal(Enemy.Location - OrderObject.Location));
+	else
+		MoveTo(Location + 0.5 * (Enemy.Location - Location));
+	Disable('AnimEnd');
+	FinishAnim();
+	if (AttitudeTo(Enemy) != ATTITUDE_Threaten)
+		{
+		PlayFighter();
+		GotoState(Attacking, SetAttackTimer);
+		}
+	else
+		{
+		PlayAnim(SeqMovingToFighter);
+		NextState = Threatening;
+		Enable('AnimEnd');
+		Goto(Begin);
+		}
+}
+
+state Retreating
+{
+ignores SeePlayer, HearNoise;
+
+engine function Damage( int Damage, Actor instigatedBy, Vector hitlocation, 
+						Vector momentum)
+{
+	CallGlobal.Damage(Damage, instigatedBy, hitlocation, momentum);
+	if (NextAnim == 'TakeHit')
+		GotoState(Attacking, SetAttackTimer); //re-assess what to do
+}
+
+engine function AnimEnd() 
+	{
+	if (NextState == 'Retreating')
+		{
+		PlayRunning();
+		Disable('AnimEnd');
+		} 
+	else if (NextState == 'Attacking')
+		{
+		PlayAnim(SeqMovingToFighter);
+		GotoState(Attacking, 'SetAttackTimer'); //FIXME - use timer here
+		}
+	}
+
+function vector PickedDestination()
+	{
+	local vector pick;
+	
+	pick = 200 * Frand() * VRand() + 300 * FRand() * Normal(Location - Enemy.Location);
+	pick.Z = FloorZ(pick);
+	//pick = Location + Reachable(pick) * (pick - Location);
+	if (Size(pick - Location) < 2 * CollisionRadius)
+		pick = Location + CollisionRadius * vector(Rotation);	
+	return pick;
+	}
+
+Begin:
+	//FIXME - use routing -retreat to base
+	//then stop being afraid - also heal slowly at base
+	//FIXME - have higher skill/IQ creatures strafe backwards, while firing
+	MoveTo(PickedDestination()); 
+	Goto(Begin);
+}
+
+state Charging
+{
+ignores SeePlayer, HearNoise;
+
+engine function HitWall(vector HitNormal)
+{
+	local float reachdist;
+	local vector hitleft, HitLocation, TraceNormal, AlongWall;
+	local actor HitActor;
+	
+	//reachdist = Reachable(Enemy.Location);
+	log("Charging "$class$" hit wall");
+	if (reachdist < 1.0)
+	{
+		log("try to slide off corner");
+		//FIXME - use navigation when available
+		//FIXME - give up charge if not possible to reach
+		//FIXME - should global HitWall do this?
+		//FIXME - flying/swimming creatures will need up/down attempt too
+		AlongWall.X = HitNormal.Y;
+		AlongWall.Y = -1 * HitNormal.X;
+		AlongWall.Z = 0;
+		
+		HitActor = Trace(HitLocation, TraceNormal, 
+		 		(Location + AlongWall * CollisionRadius) , Enemy.Location, true);
+		hitleft = HitLocation;
+		HitActor = Trace(HitLocation, TraceNormal, 
+		 		(Location - AlongWall * CollisionRadius) , Enemy.Location, true);
+		 		
+		if (size(hitleft - Location) > size(HitLocation - Location))
+			LastSeenPos = Location + AlongWall * CollisionRadius; //go left
+		else
+			LastSeenPos = Location - AlongWall * CollisionRadius; //go right
+		
+		GotoState(Charging, 'StepOut');
+	}
+}
+					
+engine function Damage( int Damage, Actor instigatedBy, Vector hitlocation, 
+						Vector momentum)
+{
+	CallGlobal.Damage(Damage, instigatedBy, hitlocation, momentum);
+	if (NextAnim == 'TakeHit')
+		GotoState(Attacking); //re-assess what to do
+}
+
+engine function AnimEnd() 
+	{
+	if (NextState == 'ChargeTurning')
+		{
+		PlayTurning();
+		Disable('AnimEnd');
+		}
+	else if (NextState == 'Charging')
+		{
+		PlayRunning();
+		Disable('AnimEnd');
+		}
+	else if (NextState == 'MovingAttack')
+		{
+		PlayMovingAttack();
+		}
+	else if (NextState == 'Attacking')
+		{
+		PlayAnim(SeqMovingToFighter);
+		GotoState(Attacking);
+		}
+	}
+
+engine function Timer( int TimerTicks )
+	{
+	bReadyToAttack = True;
+
+	if (Size(Enemy.Location - Location) 
+			<= (MeleeRange + Enemy.CollisionRadius + CollisionRadius))
+		{ 
+		NextState = Attacking;
+		Enable('AnimEnd');
+		}
+
+	if (bMovingRangedAttack && (FRand() < 0.7)) //FIXME - make decision skill based
+		{
+		NextState = MovingAttack;
+		NextAnim = NoName; //reset, so moving attack can use it
+		Enable('AnimEnd');
+		}
+	else if (bHasRangedAttack)
+		{ 
+		if (Aggressiveness + BaseAggressiveness > 3 * FRand()) //then keep charging
+			SetTimer(1.5,false); 
+		else
+			{
+			NextState = Attacking;
+			Enable('AnimEnd');
+			}
+		}
+	}
+
+function EnemyNotVisible()
+	{
+	Log("enemy not visible");
+	NextState = 'Hunting';
+	GotoState(Hunting); //no animation transition needed
+	}
+
+StepOut:
+	Sleep(0.05);
+	Disable('HitWall');
+	StrafeFacing(LastSeenPos, Enemy); //don't change anim (short move)
+	Enable('HitWall');
+	Goto('CloseIn');
+		
+Begin:
+
+	Log(class$ " charging");
+	if (AnimRate == 0.0) PlayRunning();
+
+Charge:
+	NextState = 'ChargeTurning';
+	TurnToward(Enemy);
+	NextState = 'Charging';
+	Enable('AnimEnd');
+	
+CloseIn:
+	MoveToward(Enemy);
+	Log("Got to enemy");
+	if (bReadyToAttack) 
+		{
+		NextState = Attacking;
+		Enable('AnimEnd');
+		MoveToward(Enemy);
+		}		
+	else Goto(Charge);
+}
+
+state TacticalMove
+{
+ignores SeePlayer, HearNoise;
+
+engine function Damage( int Damage, Actor instigatedBy, Vector hitlocation, 
+						Vector momentum)
+{
+	CallGlobal.Damage(Damage, instigatedBy, hitlocation, momentum);
+	if (NextAnim == 'TakeHit')
+		GotoState(Attacking); //re-assess what to do
+}
+
+engine function AnimEnd() 
+	{
+	local float dir;
+	
+	if (NextState == 'TacticalStrafeMove')
+	{
+		dir = Normal(Destination - Location) Dot Normal(Enemy.Location - Location);
+		if (dir > 0.9)
+			PlayRunning();
+		else if (dir < -0.9)
+			PlayRetreating();
+		else 
+			PlayStrafing(); 
+	}
+ 	else if (NextState == 'TacticalMove')
+ 		PlayRunning();
+	else if (NextState == 'Attacking')
+		{
+		PlayAnim(SeqMovingToFighter);
+		GotoState(Attacking);
+		}
+	}
+
+engine function Timer( int TimerTicks )
+	{
+	bReadyToAttack = True;
+//	if (bStrafingRangedAttack && (NextState == 'TacticalStrafeMove') && (FRand() < 0.75)) //FIXME - make decision skill based
+//		{
+//		NextState = MovingAttack;
+//		NextAnim = NoName; //reset, so moving attack can use it
+//		Enable('AnimEnd');
+//		}
+// else
+	if (bHasRangedAttack || (Size(Enemy.Location - Location) 
+			<= (MeleeRange + Enemy.CollisionRadius + CollisionRadius)))
+		{ 
+		NextState = Attacking;
+		Enable('AnimEnd');
+		}
+	}
+
+function EnemyNotVisible()
+	{
+	Log("enemy not visible");
+	NextState = 'Attacking';
+	Enable('AnimEnd');
+	}
+
+/* PickedDestination()
+Choose a destination for the tactical move, based on aggressiveness and the tactical
+situation. Make sure destination is reachable
+FIXME - if enemy reachable, don't jump down to non-reachable location 
+maybe never jump down below enemy unless he's reachable from destination
+*/
+function vector PickedDestination()
+	{
+	local vector pick;
+	local float aggression;
+	
+	aggression = Aggressiveness + BaseAggressiveness + 2.0 * FRand() - 1.0;
+	pick = 300 * Frand() * VRand() + 100 * FRand() * aggression * Normal(Enemy.Location - Location);
+	pick.Z = FloorZ(pick);
+	log("started with pick "$pick);
+	//pick = Location + Reachable(pick) * (pick - Location);
+	log("adjusted to pick "$pick);
+	if (Size(pick - Location) < 2 * CollisionRadius)
+		pick = Location + CollisionRadius * vector(Rotation);	
+	return pick;
+	}
+
+Begin:
+
+	Log(class$ " moving tactically");
+	if (!bCanStrafe || (Frand() > 0.75)) //FIXME - make skill based (and also based on angle of move)
+		MoveTo(PickedDestination());
+	else
+		{
+		NextState = TacticalStrafeMove;
+		StrafeFacing(PickedDestination(), Enemy);	
+		}
+	
+	if (FRand() < 0.9) 
+		{
+		Log(class$ "done with move");
+		NextState = Attacking;
+		Enable('AnimEnd');
+		MoveToward(Enemy); 
+		//FIXME - instead, play transition to fighter (slowly), from whatever
+		//frame I am at currently, and go to attacking immediately
+		// - use the interpolation capability
+		}
+	else // possibility of multiple combined tacticalmoves (w/ no return to Attacking)
+		Goto(Begin);
+}
+
+state Sniping
+{
+ignores SeePlayer, HearNoise;
+
+engine function Damage( int Damage, Actor instigatedBy, Vector hitlocation, 
+						Vector momentum)
+{
+	CallGlobal.Damage(Damage, instigatedBy, hitlocation, momentum);
+	GotoState(Attacking); //re-assess what to do
+}
+
+engine function AnimEnd() 
+	{
+	if (NextState == 'Sniping')
+		{
+		PlayTurning();
+		Disable('AnimEnd');
+		}
+	else if (NextState == 'Attacking')
+		{
+		PlayAnim(SeqMovingToFighter);
+		GotoState(Attacking);
+		}
+	}
+
+engine function Timer( int TimerTicks )
+	{
+	log("Attack timer sprung in Sniping");
+	bReadyToAttack = True;
+	NextState = Attacking;
+	Enable('AnimEnd');
+	}
+
+function EnemyNotVisible()
+	{
+	Log("enemy not visible");
+	NextState = 'Attacking';
+	Enable('AnimEnd');
+	}
+	
+Begin:
+
+	Log(class$ " sniping");
+	if (AnimRate == 0.0) PlayTurning();
+
+Snipe:
+	Acceleration = vect(0,0,0);
+	TurnToward(Enemy);
+	if (bReadyToAttack) 
+		{
+		NextState = Attacking;
+		Enable('AnimEnd');
+		}		
+	Goto(Snipe);
+}
+
+state Hunting
+{
+engine function Damage( int Damage, Actor instigatedBy, Vector hitlocation, 
+						Vector momentum)
+{
+	CallGlobal.Damage(Damage, instigatedBy, hitlocation, momentum);
+	if (NextAnim == 'TakeHit')
+		GotoState(Attacking); //re-assess what to do
+}
+
+engine function AnimEnd() 
+{
+	if (NextState == 'Hunting')
+		{
+		PlayRunning();
+		Disable('AnimEnd');
+		}
+	else if (NextState == 'Attacking')
+	{ //play transition to next state
+		playAnim(SeqMovingToFighter);
+		GotoState(Attacking);
+	}
+}
+
+function bool SetEnemy(Pawn NewEnemy)
+{
+	local bool result;
+	result = false;
+	if (CallGlobal.SetEnemy(NewEnemy))
+		{
+		result = true;
+		if ((!bReadyToAttack) || (!bHasRangedAttack))
+			GotoState(Charging); // no animation transition needed
+		else
+			{
+			NextState = Attacking;
+			Disable('SeePlayer');
+			Disable('HearNoise');
+			Enable('AnimEnd');
+			}
+		}
+	return result;
+} 
+
+engine function Timer( int TimerTicks )
+{
+	bReadyToAttack = true;
+}
+
+
+Begin:
+	Log(class$" Hunting"); //FIXME put a moveto here, with a seeplayer engine function above
+	//FIXME - marker for debugging
+	Alertness = 0.5;
+	//Spawn(StingerProjectile ,NoName,
+	//		LastSeenPos,Rotation(Enemy.Location - LastSeenPos));
+	if (AnimRate == 0.0) PlayRunning();
+
+Follow:
+	MoveTo(LastSeenPos); //first time, its the actual last seen position
+	If (NextState != 'Attacking') //I haven't seen him
+		{
+		LastSeenPos = Enemy.Location; //best hope for following (without routing)
+		Goto(Follow);
+		}
+
+PreAttack:
+		Log("Coming out of hunting in pre-attack mode");
+		MoveToward(Enemy);
+		Goto(PreAttack);
+	
+}
+
+//MeleeAttack and RangedAttack are implemented in the subclasses
+// Except that DamageTarget is inherited by all
+
+state MeleeAttack
+{
+ignores SeePlayer, HearNoise;
+/* DamageTarget
+check if attack hit target, and if so damage it
+*/
+
+function DamageTarget(int hitdamage)
+{
+	local vector TargetDir;
+	local float TargetDist;
+	TargetDir = Normal(Target.Location - Location);
+	TargetDist = Size(Target.Location - Location);
+	log("Melee damage by "$class$" to "$Target.class);
+	If (TargetDist <= (MeleeRange + Target.CollisionRadius + CollisionRadius)) //still in melee range
+		{
+		log("Its close enough");
+		If (vector(Rotation) Dot TargetDir < 0.9)	
+		//FIXME - also do trace 
+			Target.Damage(hitdamage, Self,Target.Location,
+				(1000.0 * float(hitdamage) * 0.5 * (TargetDir + vect(0,0,1))));
+		}
+}
+
+function EnemyNotVisible()
+	{
+	Log("enemy not visible");
+	GotoState(Attacking, SetAttackTimer);
+	}
+	
+Begin:
+	Log(class$" has no Melee Attack");
+	GotoState(RangedAttack);
+}
+
+state RangedAttack
+{
+ignores SeePlayer, HearNoise;
+/* RayDamageTarget
+check if ray (instant) attack hit target, and if so damage it
+If ranged attack uses projectile, its impact will trigger the damage
+*/
+function RayDamageTarget(int hitdamage, vector RayDir)
+{
+	local actor HitActor;
+	local vector HitLocation, HitNormal, TargetPoint;
+	
+	TargetPoint = Location + RayDir * Max(2000, Size(Target.Location - Location));
+	
+	HitActor = Trace(HitLocation, HitNormal, Location, Target.Location, true);
+	if( HitActor!=None && HitActor!=Level )
+		 {
+	 		Log("Ray from "$class$" hit "$target.class);
+	 		Target.Damage(hitdamage, Self,Target.Location,
+				(1000.0 * float(hitdamage) * (Normal(Target.Location - Location) + vect(0,0,1))));
+		}
+}
+
+function EnemyNotVisible()
+	{
+	Log("enemy not visible");
+	}
+
+Begin:
+	Log(class$" has no Ranged Attack");
+	GotoState(Attacking);
+}
+
+state VictoryDance
+{
+ignores SeePlayer, HearNoise;
+
+Begin:
+	Log(class$" Victory dance");
+	Rotation.Pitch = 0;
+	Rotation.Roll = 0;
+
+	FinishAnim();
+	PlayVictoryDance();
+	GotoState(Waiting); //fixme - should be auto
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Camera=None
+      Player=None
+      PlayerName=""
+      Team=""
+      StatusBar=None
+      Weapon=None
+      ViewRotation=(0,0,0)
+      MaxPitch=0
+      BaseEyeHeight=+00000.000000
+      EyeHeight=+00000.000000
+      Bob=+00000.000100
+      OrthoZoom=+00000.000000
+      FovAngle=+00095.000000
+      ShowFlags=0
+      RendMap=0
+      Misc1=0
+      Misc2=0
+      DieCount=0
+      ItemCount=0
+      KillCount=0
+      SecretCount=0
+      AmmoCount(0)=0
+      AmmoCount(1)=0
+      AmmoCount(2)=0
+      AmmoCount(3)=0
+      AmmoCount(4)=0
+      AmmoCount(5)=0
+      AmmoCount(6)=0
+      AmmoCount(7)=0
+      AmmoCount(8)=0
+      AmmoCount(9)=0
+      AmmoCapacity(0)=250
+      AmmoCapacity(1)=100
+      AmmoCapacity(2)=500
+      AmmoCapacity(3)=900
+      AmmoCapacity(4)=0
+      AmmoCapacity(5)=0
+      AmmoCapacity(6)=0
+      AmmoCapacity(7)=0
+      AmmoCapacity(8)=0
+      AmmoCapacity(9)=0
+      NaturalArmor(0)=+00000.000000
+      NaturalArmor(1)=+00000.000000
+      NaturalArmor(2)=+00000.000000
+      NaturalArmor(3)=+00000.000000
+      Armor(0)=+00000.000000
+      Armor(1)=+00000.000000
+      Armor(2)=+00000.000000
+      Armor(3)=+00000.000000
+      HealRate=+00000.000000
+      bCanPossess=True
+      bLocalMovement=False
+      bLocalRotation=False
+      bBehindView=False
+      bIsPlayer=False
+      bReadyToAttack=False
+      bHasRangedAttack=False
+      bMovingRangedAttack=False
+      bCanStrafe=False
+      SightRadius=+04100.000000
+      PeripheralVision=+00000.000000
+      Noise=+00000.000000
+      HearingThreshold=+00000.000000
+      Visibility=0
+      Orders=None
+      OrderTag=None
+      OrderObject=None
+      LastSeenPos=(+00000.000000,+00000.000000,+00000.000000)
+      TimeBetweenAttacks=+00001.000000
+      MeleeRange=+00000.000000
+      Alertness=+00000.000000
+      NextAnim=None
+      SightCounter=+00000.000000
+      Stimulus=+00000.000000
+      Enemy=None
+      Aggressiveness=+00000.000000
+      BaseAggressiveness=+00000.000000
+      AttitudeToPlayer=ATTITUDE_Hate
+      Intelligence=BRAINS_MAMMAL
+      OldEnemy=None
+      MoveTarget=None
+      NextState=None
+      Destination=(+00000.000000,+00000.000000,+00000.000000)
+      Focus=(+00000.000000,+00000.000000,+00000.000000)
+      DesiredSpeed=+00000.000000
+      SeqWaitingToFighter=None
+      SeqFighterToWaiting=None
+      SeqFighterToMoving=None
+      SeqMovingToFighter=None
+      GroundSpeed=+03200.000000
+      WaterSpeed=+00200.000000
+      AirSpeed=+00000.000000
+      Health=+00100.000000
+      AccelRate=+00300.000000
+      JumpZ=+00280.000000
+      MaxStepHeight=+00025.000000
+      InvisibilityTime=0
+      SuperShieldTime=0
+      SuperStrengthTime=0
+      bZoom=False
+      bRun=False
+      bLook=False
+      bDuck=False
+      bStrafe=False
+      bFire=False
+      bAltFire=False
+      bJump=False
+      bExtra3=False
+      bExtra2=False
+      bExtra1=False
+      bExtra0=False
+      aForward=+00000.000000
+      aTurn=+00000.000000
+      aStrafe=+00000.000000
+      aUp=+00000.000000
+      aLookUp=+00000.000000
+      aExtra4=+00000.000000
+      aExtra3=+00000.000000
+      aExtra2=+00000.000000
+      aExtra1=+00000.000000
+      aExtra0=+00000.000000
+      SurfaceForceType=SFT_None
+      SurfaceForcePeriod=0
+      SurfaceForceMagnitude=0
+      bDirectional=True
+      bCollideActors=True
+      bCollideWorld=True
+      bBlockActors=True
+      bBlockPlayers=True
+      bProjTarget=True
+      SoundVolume=0
+      bMomentum=True
+      bPitch=True
+      bYaw=True
+      bRoll=True
+      bEnginePhysics=True
+      bIsKillGoal=True
+   End DefaultProperties
+End Class
+
+Begin Class Name=ScriptedPawn
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// ScriptedPawn.
+//=============================================================================
+class ScriptedPawn expands Pawn
+	package(UnGame);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+   End DefaultProperties
+End Class
+
+Begin Class Name=Skaarj
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Skaarj.
+//=============================================================================
+class Skaarj expands ScriptedPawn
+	package(UnGame);
+	
+#exec MESH IMPORT MESH=Skaarj ANIVFILE=\UNREAL\MODELS\ANIV17.3D DATAFILE=\UNREAL\MODELS\DATA17.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Skaarj X=0 Y=0 Z=00 YAW=64
+
+#exec MESH SEQUENCE MESH=Skaarj SEQ=All  STARTFRAME=0  NUMFRAMES=335
+
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Squat        STARTFRAME=1   NUMFRAMES=40
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Blade        STARTFRAME=39  NUMFRAMES=35
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Claw        STARTFRAME=74  NUMFRAMES=19
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Death        STARTFRAME=93  NUMFRAMES=44
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Fighter      STARTFRAME=137 NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Headup       STARTFRAME=138 NUMFRAMES=20
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Firing       STARTFRAME=159 NUMFRAMES=19
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Looking      STARTFRAME=179 NUMFRAMES=44
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Jog          STARTFRAME=223 NUMFRAMES=20
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Lunge        STARTFRAME=243 NUMFRAMES=34
+#exec MESH SEQUENCE MESH=Skaarj SEQ=Spin         STARTFRAME=277 NUMFRAMES=19
+#exec MESH SEQUENCE MESH=Skaarj SEQ=T1           STARTFRAME=296 NUMFRAMES=4
+#exec MESH SEQUENCE MESH=Skaarj SEQ=T2           STARTFRAME=300 NUMFRAMES=9
+#exec MESH SEQUENCE MESH=Skaarj SEQ=T3           STARTFRAME=309 NUMFRAMES=4
+#exec MESH SEQUENCE MESH=Skaarj SEQ=T4           STARTFRAME=313 NUMFRAMES=4
+#exec MESH SEQUENCE MESH=Skaarj SEQ=T5           STARTFRAME=317 NUMFRAMES=14
+#exec MESH SEQUENCE MESH=Skaarj SEQ=T6           STARTFRAME=331 NUMFRAMES=4
+
+#exec TEXTURE IMPORT NAME=Skaarj1 FILE=\UNREAL\MODELS\Texture2.PCX FAMILY=Skins FLAGS=2
+#exec TEXTURE IMPORT NAME=Skaarj2 FILE=\UNREAL\MODELS\Texture4.PCX FAMILY=Skins PALETTE=Skaarj1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Skaarj MESH=Skaarj 
+#exec MESHMAP SCALE MESHMAP=Skaarj X=0.09 Y=0.09 Z=0.18
+
+#exec MESHMAP SETTEXTURE MESHMAP=Skaarj NUM=1 TEXTURE=Skaarj1 
+#exec MESHMAP SETTEXTURE MESHMAP=Skaarj NUM=3 TEXTURE=Skaarj2
+//-----------------------------------------------------------------------------
+// Skaarj variables.
+
+// Sounds.
+var() sound 
+	LungeSound,		// Sound made when Skaarj lunges.
+	SpinSound,		// Sound made when Skaarj does spin.
+	ClawSound,		// Sound made when Skaarj claws.
+	ShootSound;		// Sound made when Skaarj shoots.
+
+// Attack damage.
+var() byte
+	LungeDamage,	// Basic damage done by lunge.
+	SpinDamage,		// Basic damage done by spin.
+	ClawDamage,		// Basic damage done by each claw.
+	ShootDamage;	// Basic damage caused by shooting.
+
+//Skaarj animations
+//FIXME - make these final?
+function PlayWaiting()
+	{
+	local float decision;
+	local float animspeed;
+	animspeed = 0.5 + 0.5 * FRand(); //fixme - add to all creatures
+
+	decision = FRand();
+	if (!bool(NextAnim)) //pick first waiting animation
+		NextAnim = Squat;
+		
+	LoopAnim(NextAnim, animspeed);
+	log("Next skaarj waiting anim is "$nextanim);
+	if (NextAnim == 'Headup')
+		{
+		NextAnim = Looking;
+		Alertness = 0.0;
+		}
+	else if (NextAnim == 'Looking')
+		{
+		Alertness = 1.0;
+		if (decision < 0.65)
+			NextAnim = Squat;
+		}
+	else if (NextAnim == 'Squat')
+		{
+		Alertness = -0.5;
+		if (decision < 0.3) 
+			NextAnim = Blade;
+		else if (decision < 0.55)
+			NextAnim = Headup;
+ 		}
+	else if (NextAnim == 'Blade')
+		{
+		Alertness = -0.5;
+		if (decision < 0.65) 
+			NextAnim = Squat;
+		}
+	
+	}
+
+function PlayPatrolStop()
+	{
+	PlayFighter();	
+	}
+
+function PlayWaitingGuard()
+	{
+	NextState = Waiting;
+	PlayWaiting();
+	}
+
+function PlayWaitingAmbush()
+	{
+	Alertness = 1.0;
+	LoopAnim(Fighter);
+	/*
+	if (FRand() < 0.4)
+		LoopAnim(Headup, 0.2);
+	else 
+		LoopAnim(Looking, 0.5);*/
+	}
+
+function PlayFighter()
+	{
+	LoopAnim(T1);
+	}
+
+function PlayRunning()
+{
+	LoopAnim(Jog, -1.0/GroundSpeed,true, 0.3);
+}
+
+function PlayThreatening()
+{
+	PlayFighter();
+}
+
+function PlayTurning()
+{
+	PlayFighter();
+}
+
+function PlayDying()
+{
+	PlayAnim(Death);
+}
+
+function PlayTakeHit()
+{
+	PlayFighter();
+}
+
+function SpawnLeftShot()
+{
+	local actor Proj;
+	local rotation FireRotation;
+	local vector X,Y,Z;
+	GetAxes(Rotation,X,Y,Z);
+	
+	FireRotation = Rotation;
+	FireRotation.Yaw = FireRotation.Yaw + 1500 * FRand() - 750;
+	Log("Play ranged attack");
+	//improve random direction error - based on creature attackAccuracy (add instancevar) - 	skill effect!!! - more error if firing while moving
+	Proj = spawn(SkaarjProjectile,None,NoName,
+		(Location + 1.2 * CollisionRadius * X + 0.5 * CollisionRadius * Y),FireRotation);
+	if( Proj != None )
+		{
+		Proj.instigator = Self;
+		} 
+}
+
+function SpawnRightShot()
+{
+	local actor Proj;
+	local rotation FireRotation;
+	local vector X,Y,Z;
+	GetAxes(Rotation,X,Y,Z);
+	
+	FireRotation = Rotation;
+	FireRotation.Yaw = FireRotation.Yaw + 1500 * FRand() - 750;
+	Log("Play ranged attack");
+	//improve random direction error - based on creature attackAccuracy (add instancevar) - 	skill effect!!!
+	//FIXME - place projectile accurately and on correct frame
+	Proj = spawn(SkaarjProjectile,None,NoName,
+		(Location + 1.2 * CollisionRadius * X - 0.5 * CollisionRadius * Y),FireRotation);
+	if( Proj != None )
+		{
+		Proj.instigator = Self;
+		} 
+}
+
+//FIXME - put this into the victory dance state?
+//Also - need to be able to acquire enemies during victory dance
+//(at least if shot)
+function PlayVictoryDance()
+{
+	PlayFighter();
+}
+	
+
+//also change accuracy based on enemy normal velocity, and own accuracy
+state MeleeAttack
+{
+ignores SeePlayer, HearNoise;
+
+function PlayMeleeAttack()
+{
+	local int hitdamage;
+	local float TargetDist;
+	local vector TargetDir;
+	TargetDir = Normal(Target.Location - Location);
+	TargetDist = Size(Target.Location - Location);
+	hitdamage = 20;  //fixme make this an instance variable
+	If (TargetDist <= (CollisionRadius + Target.CollisionRadius + CollisionRadius))
+ 		PlayAnim(Spin); 
+ 	else
+ 		{
+ 		Velocity = Velocity + AccelRate * TargetDir; //instant acceleration in that direction
+ 		PlayAnim(Lunge);
+ 		}
+	//FIXME - coordinate damage with correct frame
+	DamageTarget(hitdamage);
+}
+
+engine function AnimEnd() 
+{
+	PlayMeleeAttack();
+	if (Size(Target.Location - Location) > (MeleeRange + Target.CollisionRadius + CollisionRadius)) 
+		GotoState(Attacking, SetAttackTimer);
+	else if (Pawn(Target) != None)
+		if (Pawn(Target).Health < 0)
+			GotoState(Attacking, SetAttackTimer);
+
+}
+
+Begin:
+	Log(class$" Melee Attack");
+	if (AnimRate == 0.0) PlayMeleeAttack();
+FaceTarget:
+	MoveToward(Target);
+	Goto(FaceTarget);
+}
+
+state RangedAttack
+{
+ignores SeePlayer, HearNoise;
+
+function PlayRangedAttack()
+{
+	local int hitdamage;
+	local vector X,Y,Z;
+	GetAxes(Rotation,X,Y,Z);
+
+	if (Normal(Target.Location - Location) Dot X < 0.98) //keep turning
+		PlayTurning(); //FIXME - turning anim
+	else
+		{	
+		Log("Play ranged attack");
+		hitdamage = 15;
+			//Also add random error - based on creature attackAccuracy (add instancevar)
+
+		PlayAnim(Firing); //FIXME - damage on correct frame
+		SpawnLeftShot();
+		SpawnRightShot();
+		}
+}
+
+engine function AnimEnd() 
+{
+	PlayRangedAttack();
+	If (FRand() < 0.6) //FIXME base on skill and instance var
+		GotoState(Attacking, SetAttackTimer);
+}
+
+Begin:
+	Acceleration = vect(0,0,0); //stop
+	Log(class$" Ranged Attack");
+	if (AnimRate == 0.0) PlayRangedAttack();
+FaceTarget:
+	TurnToward(Target);
+	Goto(FaceTarget);
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      LungeSound=None
+      SpinSound=None
+      ClawSound=None
+      ShootSound=None
+      LungeDamage=25
+      SpinDamage=20
+      ClawDamage=20
+      ShootDamage=11
+      bCanPossess=False
+      bHasRangedAttack=True
+      Visibility=128
+      MeleeRange=+00080.000000
+      BaseAggressiveness=+00001.000000
+      Intelligence=BRAINS_HUMAN
+      SeqWaitingToFighter=T1
+      SeqFighterToWaiting=T2
+      SeqFighterToMoving=T6
+      SeqMovingToFighter=T5
+      GroundSpeed=+00400.000000
+      WaterSpeed=+00180.000000
+      AccelRate=+00200.000000
+      JumpZ=+00000.000000
+      DrawType=DT_Mesh
+      Mesh=Skaarj
+      CollisionRadius=+00040.000000
+      CollisionHeight=+00046.000000
+      Mass=+00200.000000
+      RotationSpeed=50000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Brute
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Brute.
+//=============================================================================
+class Brute expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=BigMan ANIVFILE=\Unreal\Models\ANIV58.3D DATAFILE=\Unreal\Models\DATA58.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=BigMan X=-46 Y=120 Z=-170 YAW=64
+
+#exec MESH SEQUENCE MESH=BigMan SEQ=All          STARTFRAME=0   NUMFRAMES=411
+#exec MESH SEQUENCE MESH=BigMan SEQ=StillLook    STARTFRAME=0   NUMFRAMES=50
+#exec MESH SEQUENCE MESH=BigMan SEQ=StillFire    STARTFRAME=50  NUMFRAMES=20
+#exec MESH SEQUENCE MESH=BigMan SEQ=PistolWhip   STARTFRAME=70  NUMFRAMES=20
+#exec MESH SEQUENCE MESH=BigMan SEQ=Sleep        STARTFRAME=90  NUMFRAMES=30
+#exec MESH SEQUENCE MESH=BigMan SEQ=GutShot      STARTFRAME=120 NUMFRAMES=35
+#exec MESH SEQUENCE MESH=BigMan SEQ=Die          STARTFRAME=155 NUMFRAMES=36
+#exec MESH SEQUENCE MESH=BigMan SEQ=ShootLeft    STARTFRAME=191 NUMFRAMES=23
+#exec MESH SEQUENCE MESH=BigMan SEQ=Walk         STARTFRAME=213 NUMFRAMES=45
+#exec MESH SEQUENCE MESH=BigMan SEQ=WalkLeft     STARTFRAME=213 NUMFRAMES=22
+#exec MESH SEQUENCE MESH=BigMan SEQ=WalkRight    STARTFRAME=235 NUMFRAMES=23
+#exec MESH SEQUENCE MESH=BigMan SEQ=ShootRight   STARTFRAME=258 NUMFRAMES=22
+#exec MESH SEQUENCE MESH=BigMan SEQ=T1           STARTFRAME=280 NUMFRAMES=25
+#exec MESH SEQUENCE MESH=BigMan SEQ=T2           STARTFRAME=305 NUMFRAMES=19
+#exec MESH SEQUENCE MESH=BigMan SEQ=T3           STARTFRAME=324 NUMFRAMES=16
+#exec MESH SEQUENCE MESH=BigMan SEQ=T4           STARTFRAME=340 NUMFRAMES=15
+#exec MESH SEQUENCE MESH=BigMan SEQ=T5           STARTFRAME=355 NUMFRAMES=5
+#exec MESH SEQUENCE MESH=BigMan SEQ=TakeHit      STARTFRAME=360 NUMFRAMES=10
+#exec MESH SEQUENCE MESH=BigMan SEQ=Die2         STARTFRAME=370 NUMFRAMES=41
+
+#exec TEXTURE IMPORT NAME=BigMan1 FILE=\Unreal\Models\BigMan1.PCX FAMILY="Skins"
+#exec TEXTURE IMPORT NAME=BigMan2 FILE=\Unreal\Models\BigMan2.PCX FAMILY="Skins" Palette=BigMan1
+
+
+#exec MESHMAP NEW   MESHMAP=BigMan MESH=BigMan 
+#exec MESHMAP SCALE MESHMAP=BigMan X=0.1 Y=0.1 Z=0.2
+
+
+
+#exec MESHMAP SETTEXTURE MESHMAP=BigMan NUM=0 TEXTURE=BigMan1 
+#exec MESHMAP SETTEXTURE MESHMAP=BigMan NUM=4 TEXTURE=BigMan2
+
+//-----------------------------------------------------------------------------
+// Brute variables.
+
+// Sounds.
+var() sound
+	ShootSound,	    // Sound made when monster shoots.
+	WhipSound;      // Sound made during pistol-whip.
+
+// Attack damage.
+var() byte
+	ShootDamage,	// Basic damage done by each shot.
+	WhipDamage;		// Basic damage done by pistol-whip.
+
+function PlayWaiting()
+	{
+	local float decision;
+	local float animspeed;
+	animspeed = 0.5 + 0.5 * FRand(); //fixme - add to all creatures
+
+	decision = FRand();
+	if (!bool(NextAnim)) //pick first waiting animation
+		NextAnim = Sleep;
+		
+	LoopAnim(NextAnim, animspeed);
+	log("Next brute waiting anim is "$nextanim);
+	if (NextAnim == 'Sleep')
+		{
+		Alertness = -1.0;
+		if (decision < 0.1)
+			NextAnim = StillLook;
+		}
+	else if (NextAnim == 'StillLook')
+		{
+		Alertness = 1.0;
+		NextAnim = Sleep;
+ 		}
+	}
+
+function PlayPatrolStop()
+	{
+	local float decision;
+	local float animspeed;
+	animspeed = 0.5 + 0.5 * FRand(); //fixme - add to all creatures
+
+	decision = FRand();
+	if (!bool(NextAnim)) //pick first waiting animation
+		NextAnim = Sleep;
+		
+	LoopAnim(NextAnim, animspeed);
+	log("Next brute waiting anim is "$nextanim);
+	if (NextAnim == 'Sleep')
+		{
+		Alertness = 0.0;
+		if (decision < 0.4)
+			NextAnim = StillLook;
+		}
+	else if (NextAnim == 'StillLook')
+		{
+		Alertness = 1.0;
+		NextAnim = Sleep;
+ 		}
+	}
+
+function PlayWaitingGuard()
+	{
+	NextState = Waiting;
+	PlayWaiting();
+	}
+
+function PlayWaitingAmbush()
+	{
+	Alertness = 1.0;
+	LoopAnim(StillLook, 0.3);
+	}
+
+function PlayFighter()
+	{
+	LoopAnim(T1);
+	}
+
+function PlayRunning()
+{
+	LoopAnim(Walk, -1.0/GroundSpeed,true,0.3);
+}
+
+function PlayThreatening()
+{
+	PlayFighter();
+}
+
+function PlayTurning()
+{
+	PlayRunning();
+}
+
+function PlayDying()
+{
+	if (FRand() < 0.5)
+		PlayAnim(Die);
+	else
+		PlayAnim(Die2);
+}
+
+function PlayTakeHit()
+{
+	PlayAnim(TakeHit);
+}
+
+function PlayMovingAttack()
+{
+	bReadyToAttack = true; //so he'll smoothly switch to melee
+	if (!bool(NextAnim))
+		NextAnim = ShootLeft;
+	
+	PlayAnim(NextAnim);
+	
+	if (NextAnim == 'ShootLeft')
+		{
+		SpawnLeftShot();
+		NextAnim = ShootRight;
+		}
+	else if (NextAnim == 'ShootRight')
+		{
+		SpawnRightShot();
+		if (FRand() < 0.7)
+			NextAnim = ShootLeft;
+		else
+			NextAnim = WalkLeft;
+		}
+	else if (NextAnim == 'WalkLeft')
+		{
+		NextState = 'Charging'; //FIXME - generalize
+		bReadyToAttack = false;
+		SetTimer(TimeBetweenAttacks  * (1.0 + FRand()),false); //FIXME single spot (function)
+		PlayRunning();
+		Disable('AnimEnd');
+		}
+}
+
+//FIXME - put this into the victory dance state?
+//Also - need to be able to acquire enemies during victory dance
+//(at least if shot)
+function PlayVictoryDance()
+{
+	PlayFighter();
+}
+	
+function SpawnLeftShot()
+{
+	local actor Proj;
+	local rotation FireRotation;
+	local vector X,Y,Z;
+	GetAxes(Rotation,X,Y,Z);
+	
+	FireRotation = Rotation;
+	FireRotation.Yaw = FireRotation.Yaw + 3500 * FRand() - 1750;
+	Log("Play ranged attack");
+	//improve random direction error - based on creature attackAccuracy (add instancevar) - 	skill effect!!! - more error if firing while moving
+/*	Proj = spawn(BruteProjectile ,None,NoName,
+		(Location + 1.2 * CollisionRadius * X + 0.5 * CollisionRadius * Y),FireRotation);
+	if( Proj != None )
+		{
+		Proj.instigator = Self;
+		} */
+}
+
+function SpawnRightShot()
+{
+	local actor Proj;
+	local rotation FireRotation;
+	local vector X,Y,Z;
+	GetAxes(Rotation,X,Y,Z);
+	
+	FireRotation = Rotation;
+	FireRotation.Yaw = FireRotation.Yaw + 3500 * FRand() - 1750;
+	Log("Play ranged attack");
+	//improve random direction error - based on creature attackAccuracy (add instancevar) - 	skill effect!!!
+	//FIXME - place projectile accurately and on correct frame
+/*	Proj = spawn(BruteProjectile,None,NoName,
+		(Location + 1.2 * CollisionRadius * X - 0.5 * CollisionRadius * Y),FireRotation);
+	if( Proj != None )
+		{
+		Proj.instigator = Self;
+		} */
+}
+
+//also change accuracy based on enemy normal velocity, and own accuracy
+state MeleeAttack
+{
+ignores SeePlayer, HearNoise;
+
+function PlayMeleeAttack()
+{
+	local int hitdamage;
+	local float TargetDist;
+	local vector TargetDir;
+	TargetDir = Normal(Target.Location - Location);
+	TargetDist = Size(Target.Location - Location);
+	hitdamage = 20;  //fixme make this an instance variable
+	If (FRand() < 0.5)
+ 		PlayAnim(GutShot); 
+ 	else
+ 		{
+  		PlayAnim(PistolWhip);
+ 		}
+	//FIXME - coordinate damage with correct frame
+	DamageTarget(hitdamage);
+}
+
+engine function AnimEnd() 
+{
+	PlayMeleeAttack();
+	if (Size(Target.Location - Location) > (MeleeRange + Target.CollisionRadius + CollisionRadius)) 
+		GotoState(Attacking, SetAttackTimer);
+	else if (Pawn(Target) != None)
+		if (Pawn(Target).Health < 0)
+			GotoState(Attacking, SetAttackTimer);
+
+}
+
+Begin:
+	Log(class$" Melee Attack");
+	if (AnimRate == 0.0) PlayMeleeAttack();
+FaceTarget:
+	TurnToward(Target);
+	Goto(FaceTarget);
+}
+
+state RangedAttack
+{
+ignores SeePlayer, HearNoise;
+
+function PlayRightShot()
+	{
+	SpawnRightShot(); 
+	MakeNoise(1.0); //FIXME - set appropriate loudness
+	PlayAnim(StillFire); //FIXME - need animation notification to spawnshots!!!!
+	}
+
+function PlayLeftShot()
+	{
+	SpawnLeftShot(); 
+	MakeNoise(1.0); //FIXME - set appropriate loudness
+	PlayAnim(StillFire); 
+	}
+
+engine function AnimEnd() 
+	{
+	if (NextAnim == 'RightShot')
+		{
+		PlayRightShot();
+		NextAnim = 'LeftShot';
+		}
+	else //left shot
+		{
+		PlayLeftShot();
+		NextAnim = 'RightShot';
+		If (FRand() < 0.1) //FIXME base on skill
+			GotoState(Attacking, SetAttackTimer);
+		}
+	}
+
+Begin:
+	NextAnim = 'RightShot';
+	Acceleration = vect(0,0,0); //stop
+	Log(class$" Ranged Attack");
+	if (AnimRate == 0.0) PlayRightShot();
+	
+FaceTarget:
+	TurnToward(Target);
+	Goto(FaceTarget);
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      ShootSound=None
+      WhipSound=None
+      ShootDamage=0
+      WhipDamage=20
+      bCanPossess=False
+      bHasRangedAttack=True
+      bMovingRangedAttack=True
+      Aggressiveness=+00000.500000
+      BaseAggressiveness=+00001.000000
+      SeqWaitingToFighter=T5
+      SeqFighterToWaiting=T5
+      SeqFighterToMoving=T3
+      SeqMovingToFighter=T4
+      GroundSpeed=+00180.000000
+      WaterSpeed=+00100.000000
+      AirSpeed=+00100.000000
+      AccelRate=+00120.000000
+      JumpZ=+00000.000000
+      DrawType=DT_Mesh
+      Mesh=BigMan
+      DrawScale=+00001.500000
+      CollisionRadius=+00055.000000
+      CollisionHeight=+00068.000000
+      Mass=+00400.000000
+      RotationSpeed=20000
+   End DefaultProperties
+End Class
+
+Begin Class Name=ArchAngel
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// ArchAngel.
+//=============================================================================
+class ArchAngel expands Brute
+	package(UnGame);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      ShootDamage=8
+      WhipDamage=30
+      bHasRangedAttack=False
+      bMovingRangedAttack=False
+      TimeBetweenAttacks=+00000.000000
+      Aggressiveness=+00000.000000
+      BaseAggressiveness=+00000.000000
+      AttitudeToPlayer=ATTITUDE_Fear
+      Intelligence=BRAINS_NONE
+      SeqWaitingToFighter=None
+      SeqFighterToWaiting=None
+      SeqFighterToMoving=None
+      SeqMovingToFighter=None
+      GroundSpeed=+00004.300000
+      WaterSpeed=+00000.000000
+      AirSpeed=+00000.000000
+      AccelRate=+00001.000000
+      DrawScale=+00001.150000
+      CollisionRadius=+00046.000000
+      CollisionHeight=+00057.000000
+      bPitch=False
+      bYaw=False
+      bRoll=False
+      bEnginePhysics=False
+      RotationSpeed=0
+   End DefaultProperties
+End Class
+
+Begin Class Name=Gasbag
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Gasbag.
+//=============================================================================
+class Gasbag expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=GasBag ANIVFILE=\UNREAL\MODELS\ANIV28.3D DATAFILE=\UNREAL\MODELS\DATA28.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=GasBag X=0 Y=150 Z=0 YAW=64
+
+#exec MESH SEQUENCE MESH=GasBag SEQ=All      STARTFRAME=0  NUMFRAMES=226
+#exec MESH SEQUENCE MESH=GasBag SEQ=2Punch   STARTFRAME=0  NUMFRAMES=24
+#exec MESH SEQUENCE MESH=GasBag SEQ=Belch    STARTFRAME=24 NUMFRAMES=29
+#exec MESH SEQUENCE MESH=GasBag SEQ=Deflate  STARTFRAME=53 NUMFRAMES=31
+#exec MESH SEQUENCE MESH=GasBag SEQ=Fiddle   STARTFRAME=84 NUMFRAMES=30
+#exec MESH SEQUENCE MESH=GasBag SEQ=Fighter  STARTFRAME=114 NUMFRAMES=1
+#exec MESH SEQUENCE MESH=GasBag SEQ=Float    STARTFRAME=115 NUMFRAMES=25
+#exec MESH SEQUENCE MESH=GasBag SEQ=Grab     STARTFRAME=140 NUMFRAMES=40
+#exec MESH SEQUENCE MESH=GasBag SEQ=Pound    STARTFRAME=180 NUMFRAMES=24
+#exec MESH SEQUENCE MESH=GasBag SEQ=T1       STARTFRAME=204 NUMFRAMES=5
+#exec MESH SEQUENCE MESH=GasBag SEQ=T2       STARTFRAME=209 NUMFRAMES=9
+#exec MESH SEQUENCE MESH=GasBag SEQ=T3       STARTFRAME=218 NUMFRAMES=4
+#exec MESH SEQUENCE MESH=GasBag SEQ=T4       STARTFRAME=222 NUMFRAMES=4
+
+#exec TEXTURE IMPORT NAME=GasBag2 FILE=\UNREAL\MODELS\gasbod.PCX FAMILY="Skins" FLAGS=2
+#exec TEXTURE IMPORT NAME=GasBag1 FILE=\UNREAL\MODELS\gasarm.PCX FAMILY="Skins" PALETTE=GasBag1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=GasBag MESH=GasBag 
+#exec MESHMAP SCALE MESHMAP=GasBag X=0.05 Y=0.05 Z=0.1
+
+#exec MESHMAP SETTEXTURE MESHMAP=GasBag NUM=5 TEXTURE=GasBag1 
+#exec MESHMAP SETTEXTURE MESHMAP=GasBag NUM=6 TEXTURE=GasBag2
+
+//-----------------------------------------------------------------------------
+// Gasbag variables.
+
+// Sounds.
+var() sound
+	BelchSound,		// Sound made when monster belches.
+	PunchSound,     // Sound made during each punch.
+	PoundSound;     // Sound made during pound .
+
+// Attack damage.
+var() byte
+	BelchDamage,	// Basic damage done by belch.
+	PunchDamage,	// Basic damage done by each punch.
+	PoundDamage;	// Basic damage done by pound.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      BelchSound=None
+      PunchSound=None
+      PoundSound=None
+      BelchDamage=10
+      PunchDamage=20
+      PoundDamage=25
+      bCanPossess=False
+      TimeBetweenAttacks=+00000.000000
+      AttitudeToPlayer=ATTITUDE_Fear
+      Intelligence=BRAINS_NONE
+      GroundSpeed=+00003.000000
+      WaterSpeed=+00000.000000
+      AccelRate=+00001.000000
+      JumpZ=+00000.000000
+      DrawType=DT_Mesh
+      Mesh=Gasbag
+      CollisionRadius=+00028.000000
+      CollisionHeight=+00010.000000
+      Mass=+00070.000000
+      bPitch=False
+      bYaw=False
+      bRoll=False
+      bEnginePhysics=False
+   End DefaultProperties
+End Class
+
+Begin Class Name=RazorFish
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// RazorFish.
+//=============================================================================
+class RazorFish expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=fish ANIVFILE=..\MODELS\fish_a.3D DATAFILE=..\MODELS\fish_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=fish X=0 Y=-60 Z=0 YAW=64 ROLL=0 
+
+#exec MESH SEQUENCE MESH=fish SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=fish SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=Jfish1 FILE=..\MODELS\fish.PCX FAMILY=Skins PALETTE=Jfish1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=fish MESH=fish 
+#exec MESHMAP SCALE MESHMAP=fish X=0.05 Y=0.05 Z=0.1
+
+#exec MESHMAP SETTEXTURE MESHMAP=fish NUM=1 TEXTURE=Jfish1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+   End DefaultProperties
+End Class
+
+Begin Class Name=Manta
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Manta.
+//=============================================================================
+class Manta expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Manta ANIVFILE=\UNREAL\MODELS\aniv29.3D DATAFILE=\UNREAL\MODELS\data29.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Manta X=0 Y=-100 Z=100 YAW=64
+#exec MESH SEQUENCE MESH=Manta SEQ=All  STARTFRAME=0  NUMFRAMES=152
+#exec MESH SEQUENCE MESH=Manta SEQ=Fly  STARTFRAME=0  NUMFRAMES=20
+#exec MESH SEQUENCE MESH=Manta SEQ=Sting  STARTFRAME=20  NUMFRAMES=30
+#exec MESH SEQUENCE MESH=Manta SEQ=Whip  STARTFRAME=50  NUMFRAMES=30
+#exec MESH SEQUENCE MESH=Manta SEQ=Death  STARTFRAME=81  NUMFRAMES=25
+#exec MESH SEQUENCE MESH=Manta SEQ=Landing  STARTFRAME=106  NUMFRAMES=25
+#exec MESH SEQUENCE MESH=Manta SEQ=TakeOff  STARTFRAME=132  NUMFRAMES=20
+#exec TEXTURE IMPORT NAME=JManta1 FILE=\UNREAL\MODELS\manta.PCX FAMILY="Skins" PALETTE=JManta1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Manta MESH=Manta 
+#exec MESHMAP SCALE MESHMAP=Manta X=0.05 Y=0.05 Z=0.1
+
+#exec MESHMAP SETTEXTURE MESHMAP=Manta NUM=2 TEXTURE=JManta1
+
+//-----------------------------------------------------------------------------
+// Manta variables.
+
+// Sounds.
+var() sound
+	StingSound,		// Sound made when monster stings.
+	WhipSound;		// Sound made during whip.
+
+// Attack damage.
+var() byte
+	StingDamage,	// Basic damage done by Sting.
+	WhipDamage;		// Basic damage done by whip.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      StingSound=None
+      WhipSound=None
+      StingDamage=20
+      WhipDamage=20
+      bCanPossess=False
+      TimeBetweenAttacks=+00000.000000
+      AttitudeToPlayer=ATTITUDE_Fear
+      Intelligence=BRAINS_NONE
+      GroundSpeed=+00009.500000
+      WaterSpeed=+00000.000000
+      AccelRate=+00001.000000
+      JumpZ=+00000.000000
+      DrawType=DT_Mesh
+      Mesh=Manta
+      CollisionRadius=+00025.000000
+      CollisionHeight=+00010.000000
+      Mass=+00080.000000
+      bPitch=False
+      bYaw=False
+      bRoll=False
+      bEnginePhysics=False
+   End DefaultProperties
+End Class
+
+Begin Class Name=Krall
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Krall.
+//=============================================================================
+class Krall expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Krall ANIVFILE=\UNREAL\MODELS\kralla.3D DATAFILE=\UNREAL\MODELS\kralld.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Krall X=70 Y=350 Z=-80 YAW=64
+
+#exec MESH SEQUENCE MESH=krall SEQ=All          STARTFRAME=0   NUMFRAMES=424
+#exec MESH SEQUENCE MESH=krall SEQ=Breath       STARTFRAME=0   NUMFRAMES=29
+#exec MESH SEQUENCE MESH=krall SEQ=Die1         STARTFRAME=29  NUMFRAMES=45
+#exec MESH SEQUENCE MESH=krall SEQ=Fighter      STARTFRAME=74  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=krall SEQ=Hit          STARTFRAME=75  NUMFRAMES=14
+#exec MESH SEQUENCE MESH=krall SEQ=Look         STARTFRAME=89  NUMFRAMES=44
+#exec MESH SEQUENCE MESH=krall SEQ=Shoot1       STARTFRAME=133 NUMFRAMES=24
+#exec MESH SEQUENCE MESH=krall SEQ=Shoot2       STARTFRAME=157 NUMFRAMES=44
+#exec MESH SEQUENCE MESH=krall SEQ=Stand        STARTFRAME=201 NUMFRAMES=1
+#exec MESH SEQUENCE MESH=krall SEQ=Strike1      STARTFRAME=202 NUMFRAMES=20
+#exec MESH SEQUENCE MESH=krall SEQ=Strike2      STARTFRAME=222 NUMFRAMES=23
+#exec MESH SEQUENCE MESH=krall SEQ=Strike3      STARTFRAME=245 NUMFRAMES=29
+#exec MESH SEQUENCE MESH=krall SEQ=T1           STARTFRAME=274 NUMFRAMES=4
+#exec MESH SEQUENCE MESH=krall SEQ=T2           STARTFRAME=278 NUMFRAMES=9
+#exec MESH SEQUENCE MESH=krall SEQ=T3           STARTFRAME=287 NUMFRAMES=14
+#exec MESH SEQUENCE MESH=krall SEQ=T4           STARTFRAME=301 NUMFRAMES=9
+#exec MESH SEQUENCE MESH=krall SEQ=Throw        STARTFRAME=310 NUMFRAMES=49
+#exec MESH SEQUENCE MESH=krall SEQ=Twirl        STARTFRAME=359 NUMFRAMES=34
+#exec MESH SEQUENCE MESH=krall SEQ=Walk         STARTFRAME=393 NUMFRAMES=29
+#exec MESH SEQUENCE MESH=krall SEQ=Footup       STARTFRAME=422 NUMFRAMES=1
+
+#exec TEXTURE IMPORT NAME=krall FILE=\UNREAL\MODELS\krall.PCX FAMILY=Skins FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=krall MESH=krall 
+#exec MESHMAP SCALE MESHMAP=krall X=0.08 Y=0.08 Z=0.16
+
+#exec MESHMAP SETTEXTURE MESHMAP=krall NUM=1 TEXTURE=krall
+
+//FIXME - make these final?
+function PlayWaiting()
+	{
+	local float decision;
+	local float animspeed;
+	animspeed = 0.5 + 0.5 * FRand(); //fixme - add to all creatures
+	decision = FRand();
+	if (!bool(NextAnim)) //pick first waiting animation
+		NextAnim = Breath;
+		
+	LoopAnim(NextAnim, animspeed);
+	log("Next krall waiting anim is "$nextanim);
+	if (NextAnim == 'Breath')
+		{
+		Alertness = 0.0;
+		if (decision < 0.2)
+			NextAnim = Look;
+		}
+	else if (NextAnim == 'Look')
+		{
+		Alertness = 1.0;
+		if (decision < 0.3) 
+			NextAnim = Twirl;
+		else 
+			NextAnim = Breath;
+ 		}
+ 	else if (NextAnim == 'Twirl')
+ 		{
+ 		Alertness = 0.0;
+ 		if (decision < 0.5) 
+			NextAnim = Twirl;
+		else 
+			NextAnim = Breath;
+ 		}
+		
+	}
+
+function PlayPatrolStop()
+	{
+	local float decision;
+	local float animspeed;
+	animspeed = 0.5 + 0.5 * FRand(); //fixme - add to all creatures
+	decision = FRand();
+	if (!bool(NextAnim)) //pick first waiting animation
+		NextAnim = Breath;
+		
+	LoopAnim(NextAnim, animspeed);
+	log("Next krall patrolstop anim is "$nextanim);
+	if (NextAnim == 'Breath')
+		{
+		Alertness = 0.0;
+		if (decision < 0.4)
+			NextAnim = Look;
+		}
+	else if (NextAnim == 'Look')
+		{
+		Alertness = 1.0;
+		if (decision < 0.3) 
+			NextAnim = Twirl;
+		else 
+			NextAnim = Breath;
+ 		}
+ 	else if (NextAnim == 'Twirl')
+ 		{
+ 		Alertness = 0.0;
+ 		if (decision < 0.5) 
+			NextAnim = Twirl;
+		else 
+			NextAnim = Breath;
+ 		}
+		
+	}
+	
+	
+function PlayWaitingGuard()
+	{
+	NextState = Waiting;
+	PlayWaiting();
+	}
+
+function PlayWaitingAmbush()
+	{
+	if (FRand() < 0.4)
+		LoopAnim('Look', 0.3);
+	else 
+		LoopAnim('Breath');
+	Alertness = 1.0;
+	}
+
+function PlayFighter()
+	{
+	LoopAnim(T1);
+	}
+
+function PlayMovingAttack()
+{
+	bReadyToAttack = true; //so he'll smoothly switch to melee
+	PlayAnim('Shoot2');
+	if (FRand() < 0.3)
+		{
+		NextState = 'Charging'; //FIXME - generalize
+		bReadyToAttack = false;
+		SetTimer(TimeBetweenAttacks  * (1.0 + FRand()),false); //FIXME single spot (function)
+		}
+
+}
+
+function PlayRunning()
+{
+	LoopAnim('Walk', -1.0/GroundSpeed,true,0.3);
+}
+
+function PlayThreatening()
+{
+	local float decision;
+	local float animspeed;
+	decision = FRand();
+	
+	animspeed = 0.5 + 0.5 * FRand(); //fixme - add to all creatures
+	decision = FRand();
+	if (!bool(NextAnim)) //pick first waiting animation
+		NextAnim = Breath;
+		
+	LoopAnim(NextAnim, animspeed);
+	log("Next krall threatening anim is "$nextanim);
+	
+	if ((NextAnim != 'Breath') || (decision < 0.3))
+		{
+		decision = FRand();
+		if (decision < 0.35)
+			NextAnim = 'Breath';
+		else if (decision < 0.55)
+			NextAnim = 'Twirl';
+		else if (decision < 0.8)
+			NextAnim = 'T3';
+		else if (decision < 0.9)
+			NextAnim = 'Strike1';
+		else 
+			NextAnim = 'Strike2'; 
+		}
+	else
+		NextAnim = 'Breath';	
+}
+
+function PlayTurning()
+{
+	PlayFighter();
+}
+
+function PlayDying()
+{
+	PlayAnim('Die1');
+}
+
+function PlayTakeHit()
+{
+	PlayAnim('Hit');
+}
+
+//FIXME - put this into the victory dance state?
+//Also - need to be able to acquire enemies during victory dance
+//(at least if shot)
+function PlayVictoryDance()
+{
+	PlayFighter();
+}
+	
+function SpawnShot()
+{
+	local actor Proj;
+	local rotation FireRotation;
+	local vector X,Y,Z;
+	GetAxes(Rotation,X,Y,Z);
+	
+	FireRotation = Rotation;
+	FireRotation.Yaw = FireRotation.Yaw + 3500 * FRand() - 1750;
+	Log("Play ranged attack");
+	//improve random direction error - based on creature attackAccuracy (add instancevar) - 	skill effect!!!
+	//FIXME - place projectile accurately and on correct frame
+	Proj = spawn(SkaarjProjectile,None,NoName,
+		(Location + 1.2 * CollisionRadius * X - 0.5 * CollisionRadius * Y),FireRotation);
+	if( Proj != None )
+		{
+		Proj.instigator = Self;
+		}
+}
+
+//also change accuracy based on enemy normal velocity, and own accuracy
+state MeleeAttack
+{
+ignores SeePlayer, HearNoise;
+
+function PlayMeleeAttack()
+{
+	local int hitdamage;
+	local float TargetDist, decision;
+	local vector TargetDir;
+	If (FRand() < 0.2) //FIXME - base on skill
+		PlayAnim('T3');
+	else
+		{
+		TargetDir = Normal(Target.Location - Location);
+		TargetDist = Size(Target.Location - Location);
+		hitdamage = 20;  //fixme make this an instance variable
+		decision = FRand();
+		 if (decision < 0.25)
+			PlayAnim('Strike1'); 
+	 	else if (decision < 0.5)
+	   		PlayAnim('Strike2');
+	 	else if (decision < 0.75)
+	 		PlayAnim('Strike3');
+	 	else
+	 		{
+	 		PlayAnim('Throw'); //FIXME - do this right
+	  		Target.Velocity += vector(Rotation) * 100; 
+			Target.Velocity.Z = 300;
+	 		Target.Rotation.Pitch = 8192;
+	 		}		
+		//FIXME - coordinate damage with correct frame
+		DamageTarget(hitdamage);
+		}
+}
+
+engine function AnimEnd() 
+{
+	PlayMeleeAttack();
+	if (Size(Target.Location - Location) > (MeleeRange + Target.CollisionRadius + CollisionRadius)) 
+		GotoState(Attacking, SetAttackTimer);
+	else if (Pawn(Target) != None)
+		if (Pawn(Target).Health < 0)
+			GotoState(Attacking, SetAttackTimer);
+	
+}
+
+Begin:
+	Log(class$" Melee Attack");
+	if (AnimRate == 0.0) PlayMeleeAttack();
+FaceTarget:
+	MoveToward(Target);
+	Goto(FaceTarget);
+}
+
+state RangedAttack
+{
+ignores SeePlayer, HearNoise;
+
+function PlayRangedAttack()
+{
+	local int hitdamage;
+	local vector X,Y,Z;
+	GetAxes(Rotation,X,Y,Z);
+
+	if (Normal(Target.Location - Location) Dot X < 0.98) //keep turning
+		PlayTurning(); //FIXME - turning anim
+	else
+		{	
+		Log("Play ranged attack");
+		hitdamage = 15;
+			//Also add random error - based on creature attackAccuracy (add instancevar)
+		PlayAnim('Shoot1'); //FIXME - damage on correct frame
+		//RayDamageTarget(hitdamage, X);
+		SpawnShot();
+		}
+}
+
+engine function AnimEnd() 
+{
+	PlayRangedAttack();
+	If (FRand() < 0.6) //FIXME base on skill and instance var
+		GotoState(Attacking, SetAttackTimer);
+}
+
+Begin:
+	Acceleration = vect(0,0,0); //stop
+	Log(class$" Ranged Attack");
+	if (AnimRate == 0.0) PlayRangedAttack();
+FaceTarget:
+	TurnToward(Target);
+	Goto(FaceTarget);
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bHasRangedAttack=True
+      bMovingRangedAttack=True
+      Visibility=128
+      AttitudeToPlayer=ATTITUDE_Threaten
+      SeqWaitingToFighter=T1
+      SeqFighterToWaiting=T2
+      SeqFighterToMoving=T3
+      SeqMovingToFighter=T4
+      GroundSpeed=+00200.000000
+      WaterSpeed=+00100.000000
+      AirSpeed=+00100.000000
+      AccelRate=+00500.000000
+      JumpZ=+00300.000000
+      DrawType=DT_Mesh
+      Mesh=Krall
+      CollisionHeight=+00044.000000
+      Mass=+00150.000000
+      RotationSpeed=50000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Titan
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Titan.
+//=============================================================================
+class Titan expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Titan ANIVFILE=..\MODELS\titana.3D DATAFILE=..\MODELS\titand.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Titan X=40 Y=300 Z=-65 YAW=64
+
+#exec MESH SEQUENCE MESH=titan SEQ=All       STARTFRAME=0   NUMFRAMES=305
+#exec MESH SEQUENCE MESH=titan SEQ=TWalk001  STARTFRAME=0   NUMFRAMES=60
+#exec MESH SEQUENCE MESH=titan SEQ=TBrea001  STARTFRAME=60  NUMFRAMES=30
+#exec MESH SEQUENCE MESH=titan SEQ=TDeat001  STARTFRAME=90  NUMFRAMES=58
+#exec MESH SEQUENCE MESH=titan SEQ=TFigh001  STARTFRAME=148 NUMFRAMES=1
+#exec MESH SEQUENCE MESH=titan SEQ=TPunc001  STARTFRAME=149 NUMFRAMES=24
+#exec MESH SEQUENCE MESH=titan SEQ=TSlap001  STARTFRAME=173 NUMFRAMES=29
+#exec MESH SEQUENCE MESH=titan SEQ=TSnif001  STARTFRAME=202 NUMFRAMES=35
+#exec MESH SEQUENCE MESH=titan SEQ=TStom001  STARTFRAME=237 NUMFRAMES=34
+#exec MESH SEQUENCE MESH=titan SEQ=TThro001  STARTFRAME=271 NUMFRAMES=34
+
+#exec TEXTURE IMPORT NAME=Jtitan1 FILE=..\MODELS\titan.PCX FAMILY=Skins PALETTE=Jtitan1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=titan MESH=titan 
+#exec MESHMAP SCALE MESHMAP=titan X=0.25 Y=0.25 Z=0.5
+
+#exec MESHMAP SETTEXTURE MESHMAP=titan NUM=1 TEXTURE=Jtitan1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Titan
+      CollisionRadius=+00115.000000
+      CollisionHeight=+00110.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Male
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Male.
+//=============================================================================
+class Male expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Male ANIVFILE=..\MODELS\Male_a.3D DATAFILE=..\MODELS\Male_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Male X=0 Y=0 Z=0 YAW=64
+
+#exec MESH SEQUENCE MESH=Male SEQ=All    STARTFRAME=0 NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Male SEQ=Still  STARTFRAME=0 NUMFRAMES=1
+
+#exec TEXTURE IMPORT NAME=JMale1 FILE=..\MODELS\Male.PCX FAMILY=Skins PALETTE=JMale1 FLAGS=2
+#exec MESHMAP NEW   MESHMAP=Male MESH=Male
+#alwaysexec MESHMAP SCALE MESHMAP=Male X=0.032 Y=0.032 Z=0.064
+
+#exec MESHMAP SETTEXTURE MESHMAP=Male NUM=1 TEXTURE=JMale1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Male
+      CollisionRadius=+00018.000000
+      CollisionHeight=+00030.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Female
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Female.
+//=============================================================================
+class Female expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Female ANIVFILE=..\MODELS\Female_a.3D DATAFILE=..\MODELS\Female_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Female X=0 Y=30 Z=-50 YAW=64
+
+#exec MESH SEQUENCE MESH=Female SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Female SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+#exec TEXTURE IMPORT NAME=JFemale1 FILE=..\MODELS\Female.PCX FAMILY=Skins PALETTE=JFemale1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Female MESH=Female
+#exec MESHMAP SCALE MESHMAP=Female X=0.035 Y=0.035 Z=0.07
+
+#exec MESHMAP SETTEXTURE MESHMAP=Female NUM=1 TEXTURE=JFemale1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Female
+      CollisionRadius=+00018.000000
+      CollisionHeight=+00030.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Cow
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Cow.
+//=============================================================================
+class Cow expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Cow ANIVFILE=..\MODELS\Cow_a.3D DATAFILE=..\MODELS\Cow_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Cow X=0 Y=100 Z=-120 YAW=64
+
+#exec MESH SEQUENCE MESH=Cow SEQ=All    STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Cow SEQ=Still  STARTFRAME=0  NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JCow1 FILE=..\MODELS\Cow.PCX FAMILY=Skins PALETTE=JCow1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Cow MESH=Cow
+#exec MESHMAP SCALE MESHMAP=Cow X=0.08 Y=0.08 Z=0.16
+
+#exec MESHMAP SETTEXTURE MESHMAP=Cow NUM=1 TEXTURE=JCow1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Cow
+      CollisionRadius=+00045.000000
+      CollisionHeight=+00035.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Pupae
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Pupae.
+//=============================================================================
+class Pupae expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Pupae ANIVFILE=..\MODELS\pupae_a.3D DATAFILE=..\MODELS\pupae_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Pupae X=0 Y=0 Z=0 YAW=64
+
+#exec MESH SEQUENCE MESH=pupae SEQ=All    STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=pupae SEQ=Still  STARTFRAME=0  NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JPupae1 FILE=..\MODELS\pupae.PCX FAMILY=Skins PALETTE=Jpupae1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=pupae MESH=pupae 
+#exec MESHMAP SCALE MESHMAP=pupae X=0.03 Y=0.03 Z=0.06
+
+#exec MESHMAP SETTEXTURE MESHMAP=pupae NUM=1 TEXTURE=Jpupae1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Pupae
+      CollisionRadius=+00028.000000
+      CollisionHeight=+00009.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Mercenary
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Mercenary
+//=============================================================================
+class Mercenary expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Merc ANIVFILE=..\MODELS\Merc_a.3D DATAFILE=..\MODELS\Merc_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Merc X=0 Y=90 Z=-80 YAW=64
+
+#exec MESH SEQUENCE MESH=Merc SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Merc SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JMerc1 FILE=..\MODELS\Mercenar.PCX FAMILY=Skins PALETTE=JMerc1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Merc MESH=Merc 
+#exec MESHMAP SCALE MESHMAP=Merc X=0.045 Y=0.045 Z=0.09
+
+#exec MESHMAP SETTEXTURE MESHMAP=Merc NUM=1 TEXTURE=JMerc1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Merc
+      CollisionRadius=+00030.000000
+      CollisionHeight=+00039.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Queen
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Queen.
+//=============================================================================
+class Queen expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Queen ANIVFILE=..\MODELS\queen_a.3D DATAFILE=..\MODELS\queen_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Queen X=0 Y=-400 Z=-50 YAW=64
+
+#exec MESH SEQUENCE MESH=queen SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=queen SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JQueen1 FILE=..\MODELS\queen.PCX FAMILY=Skins PALETTE=Jqueen1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=queen MESH=queen 
+#exec MESHMAP SCALE MESHMAP=queen X=0.15 Y=0.15 Z=0.3
+
+#exec MESHMAP SETTEXTURE MESHMAP=queen NUM=1 TEXTURE=Jqueen1 ; Apply textures
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Queen
+      CollisionRadius=+00082.000000
+      CollisionHeight=+00097.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Squid
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Squid.
+//=============================================================================
+class Squid expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Squid ANIVFILE=..\MODELS\squid_a.3D DATAFILE=..\MODELS\squid_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Squid X=0 Y=100 Z=0 YAW=128 ROLL=-64 
+
+#exec MESH SEQUENCE MESH=squid SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=squid SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JSquid1 FILE=..\MODELS\squid.PCX FAMILY=Skins PALETTE=Jsquid1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Squid MESH=squid 
+#exec MESHMAP SCALE MESHMAP=Squid X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=squid NUM=1 TEXTURE=Jsquid1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Squid
+      CollisionRadius=+00030.000000
+      CollisionHeight=+00038.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Slith
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Slith.
+//=============================================================================
+class Slith expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Slith ANIVFILE=..\MODELS\slith_a.3D DATAFILE=..\MODELS\slith_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Slith X=0 Y=-300 Z=-40 YAW=64
+
+#exec MESH SEQUENCE MESH=slith SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=slith SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JSlith1 FILE=..\MODELS\slith.PCX FAMILY=Skins PALETTE=Jslith1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=slith MESH=slith 
+#exec MESHMAP SCALE MESHMAP=slith X=0.04 Y=0.04 Z=0.08
+
+#exec MESHMAP SETTEXTURE MESHMAP=slith NUM=1 TEXTURE=Jslith1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Slith
+      CollisionHeight=+00024.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Warlord
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Warlord.
+//=============================================================================
+class Warlord expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Warlord ANIVFILE=..\MODELS\warlor_a.3D DATAFILE=..\MODELS\warlor_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Warlord X=0 Y=00 Z=0 YAW=64
+
+#exec MESH SEQUENCE MESH=warlord SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=warlord SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JWarlord1 FILE=..\MODELS\warlord.PCX FAMILY=Skins PALETTE=Jwarlord1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Warlord MESH=warlord 
+#exec MESHMAP SCALE MESHMAP=Warlord X=0.09 Y=0.09 Z=0.18
+
+#exec MESHMAP SETTEXTURE MESHMAP=warlord NUM=1 TEXTURE=Jwarlord1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Warlord
+      CollisionRadius=+00052.000000
+      CollisionHeight=+00078.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Nali
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Nali.
+//=============================================================================
+class Nali expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Nali ANIVFILE=..\MODELS\nali_a.3D DATAFILE=..\MODELS\nali_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Nali X=0 Y=00 Z=0 YAW=64
+
+#exec MESH SEQUENCE MESH=nali SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=nali SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JNali1 FILE=..\MODELS\nali.PCX FAMILY=Skins PALETTE=Jnali1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=nali MESH=nali 
+#exec MESHMAP SCALE MESHMAP=nali X=0.04 Y=0.04 Z=0.08
+
+#exec MESHMAP SETTEXTURE MESHMAP=nali NUM=1 TEXTURE=Jnali1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Nali
+      CollisionRadius=+00018.000000
+      CollisionHeight=+00040.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Turret
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Turret.
+//=============================================================================
+class Turret expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Turret ANIVFILE=..\MODELS\turret_a.3D DATAFILE=..\MODELS\turret_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Turret X=-50 Y=0 Z=-10 YAW=0
+
+#exec MESH SEQUENCE MESH=turret SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=turret SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JTurret1 FILE=..\MODELS\turret.PCX FAMILY=Skins PALETTE=Jturret1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=turret MESH=turret 
+#exec MESHMAP SCALE MESHMAP=turret X=0.05 Y=0.05 Z=0.1
+
+#exec MESHMAP SETTEXTURE MESHMAP=turret NUM=1 TEXTURE=Jturret1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Turret
+      CollisionRadius=+00035.000000
+      CollisionHeight=+00012.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Hawk
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// hawk.
+//=============================================================================
+class Hawk expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Hawk ANIVFILE=..\MODELS\hawk_a.3D DATAFILE=..\MODELS\hawk_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Hawk X=0 Y=0 Z=0 YAW=64
+
+#exec MESH SEQUENCE MESH=Hawk SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Hawk SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JHawk1 FILE=..\MODELS\hawk.PCX FAMILY=Skins PALETTE=Jhawk1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=hawk MESH=hawk 
+#exec MESHMAP SCALE MESHMAP=hawk X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=hawk NUM=1 TEXTURE=Jhawk1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Hawk
+      CollisionRadius=+00052.000000
+      CollisionHeight=+00018.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Fly
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Fly.
+//=============================================================================
+class Fly expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Fly ANIVFILE=..\MODELS\fly_a.3D DATAFILE=..\MODELS\fly_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Fly X=0 Y=-450 Z=0 YAW=64
+
+#exec MESH SEQUENCE MESH=Fly SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Fly SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JFly1 FILE=..\MODELS\fly.PCX FAMILY=Skins PALETTE=Jfly1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=fly MESH=fly 
+#exec MESHMAP SCALE MESHMAP=fly X=0.02 Y=0.02 Z=0.04
+
+#exec MESHMAP SETTEXTURE MESHMAP=fly NUM=1 TEXTURE=Jfly1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Fly
+      CollisionRadius=+00016.000000
+      CollisionHeight=+00008.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Blob
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Blob
+//=============================================================================
+class Blob expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Blob ANIVFILE=..\MODELS\blob_a.3D DATAFILE=..\MODELS\blob_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Blob X=0 Y=-100 Z=-230 YAW=64
+
+#exec MESH SEQUENCE MESH=Blob SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Blob SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JBlob1 FILE=..\MODELS\blob.PCX FAMILY=Skins PALETTE=Jblob1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Blob MESH=blob
+#exec MESHMAP SCALE MESHMAP=Blob X=0.07 Y=0.07 Z=0.14
+
+#exec MESHMAP SETTEXTURE MESHMAP=blob NUM=1 TEXTURE=Jblob1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Blob
+      CollisionRadius=+00037.000000
+      CollisionHeight=+00009.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Firefly
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Firefly.
+//=============================================================================
+class Firefly expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Firefly ANIVFILE=..\MODELS\firef_a.3D DATAFILE=..\MODELS\firef_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Firefly X=0 Y=00 Z=0 YAW=64
+
+#exec MESH SEQUENCE MESH=Firefly SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Firefly SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+
+#exec TEXTURE IMPORT NAME=JFirefly1 FILE=..\MODELS\firefly.PCX FAMILY=Skins PALETTE=Jfirefly1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Firefly MESH=firefly
+#exec MESHMAP SCALE MESHMAP=Firefly X=0.005 Y=0.005 Z=0.01
+
+#exec MESHMAP SETTEXTURE MESHMAP=firefly NUM=1 TEXTURE=Jfirefly1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      DrawType=DT_Mesh
+      Mesh=Firefly
+      CollisionRadius=+00002.000000
+      CollisionHeight=+00001.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=FireflySwarm
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// FireflySwarm.
+//=============================================================================
+class FireflySwarm expands ScriptedPawn;
+
+var() byte swarmsize; //number of fireflies in swarm
+
+//FIXME add stasis mode
+
+auto state wandering
+{
+function addflies()
+	{
+	local actor newfly;
+	local int num;
+	num = swarmsize;
+	while (num > 0)
+		{
+		num -= 1;
+		newfly = spawn(firefly,None,NoName, Location + VRand() * CollisionRadius);
+		newfly.setowner(self);
+		}
+	}
+	
+engine function timer (int ticks)
+	{
+	gotostate('wandering','newdir');
+	}
+
+Begin:
+	addflies();
+
+Newdir:
+	MoveTo(300 * VRand());
+}		
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      swarmsize=0
+   End DefaultProperties
+End Class
+
+Begin Class Name=Tentacle
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Tentacle.
+//=============================================================================
+class Tentacle expands ScriptedPawn
+	package(UnGame);
+
+#exec MESH IMPORT MESH=Tentacle ANIVFILE=\UNREAL\MODELS\aniv42.3D DATAFILE=\UNREAL\MODELS\data42.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Tentacle X=0 Y=-180 Z=100 YAW=64
+#exec MESH SEQUENCE MESH=Tentacle SEQ=All  STARTFRAME=0  NUMFRAMES=196
+#exec MESH SEQUENCE MESH=Tentacle SEQ=Waver  STARTFRAME=0  NUMFRAMES=30
+#exec MESH SEQUENCE MESH=Tentacle SEQ=Shoot  STARTFRAME=30 NUMFRAMES=30
+#exec MESH SEQUENCE MESH=Tentacle SEQ=Mebax  STARTFRAME=60 NUMFRAMES=10
+#exec MESH SEQUENCE MESH=Tentacle SEQ=Death  STARTFRAME=100 NUMFRAMES=70
+#exec MESH SEQUENCE MESH=Tentacle SEQ=T1     STARTFRAME=171 NUMFRAMES=10
+#exec MESH SEQUENCE MESH=Tentacle SEQ=T2     STARTFRAME=181 NUMFRAMES=15
+#exec TEXTURE IMPORT NAME=JTentacle1 FILE=\UNREAL\MODELS\Tentacle.PCX FAMILY="Skins" PALETTE=JTentacle1 FLAGS=2
+
+#exec MESHMAP NEW   MESHMAP=Tentacle MESH=Tentacle 
+#exec MESHMAP SCALE MESHMAP=Tentacle X=0.1 Y=0.1 Z=0.2
+
+#exec MESHMAP SETTEXTURE MESHMAP=Tentacle NUM=1 TEXTURE=JTentacle1
+
+//-----------------------------------------------------------------------------
+// Tentacle variables.
+
+// Sounds.
+var() sound
+	ShootSound,		// Sound made when monster shoots.
+	MebaxSound;		// Sound made during mebax.
+
+// Attack damage.
+var() byte WhipDamange; // Damage done by whipping.
+
+// Projectile.
+var() projectile Projectile; // The projectile used.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      ShootSound=None
+      MebaxSound=None
+      WhipDamange=0
+      Projectile=None
+      bCanPossess=False
+      PeripheralVision=-00001.000000
+      TimeBetweenAttacks=+00000.000000
+      AttitudeToPlayer=ATTITUDE_Fear
+      Intelligence=BRAINS_NONE
+      GroundSpeed=+00000.000000
+      WaterSpeed=+00000.000000
+      AccelRate=+00001.000000
+      JumpZ=+00000.000000
+      DrawType=DT_Mesh
+      Mesh=Tentacle
+      CollisionRadius=+00036.000000
+      CollisionHeight=+00059.000000
+      bPitch=False
+      bYaw=False
+      bRoll=False
+      bEnginePhysics=False
+   End DefaultProperties
+End Class
+
+Begin Class Name=Scout
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Scout used for path generation.
+//=============================================================================
+class Scout expands ScriptedPawn
+	package(UnGame);
+
+function PreBeginPlay()
+{
+	Destroy(); //scouts shouldn't exist during play
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      bCanPossess=False
+      TimeBetweenAttacks=+00000.000000
+      AttitudeToPlayer=ATTITUDE_Fear
+      Intelligence=BRAINS_NONE
+      GroundSpeed=+00000.000000
+      WaterSpeed=+00000.000000
+      AccelRate=+00001.000000
+      JumpZ=+00000.000000
+      CollisionRadius=+00052.000000
+      CollisionHeight=+00032.000000
+      bPitch=False
+      bYaw=False
+      bRoll=False
+      bEnginePhysics=False
+   End DefaultProperties
+End Class
+
+Begin Class Name=View
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// A view, used in UnrealEd.
+//=============================================================================
+class View expands ScriptedPawn
+	package(UnEngine);
+
+#exec Texture Import File=..\Graphics\S_Camera.pcx Name=S_Camera Palette=Palette Mips=Off Flags=2
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      TimeBetweenAttacks=+00000.000000
+      AttitudeToPlayer=ATTITUDE_Fear
+      Intelligence=BRAINS_NONE
+      GroundSpeed=+00000.000000
+      WaterSpeed=+00000.000000
+      AccelRate=+00001.000000
+      JumpZ=+00000.000000
+      Location=(-00500.000000,-00300.000000,+00300.000000)
+      Texture=S_Camera
+      CollisionHeight=+00055.000000
+      LightBrightness=100
+      LightRadius=16
+      bPitch=False
+      bYaw=False
+      bRoll=False
+      bEnginePhysics=False
+   End DefaultProperties
+End Class
+
+Begin Class Name=Human
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Human.
+//=============================================================================
+class Human expands ScriptedPawn
+	package(UnGame);
+
+#call ..\Models\Woman.mac
+
+//==================================================================================
+//
+// Animation
+
+function PlayRunning()
+	{
+		//FIXME -check groundspeed, and play walk or run depending on speed
+		LoopAnim(Walk, -1.0/GroundSpeed,true,0.3);
+	}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      BaseEyeHeight=+00022.000000
+      Visibility=128
+      TimeBetweenAttacks=+00000.000000
+      AttitudeToPlayer=ATTITUDE_Fear
+      Intelligence=BRAINS_NONE
+      GroundSpeed=+00320.000000
+      WaterSpeed=+00000.000000
+      AccelRate=+01280.000000
+      MaxStepHeight=+00024.000000
+      DrawType=DT_Mesh
+      Mesh=Woman
+      DrawScale=+00001.330000
+      CollisionRadius=+00018.000000
+      CollisionHeight=+00030.000000
+      LightType=LT_Steady
+      LightBrightness=70
+      LightHue=40
+      LightSaturation=128
+      LightRadius=6
+   End DefaultProperties
+End Class
+
+Begin Class Name=Dragon
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Dragon.
+//=============================================================================
+class Dragon expands ScriptedPawn
+	package(UnGame);
+
+#call ..\Models\Dragon.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+z      bCanPossess=False
+      TimeBetweenAttacks=+00000.000000
+      AttitudeToPlayer=ATTITUDE_Fear
+      Intelligence=BRAINS_NONE
+      GroundSpeed=+00000.000000
+      WaterSpeed=+00000.000000
+      AccelRate=+00001.000000
+      JumpZ=+00000.000000
+      DrawType=DT_Mesh
+      Mesh=Dragon
+      CollisionRadius=+00052.000000
+      CollisionHeight=+00052.000000
+      bPitch=False
+      bYaw=False
+      bRoll=False
+      bEnginePhysics=False
+   End DefaultProperties
+End Class
+

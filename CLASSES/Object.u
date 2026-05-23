@@ -1,0 +1,242 @@
+DeclareClass Name=Class
+DeclareClass Name=Actor
+
+Begin Class Name=Object
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Object: The base class all objects.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class Object
+	intrinsic
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// UObjectBase properties.
+var transient const int   objVftable;
+var transient const name  Name;
+var transient const class Class;
+var transient const int   objFlags;
+var transient const int   objFileCRC;
+var transient const int   objFileHeaderOffset, objFileDataOffset;
+var transient const int   objFileHeaderSize,   objFileDataSize;
+
+//-----------------------------------------------------------------------------
+// UObject properties.
+var transient const int   objReadLocks, objWriteLocks, objTransLocks;
+var transient const int   objDataPtr;
+var transient const int   objIndex;
+var transient const int   objLinker;
+var transient const int   objFileIndex;
+
+//-----------------------------------------------------------------------------
+// FExecStackMain properties.
+var transient const Class   stackLinkClass;
+var transient const int     stackLinkNode;
+var transient const Script  stackScript;
+var transient const int     stackCode;
+var transient const int     stackLocals;
+var transient const Object  stackObject;
+var transient const int     stackProbeMask[2];
+var transient const int     stackVfCache[12];
+
+//=============================================================================
+// Basic intrinsic operators and functions.
+
+// Bool operators.
+intrinsic(129) final preoperator  bool  !  ( bool A );
+intrinsic(242) final operator(24) bool  == ( bool A, bool B );
+intrinsic(243) final operator(26) bool  != ( bool A, bool B );
+intrinsic(130) final operator(30) bool  && ( bool A, skip bool B );
+intrinsic(131) final operator(30) bool  ^^ ( bool A, bool B );
+intrinsic(132) final operator(32) bool  || ( bool A, skip bool B );
+
+// Byte operators.
+intrinsic(133) final operator(34) byte *= ( out byte A, byte B );
+intrinsic(134) final operator(34) byte /= ( out byte A, byte B );
+intrinsic(135) final operator(34) byte += ( out byte A, byte B );
+intrinsic(136) final operator(34) byte -= ( out byte A, byte B );
+intrinsic(137) final preoperator  byte ++ ( out byte A );
+intrinsic(138) final preoperator  byte -- ( out byte A );
+intrinsic(139) final postoperator byte ++ ( out byte A );
+intrinsic(140) final postoperator byte -- ( out byte A );
+
+// Integer operators.
+intrinsic(141) final preoperator  int  ~  ( int A );
+intrinsic(143) final preoperator  int  -  ( int A );
+intrinsic(144) final operator(16) int  *  ( int A, int B );
+intrinsic(145) final operator(16) int  /  ( int A, int B );
+intrinsic(146) final operator(20) int  +  ( int A, int B );
+intrinsic(147) final operator(20) int  -  ( int A, int B );
+intrinsic(148) final operator(22) int  << ( int A, int B );
+intrinsic(149) final operator(22) int  >> ( int A, int B );
+intrinsic(150) final operator(24) bool <  ( int A, int B );
+intrinsic(151) final operator(24) bool >  ( int A, int B );
+intrinsic(152) final operator(24) bool <= ( int A, int B );
+intrinsic(153) final operator(24) bool >= ( int A, int B );
+intrinsic(154) final operator(24) bool == ( int A, int B );
+intrinsic(155) final operator(26) bool != ( int A, int B );
+intrinsic(156) final operator(28) int  &  ( int A, int B );
+intrinsic(157) final operator(28) int  ^  ( int A, int B );
+intrinsic(158) final operator(28) int  |  ( int A, int B );
+intrinsic(159) final operator(34) int  *= ( out int A, int B );
+intrinsic(160) final operator(34) int  /= ( out int A, int B );
+intrinsic(161) final operator(34) int  += ( out int A, int B );
+intrinsic(162) final operator(34) int  -= ( out int A, int B );
+intrinsic(163) final preoperator  int  ++ ( out int A );
+intrinsic(164) final preoperator  int  -- ( out int A );
+intrinsic(165) final postoperator int  ++ ( out int A );
+intrinsic(166) final postoperator int  -- ( out int A );
+
+// Integer functions.
+intrinsic(167) final Function     int  Rand ( int Max );
+intrinsic(249) final function     int  Min   ( int A, int B );
+intrinsic(250) final function     int  Max   ( int A, int B );
+intrinsic(251) final function     int  Clamp ( int V, int A, int B );
+
+// Float operators.
+intrinsic(169) final preoperator  float -  ( float A );
+intrinsic(170) final operator(12) float ** ( float A, float B );
+intrinsic(171) final operator(16) float *  ( float A, float B );
+intrinsic(172) final operator(16) float /  ( float A, float B );
+intrinsic(173) final operator(18) float %  ( float A, float B );
+intrinsic(174) final operator(20) float +  ( float A, float B );
+intrinsic(175) final operator(20) float -  ( float A, float B );
+intrinsic(176) final operator(24) bool  <  ( float A, float B );
+intrinsic(177) final operator(24) bool  >  ( float A, float B );
+intrinsic(178) final operator(24) bool  <= ( float A, float B );
+intrinsic(179) final operator(24) bool  >= ( float A, float B );
+intrinsic(180) final operator(24) bool  == ( float A, float B );
+intrinsic(210) final operator(24) bool  ~= ( float A, float B );
+intrinsic(181) final operator(26) bool  != ( float A, float B );
+intrinsic(182) final operator(34) float *= ( out float A, float B );
+intrinsic(183) final operator(34) float /= ( out float A, float B );
+intrinsic(184) final operator(34) float += ( out float A, float B );
+intrinsic(185) final operator(34) float -= ( out float A, float B );
+
+// Float functions.
+intrinsic(186) final function     float Abs   ( float A );
+intrinsic(187) final function     float Sin   ( float A );
+intrinsic(188) final function     float Cos   ( float A );
+intrinsic(189) final function     float Tan   ( float A );
+intrinsic(190) final function     float Atan  ( float A );
+intrinsic(191) final function     float Exp   ( float A );
+intrinsic(192) final function     float Loge  ( float A );
+intrinsic(193) final function     float Sqrt  ( float A );
+intrinsic(194) final function     float Square( float A );
+intrinsic(195) final function     float FRand ();
+intrinsic(244) final function     float FMin  ( float A, float B );
+intrinsic(245) final function     float FMax  ( float A, float B );
+intrinsic(246) final function     float FClamp( float V, float A, float B );
+intrinsic(247) final function     float Lerp  ( float Alpha, float A, float B );
+intrinsic(248) final function     float Smerp ( float Alpha, float A, float B );
+
+// String operators.
+intrinsic(228) final operator(20) string[255] $  ( coerce string[255] A, coerce String[255] B );
+intrinsic(197) final operator(24) bool        <  ( string[255] A, String[255] B );
+intrinsic(198) final operator(24) bool        >  ( string[255] A, String[255] B );
+intrinsic(199) final operator(24) bool        <= ( string[255] A, String[255] B );
+intrinsic(200) final operator(24) bool        >= ( string[255] A, String[255] B );
+intrinsic(201) final operator(24) bool        == ( string[255] A, String[255] B );
+intrinsic(202) final operator(26) bool        != ( string[255] A, String[255] B );
+intrinsic(168) final operator(24) bool        ~= ( string[255] A, String[255] B );
+
+// String functions.
+intrinsic(204) final function int         Len   ( string[255] S );
+intrinsic(205) final function int         InStr ( string[255] S, string[255] t);
+intrinsic(206) final function string[255] Mid   ( string[255] S, int i, optional int j );
+intrinsic(207) final function string[255] Left  ( string[255] S, int i );
+intrinsic(208) final function string[255] Right ( string[255] S, int i );
+intrinsic(209) final function string[255] Caps  ( string[255] S );
+
+// Vector operators.
+intrinsic(211) final preoperator  vector -     ( vector A );
+intrinsic(212) final operator(16) vector *     ( vector A, float B );
+intrinsic(213) final operator(16) vector *     ( float A, vector B );
+intrinsic(296) final operator(16) vector *     ( vector A, vector B );
+intrinsic(214) final operator(16) vector /     ( vector A, float B );
+intrinsic(215) final operator(20) vector +     ( vector A, vector B );
+intrinsic(216) final operator(20) vector -     ( vector A, vector B );
+intrinsic(275) final operator(22) vector <<    ( vector A, rotation B );
+intrinsic(276) final operator(22) vector >>    ( vector A, rotation B );
+intrinsic(217) final operator(24) bool   ==    ( vector A, vector B );
+intrinsic(218) final operator(26) bool   !=    ( vector A, vector B );
+intrinsic(219) final operator(16) float  Dot   ( vector A, vector B );
+intrinsic(220) final operator(16) vector Cross ( vector A, vector B );
+intrinsic(221) final operator(34) vector *=    ( out vector A, float B );
+intrinsic(297) final operator(34) vector *=    ( out vector A, vector B );
+intrinsic(222) final operator(34) vector /=    ( out vector A, float B );
+intrinsic(223) final operator(34) vector +=    ( out vector A, vector B );
+intrinsic(224) final operator(34) vector -=    ( out vector A, vector B );
+
+// Vector functions.
+intrinsic(225) final function float  Size   ( vector A );
+intrinsic(226) final function vector Normal ( vector A );
+intrinsic(227) final function        Invert ( out vector X, out vector Y, out vector Z );
+intrinsic(252) final function vector VRand  ( );
+intrinsic(253) final function float  Dist   ( vector A, vector B );//todo: Kill
+
+// Rotation operators and functions.
+intrinsic(142) final operator(24) bool ==     ( rotation A, rotation B );
+intrinsic(203) final operator(26) bool !=     ( rotation A, rotation B );
+intrinsic(287) final operator(16) rotation *  ( rotation A, float    B );
+intrinsic(288) final operator(16) rotation *  ( float    A, rotation B );
+intrinsic(289) final operator(16) rotation /  ( rotation A, float    B );
+intrinsic(290) final operator(34) rotation *= ( out rotation A, float B  );
+intrinsic(291) final operator(34) rotation /= ( out rotation A, float B  );
+intrinsic(229) final function GetAxes         ( rotation A, out vector X, out vector Y, out vector Z );
+intrinsic(230) final function GetUnAxes       ( rotation A, out vector X, out vector Y, out vector Z );
+
+// Object operators.
+intrinsic(154) final operator(24) bool == ( Object A, Object B );
+intrinsic(155) final operator(26) bool != ( Object A, Object B );
+
+// Name operators.
+intrinsic(254) final operator(24) bool == ( name A, name B );
+intrinsic(255) final operator(26) bool != ( name A, name B );
+
+//=============================================================================
+// Messaging, logging, error handling.
+
+intrinsic(231) final function Log       ( coerce string[255] S ); // Write to log file.
+intrinsic(232) final function Warn      ( coerce string[255] S ); // Dev warning.
+intrinsic(268)       function Message   ( coerce string[255] S ); // Human readable.
+
+//=============================================================================
+// General functions.
+
+// Classes.
+intrinsic(258) final function bool ClassIsChildOf( class TestClass, class ParentClass );
+
+// Internet.
+intrinsic(274) final function InternetSend( string[80] ToURL, string[255] Msg );
+engine function InternetReceive( string[80] FromURL, string[255] Msg );
+
+//=============================================================================
+// Engine notification functions.
+
+// Updates.
+engine function Tick( float Time );
+
+// Server function.
+engine function Server( float F, name N, string[255] S );
+
+// Querying.
+engine function Callback( object Other );
+
+//=============================================================================
+// Functions.
+
+// Call the other actor's callback; responds to broadcasts.
+final function CallMe( object Other )
+{
+	Other.Callback(Self);
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Object
+   End DefaultProperties
+End Class

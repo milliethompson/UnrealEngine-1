@@ -1,7 +1,7 @@
 /*============================================================================
 UnWnProp.cpp: Properties dialog
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
@@ -15,11 +15,7 @@ Revision history:
 #include "unwn.h"
 #include "UnWnProp.h"
 #include "UnWnPref.h"
-#include "UnWnActD.h"
-#include "UnWnSenD.h"
-#include "UnWnDevD.h"
 #include "UnWnAudD.h"
-#include "UnWnSerD.h"
 #include "UnChecks.h"
 
 #include "UnConfig.h" // So we can save configurations.
@@ -177,20 +173,20 @@ void CDialogProperties::StartNewPage()
         }
         case DevicesPage:
         {
-            NewDialog = new CDialogInputDevices(TabParent);
-            NewDialogId = CDialogInputDevices::IDD;
+            //NewDialog = new CDialogInputDevices(TabParent);
+            //NewDialogId = CDialogInputDevices::IDD;
             break;
         }
         case ActionsPage:
         {
-            NewDialog = new CDialogInputActions(Camera,TabParent);
-            NewDialogId = CDialogInputActions::IDD;
+            //NewDialog = new CDialogInputActions(Camera,TabParent);
+            //NewDialogId = CDialogInputActions::IDD;
             break;
         }
         case SensitivityPage:
         {
-            NewDialog = new CDialogInputSensitivity(Camera,TabParent);
-            NewDialogId = CDialogInputSensitivity::IDD;
+            //NewDialog = new CDialogInputSensitivity(Camera,TabParent);
+            //NewDialogId = CDialogInputSensitivity::IDD;
             break;
         }
 //todo:add        case ServerPage:
@@ -270,6 +266,7 @@ BOOL CDialogProperties::Accept()
         }
         case DevicesPage:
         {
+			/*!!
             CDialogInputDevices & Dialog = *(CDialogInputDevices*)PageDialog;
             Accepted = Dialog.Accept();
             if( Accepted )
@@ -277,10 +274,12 @@ BOOL CDialogProperties::Accept()
                 Camera->Console->GetInput()->SaveValues();
                 //tbd:GConfiguration.WriteValuesToFile( FConfiguration::InputSection );
             }
+			*/
             break;
         }
         case ActionsPage:
         {
+			/*!!
             CDialogInputActions & Dialog = *(CDialogInputActions*)PageDialog;
             Accepted = Dialog.Accept();
             if( Accepted && Dialog.ChangesWereSaved )
@@ -288,10 +287,12 @@ BOOL CDialogProperties::Accept()
                 Camera->Console->GetInput()->SaveValues();
                 //tbd:GConfiguration.WriteValuesToFile( FConfiguration::ActionSection );
             }
+			*/
             break;
         }
         case SensitivityPage:
         {
+			/*!!
             CDialogInputSensitivity & Dialog = *(CDialogInputSensitivity*)PageDialog;
             Accepted = Dialog.Accept();
             if( Accepted && Dialog.ChangesWereSaved )
@@ -299,6 +300,7 @@ BOOL CDialogProperties::Accept()
                 Camera->Console->GetActions()->SaveValues();
                 //tbd:GConfiguration.WriteValuesToFile( FConfiguration::InputSection );
             }
+			*/
             break;
         }
 //todo:add        case ServerPage:

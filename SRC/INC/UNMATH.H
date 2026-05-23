@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnMath.h: Unreal math routines
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -25,523 +25,50 @@ class  FGlobalMath;	// Global math table class.
 	Constants.
 -----------------------------------------------------------------------------*/
 
-#define PI 								(3.1415926535897932)
-#define SQRT2							(1.4142135623730950)
-#define SQRT3							(1.7320508075688772)
-#define LOGE2							(0.6931471805599453)
-#define FLOAT_NONE						(MAXSWORD)
-#define SMALL_NUMBER					(1.e-8)
+#define PI 					(3.1415926535897932)
+#define SQRT2				(1.4142135623730950)
+#define SQRT3				(1.7320508075688772)
+#define LOGE2				(0.6931471805599453)
+#define SMALL_NUMBER		(1.e-8)
+#define KINDA_SMALL_NUMBER	(1.e-4)
 
 /*-----------------------------------------------------------------------------
-	FVector.
+	Templates.
 -----------------------------------------------------------------------------*/
 
-//
-// Information associated with a floating point vector, describing its
-// status as a point in a rendering context.
-//
-enum EVectorFlags
-{
-	FVF_OutXMin		= 0x04,	// Outcode rejection, off left hand side of screen.
-	FVF_OutXMax		= 0x08,	// Outcode rejection, off right hand side of screen.
-	FVF_OutYMin		= 0x10,	// Outcode rejection, off top of screen.
-	FVF_OutYMax		= 0x20,	// Outcode rejection, off bottom of screen.
-	FVF_OutReject   = (FVF_OutXMin | FVF_OutXMax | FVF_OutYMin | FVF_OutYMax), // Outcode rejectable.
-	FVF_OutSkip		= (FVF_OutXMin | FVF_OutXMax | FVF_OutYMin | FVF_OutYMax), // Outcode clippable.
-};
-
-//
-// Floating point vector alignment flags, for directional vectors.  Aids in
-// optimizing trivial transformations.
-//
-enum EVectorAlign
-{
-	FVA_None		= 0,	// Vector isn't axis-aligned.
-	FVA_X			= 1,	// Vector is parallel to the X-Axis.
-	FVA_Y			= 2,	// Vector is parallel to the Y-Axis.
-	FVA_Z			= 3,	// Vector is parallel to the Z-Axis.
-	FVA_Uncached	= 4,	// Indicates that the thing is not cached.
-};
-
-//
-// 32-bit floating point point, vector, plane, and color.
-//
-class UNREAL_API FVector 
-{
-public:
-	union
-	{
-		struct {FLOAT X,Y,Z;};		// Coordinates.
-		struct {FLOAT R,G,B;};		// Color components.
-		struct {FLOAT V[3];};		// Indexed components.
-	};
-	union
-	{
-		// Special flags for 3-component (X,Y,Z) vectors.
-		struct
-		{
-			DWORD	iTransform	:16;// Transformation cache index
-			DWORD	Flags		:8;	// Engine-internal misc flags from EVectorFlags
-			DWORD	Align		:8;	// Engine-internal alignment from EVectorAlign
-		};
-		FLOAT W;					// Fourth coordinate for 4-component (X,Y,Z,D) planes
-	};
-
-	// Math operators.
-	FLOAT&  inline operator() (const int i) {return V[i];};
-	FVector inline operator+  (const FVector &V) const;
-	FVector inline operator+= (const FVector &V);
-	FVector inline operator-  (const FVector &V) const;
-	FVector inline operator-  () const;
-	FVector inline operator-= (const FVector &V);
-	FVector inline operator*  (FLOAT Scale) const;
-	FVector inline operator^  (const FVector &V) const; // Cross product
-	FLOAT   inline operator|  (const FVector &V) const; // Dot product
-	friend FVector inline operator*  (FLOAT Scale,const FVector &V);
-	FVector inline operator*= (FLOAT Scale);
-	FVector inline operator/  (FLOAT Scale) const;
-	FVector inline operator/= (FLOAT Scale);
-	int     inline operator== (const FVector &V) const;
-	int     inline operator!= (const FVector &V) const;
-
-	// Simple functions.
-	FVector inline Make(FLOAT CX, FLOAT CY, FLOAT CZ);
-	FLOAT	inline Size() const;
-	FLOAT	inline SizeSquared() const;
-	FLOAT	inline Size2D() const;
-	int     inline IsNearlyZero() const;
-	int  	inline IsZero() const;
-	int		inline Normalize();
-	FVector inline Normal() const;
-	void	inline NormalizeApprox ();
-	void	inline AddYawed (FLOAT Forward,FLOAT Strafe,INT Yaw);
-	FLOAT	inline GetYawedNormal (INT Yaw);
-	FLOAT   inline GetYawedTangent(INT Yaw);
-	void	inline MoveBounded (const FVector &Delta);
-	FVector inline GridSnap (const FVector &Grid);
-	void	inline MakePlane (const FVector &Base, const FVector &Normal);
-	FLOAT	inline PlaneDot (const FVector &Point) const;
-
-	// Transformation.
-	void	inline TransformVector	(const FCoords &Coords);
-	void	inline TransformPoint	(const FCoords &Coords);
-	FVector inline Mirror			(const FVector &MirrorNormal) const;
-
-	// Complicated functions.
-	FRotation		Rotation					();
-	void			Flip						();
-	void			FindBestAxisVectors(FVector &Axis1,FVector &Axis2);
-
-	// Friends.
-	friend FLOAT   inline FDist					(const FVector &V1, const FVector &V2);
-	friend FLOAT   inline FDistSquared			(const FVector &V1, const FVector &V2);
-	friend FLOAT   inline FDistApprox			(const FVector &V1, const FVector &V2);
-	friend FVector inline FMidpoint				(const FVector &V1, const FVector &V2);
-	friend int     inline FPointsAreSame        (const FVector &P, const FVector &Q);
-	friend int     inline FPointsAreNear        (const FVector &Point1,const FVector &Point2, FLOAT Dist);
-	friend FLOAT   inline FPointPlaneDist       (const FVector &Point,const FVector &PlaneBase,const FVector &PlaneNormal);
-	friend FLOAT   inline FEllipsePlaneDist     (const FVector &Point,const FVector &Weight,const FVector &PlaneOrigin,const FVector &PlaneNormal);
-	friend FVector inline FLinePlaneIntersection(const FVector &Point1,const FVector &Point2,const FVector &PlaneOrigin,const FVector &PlaneNormal);
-	friend int     inline FParallel             (const FVector &Normal1, const FVector &Normal2);
-	friend int     inline FCoplanar             (const FVector &Base1, const FVector &Normal1, const FVector &Base2, const FVector &Normal2);
-	friend FLOAT   inline frand					();
-	friend FLOAT   inline frand					(FLOAT Max);
-	friend FLOAT   inline frand					(FLOAT Min,FLOAT Max);
-	friend void	UNREAL_API InvertVectors (FVector &V1,FVector &V2,FVector &V3,FVector &R1,FVector &R2,FVector &R3);
-	friend void UNREAL_API PerturbNormalVector(FVector &V,const FCoords &C,FLOAT Ratio);
-
-	// Macros to perform an operation on each of a vector's 3 or 4 components. Example.
-	//
-	//	FVector A,B,C;
-	//	forv3(i,A(i)+=B(i)*C(i));
-	#define forv3(_var,_expr) {{const int _var=0;_expr;}{const int _var=1;_expr;}{const int _var=2;_expr;}}
-	#define forv4(_var,_expr) {{const int _var=0;_expr;}{const int _var=1;_expr;}{const int _var=2;_expr;}{const int _var=3;_expr;}}
-};
-
-/*-----------------------------------------------------------------------------
-	FScale.
------------------------------------------------------------------------------*/
-
-//
-// An axis along which sheering is performed
-//
-enum ESheerAxis
-{
-	SHEER_None = 0,
-	SHEER_XY   = 1,
-	SHEER_XZ   = 2,
-	SHEER_YX   = 3,
-	SHEER_YZ   = 4,
-	SHEER_ZX   = 5,
-	SHEER_ZY   = 6,
-};
-
-//
-// Scaling and sheering info associated with a brush.  This is 
-// easily-manipulated information which is built into a transformation
-// matrix later.
-//
-class UNREAL_API FScale 
-{
-public:
-	FVector		Scale;
-	FLOAT		SheerRate;
-	INT			SheerAxis; // From ESheerAxis
-
-	// Functions.
-	FScale inline	Make(FVector CScale,FLOAT CSheerRate,ESheerAxis CSheerAxis);
-	FLOAT  inline	Orientation ();
-	void			Flip();
-};
-
-/*-----------------------------------------------------------------------------
-	FRotation & FFloatRotation.
------------------------------------------------------------------------------*/
-
-//
-// Totation info used throughout Unreal.
-//
-class UNREAL_API FRotation
-{
-public:
-
-	ANGLE_TYPE Pitch;   // Looking up and down (0=Straight Ahead, +Up, -Down).
-	ANGLE_TYPE Yaw;     // Rotating around (running in circles), 0=East, +North, -South.
-	ANGLE_TYPE Roll;    // Rotation about axis of screen, 0=Straight, +Clockwise, -CCW.
-
-	// Operators.
-	FRotation	inline operator+  (const FRotation &V) const;
-	FRotation	inline operator+= (const FRotation &V);
-	FRotation	inline operator-  (const FRotation &V) const;
-	FRotation	inline operator-  () const;
-	FRotation	inline operator-= (const FRotation &V);
-	FRotation inline operator*  (FLOAT Scale) const;
-	friend FRotation inline operator*  (FLOAT Scale,const FRotation &R);
-	FRotation inline operator*= (FLOAT Scale);
-	int			inline operator== (const FRotation &R) const;
-	int			inline operator!= (const FRotation &R) const;
-
-	// Functions.
-	FRotation	inline Make			(INT CPitch,INT CYaw,INT CRoll);
-	void		inline Add			(INT DeltaPitch, INT DeltaYaw, INT DeltaRoll);
-	void		inline AddBounded	(INT DeltaPitch, INT DeltaYaw, INT DeltaRoll);
-	FRotation	inline GridSnap		(const FRotation &RotGrid);
-	FVector		Vector				();
-	void		Flip				();
-};
-
-//
-// Floating point rotation used for high-precision rotation in UnrealEd.
-//
-class FFloatRotation
-{
-public:
-	FLOAT	Pitch;
-	FLOAT	Yaw;
-	FLOAT	Roll;
-};
-
-/*-----------------------------------------------------------------------------
-	FCoords, FModelCoords.
------------------------------------------------------------------------------*/
-
-//
-// A coordinate system matrix.
-//
-class UNREAL_API FCoords
-{
-public:
-	FVector	Origin;
-	FVector	XAxis;
-	FVector YAxis;
-	FVector ZAxis;
-
-	// Simple functions.
-	FCoords inline Make(FVector COrigin, FVector CXAxis, FVector CYAxis, FVector CZAxis);
-	FCoords	inline Transposition();
-
-	// Transformation.
-	void     inline TransformByCoords				(const FCoords   &TransformCoords);
-	void	 inline TransformByRotation				(const FRotation &Rot);
-	void	 inline DeTransformByRotation			(const FRotation &Rot);
-	void	 inline TransformByScale				(const FScale    &Scale);
-	void	 inline DeTransformByScale				(const FScale    &Scale);
-	FCoords  inline Mirror							(const FVector   &MirrorNormal) const; // Mirror must be normal
-
-	// Other.
-	void	Flip									();
-};
-
-//
-// A model coordinate system, describing both the covariant and contravariant
-// transformation matrices to transform points and normals by.
-//
-class UNREAL_API FModelCoords
-{
-public:
-	FCoords PointXform;		// Coordinates to transform points by (covariant).
-	FCoords VectorXform;	// Coordinates to transform normals by (contravariant).
-	void Flip();
-};
-
-/*-----------------------------------------------------------------------------
-	Bounds.
------------------------------------------------------------------------------*/
-
-//
-// A bounding volume in space. Contains an axis-aligned bounding box 
-// (extendeding from Min to Max) and a bounding sphere Sphere.
-//
-class UNREAL_API FBoundingRect
-{
-public:
-	FVector Min;	// X,Y,Z = Box minima
-	FVector Max;	// X,Y,Z = Box maxima
-
-	// Call Init() to initialize to an empty bound centered at 0,0,0.
-	//
-	// To set bounding box and sphere to meaningful values, cycle through all
-	// your points twice (Pass = 0-1) and call Update() with each vertex and
-	// the pass number, then call Finalize() when done.
-	void Init();
-	void Init(FVector *Points,int NumPts);
-	void Flip();
-};
-
-class UNREAL_API FBoundingVolume : public FBoundingRect
-{
-public:
-	FVector Sphere;	// X,Y,Z = Center, D = radius.
-	void Init();
-	void Init(FVector *Points,int NumPts);
-	void Flip();
-};
-
-/*-----------------------------------------------------------------------------
-	FGlobalMath.
------------------------------------------------------------------------------*/
-
-//
-// Global math structure
-//
-class UNREAL_API FGlobalMath
-{
-public:
-	enum {ANGLE_SHIFT 	= 4};		// Bits to shift to get lookup value.
-	enum {ANGLE_BITS	= 12};		// Number of valid bits in angles.
-	enum {NUM_ANGLES 	= 4096}; 	// Number of angles that are in lookup table (was 1024).
-	enum {NUM_SQRTS		= 16384};	// Number of square roots in lookup table.
-	enum {ANGLE_MASK    =  (((1<<FGlobalMath::ANGLE_BITS)-1)<<FGlobalMath::ANGLE_SHIFT)};
-
-	// Tables.
-private:
-	FLOAT  SinFLOAT			[NUM_ANGLES];
-	FLOAT  CosFLOAT			[NUM_ANGLES];
-	FLOAT  SqrtFLOAT		[NUM_SQRTS];
-	FLOAT  LightSqrtFLOAT	[NUM_SQRTS];
-
-	// Basic math functions.
-public:
-	inline FLOAT Sqrt( int i )		{ return SqrtFLOAT[i]; };
-	inline FLOAT LightSqrt( int i ) { return LightSqrtFLOAT[i]; };
-	inline FLOAT SinTab( int i )	{ return SinFLOAT[(i>>ANGLE_SHIFT)&(NUM_ANGLES-1)]; };
-	inline FLOAT CosTab( int i )	{ return CosFLOAT[(i>>ANGLE_SHIFT)&(NUM_ANGLES-1)]; };
-	inline FLOAT SinFloat( FLOAT F ){ return SinFLOAT[(int)((F*NUM_ANGLES)/(2.0*PI))&(NUM_ANGLES-1)]; };
-	inline FLOAT CosFloat( FLOAT F ){ return CosFLOAT[(int)((F*NUM_ANGLES)/(2.0*PI))&(NUM_ANGLES-1)]; };
-
-	// Constants.
-	FVector		VectorMin;
-	FVector		VectorMax;
-	FVector  	UnitVector;
-	FVector  	ZeroVector;
-	FVector  	XAxisVector;
-	FVector  	YAxisVector;
-	FVector  	ZAxisVector;
-	FVector  	WorldMin;
-	FVector  	WorldMax;
-	FVector		UnitScaleVect;
-	FCoords  	UnitCoords;
-	FScale   	UnitScale;
-	FRotation	ZeroRotation;
-	FCoords		CameraViewCoords;
-	FCoords		UncameraViewCoords;
-	FRotation	SixViewRotations[6];
-
-	// Startup and shutdown.
-	void Init();
-	void Exit();
-
-	// Functions.
-	DWORD LogTwo (DWORD N);
-	DWORD NextPowerOfTwo (DWORD N);
-};
-
-//
-// Eliminate all fractional precision from an angle.
-//
-inline INT MaskAngle(INT Angle)
-{
-	return Angle & FGlobalMath::ANGLE_MASK;
-};
-
-/*-----------------------------------------------------------------------------
-	Floating point constants.
------------------------------------------------------------------------------*/
-
-//
-// Lengths of normalized vectors (These are half their maximum values
-// to assure that dot products with normalized vectors don't overflow):
-//
-#define FLOAT_NORMAL_THRESH				(0.0001)
-//
-// Magic numbers required for CSG to work stably:
-//
-#define THRESH_POINT_ON_PLANE			(0.10)		/* Thickness of plane for front/back/inside test */
-#define THRESH_POINT_ON_SIDE			(0.20)		/* Thickness of polygon side's side-plane for point-inside/outside/on side test */
-#define THRESH_POINTS_ARE_SAME			(0.002)		/* Two points are same if within this distance */
-#define THRESH_POINTS_ARE_NEAR			(0.015)		/* Two points are near if within this distance and can be combined if imprecise math is ok */
-#define THRESH_NORMALS_ARE_SAME			(0.00002)	/* Two normal points are same if within this distance */
-													/* Making this too large results in incorrect CSG classification and disaster */
-#define THRESH_VECTORS_ARE_NEAR			(0.0004)	/* Two vectors are near if within this distance and can be combined if imprecise math is ok */
-													/* Making this too large results in lighting problems due to inaccurate texture coordinates */
-#define THRESH_SPLIT_POLY_WITH_PLANE	(0.25)		/* A plane splits a polygon in half */
-#define THRESH_SPLIT_POLY_PRECISELY		(0.01)		/* A plane exactly splits a polygon */
-#define THRESH_ZERO_NORM_SQUARED		(0.01*0.01)	/* Size of a unit normal that is considered "zero", squared */
-#define THRESH_VECTORS_ARE_PARALLEL		(0.02)		/* Vectors are parallel if dot product varies less than this */
-
-#define THRESH_OPTGEOM_COPLANAR			(0.05)		/* Threshold for Bsp geometry optimization */
-#define THRESH_OPTGEOM_COSIDAL			(0.05)		/* Threshold for Bsp geometry optimization */
-
-/*-----------------------------------------------------------------------------
-	Fast, global inline functions.
------------------------------------------------------------------------------*/
-
+// Fixed point conversion.
 inline	int Fix		(int A)			{return A<<16;};
 inline	int Fix		(FLOAT A)		{return A*65536.0;};
 inline	int Unfix	(int A)			{return A>>16;};
 
-template <class T> inline	T   Abs	(const T A)				{return (A>=(T)0) ? A : -A;}
-template <class T> inline	T   Sgn	(const T A)				{return (A>0) ? 1 : ((A<0) ? -1 : 0);}
-template <class T> inline	T	Max	(const T A, const T B)	{return (A>=B) ? A : B;}
-template <class T> inline	T	Min	(const T A, const T B)	{return (A<=B) ? A : B;}
-template <class T> inline	T	Square(const T A)			{return A*A;}
-template <class T> inline   T   Align4(const T A)			{return (A+3)&~3;}
-template <class T> inline   T   Align(const T Ptr, INT Alignment)
-{
-	return (T)
-	(
-		((DWORD)Ptr + Alignment - 1) & ~(Alignment-1)
-	);
-}
+// Standard templates.
+template <class T> inline T Abs(const T A) {return (A>=(T)0) ? A : -A;}
+template <class T> inline T Sgn(const T A) {return (A>0) ? 1 : ((A<0) ? -1 : 0);}
+template <class T> inline T	Max(const T A, const T B) {return (A>=B) ? A : B;}
+template <class T> inline T	Min(const T A, const T B) {return (A<=B) ? A : B;}
+template <class T> inline T	Square(const T A) {return A*A;}
+template <class T> inline T Clamp (const T X, const T Min, const T Max) {return X<Min ? Min : X<Max ? X : Max;}
 
-
-inline FLOAT Min(FLOAT Value1, FLOAT Value2)	{return Value1 <= Value2 ? Value1 : Value2;}
-inline FLOAT Max(FLOAT Value1, FLOAT Value2)	{return Value1 >= Value2 ? Value1 : Value2;}
-inline int Min(int Value1, int Value2)			{return Value1 <= Value2 ? Value1 : Value2;}
-inline int Max(int Value1, int Value2)			{return Value1 >= Value2 ? Value1 : Value2;}
-
-template <class T> inline void Exchange(T A, T B)
-{
-	T Temp = A;
-	A      = B;
-	B      = Temp;
-};
-
-template <class T> inline T Clamp (const T X, const T Min, const T Max)
-{
-	if		((X>=Min) && (X<=Max))	return X;
-	else if	(X<Min)					return Min;
-	else							return Max;
-};
-
-inline void UpdateMin(FVector *Min,FVector *V)
-{
-	if (V->X < Min->X) Min->X = V->X;
-	if (V->Y < Min->Y) Min->Y = V->Y;
-	if (V->Z < Min->Z) Min->Z = V->Z;
-};
-
-inline void UpdateMax(FVector *Max,FVector *V)
-{
-	if (V->X > Max->X) Max->X = V->X;
-	if (V->Y > Max->Y) Max->Y = V->Y;
-	if (V->Z > Max->Z) Max->Z = V->Z;
-};
-
-//
-// Convert a floating point number to an integer.
-// Workaround to VC++'s unbelievably slow conversion routine.
-//
-inline void ftoi(INT &I,FLOAT F)
-{
-#if ASM
-	__asm fld   [F]				// Load as floating point number
-	__asm mov   eax,[I]			// Address of destination
-	__asm fistp [DWORD PTR eax]	// Store as integer and pop
-#else
-	I = (int)floor(F+0.5);		// Note: Very slow code.
-#endif
-};
-
-//
-// Convert a floating point number to a byte.
-// Workaround to VC++'s unbelievably slow conversion routine.
-//
-inline void ftob(BYTE &B,FLOAT F)
-{
-#if ASM
-	INT Temp;
-	__asm fld   [F]				// Load as floating point number.
-	__asm mov   eax,[B]			// Address of destination.
-	__asm fistp [Temp]			// Store as integer and pop.
-	__asm mov   bl,BYTE PTR [Temp]
-	__asm mov   [eax],bl
-#else
-	B = (BYTE)floor(F+0.5);		// Note: Very slow code.
-#endif
-};
-
-inline INT ftoi(FLOAT F)
-{
-#if ASM
-	int I;
-	__asm fld   [F]				// Load as floating point number.
-	__asm fistp [I]				// Store as integer and pop.
-	return I;
-#else
-	return (int)floor(F+0.5);	// Note: Very slow code.
-#endif
-};
+// Alignment templates.
+template <class T> inline T Align(const T Ptr, INT Alignment) {return (T)(((DWORD)Ptr + Alignment - 1) & ~(Alignment-1));}
 
 /*-----------------------------------------------------------------------------
 	Global functions.
 -----------------------------------------------------------------------------*/
 
-FLOAT	inline FSnap		(FLOAT Location, FLOAT Grid);
-FLOAT	inline FSheerSnap	(FLOAT Sheer);
-DWORD	inline FNextPowerOfTwo (DWORD N);
-DWORD	inline FLogTwo		(DWORD N);
-FLOAT	inline FCalcFov		(FLOAT SXR, FLOAT FovAngle);
-WORD	inline FAddAngleConfined(WORD Angle,INT Delta, WORD MinThresh, WORD MaxThresh);
-void	inline FCalcViewCoords (const FVector &Location, const FRotation &Rotation, FCoords &Coords, FCoords &Uncoords);
-
-/*-----------------------------------------------------------------------------
-	Big global functions.
------------------------------------------------------------------------------*/
-
 //
 // Snap a value to the nearest grid multiple.
 //
-FLOAT FSnap (FLOAT Location, FLOAT Grid)
+inline FLOAT FSnap( FLOAT Location, FLOAT Grid )
 {
-	if (Grid==0)	return Location;
+	if( Grid==0.0 )	return Location;
 	else			return floor((Location + 0.5*Grid)/Grid)*Grid;
 }
 
 //
 // Internal sheer adjusting function so it snaps nicely at 0 and 45 degrees.
 //
-FLOAT inline FSheerSnap (FLOAT Sheer)
+inline FLOAT FSheerSnap (FLOAT Sheer)
 {
 	if		(Sheer < -0.65)	return Sheer + 0.15;
 	else if (Sheer > +0.65)	return Sheer - 0.15;
@@ -555,7 +82,7 @@ FLOAT inline FSheerSnap (FLOAT Sheer)
 //
 // Find the closest power of 2 that is >= N.
 //
-DWORD inline FNextPowerOfTwo (DWORD N)
+inline DWORD FNextPowerOfTwo (DWORD N)
 {
 	if (N<=0L		) return 0L;
 	if (N<=1L		) return 1L;
@@ -579,9 +106,9 @@ DWORD inline FNextPowerOfTwo (DWORD N)
 }
 
 //
-// Find the largest number whose base-2 log is <= N.
+// Find the largest number whose base-two log is <= N.
 //
-DWORD inline FLogTwo (DWORD N)
+inline DWORD FLogTwo( DWORD N )
 {
 	if (N<=0L		) return 0;
 	if (N<=1L		) return 0;
@@ -605,449 +132,753 @@ DWORD inline FLogTwo (DWORD N)
 }
 
 //
-// Calculate projection plane distance in pixels,
-// given field of view angle and screen X resolution.
-//
-FLOAT inline FCalcFov( FLOAT SXR, FLOAT FovAngle )
-{
-	WORD TempAngle = (0.5 * 65536.0 / 360.0) * FovAngle;
-	return SXR / (2.0*GMath.SinTab(TempAngle) / GMath.CosTab(TempAngle));
-}
-
-//
 // Add to a word angle, constraining it within a min (not to cross)
 // and a max (not to cross).  Accounts for funkyness of word angles.
 // Assumes that angle is initially in the desired range.
 //
-WORD inline FAddAngleConfined(WORD Angle,INT Delta, WORD MinThresh, WORD MaxThresh)
+inline WORD FAddAngleConfined( INT Angle, INT Delta, INT MinThresh, INT MaxThresh )
 {
-	if( Delta<0 )
+	if( Delta < 0 )
 	{
-		if ((Delta<=-0x10000L) || (Delta<=-(INT)((WORD)(Angle-MinThresh)))) 
+		if ( Delta<=-0x10000L || Delta<=-(INT)((WORD)(Angle-MinThresh)))
 			return MinThresh;
 	}
-	else if (Delta>0)
+	else if( Delta > 0 )
 	{
-		if ((Delta>=0x10000L) || (Delta>=(INT)((WORD)(MaxThresh-Angle)))) 
+		if( Delta>=0x10000L || Delta>=(INT)((WORD)(MaxThresh-Angle)))
 			return MaxThresh;
 	}
-	return (WORD)((INT)Angle+Delta);
+	return (WORD)(Angle+Delta);
+}
+
+/*-----------------------------------------------------------------------------
+	FVector.
+-----------------------------------------------------------------------------*/
+
+// Information associated with a floating point vector, describing its
+// status as a point in a rendering context.
+enum EVectorFlags
+{
+	FVF_OutXMin		= 0x04,	// Outcode rejection, off left hand side of screen.
+	FVF_OutXMax		= 0x08,	// Outcode rejection, off right hand side of screen.
+	FVF_OutYMin		= 0x10,	// Outcode rejection, off top of screen.
+	FVF_OutYMax		= 0x20,	// Outcode rejection, off bottom of screen.
+	FVF_OutReject   = (FVF_OutXMin | FVF_OutXMax | FVF_OutYMin | FVF_OutYMax), // Outcode rejectable.
+	FVF_OutSkip		= (FVF_OutXMin | FVF_OutXMax | FVF_OutYMin | FVF_OutYMax), // Outcode clippable.
+};
+
+//
+// Floating point vector.
+//
+class UNENGINE_API FVector 
+{
+public:
+	union
+	{
+		struct {FLOAT X,Y,Z;};			// Coordinates.
+		struct {FLOAT R,G,B;};			// Color components.
+		struct {FLOAT V[3];};			// Indexed components.
+	};
+
+	// Constructors.
+	FVector() {}
+	FVector( FLOAT InX, FLOAT InY, FLOAT InZ )
+	:	X(InX), Y(InY), Z(InZ) {};
+
+	// Binary math operators.
+	FVector operator^( const FVector &V ) const
+	{
+		return FVector
+		(
+			Y * V.Z - Z * V.Y,
+			Z * V.X - X * V.Z,
+			X * V.Y - Y * V.X
+		);
+	}
+	FLOAT operator|( const FVector &V ) const
+	{
+		return X*V.X + Y*V.Y + Z*V.Z;
+	}
+	friend FVector operator*( FLOAT Scale,const FVector &V )
+	{
+		return FVector( V.X * Scale, V.Y * Scale, V.Z * Scale );
+	}
+	FVector operator+( const FVector &V ) const
+	{
+		return FVector( X + V.X, Y + V.Y, Z + V.Z );
+	}
+	FVector operator-( const FVector &V ) const
+	{
+		return FVector( X - V.X, Y - V.Y, Z - V.Z );
+	}
+	FVector operator*( FLOAT Scale ) const
+	{
+		return FVector( X * Scale, Y * Scale, Z * Scale );
+	}
+	FVector operator/( FLOAT Scale ) const
+	{
+		FLOAT RScale = 1.0/Scale;
+		return FVector( X * RScale, Y * RScale, Z * RScale );
+	}
+	FVector operator*( const FVector &V ) const
+	{
+		return FVector( X * V.X, Y * V.Y, Z * V.Z );
+	}
+
+	// Binary comparison operators.
+	int operator==( const FVector &V ) const
+	{
+		return X==V.X && Y==V.Y && Z==V.Z;
+	}
+	int operator!=( const FVector &V ) const
+	{
+		return X!=V.X || Y!=V.Y || Z!=V.Z;
+	}
+
+	// Unary operators.
+	FVector operator-() const
+	{
+		return FVector( -X, -Y, -Z );
+	}
+	// Assignment operators.
+	FVector operator+=( const FVector &V )
+	{
+		X += V.X; Y += V.Y; Z += V.Z;
+		return *this;
+	}
+	FVector operator-=( const FVector &V )
+	{
+		X -= V.X; Y -= V.Y; Z -= V.Z;
+		return *this;
+	}
+	FVector operator*=( FLOAT Scale )
+	{
+		X *= Scale; Y *= Scale; Z *= Scale;
+		return *this;
+	}
+	FVector operator/=( FLOAT V )
+	{
+		FLOAT RV = 1.0/V;
+		X *= RV; Y *= RV; Z *= RV;
+		return *this;
+	}
+	FVector operator*=( FVector &V )
+	{
+		X *= V.X; Y *= V.Y; Z *= V.Z;
+		return *this;
+	}
+
+	// Simple functions.
+	FLOAT Size() const
+	{
+		return sqrt(X*X+Y*Y+Z*Z);
+	}
+	FLOAT SizeSquared() const
+	{
+		return X*X + Y*Y + Z*Z;
+	}
+	FLOAT Size2D() const 
+	{
+		return sqrt( X*X + Y*Y );
+	}
+	FLOAT SizeSquared2D() const 
+	{
+		return sqrt( X*X + Y*Y );
+	}
+	int IsNearlyZero() const
+	{
+		return Abs(X)<KINDA_SMALL_NUMBER && Abs(Y)<KINDA_SMALL_NUMBER && Abs(Z)<KINDA_SMALL_NUMBER;
+	}
+	int IsZero() const
+	{
+		return X==0.0 && Y==0.0 && Z==0.0;
+	}
+	int Normalize()
+	{
+		FLOAT SquareSum = X*X+Y*Y+Z*Z;
+		if( SquareSum >= SMALL_NUMBER )
+		{
+			FLOAT Scale = 1.0/sqrt(SquareSum);
+			X *= Scale; Y *= Scale; Z *= Scale;
+			return 1;
+		}
+		else return 0;
+	}
+	FVector Normal() const
+	{
+		FLOAT SquareSum = X*X + Y*Y + Z*Z;
+		if( SquareSum >= SMALL_NUMBER )
+		{
+			FLOAT Scale = 1.0/sqrt (SquareSum);
+			return FVector( X*Scale, Y*Scale, Z*Scale );
+		}
+		else return FVector( 0.0, 0.0, 0.0 );
+	}
+	FVector GridSnap( const FVector &Grid )
+	{
+		return FVector( FSnap(X, Grid.X),FSnap(Y, Grid.Y),FSnap(Z, Grid.Z) );
+	}
+	void UpdateMinWith( const FVector &V )
+	{
+		if( V.X < X ) X=V.X;
+		if( V.Y < Y ) Y=V.Y;
+		if( V.Z < Z ) Z=V.Z;
+	}
+	void UpdateMaxWith( const FVector &V )
+	{
+		if( V.X > X ) X=V.X;
+		if( V.Y > Y ) Y=V.Y;
+		if( V.Z > Z ) Z=V.Z;
+	}
+	FVector BoundToCube( FLOAT Radius )
+	{
+		return FVector
+		(
+			Clamp(X,-Radius,Radius),
+			Clamp(Y,-Radius,Radius),
+			Clamp(Z,-Radius,Radius)
+		);
+	}
+	void AddBounded( const FVector &V, FLOAT Radius=MAXSWORD )
+	{
+		*this = (*this + V).BoundToCube(Radius);
+	}
+
+	// Return a boolean that is based on the vector's direction.
+	// When      V==zero vector Booleanize(0)=1.
+	// Otherwise Booleanize(V) <-> !Booleanize(!B).
+	BOOL Booleanize()
+	{
+		return
+			X >  0.0 ? 1 :
+			X <  0.0 ? 0 :
+			Y >  0.0 ? 1 :
+			Y <  0.0 ? 0 :
+			Z >= 0.0 ? 1 : 0;
+	}
+	void GetHSV( BYTE H, BYTE S, BYTE V, INT ColorBytes );
+
+	// Transformation.
+	FVector TransformVectorBy					(const FCoords &Coords) const;
+	FVector TransformPointBy					(const FCoords &Coords) const;
+	FVector MirrorBy							(const FVector &MirrorNormal) const;
+
+	// Complicated functions.
+	FRotation		Rotation					();
+	void			FindBestAxisVectors			(FVector &Axis1, FVector &Axis2);
+
+	// Friends.
+	friend inline FLOAT   FDist					(const FVector &V1, const FVector &V2);
+	friend inline FLOAT   FDistSquared			(const FVector &V1, const FVector &V2);
+	friend inline FLOAT   FDistApprox			(const FVector &V1, const FVector &V2);
+	friend inline FVector FMidpoint				(const FVector &V1, const FVector &V2);
+	friend inline int     FPointsAreSame        (const FVector &P, const FVector &Q);
+	friend inline int     FPointsAreNear        (const FVector &Point1,const FVector &Point2, FLOAT Dist);
+	friend inline FLOAT   FPointPlaneDist       (const FVector &Point,const FVector &PlaneBase,const FVector &PlaneNormal);
+	friend inline FVector FLinePlaneIntersection(const FVector &Point1,const FVector &Point2,const FVector &PlaneOrigin,const FVector &PlaneNormal);
+	friend inline int     FParallel             (const FVector &Normal1, const FVector &Normal2);
+	friend inline int     FCoplanar             (const FVector &Base1, const FVector &Normal1, const FVector &Base2, const FVector &Normal2);
+
+	// Serializer.
+	friend FArchive& operator<<( FArchive &Ar, FVector &V )
+	{
+		return Ar << V.X << V.Y << V.Z;
+	}
+};
+
+/*-----------------------------------------------------------------------------
+	FPlane.
+-----------------------------------------------------------------------------*/
+
+class UNENGINE_API FPlane : public FVector
+{
+public:
+	// Variables.
+	FLOAT W;
+
+	// Constructors.
+	FPlane() {}
+	FPlane( const FVector &V )
+	:	FVector(V)
+	,	W(0)
+	{}
+	FPlane( FLOAT InX, FLOAT InY, FLOAT InZ, FLOAT InW )
+	:	FVector(InX,InY,InZ)
+	,	W(InW)
+	{}
+	FPlane( const FVector &InBase, const FVector &InNormal )
+	:	FVector(InNormal)
+	,	W(InBase | InNormal)
+	{}
+
+	// Functions.
+	FLOAT PlaneDot( const FVector &P ) const
+	{
+		return X*P.X + Y*P.Y + Z*P.Z - W;
+	}
+
+	// Serializer.
+	friend FArchive& operator<<( FArchive &Ar, FPlane &P )
+	{
+		return Ar << (FVector&)P << P.W;
+	}
+};
+
+/*-----------------------------------------------------------------------------
+	FScale.
+-----------------------------------------------------------------------------*/
+
+// An axis along which sheering is performed.
+enum ESheerAxis
+{
+	SHEER_None = 0,
+	SHEER_XY   = 1,
+	SHEER_XZ   = 2,
+	SHEER_YX   = 3,
+	SHEER_YZ   = 4,
+	SHEER_ZX   = 5,
+	SHEER_ZY   = 6,
+};
+
+//
+// Scaling and sheering info associated with a brush.  This is 
+// easily-manipulated information which is built into a transformation
+// matrix later.
+//
+class UNENGINE_API FScale 
+{
+public:
+	// Variables.
+	FVector		Scale;
+	FLOAT		SheerRate;
+	INT			SheerAxis; // From ESheerAxis
+
+	// Serializer.
+	friend FArchive& operator<< (FArchive &Ar, FScale &S )
+		{return Ar << S.Scale << S.SheerRate << S.SheerAxis;}
+
+	// Constructors.
+	FScale() {}
+	FScale( const FVector &InScale, FLOAT InSheerRate, ESheerAxis InSheerAxis )
+	:	Scale(InScale), SheerRate(InSheerRate), SheerAxis(InSheerAxis) {}
+
+	// Operators.
+	int operator==( const FScale &S ) const
+	{
+		return Scale==S.Scale && SheerRate==S.SheerRate && SheerAxis==S.SheerAxis;
+	}
+
+	// Functions.
+	FLOAT  Orientation()
+	{
+		return Sgn(Scale.X * Scale.Y * Scale.Z);
+	}
+};
+
+/*-----------------------------------------------------------------------------
+	FCoords.
+-----------------------------------------------------------------------------*/
+
+//
+// A coordinate system matrix.
+//
+class UNENGINE_API FCoords
+{
+public:
+	FVector	Origin;
+	FVector	XAxis;
+	FVector YAxis;
+	FVector ZAxis;
+
+	// Constructors.
+	FCoords() {}
+	FCoords( const FVector &InOrigin, const FVector &InX, const FVector &InY, const FVector &InZ )
+	:	Origin(InOrigin), XAxis(InX), YAxis(InY), ZAxis(InZ) {}
+
+	// Operators.
+	FCoords	 Transpose	() const;
+	FCoords  Inverse    () const;
+	FCoords	 operator*	(const FCoords   &TransformCoords) const;
+	FCoords& operator*=	(const FCoords   &TransformCoords);
+	FCoords  operator*	(const FRotation &Rot) const;
+	FCoords& operator*=	(const FRotation &Rot);
+	FCoords  operator/	(const FRotation &Rot) const;
+	FCoords& operator/=	(const FRotation &Rot);
+	FCoords  operator*	(const FScale    &Scale) const;
+	FCoords& operator*=	(const FScale    &Scale);
+	FCoords  operator/	(const FScale    &Scale) const;
+	FCoords& operator/=	(const FScale    &Scale);
+	FCoords  Mirror		(const FVector   &MirrorNormal) const;
+};
+
+/*-----------------------------------------------------------------------------
+	FModelCoords.
+-----------------------------------------------------------------------------*/
+
+//
+// A model coordinate system, describing both the covariant and contravariant
+// transformation matrices to transform points and normals by.
+//
+class UNENGINE_API FModelCoords
+{
+public:
+	FCoords PointXform;		// Coordinates to transform points by (covariant).
+	FCoords VectorXform;	// Coordinates to transform normals by (contravariant).
+};
+
+/*-----------------------------------------------------------------------------
+	FRotation.
+-----------------------------------------------------------------------------*/
+
+//
+// Rotation.
+//
+class UNENGINE_API FRotation
+{
+public:
+	// Variables.
+	INT Pitch; // Looking up and down (0=Straight Ahead, +Up, -Down).
+	INT Yaw;   // Rotating around (running in circles), 0=East, +North, -South.
+	INT Roll;  // Rotation about axis of screen, 0=Straight, +Clockwise, -CCW.
+
+	// Serializer.
+	friend FArchive& operator<< (FArchive &Ar, FRotation &R )
+	{
+		WORD wPitch = R.Pitch;
+		WORD wYaw   = R.Yaw;
+		WORD wRoll  = R.Roll;
+		Ar << wPitch << wYaw << wRoll;
+		R.Pitch     = wPitch;
+		R.Yaw       = wYaw;
+		R.Roll      = wRoll;
+		return Ar;
+	}
+
+	// Constructors.
+	FRotation() {}
+	FRotation( INT InPitch, INT InYaw, INT InRoll )
+	:	Pitch(InPitch), Yaw(InYaw), Roll(InRoll) {}
+
+	// Binary arithmetic operators.
+	FRotation operator+( const FRotation &R ) const
+	{
+		return FRotation( Pitch+R.Pitch, Yaw+R.Yaw, Roll+R.Roll );
+	}
+	FRotation operator-( const FRotation &R ) const
+	{
+		return FRotation( Pitch-R.Pitch, Yaw-R.Yaw, Roll-R.Roll );
+	}
+	FRotation operator*( FLOAT Scale ) const
+	{
+		return FRotation( Pitch*Scale, Yaw*Scale, Roll*Scale );
+	}
+	friend FRotation operator*( FLOAT Scale, const FRotation &R )
+	{
+		return FRotation( R.Pitch*Scale, R.Yaw*Scale, R.Roll*Scale );
+	}
+	FRotation operator*= (FLOAT Scale)
+	{
+		Pitch *= Scale; Yaw *= Scale; Roll *= Scale;
+		return *this;
+	}
+	// Binary comparison operators.
+	int operator==( const FRotation &R ) const
+	{
+		return Pitch==R.Pitch && Yaw==R.Yaw && Roll==R.Roll;
+	}
+	int operator!=( const FRotation &V ) const
+	{
+		return Pitch!=V.Pitch || Yaw!=V.Yaw || Roll!=V.Roll;
+	}
+	// Assignment operators.
+	FRotation operator+=( const FRotation &R )
+	{
+		Pitch += R.Pitch; Yaw += R.Yaw; Roll += R.Roll;
+		return *this;
+	}
+	FRotation operator-=( const FRotation &R )
+	{
+		Pitch -= R.Pitch; Yaw -= R.Yaw; Roll -= R.Roll;
+		return *this;
+	}
+	// Functions.
+	int IsZero() const
+	{
+		return ((Pitch&65535)==0) && ((Yaw&65535)==0) && ((Roll&65535)==0);
+	}
+	FRotation Add( INT DeltaPitch, INT DeltaYaw, INT DeltaRoll )
+	{
+		Yaw   += DeltaYaw;
+		Pitch += DeltaPitch;
+		Roll  += DeltaRoll;
+		return *this;
+	}
+	FRotation AddBounded( INT DeltaPitch, INT DeltaYaw, INT DeltaRoll )
+	{
+		Yaw  += DeltaYaw;
+		Pitch = FAddAngleConfined(Pitch,DeltaPitch,192*0x100,64*0x100);
+		Roll  = FAddAngleConfined(Roll, DeltaRoll, 192*0x100,64*0x100);
+		return *this;
+	}
+	FRotation GridSnap( const FRotation &RotGrid )
+	{
+		return FRotation
+		(
+			FSnap(Pitch,RotGrid.Pitch),
+			FSnap(Yaw,  RotGrid.Yaw),
+			FSnap(Roll, RotGrid.Roll)
+		);
+	}
+	FVector Vector();
+};
+
+/*-----------------------------------------------------------------------------
+	Bounds.
+-----------------------------------------------------------------------------*/
+
+//
+// A rectangular minimum bounding volume.
+//
+class UNENGINE_API FBoundingRect
+{
+public:
+	// Variables.
+	FVector Min;
+	FVector Max;
+	BYTE    IsValid;
+
+	// Merger.
+	FBoundingRect& operator+=( const FBoundingRect &Other )
+	{
+		Min.X = ::Min( Min.X, Other.Min.X );
+		Min.Y = ::Min( Min.Y, Other.Min.Y );
+		Min.Z = ::Min( Min.Z, Other.Min.Z );
+
+		Max.X = ::Max( Max.X, Other.Max.X );
+		Max.Y = ::Max( Max.Y, Other.Max.Y );
+		Max.Z = ::Max( Max.Z, Other.Max.Z );
+
+		return *this;
+	}
+	FBoundingRect operator+( const FBoundingRect &Other ) const
+	{
+		return FBoundingRect(*this) += Other;
+	}
+
+	// Call Init() to initialize to an empty bound centered at 0,0,0.
+	// To set bounding box and sphere to meaningful values, cycle through all
+	// your points twice (Pass = 0-1) and call Update() with each vertex and
+	// the pass number, then call Finalize() when done.
+	void Init();
+	void Init( FVector *Points, int NumPts );
+
+	// Serializer.
+	friend FArchive& operator<< (FArchive &Ar, FBoundingRect &Bound)
+	{
+		return Ar << Bound.Min << Bound.Max << Bound.IsValid;
+	}
+};
+
+//
+// A rectangular and spherical minimum bounding volume.
+//
+class UNENGINE_API FBoundingVolume : public FBoundingRect
+{
+public:
+
+	// Variables.
+	FPlane Sphere; // X,Y,Z = Center, D = radius.
+
+	// Functions.
+	void Init();
+	void Init(FVector *Points,int NumPts);
+
+	// Serializer.
+	friend FArchive& operator<< (FArchive &Ar, FBoundingVolume &Bound)
+	{
+		return Ar << (FBoundingRect&)Bound << Bound.Sphere;
+	}
+};
+
+/*-----------------------------------------------------------------------------
+	FGlobalMath.
+-----------------------------------------------------------------------------*/
+
+//
+// Global mathematics info.
+//
+class UNENGINE_API FGlobalMath
+{
+public:
+	// Constants.
+	enum {ANGLE_SHIFT 	= 2};		// Bits to right-shift to get lookup value.
+	enum {ANGLE_BITS	= 12};		// Number of valid bits in angles.
+	enum {NUM_ANGLES 	= 4096}; 	// Number of angles that are in lookup table.
+	enum {NUM_SQRTS		= 16384};	// Number of square roots in lookup table.
+	enum {ANGLE_MASK    =  (((1<<FGlobalMath::ANGLE_BITS)-1)<<FGlobalMath::ANGLE_SHIFT)};
+
+	// Class constants.
+	const FVector	VectorMin;
+	const FVector	VectorMax;
+	const FVector  	UnitVector;
+	const FVector  	ZeroVector;
+	const FVector  	XAxisVector;
+	const FVector  	YAxisVector;
+	const FVector  	ZAxisVector;
+	const FVector  	WorldMin;
+	const FVector  	WorldMax;
+	const FVector	UnitScaleVect;
+	const FCoords  	UnitCoords;
+	const FScale   	UnitScale;
+	const FRotation	ZeroRotation;
+	const FCoords	CameraViewCoords;
+	const FCoords	UncameraViewCoords;
+	const FRotation	View0,View1,View2,View3,View4,View5;
+	const FRotation	*Views[6];
+
+	// Basic math functions.
+	FLOAT Sqrt( int i )
+	{
+		return SqrtFLOAT[i]; 
+	}
+	FLOAT SinTab( int i )
+	{
+		int Ofs = (i>>14) & 3; 
+		return SinSIGN[Ofs] * TrigFLOAT[((i>>ANGLE_SHIFT)&(NUM_ANGLES-1)) ^ SinMASK[Ofs]];
+	}
+	FLOAT CosTab( int i )
+	{
+		int Ofs = (i>>14) & 3; 
+		return CosSIGN[Ofs] * TrigFLOAT[((i>>ANGLE_SHIFT)&(NUM_ANGLES-1)) ^ CosMASK[Ofs]];
+	}
+	FLOAT SinFloat( FLOAT F )
+	{
+		return SinTab((F*65536)/(2.0*PI));
+	}
+	FLOAT CosFloat( FLOAT F )
+	{
+		return CosTab((F*65536)/(2.0*PI));
+	}
+
+	// Constructor.
+	FGlobalMath();
+
+private:
+	// Tables.
+	FLOAT  TrigFLOAT		[NUM_ANGLES];
+	FLOAT  SqrtFLOAT		[NUM_SQRTS];
+	FLOAT  LightSqrtFLOAT	[NUM_SQRTS];
+	FLOAT  SinSIGN[4], CosSIGN[4];
+	INT    SinMASK[4], CosMASK[4];
+};
+
+//
+// Eliminate all fractional precision from an angle.
+//
+inline INT MaskAngle(INT Angle)
+{
+	return Angle & FGlobalMath::ANGLE_MASK;
+};
+
+//
+// Compute view transformation and detransformation coordinate systems
+// for a given location and rotation.
+//
+inline void FCalcViewCoords
+(
+	const FVector	&Location, 
+	const FRotation &Rotation,
+	FCoords			&Coords, 
+	FCoords			&Uncoords
+)
+{
+	Coords         = GMath.CameraViewCoords / Rotation;
+	Coords.Origin  = Location;
+	Uncoords       = Coords.Transpose();
 }
 
 //
 // Compute view transformation and detransformation coordinate systems
 // for a given location and rotation.
 //
-void inline FCalcViewCoords (const FVector &Location, const FRotation &Rotation,
-	FCoords &Coords, FCoords &Uncoords)
-	{
-	Coords = GMath.CameraViewCoords;
-	Coords.DeTransformByRotation (Rotation);
-	Coords.Origin = Location;
-	//
-	Uncoords.XAxis.X = Coords.XAxis.X;
-	Uncoords.XAxis.Y = Coords.YAxis.X;
-	Uncoords.XAxis.Z = Coords.ZAxis.X;
-	//
-	Uncoords.YAxis.X = Coords.XAxis.Y;
-	Uncoords.YAxis.Y = Coords.YAxis.Y;
-	Uncoords.YAxis.Z = Coords.ZAxis.Y;
-	//
-	Uncoords.ZAxis.X = Coords.XAxis.Z;
-	Uncoords.ZAxis.Y = Coords.YAxis.Z;
-	Uncoords.ZAxis.Z = Coords.ZAxis.Z;
-	//
-	Uncoords.Origin  = -Location;
-	Uncoords.Origin.TransformVector(Coords);
-	};
-
+inline void FCalcWorldCoords
+(
+	const FVector	&Location, 
+	const FRotation &Rotation,
+	FCoords			&Coords, 
+	FCoords			&Uncoords
+)
+{
+	Coords         = GMath.UnitCoords / Rotation;
+	Coords.Origin  = Location;
+	Uncoords       = Coords.Transpose();
+}
 /*-----------------------------------------------------------------------------
-	FVector implementation.
+	Floating point constants.
 -----------------------------------------------------------------------------*/
 
-///////////////////////
-// FVector Operators //
-///////////////////////
-
-FVector inline FVector::operator+= (const FVector &V)
-{
-	X += V.X; Y += V.Y; Z += V.Z;
-	return *this;
-}
-
-FVector inline FVector::operator-= (const FVector &V)
-{
-	X -= V.X; Y -= V.Y; Z -= V.Z;
-	return *this;
-}
-
-FVector inline FVector::operator*= (FLOAT Scale)
-{
-	X *= Scale; Y *= Scale; Z *= Scale;
-	return *this;
-}
+//
+// Lengths of normalized vectors (These are half their maximum values
+// to assure that dot products with normalized vectors don't overflow).
+//
+#define FLOAT_NORMAL_THRESH				(0.0001)
 
 //
-// Cross product operator: The vector cross product of two vectors.  
-// The result is perpendicular to both input vectors and its magnitude
-// is |V1| |V2| cos (Angle), zero if either vector is 
-// zero or they are parallel.
+// Magic numbers for numerical precision.
 //
-FVector inline FVector::operator^ (const FVector &V) const
-{
-	FVector Result;
-	Result.X = Y * V.Z - Z * V.Y;
-	Result.Y = Z * V.X - X * V.Z;
-	Result.Z = X * V.Y - Y * V.X;
-	return Result;
-}
+#define THRESH_POINT_ON_PLANE			(0.10)		/* Thickness of plane for front/back/inside test */
+#define THRESH_POINT_ON_SIDE			(0.20)		/* Thickness of polygon side's side-plane for point-inside/outside/on side test */
+#define THRESH_POINTS_ARE_SAME			(0.002)		/* Two points are same if within this distance */
+#define THRESH_POINTS_ARE_NEAR			(0.015)		/* Two points are near if within this distance and can be combined if imprecise math is ok */
+#define THRESH_NORMALS_ARE_SAME			(0.00002)	/* Two normal points are same if within this distance */
+													/* Making this too large results in incorrect CSG classification and disaster */
+#define THRESH_VECTORS_ARE_NEAR			(0.0004)	/* Two vectors are near if within this distance and can be combined if imprecise math is ok */
+													/* Making this too large results in lighting problems due to inaccurate texture coordinates */
+#define THRESH_SPLIT_POLY_WITH_PLANE	(0.25)		/* A plane splits a polygon in half */
+#define THRESH_SPLIT_POLY_PRECISELY		(0.01)		/* A plane exactly splits a polygon */
+#define THRESH_ZERO_NORM_SQUARED		(0.01*0.01)	/* Size of a unit normal that is considered "zero", squared */
+#define THRESH_VECTORS_ARE_PARALLEL		(0.02)		/* Vectors are parallel if dot product varies less than this */
 
-//
-// Dot product operator: The scalar dot product of two vectors.  
-// The magnitude is |V1| |V2| sin (Angle), zero if either vector 
-// is zero or they are perpendicular.
-//
-FLOAT inline FVector::operator| (const FVector &V) const
-{
-	return X*V.X + Y*V.Y + Z*V.Z;
-}
-
-FVector inline operator* (FLOAT Scale,const FVector &V)
-{
-	FVector Result;
-	Result.X = V.X * Scale;
-	Result.Y = V.Y * Scale;
-	Result.Z = V.Z * Scale;
-	return Result;
-}
-
-FVector inline FVector::operator/= (FLOAT V)
-{
-	FLOAT RV = 1.0/V;
-	X *= RV; Y *= RV; Z *= RV;
-	return *this;
-}
-
-FVector inline FVector::operator+ (const FVector &V) const
-{
-	FVector Temp;
-	Temp.X = X + V.X; Temp.Y = Y + V.Y; Temp.Z = Z + V.Z;
-	return Temp;
-}
-
-FVector inline FVector::operator- (const FVector &V) const
-{
-	FVector Temp;
-	Temp.X = X - V.X; Temp.Y = Y - V.Y; Temp.Z = Z - V.Z;
-	return Temp;
-}
-
-FVector inline FVector::operator- () const
-{
-	FVector Temp;
-	Temp.X = -X; Temp.Y = -Y; Temp.Z = -Z;
-	return Temp;
-}
-
-FVector inline FVector::operator* (FLOAT Scale ) const
-{
-	FVector Temp;
-	Temp.X = X * Scale; Temp.Y = Y * Scale; Temp.Z = Z * Scale;
-	return Temp;
-}
-
-FVector inline FVector::operator/ (FLOAT Scale) const
-{
-	FVector Temp;
-	FLOAT	RScale = 1.0/Scale;
-	Temp.X = X * RScale; Temp.Y = Y * RScale; Temp.Z = Z * RScale;
-	return Temp;
-}
-
-int inline FVector::operator== (const FVector &V) const
-{
-	return (X==V.X) && (Y==V.Y) && (Z==V.Z);
-}
-
-int inline FVector::operator!= (const FVector &V) const
-{
-	return (X!=V.X) || (Y!=V.Y) || (Z!=V.Z);
-}
-
-///////////////////////
-// FVector Functions //
-///////////////////////
-
-//
-// Make a floating point vector from three floating point values.
-//
-FVector inline FVector::Make(FLOAT CX, FLOAT CY, FLOAT CZ)
-{
-	X          = CX;
-	Y          = CY;
-	Z          = CZ;
-	iTransform = MAXWORD;
-	Flags      = 0;
-	Align      = 0;
-	return *this;
-}
-
-//
-// The euclidean size of a vector.
-//
-FLOAT inline FVector::Size() const
-{
-	return sqrt(X*X+Y*Y+Z*Z);
-}
-
-//
-// The size of a vector, squared.
-//
-FLOAT inline FVector::SizeSquared() const
-{
-	return X*X+Y*Y+Z*Z;
-}
-
-//
-// The 2D size of the X and Y components of a vector, disregarding Z.
-//
-FLOAT inline FVector::Size2D() const 
-{
-	return sqrt(X*X+Y*Y);
-}
-
-//
-// See if a vector is nearly zero.
-//
-int inline FVector::IsNearlyZero() const
-{
-	return (Abs(X)<0.0001)&&(Abs(Y)<0.0001)&&(Abs(Z)<0.0001);
-}
-
-//
-// See if a vector is exactly zero.
-//
-int inline FVector::IsZero() const
-{
-	return (X==0.0)&&(Y==0.0)&&(Z==0.0);
-}
-
-//
-// Normalize a vector.  Returns 1 if ok, or 0 if the vector was
-// too small to be normalized properly.
-//
-inline int FVector::Normalize()
-{
-	FLOAT SquareSum;
-	FLOAT Scale;
-
-	SquareSum = X*X+Y*Y+Z*Z;
-	if (SquareSum >= 0.0000001)
-	{
-		Scale     = 1.0/sqrt (SquareSum);
-		X        *= Scale;
-		Y        *= Scale;
-		Z        *= Scale;
-		return 1;
-	}
-	else return 0;
-}
-
-//
-// Return normal of a vector. If too small, returns a zero vector.
-//
-inline FVector FVector::Normal() const
-{
-	FVector Result;
-	FLOAT	SquareSum;
-	FLOAT	Scale;
-
-	SquareSum = X*X+Y*Y+Z*Z;
-	if(SquareSum >= 0.0000001)
-	{
-		Scale		= 1.0/sqrt (SquareSum);
-		Result.X    = X * Scale;
-		Result.Y    = Y * Scale;
-		Result.Z    = Z * Scale;
-	}
-	else
-	{
-		Result.X = Result.Y = Result.Z = 0.0;
-	}
-	return Result;
-}
-
-//
-// Approximately normalize a vector, preserving its direction exactly.
-// +/- 9% size error.
-//
-void inline FVector::NormalizeApprox ()
-{
-	FLOAT	Min,Med,Max,Temp,Scale;
-
-	// Returns distance plus or minus 8% error, from Jack Ritter, Graphics Gems I.
-	Min = Abs(X);
-	Med = Abs(Y);
-	Max = Abs(Z);
-
-	if (Max<Med) {Temp = Max; Max = Med; Med = Temp;};
-	if (Max<Min) {Temp = Max; Max = Min; Min = Temp;};
-
-	Scale = 1.0 / (Max + (11.0/32.0)*Med + (1.0/4.0)*Min);
-
-	X *= Scale;
-	Y *= Scale;
-	Z *= Scale;
-}
-
-//
-// Snap a point to the nearest grid lattice point.
-//
-FVector inline FVector::GridSnap (const FVector &Grid)
-{
-	FVector Result;
-	Result.X = FSnap (X,Grid.X);
-	Result.Y = FSnap (Y,Grid.Y);
-	Result.Z = FSnap (Z,Grid.Z);
-	return Result;
-}
-
-//
-// Make an XYZW plane from the specified base and normal vectors.
-//
-void inline FVector::MakePlane (const FVector &Base, const FVector &Normal)
-{
-	*this	= Normal;
-	W		= Base | Normal;
-}
-
-//
-// Return the dot product of this plane with a point,
-// assumes that X, Y, Z, and W are valid.
-//
-FLOAT inline FVector::PlaneDot (const FVector &Point) const
-{
-	return
-	(	
-		X * Point.X
-		+	Y * Point.Y
-		+	Z * Point.Z
-		-	W
-	);
-}
-
-//
-// For moving the player forward and sideways.
-//
-void inline FVector::AddYawed (FLOAT Forward,FLOAT Strafe,INT Yaw)
-{
-	X +=	Forward * +GMath.CosTab(Yaw) +
-			Strafe  * -GMath.SinTab(Yaw);
-	Y +=	Forward * +GMath.SinTab(Yaw) +
-   			Strafe  * +GMath.CosTab(Yaw);
-}
-
-//
-// For finding the forward velocity of the player.
-//
-FLOAT inline FVector::GetYawedNormal (INT Yaw)
-{
-	return X * +GMath.CosTab(Yaw) + Y * +GMath.SinTab(Yaw);
-}
-
-//
-// For finding the sideways velocity of the player.
-//
-FLOAT inline FVector::GetYawedTangent(INT Yaw)
-{
-	return X * -GMath.SinTab(Yaw) + Y * +GMath.CosTab(Yaw);
-}
-
-////////////////////////////
-// FVector Transformation //
-////////////////////////////
+/*-----------------------------------------------------------------------------
+	FVector transformation.
+-----------------------------------------------------------------------------*/
 
 //
 // Transform a directional vector by a coordinate system.
 // Ignore's the coordinate system's origin.
 //
-void inline FVector::TransformVector (const FCoords &Coords)
+inline FVector FVector::TransformVectorBy( const FCoords &Coords ) const
 {
-	FVector TempPoint = *this;
-
-	X = TempPoint.X * Coords.XAxis.X +
-		TempPoint.Y * Coords.XAxis.Y +
-		TempPoint.Z * Coords.XAxis.Z;
-	Y = TempPoint.X  * Coords.YAxis.X +
-		TempPoint.Y * Coords.YAxis.Y +
-		TempPoint.Z * Coords.YAxis.Z;
-	Z = TempPoint.X * Coords.ZAxis.X +
-		TempPoint.Y * Coords.ZAxis.Y +
-		TempPoint.Z * Coords.ZAxis.Z;
+	return FVector(	*this | Coords.XAxis, *this | Coords.YAxis, *this | Coords.ZAxis );
 }
 
 //
 // Transform a point by a coordinate system, moving
 // it by the coordinate system's origin if nonzero.
 //
-void inline FVector::TransformPoint (const FCoords &Coords)
+inline FVector FVector::TransformPointBy( const FCoords &Coords ) const
 {
-	FVector TempPoint;
-
-	TempPoint.X = X - Coords.Origin.X;
-	TempPoint.Y = Y - Coords.Origin.Y;
-	TempPoint.Z = Z - Coords.Origin.Z;
-
-	X = TempPoint.X * Coords.XAxis.X +
-		TempPoint.Y * Coords.XAxis.Y +
-		TempPoint.Z * Coords.XAxis.Z;
-	Y = TempPoint.X * Coords.YAxis.X +
-		TempPoint.Y * Coords.YAxis.Y +
-		TempPoint.Z * Coords.YAxis.Z;
-	Z = TempPoint.X * Coords.ZAxis.X +
-		TempPoint.Y * Coords.ZAxis.Y +
-		TempPoint.Z * Coords.ZAxis.Z;
+	FVector Temp = *this - Coords.Origin;
+	return FVector(	Temp | Coords.XAxis, Temp | Coords.YAxis, Temp | Coords.ZAxis );
 }
 
 //
 // Mirror a vector about a normal vector.
 //
-FVector inline FVector::Mirror (const FVector &MirrorNormal) const
+inline FVector FVector::MirrorBy( const FVector &MirrorNormal ) const
 {
-	FLOAT OutFactor = 2.0 * (X * MirrorNormal.X + Y * MirrorNormal.Y + Z * MirrorNormal.Z);
-
-	FVector Result;
-	Result.X = X - OutFactor * MirrorNormal.X;
-	Result.Y = Y - OutFactor * MirrorNormal.Y;
-	Result.Z = Z - OutFactor * MirrorNormal.Z;
-	return Result;
+	return *this - MirrorNormal * (2.0 * (*this | MirrorNormal));
 }
 
-//
-// Move a point vector, restricting it to within the world box:
-//
-void inline FVector::MoveBounded (const FVector &Delta)
-{
-	FVector New;
-
-	New.X = X+Delta.X;
-	New.Y = Y+Delta.Y;
-	New.Z = Z+Delta.Z;
-
-	if ((New.X >= -MAXSWORD) && (New.X <= MAXSWORD)) X = New.X;
-	if ((New.Y >= -MAXSWORD) && (New.Y <= MAXSWORD)) Y = New.Y;
-	if ((New.Z >= -MAXSWORD) && (New.Z <= MAXSWORD)) Z = New.Z;
-}
-
-/////////////////////
-// FVector friends //
-/////////////////////
+/*-----------------------------------------------------------------------------
+	FVector friends.
+-----------------------------------------------------------------------------*/
 
 //
 // Compare two points and see if they're the same, using a threshold.
 // Returns 1=yes, 0=no.  Uses fast distance approximation.
 //
-int inline FPointsAreSame( const FVector &P, const FVector &Q )
+inline int FPointsAreSame( const FVector &P, const FVector &Q )
 {
 	FLOAT Temp;
 	Temp=P.X-Q.X;
@@ -1070,7 +901,7 @@ int inline FPointsAreSame( const FVector &P, const FVector &Q )
 // Compare two points and see if they're the same, using a threshold.
 // Returns 1=yes, 0=no.  Uses fast distance approximation.
 //
-int inline FPointsAreNear (const FVector &Point1,const FVector &Point2, FLOAT Dist)
+inline int FPointsAreNear (const FVector &Point1,const FVector &Point2, FLOAT Dist)
 {
 	FLOAT Temp;
 	Temp=(Point1.X - Point2.X); if (Abs(Temp)>=Dist) return 0;
@@ -1083,7 +914,7 @@ int inline FPointsAreNear (const FVector &Point1,const FVector &Point2, FLOAT Di
 // Calculate the signed distance (in the direction of the normal) between
 // a point and a plane.
 //
-FLOAT inline FPointPlaneDist (
+inline FLOAT FPointPlaneDist (
 	const FVector &Point,
 	const FVector &PlaneBase,
 	const FVector &PlaneNormal)
@@ -1097,63 +928,9 @@ FLOAT inline FPointPlaneDist (
 }
 
 //
-// Find the weighted distance between a point and a plane based on elliptical
-// scaling factors.  (1,1,1) = sphere, (1,1,0.5) = ellipse twice as high as it is wide.
-//
-FLOAT inline FEllipsePlaneDist (
-	const FVector &Point,
-	const FVector &Weight,
-	const FVector &PlaneOrigin,
-	const FVector &PlaneNormal)
-{
-	return
-	(
-		(Point.X - PlaneOrigin.X) * PlaneNormal.X * Weight.X +
-		(Point.Y - PlaneOrigin.Y) * PlaneNormal.Y * Weight.Y +
-		(Point.Z - PlaneOrigin.Z) * PlaneNormal.Z * Weight.Z
-	);
-}
-
-//
-// Find the intersection of an infinite line (defined by two points) and
-// a plane.  Assumes that the line and plane do indeed intersect; you must
-// make sure they're not parallel before calling.
-//
-FVector inline FLinePlaneIntersection (
-	const FVector &Point1,
-	const FVector &Point2,
-	const FVector &PlaneOrigin,
-	const FVector &PlaneNormal)
-{
-	FVector	Delta,Intersection;
-	FLOAT	Time,TimeNumerator,TimeDenominator;
-
-	Delta.X = Point2.X - Point1.X;
-	Delta.Y = Point2.Y - Point1.Y;
-	Delta.Z = Point2.Z - Point1.Z;
-
-	TimeNumerator=
-		((PlaneOrigin.X - Point1.X) * PlaneNormal.X +
-		( PlaneOrigin.Y - Point1.Y) * PlaneNormal.Y +
-		( PlaneOrigin.Z - Point1.Z) * PlaneNormal.Z);
-	TimeDenominator=
-		((Delta.X * PlaneNormal.X) +
-		( Delta.Y * PlaneNormal.Y) +
-		( Delta.Z * PlaneNormal.Z));
-	if (TimeDenominator==0) Time=0.5; // Prevent divide by zero
-	else Time=TimeNumerator/TimeDenominator;
-
-	Intersection.X = Point1.X + Time*Delta.X;
-	Intersection.Y = Point1.Y + Time*Delta.Y;
-	Intersection.Z = Point1.Z + Time*Delta.Z;
-
-	return Intersection;
-}
-
-//
 // Euclidean distance between two points.
 //
-FLOAT inline FDist( const FVector &V1, const FVector &V2 )
+inline FLOAT FDist( const FVector &V1, const FVector &V2 )
 {
 	FLOAT DX,DY,DZ;
 
@@ -1167,7 +944,7 @@ FLOAT inline FDist( const FVector &V1, const FVector &V2 )
 //
 // Squared distance between two points.
 //
-FLOAT inline FDistSquared( const FVector &V1, const FVector &V2 )
+inline FLOAT FDistSquared( const FVector &V1, const FVector &V2 )
 {
 	FLOAT DX,DY,DZ;
 
@@ -1181,7 +958,7 @@ FLOAT inline FDistSquared( const FVector &V1, const FVector &V2 )
 //
 // Returns distance plus or minus 8% error, from Jack Ritter, Graphics Gems I.
 //
-FLOAT inline FDistApprox( const FVector &V1, const FVector &V2 )
+inline FLOAT FDistApprox( const FVector &V1, const FVector &V2 )
 {
 	FLOAT	Min,Med,Max,Temp;
 
@@ -1198,7 +975,7 @@ FLOAT inline FDistApprox( const FVector &V1, const FVector &V2 )
 //
 // The midpoint of two points.
 //
-FVector inline FMidpoint( const FVector &V1, const FVector &V2 )
+inline FVector FMidpoint( const FVector &V1, const FVector &V2 )
 {
 	FVector Result;
 	Result.X = 0.5 * (V1.X + V2.X);
@@ -1210,7 +987,7 @@ FVector inline FMidpoint( const FVector &V1, const FVector &V2 )
 //
 // See if two normal vectors (or plane normals) are nearly parallel.
 //
-int inline FParallel( const FVector &Normal1, const FVector &Normal2 )
+inline int FParallel( const FVector &Normal1, const FVector &Normal2 )
 {
 	FLOAT NormalDot = Normal1 | Normal2;
 	return (Abs (NormalDot - 1.0) <= THRESH_VECTORS_ARE_PARALLEL);
@@ -1219,7 +996,7 @@ int inline FParallel( const FVector &Normal1, const FVector &Normal2 )
 //
 // See if two planes are coplanar.
 //
-int inline FCoplanar( const FVector &Base1, const FVector &Normal1, const FVector &Base2, const FVector &Normal2 )
+inline int FCoplanar( const FVector &Base1, const FVector &Normal1, const FVector &Base2, const FVector &Normal2 )
 {
 	if      (!FParallel(Normal1,Normal2)) return 0;
 	else if (FPointPlaneDist (Base2,Base1,Normal1) > THRESH_POINT_ON_PLANE) return 0;
@@ -1230,186 +1007,123 @@ int inline FCoplanar( const FVector &Base1, const FVector &Normal1, const FVecto
 	FCoords implementation.
 -----------------------------------------------------------------------------*/
 
-///////////////////////
-// FCoords Functions //
-///////////////////////
+//
+// Return this coordinate system's transpose.
+//
+inline FCoords FCoords::Transpose() const
+{
+	return FCoords
+	(
+		-Origin.TransformVectorBy(*this),
+		FVector( XAxis.X, YAxis.X, ZAxis.X ),
+		FVector( XAxis.Y, YAxis.Y, ZAxis.Y ),
+		FVector( XAxis.Z, YAxis.Z, ZAxis.Z )
+	);
+}
 
 //
-// Make a coordinate system out of an origin point and three axis vectors.
+// Transform this coordinate system by another coordinate system.
 //
-FCoords inline FCoords::Make(FVector COrigin, FVector CXAxis, FVector CYAxis, FVector CZAxis)
+inline FCoords& FCoords::operator*=( const FCoords &TransformCoords )
 {
-	Origin     = COrigin;
-	XAxis      = CXAxis;
-	YAxis      = CYAxis;
-	ZAxis      = CZAxis;
+	Origin = Origin.TransformPointBy ( TransformCoords );
+	XAxis  = XAxis .TransformVectorBy( TransformCoords );
+	YAxis  = YAxis .TransformVectorBy( TransformCoords );
+	ZAxis  = ZAxis .TransformVectorBy( TransformCoords );
 	return *this;
 }
-
-//
-// Return the transposition of this coordinate system.
-//
-FCoords inline FCoords::Transposition()
+inline FCoords FCoords::operator*( const FCoords &TransformCoords ) const
 {
-	FCoords Result;
-
-	Result.XAxis.X = XAxis.X;
-	Result.XAxis.Y = YAxis.X;
-	Result.XAxis.Z = ZAxis.X;
-
-	Result.YAxis.X = XAxis.Y;
-	Result.YAxis.Y = YAxis.Y;
-	Result.YAxis.Z = ZAxis.Y;
-
-	Result.ZAxis.X = XAxis.Z;
-	Result.ZAxis.Y = YAxis.Z;
-	Result.ZAxis.Z = ZAxis.Z;
-
-	return Result;
+	return FCoords(*this) *= TransformCoords;
 }
 
 //
-// Transform a coordinate system's vectors by another coordinate
-// system's vectors.  Disregards all origins.
+// Transform this coordinate system by a pitch-yaw-roll rotation.
 //
-void inline FCoords::TransformByCoords (const FCoords &TransformCoords)
+inline FCoords& FCoords::operator*=( const FRotation &Rot )
 {
-	XAxis.TransformVector (TransformCoords);
-	YAxis.TransformVector (TransformCoords);
-	ZAxis.TransformVector (TransformCoords);
-}
-
-/////////////////////////////
-// FCoords Transformations //
-/////////////////////////////
-
-//
-// Apply a yaw/pitch/roll transformation to a coordinate system.  Slow and
-// unoptimized.  This is okay, since it's called infrequently.
-//
-void inline FCoords::TransformByRotation( const FRotation &Rot )
-{
-	FCoords TempCoords;
-
-	// * Rule of thumb for pitch, yaw, roll components: When a component's
-	// * value is zero, the corresponding matrix should be the identity matrix.
-	// * All of these matrices should always be orthogonal.
-	// * Do DeTransforms in reverse order (roll, pitch, yaw)
-
 	// Apply yaw rotation.
-	TempCoords.XAxis.X = + GMath.CosTab(Rot.Yaw);
-	TempCoords.XAxis.Y = + GMath.SinTab(Rot.Yaw);
-	TempCoords.XAxis.Z = + 0.0;
-
-	TempCoords.YAxis.X = - GMath.SinTab(Rot.Yaw);
-	TempCoords.YAxis.Y = + GMath.CosTab(Rot.Yaw);
-	TempCoords.YAxis.Z = + 0.0;
-
-	TempCoords.ZAxis.X = + 0.0;
-	TempCoords.ZAxis.Y = + 0.0;
-	TempCoords.ZAxis.Z = + 1.0;
-
-	TransformByCoords (TempCoords);
+	*this *= FCoords
+	(	
+		FVector( 0.0, 0.0, 0.0 ),
+		FVector( +GMath.CosTab(Rot.Yaw), +GMath.SinTab(Rot.Yaw), +0.0 ),
+		FVector( -GMath.SinTab(Rot.Yaw), +GMath.CosTab(Rot.Yaw), +0.0 ),
+		FVector( +0.0, +0.0, +1.0 )
+	);
 
 	// Apply pitch rotation.
-	TempCoords.XAxis.X = + GMath.CosTab(Rot.Pitch);
-	TempCoords.XAxis.Y = + 0.0;
-	TempCoords.XAxis.Z = + GMath.SinTab(Rot.Pitch);
-
-	TempCoords.YAxis.X = + 0.0;
-	TempCoords.YAxis.Y = + 1.0;
-	TempCoords.YAxis.Z = + 0.0;
-
-	TempCoords.ZAxis.X = - GMath.SinTab(Rot.Pitch);
-	TempCoords.ZAxis.Y = + 0.0;
-	TempCoords.ZAxis.Z = + GMath.CosTab(Rot.Pitch);
-
-	TransformByCoords (TempCoords);
+	*this *= FCoords
+	(	
+		FVector( 0.0, 0.0, 0.0 ),
+		FVector( +GMath.CosTab(Rot.Pitch), +0.0, +GMath.SinTab(Rot.Pitch) ),
+		FVector( +0.0, +1.0, +0.0 ),
+		FVector( -GMath.SinTab(Rot.Pitch), +0.0, +GMath.CosTab(Rot.Pitch) )
+	);
 
 	// Apply roll rotation.
-	TempCoords.XAxis.X = + 1.0;
-	TempCoords.XAxis.Y = + 0.0;
-	TempCoords.XAxis.Z = + 0.0;
-
-	TempCoords.YAxis.X = + 0.0;
-	TempCoords.YAxis.Y = + GMath.CosTab(Rot.Roll);
-	TempCoords.YAxis.Z = - GMath.SinTab(Rot.Roll);
-
-	TempCoords.ZAxis.X = + 0.0;
-	TempCoords.ZAxis.Y = + GMath.SinTab(Rot.Roll);
-	TempCoords.ZAxis.Z = + GMath.CosTab(Rot.Roll);
-
-	TransformByCoords (TempCoords);
+	*this *= FCoords
+	(	
+		FVector( 0.0, 0.0, 0.0 ),
+		FVector( +1.0, +0.0, +0.0 ),
+		FVector( +0.0, +GMath.CosTab(Rot.Roll), -GMath.SinTab(Rot.Roll) ),
+		FVector( +0.0, +GMath.SinTab(Rot.Roll), +GMath.CosTab(Rot.Roll) )
+	);
+	return *this;
+}
+inline FCoords FCoords::operator*( const FRotation &Rot ) const
+{
+	FCoords Result = *this;
+	return FCoords(*this) *= Rot;
 }
 
 //
-// Apply a yaw/pitch/roll detransformation to a coordinate system.  Slow and
-// unoptimized.  This is okay, since it's only called 1-2x per frame.
+// Detransform this coordinate system by a pitch-yaw-roll rotation.
 //
-void inline FCoords::DeTransformByRotation( const FRotation &Rot )
+inline FCoords& FCoords::operator/=( const FRotation &Rot )
 {
-	FCoords TempCoords;
-
-	// These rotation matrices are just the negative pitch, yaw, and roll matrices.
-
-	// Apply inverse roll rotation:
-	TempCoords.XAxis.X = + 1.0;
-	TempCoords.XAxis.Y = - 0.0;
-	TempCoords.XAxis.Z = + 0.0;
-
-	TempCoords.YAxis.X = - 0.0;
-	TempCoords.YAxis.Y = + GMath.CosTab(Rot.Roll);
-	TempCoords.YAxis.Z = + GMath.SinTab(Rot.Roll);
-
-	TempCoords.ZAxis.X = + 0.0;
-	TempCoords.ZAxis.Y = - GMath.SinTab(Rot.Roll);
-	TempCoords.ZAxis.Z = + GMath.CosTab(Rot.Roll);
-
-	TransformByCoords (TempCoords);
+	// Apply inverse roll rotation.
+	*this *= FCoords
+	(
+		FVector( 0.0, 0.0, 0.0 ),
+		FVector( +1.0, -0.0, +0.0 ),
+		FVector( -0.0, +GMath.CosTab(Rot.Roll), +GMath.SinTab(Rot.Roll) ),
+		FVector( +0.0, -GMath.SinTab(Rot.Roll), +GMath.CosTab(Rot.Roll) )
+	);
 
 	// Apply inverse pitch rotation.
-	TempCoords.XAxis.X = + GMath.CosTab(Rot.Pitch);
-	TempCoords.XAxis.Y = + 0.0;
-	TempCoords.XAxis.Z = - GMath.SinTab(Rot.Pitch);
-
-	TempCoords.YAxis.X = + 0.0;
-	TempCoords.YAxis.Y = + 1.0;
-	TempCoords.YAxis.Z = - 0.0;
-
-	TempCoords.ZAxis.X = - -GMath.SinTab(Rot.Pitch);
-	TempCoords.ZAxis.Y = + 0.0;
-	TempCoords.ZAxis.Z = + GMath.CosTab(Rot.Pitch);
-
-	TransformByCoords (TempCoords);
+	*this *= FCoords
+	(
+		FVector( 0.0, 0.0, 0.0 ),
+		FVector( +GMath.CosTab(Rot.Pitch), +0.0, -GMath.SinTab(Rot.Pitch) ),
+		FVector( +0.0, +1.0, -0.0 ),
+		FVector( +GMath.SinTab(Rot.Pitch), +0.0, +GMath.CosTab(Rot.Pitch) )
+	);
 
 	// Apply inverse yaw rotation.
-	TempCoords.XAxis.X = + GMath.CosTab(Rot.Yaw);
-	TempCoords.XAxis.Y = - GMath.SinTab(Rot.Yaw);
-	TempCoords.XAxis.Z = - 0.0;
-
-	TempCoords.YAxis.X = + GMath.SinTab(Rot.Yaw);
-	TempCoords.YAxis.Y = + GMath.CosTab(Rot.Yaw);
-	TempCoords.YAxis.Z = + 0.0;
-
-	TempCoords.ZAxis.X = - 0.0;
-	TempCoords.ZAxis.Y = + 0.0;
-	TempCoords.ZAxis.Z = + 1.0;
-
-	TransformByCoords (TempCoords);
+	*this *= FCoords
+	(
+		FVector( 0.0, 0.0, 0.0 ),
+		FVector( +GMath.CosTab(Rot.Yaw), -GMath.SinTab(Rot.Yaw), -0.0 ),
+		FVector( +GMath.SinTab(Rot.Yaw), +GMath.CosTab(Rot.Yaw), +0.0 ),
+		FVector( -0.0, +0.0, +1.0 )
+	);
+	return *this;
+}
+inline FCoords FCoords::operator/( const FRotation &Rot ) const
+{
+	return FCoords(*this) /= Rot;
 }
 
 //
+// Transform this coordinate system by a scale.
 // Note: Will return coordinate system of opposite handedness if
-// Scale.X*Scale.Y*Scale.Z is negative.  You must check for this
-// yourself, i.e. to prevent polygons vertices of the wrong clockness.
+// Scale.X*Scale.Y*Scale.Z is negative.
 //
-void inline FCoords::TransformByScale( const FScale &Scale )
+inline FCoords& FCoords::operator*=( const FScale &Scale )
 {
-	FCoords TempCoords;
-	FLOAT Sheer = FSheerSnap (Scale.SheerRate);
-
 	// Apply sheering.
-	TempCoords = GMath.UnitCoords;
+	FLOAT   Sheer      = FSheerSnap( Scale.SheerRate );
+	FCoords TempCoords = GMath.UnitCoords;
 	switch (Scale.SheerAxis)
 	{
 		case SHEER_XY:
@@ -1430,37 +1144,40 @@ void inline FCoords::TransformByScale( const FScale &Scale )
 		case SHEER_ZY:
 			TempCoords.ZAxis.Y = Sheer;
 			break;
-		default: // SHEER_NONE
+		default:
 			break;
 	}
-	TransformByCoords(TempCoords);
+	*this *= TempCoords;
 
 	// Apply scaling.
 	TempCoords = GMath.UnitCoords;
 	TempCoords.XAxis.X *= Scale.Scale.X;
 	TempCoords.YAxis.Y *= Scale.Scale.Y;
 	TempCoords.ZAxis.Z *= Scale.Scale.Z;
-	TransformByCoords(TempCoords);
+	*this *= TempCoords;
+	return *this;
+}
+inline FCoords FCoords::operator*( const FScale &Scale ) const
+{
+	return FCoords(*this) *= Scale;
 }
 
 //
-// Inversely transform a coordinate system by a scale.
+// Detransform a coordinate system by a scale.
 //
-void inline FCoords::DeTransformByScale( const FScale &Scale )
+inline FCoords& FCoords::operator/=( const FScale &Scale )
 {
-	FCoords TempCoords;
-	FLOAT	Sheer = FSheerSnap (Scale.SheerRate);
-
 	// Deapply scaling.
-	TempCoords = GMath.UnitCoords;
-	if (Scale.Scale.X!=0) TempCoords.XAxis.X /= Scale.Scale.X;
-	if (Scale.Scale.Y!=0) TempCoords.YAxis.Y /= Scale.Scale.Y;
-	if (Scale.Scale.Z!=0) TempCoords.ZAxis.Z /= Scale.Scale.Z;
-	TransformByCoords(TempCoords);
+	FCoords TempCoords = GMath.UnitCoords;
+	if( Scale.Scale.X != 0 ) TempCoords.XAxis.X /= Scale.Scale.X;
+	if( Scale.Scale.Y != 0 ) TempCoords.YAxis.Y /= Scale.Scale.Y;
+	if( Scale.Scale.Z != 0 ) TempCoords.ZAxis.Z /= Scale.Scale.Z;
+	*this *= TempCoords;
 
 	// Deapply sheering.
-	TempCoords = GMath.UnitCoords;
-	switch (Scale.SheerAxis)
+	TempCoords  = GMath.UnitCoords;
+	FLOAT Sheer = FSheerSnap (Scale.SheerRate);
+	switch( Scale.SheerAxis )
 	{
 		case SHEER_XY:
 			TempCoords.XAxis.Y = -Sheer;
@@ -1483,223 +1200,138 @@ void inline FCoords::DeTransformByScale( const FScale &Scale )
 		default: // SHEER_NONE
 			break;
 	}
-	TransformByCoords(TempCoords);
-}
-
-//
-// Mirror a coordinate system about a normal vector.  MirrorNormal must
-// have a length of 1 to avoid distortion.
-//
-FCoords inline FCoords::Mirror (const FVector &MirrorNormal) const
-{
-	FCoords Result;
-	Result.XAxis  = XAxis.Mirror(MirrorNormal);
-	Result.YAxis  = YAxis.Mirror(MirrorNormal);
-	Result.ZAxis  = ZAxis.Mirror(MirrorNormal);
-	Result.Origin = Origin; // Should mirror
-	return Result;
-}
-
-/*-----------------------------------------------------------------------------
-	FRotation operators.
------------------------------------------------------------------------------*/
-
-///////////////////////
-// FVector Operators //
-///////////////////////
-
-FRotation inline FRotation::operator+= (const FRotation &R)
-{
-	Pitch += R.Pitch; Yaw += R.Yaw; Roll += R.Roll;
+	*this *= TempCoords;
 	return *this;
 }
-
-FRotation inline FRotation::operator-= (const FRotation &R)
+inline FCoords FCoords::operator/( const FScale &Scale ) const
 {
-	Pitch -= R.Pitch; Yaw -= R.Yaw; Roll -= R.Roll;
-	return *this;
-}
-
-FRotation inline FRotation::operator+ (const FRotation &R) const
-{
-	FRotation Temp;
-	Temp.Pitch = Pitch + R.Pitch; Temp.Yaw = Yaw + R.Yaw; Temp.Roll = Roll + R.Roll;
-	return Temp;
-}
-
-FRotation inline FRotation::operator- (const FRotation &R) const
-{
-	FRotation Temp;
-	Temp.Pitch = Pitch - R.Pitch; Temp.Yaw = Yaw - R.Yaw; Temp.Roll = Roll - R.Roll;
-	return Temp;
-}
-
-FRotation inline FRotation::operator- () const
-{
-	FRotation Temp;
-	Temp.Pitch = -Pitch; Temp.Yaw = -Yaw; Temp.Roll = -Roll;
-	return Temp;
-}
-
-FRotation inline FRotation::operator* (FLOAT Scale) const
-{
-	FRotation Temp;
-	Temp.Pitch = Scale * (FLOAT)(SWORD)Pitch;
-	Temp.Yaw   = Scale * (FLOAT)(SWORD)Yaw;
-	Temp.Roll  = Scale * (FLOAT)(SWORD)Roll;
-	return Temp;
-}
-
-FRotation inline operator* (FLOAT Scale,const FRotation &R)
-{
-	FRotation Temp;
-	Temp.Pitch = Scale * (FLOAT)(SWORD)R.Pitch;
-	Temp.Yaw   = Scale * (FLOAT)(SWORD)R.Yaw;
-	Temp.Roll  = Scale * (FLOAT)(SWORD)R.Roll;
-	return Temp;
-}
-
-FRotation inline FRotation::operator*= (FLOAT Scale)
-{
-	Pitch = Scale * (FLOAT)(SWORD)Pitch;
-	Yaw   = Scale * (FLOAT)(SWORD)Yaw;
-	Roll  = Scale * (FLOAT)(SWORD)Roll;
-	return *this;
-}
-
-int inline FRotation::operator== (const FRotation &V) const
-{
-	return (Pitch==V.Pitch) && (Yaw==V.Yaw) && (Roll==V.Roll);
-}
-
-int inline FRotation::operator!= (const FRotation &V) const
-{
-	return (Pitch!=V.Pitch) || (Yaw!=V.Yaw) || (Roll!=V.Roll);
-}
-
-/*-----------------------------------------------------------------------------
-	FRotation class functions.
------------------------------------------------------------------------------*/
-
-//
-// Make a rotation from a pitch, yaw, and roll.
-//
-FRotation inline FRotation::Make( INT CPitch,INT CYaw,INT CRoll )
-{
-	Pitch	= CPitch;
-	Yaw		= CYaw;
-	Roll	= CRoll;
-	return *this;
+	return FCoords(*this) /= Scale;
 }
 
 //
-// Add signed pitch, yaw, and roll values to this rotation.
-// Since the components are WORD's, they automatically wrap around
-// as they should.
+// Mirror a coordinate system about a normal vector.  MirrorNormal must be a normal.
 //
-void inline FRotation::Add( INT DeltaPitch, INT DeltaYaw, INT DeltaRoll )
+inline FCoords FCoords::Mirror( const FVector &MirrorNormal ) const
 {
-	Yaw   += DeltaYaw;
-	Pitch += DeltaPitch;
-	Roll  += DeltaRoll;
-}
-
-//
-// Add signed pitch, yaw, and roll values to this rotation, making
-// sure the resulting camera view rotation doesn't become disorienting.
-//
-void inline FRotation::AddBounded( INT DeltaPitch, INT DeltaYaw, INT DeltaRoll )
-{
-	Yaw  += (WORD)DeltaYaw;
-	Pitch = FAddAngleConfined(Pitch,DeltaPitch,192*0x100,64*0x100);
-	Roll  = FAddAngleConfined(Roll, DeltaRoll, 192*0x100,64*0x100);
-}
-
-//
-// Snap this rotation to a rotational grid value.
-//
-FRotation inline FRotation::GridSnap( const FRotation &RotGrid )
-{
-	FRotation Result;
-	Result.Pitch = FSnap (Pitch,RotGrid.Pitch);
-	Result.Yaw   = FSnap (Yaw,  RotGrid.Yaw);
-	Result.Roll  = FSnap (Roll, RotGrid.Roll);
-	return Result;
-}
-
-/*-----------------------------------------------------------------------------
-	FScale class functions.
------------------------------------------------------------------------------*/
-
-//
-// Make a scale from a vector, sheer rate, and sheer axis.
-//
-FScale inline FScale::Make( FVector CScale,FLOAT CSheerRate,ESheerAxis CSheerAxis )
-{
-	Scale		= CScale;
-	SheerRate	= CSheerRate;
-	SheerAxis   = CSheerAxis;
-	return *this;
-}
-
-//
-// Return orientation of a scale transform (1 = regular, -1 = opposite clockness,
-// 0=collapsed).
-//
-FLOAT inline FScale::Orientation()
-{
-	FLOAT Temp = Scale.X * Scale.Y * Scale.Z;
-	return Sgn(Temp);
-}
-
-//
-// Calculate view coordinate system for a camera.
-//
-void inline FCalcViewCoords( const FVector &Location, const FRotation &Rotation,
-	FCoords *Coords, FCoords *Uncoords )
-{
-	*Coords = GMath.CameraViewCoords;
-	Coords->DeTransformByRotation (Rotation);
-	Coords->Origin = Location;
-
-	if( Uncoords )
-	{
-		// Compute Screen->World coordinates (orthogonal inverse = transpose).
-		Uncoords->XAxis.X = Coords->XAxis.X;
-		Uncoords->XAxis.Y = Coords->YAxis.X;
-		Uncoords->XAxis.Z = Coords->ZAxis.X;
-
-		Uncoords->YAxis.X = Coords->XAxis.Y;
-		Uncoords->YAxis.Y = Coords->YAxis.Y;
-		Uncoords->YAxis.Z = Coords->ZAxis.Y;
-
-		Uncoords->ZAxis.X = Coords->XAxis.Z;
-		Uncoords->ZAxis.Y = Coords->YAxis.Z;
-		Uncoords->ZAxis.Z = Coords->ZAxis.Z;
-
-		Uncoords->Origin  = Location * -1;
-
-		Uncoords->Origin.TransformVector(*Coords);
-	}
+	// Should mirror origin?
+	return FCoords
+	(
+		Origin,
+		XAxis.MirrorBy(MirrorNormal),
+		YAxis.MirrorBy(MirrorNormal),
+		ZAxis.MirrorBy(MirrorNormal)
+	);
 }
 
 /*-----------------------------------------------------------------------------
 	Random numbers.
 -----------------------------------------------------------------------------*/
 
+//
+// Random number from 0.0 to 1.0.
+//
 inline FLOAT frand()
 {
 	return (1.0 / RAND_MAX) * rand();
 }
 
-inline FLOAT frand(FLOAT Max)
+//
+// Compute pushout of a box from a plane.
+//
+inline FLOAT FBoxPushOut( const FVector &Normal, FLOAT Radius, FLOAT Height )
 {
-	return (Max/RAND_MAX) * rand();
+	return Abs(Normal.X*Radius) + Abs(Normal.Y*Radius) + Abs(Normal.Z*Height);
 }
 
-inline FLOAT frand(FLOAT Min,FLOAT Max)
+/*-----------------------------------------------------------------------------
+	Advanced geometry.
+-----------------------------------------------------------------------------*/
+
+//
+// Find the intersection of an infinite line (defined by two points) and
+// a plane.  Assumes that the line and plane do indeed intersect; you must
+// make sure they're not parallel before calling.
+//
+inline FVector FLinePlaneIntersection
+(
+	const FVector &Point1,
+	const FVector &Point2,
+	const FVector &PlaneOrigin,
+	const FVector &PlaneNormal
+)
 {
-	return Min + ((Max-Min)/RAND_MAX) * rand();
+	FVector Delta           = Point2 - Point1;
+	FLOAT   TimeNumerator   = (PlaneOrigin - Point1) | PlaneNormal;
+	FLOAT   TimeDenominator = Delta | PlaneNormal;
+
+	return Point1 + (Point2-Point1) * (TimeNumerator/TimeDenominator);
+}
+
+/*-----------------------------------------------------------------------------
+	FPlane functions.
+-----------------------------------------------------------------------------*/
+
+//
+// Compute intersection point of three planes.
+// Return 1 if valid, 0 if infinite.
+//
+inline int FIntersectPlanes3( FVector &I, const FPlane &P1, const FPlane &P2, const FPlane &P3 )
+{
+	guard(FIntersectPlanes3);
+
+	// Compute determinant, the triple product P1|(P2^P3)==(P1^P2)|P3.
+	FLOAT Det = (P1 ^ P2) | P3;
+	if( Square(Det) < Square(0.001) )
+	{
+		I = GMath.ZeroVector;
+		return 0;
+	}
+	else
+	{
+		// Compute the intersection point, guaranteed valid if determinant is nonzero.
+		I = (P1.W*(P2^P3) + P2.W*(P3^P1) + P3.W*(P1^P2)) / Det;
+	}
+	return 1;
+	unguard;
+}
+
+//
+// Compute intersection point and direction of line joining two planes.
+// Return 1 if valid, 0 if infinite.
+//
+inline FIntersectPlanes2( FVector &I, FVector &D, const FPlane &P1, const FPlane &P2 )
+{
+	guard(FIntersectPlanes2);
+
+	// Compute line direction, perpendicular to both plane normals.
+	D = P1 ^ P2;
+	FLOAT DD = D.SizeSquared();
+	if( DD < Square(0.001) )
+	{
+		// Parallel or nearly parallel planes.
+		D = I = GMath.ZeroVector;
+		return 0;
+	}
+	else
+	{
+		// Compute intersection.
+		I = (P1.W*(P2^D) + P2.W*(D^P1)) / DD;
+		D.Normalize();
+		return 1;
+	}
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	FRotation functions.
+-----------------------------------------------------------------------------*/
+
+//
+// Convert a rotation into a vector facing in its direction.
+//
+inline FVector FRotation::Vector()
+{
+	return (GMath.UnitCoords / *this).XAxis;
 }
 
 /*-----------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnEdCam.cpp: Unreal editor camera movement/selection functions
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -19,21 +19,21 @@
 // Flags for cameraClick, stored in Camera header's ClickFlags:
 //
 enum ECameraClick
-	{
+{
 	CF_MOVE_BRUSH	= 1,	// Set if the brush has been moved since first click
 	CF_MOVE_ACTOR	= 2,	// Set if the actors have been moved since first click
 	CF_MOVE_TEXTURE = 4,	// Set if textures have been adjusted since first click
 	CF_MOVE_ALL     = (CF_MOVE_BRUSH | CF_MOVE_ACTOR | CF_MOVE_TEXTURE),
-	};
+};
 
 //
 // Internal declarations:
 //
-void NoteBrushMovement 		(ICamera *CameraInfo);
-void NoteTextureMovement	(ICamera *CameraInfo);
-void NoteActorMovement 		(ICamera *CameraInfo);
+void NoteBrushMovement 		(UCamera *Camera);
+void NoteTextureMovement	(UCamera *Camera);
+void NoteActorMovement 		(UCamera *Camera);
 void constrainSimplePoint	(FVector *Location,FConstraints *Constraints);
-int  GetMeshMapFrame		(UResource *MeshMap, int AnimSeq, int AnimOfs);
+int  GetMeshMapFrame		(UObject *MeshMap, int AnimSeq, int AnimOfs);
 
 //
 // Global variables (not beautiful, but they do the job)
@@ -49,13 +49,13 @@ int		GFixScale=0;
 //
 // Callback for selecting a polygon, transaction-tracked.
 //
-void SelectPolyFunc (IModel *ModelInfo, INDEX iSurf)
+void SelectPolyFunc( UModel *Model, INDEX iSurf )
 	{
-	FBspSurf *Poly = &ModelInfo->BspSurfs[iSurf];
+	FBspSurf *Poly = &Model->Surfs(iSurf);
 	//
 	if (!(Poly->PolyFlags & PF_Selected))
 		{
-		GTrans->NoteBspSurf (ModelInfo,iSurf,0);
+		Model->Surfs->ModifyItem(iSurf,0);
 		Poly->PolyFlags |= (PF_Selected);
 		};
 	};
@@ -63,13 +63,13 @@ void SelectPolyFunc (IModel *ModelInfo, INDEX iSurf)
 //
 // Callback for deselecting a polygon, transaction-tracked.
 //
-void DeselectPolyFunc (IModel *ModelInfo, INDEX iSurf)
+void DeselectPolyFunc (UModel *Model, INDEX iSurf)
 	{
-	FBspSurf *Poly = &ModelInfo->BspSurfs[iSurf];
+	FBspSurf *Poly = &Model->Surfs(iSurf);
 	//
 	if (Poly->PolyFlags & PF_Selected)
 		{
-		GTrans->NoteBspSurf (ModelInfo,iSurf,0);
+		Model->Surfs->ModifyItem(iSurf,0);
 		Poly->PolyFlags &= (~PF_Selected);
 		};
 	};
@@ -85,61 +85,78 @@ void DeselectPolyFunc (IModel *ModelInfo, INDEX iSurf)
 // there should rotate about the respective axis, but this isn't feasible since brushes
 // just have P-Y-R rotations.  Can live with this.
 //
-void CalcFreeOrthoMoveRot (ICamera *CameraInfo,SWORD MouseX,SWORD MouseY,BYTE Buttons,
-	FVector *Delta,FFloatRotation *DeltaRot)
-	{
-	GUARD;
+void CalcFreeOrthoMoveRot
+(
+	UCamera		*Camera,
+	FLOAT		MouseX,
+	FLOAT		MouseY,
+	DWORD		Buttons,
+	FVector		&Delta,
+	FRotation	&DeltaRot
+)
+{
+	guard(CalcFreeOrthoMoveRot);
 	FLOAT *OrthoAxis1,*OrthoAxis2,Axis2Sign,Axis1Sign,*OrthoAngle,AngleSign;
-	//
-	if (CameraInfo->RendMap==REN_OrthXY)
-		{
-		OrthoAxis1 = &Delta->X;  			Axis1Sign=1.0;
-		OrthoAxis2 = &Delta->Y;  			Axis2Sign=1.0;
-		OrthoAngle = &DeltaRot->Yaw; 		AngleSign=1.0;
-		}
-	else if (CameraInfo->RendMap==REN_OrthXZ)
-		{
-		OrthoAxis1 = &Delta->X; 			Axis1Sign=1.0;
-		OrthoAxis2 = &Delta->Z; 			Axis2Sign=-1.0;
-		OrthoAngle = &DeltaRot->Pitch; 		AngleSign=1.0; // Should rotate about Y axis
-		}
-	else if (CameraInfo->RendMap==REN_OrthYZ)
-		{
-		OrthoAxis1 = &Delta->Y; 			Axis1Sign=1;
-		OrthoAxis2 = &Delta->Z; 			Axis2Sign=-1;
-		OrthoAngle = &DeltaRot->Roll; 		AngleSign=1.0; // Should rotate about X axis
-		}
+
+	FLOAT DeltaPitch = DeltaRot.Pitch;
+	FLOAT DeltaYaw   = DeltaRot.Yaw;
+	FLOAT DeltaRoll  = DeltaRot.Roll;
+
+	if( Camera->Actor->RendMap == REN_OrthXY )
+	{
+		OrthoAxis1 = &Delta.X;  	Axis1Sign = +1;
+		OrthoAxis2 = &Delta.Y;  	Axis2Sign = +1;
+		OrthoAngle = &DeltaYaw;		AngleSign = +1;
+	}
+	else if( Camera->Actor->RendMap==REN_OrthXZ )
+	{
+		OrthoAxis1 = &Delta.X; 		Axis1Sign = +1;
+		OrthoAxis2 = &Delta.Z; 		Axis2Sign = -1;
+		OrthoAngle = &DeltaPitch; 	AngleSign = +1;
+	}
+	else if( Camera->Actor->RendMap==REN_OrthYZ )
+	{
+		OrthoAxis1 = &Delta.Y; 		Axis1Sign = +1;
+		OrthoAxis2 = &Delta.Z; 		Axis2Sign = -1;
+		OrthoAngle = &DeltaRoll; 	AngleSign = +1;
+	}
 	else
-		{
+	{
 		appError("Invalid rendering mode");
 		return;
-		}
-	//
-	// Special orthogonal view movement controls:
-	//
-	if (Buttons == BUT_LEFT) // Left button: Move up/down/left/right
-		{
-		*OrthoAxis1 = CameraInfo->OrthoZoom/30000.0*(FLOAT)MouseX;
-		if      ((MouseX<0)&&(*OrthoAxis1==0)) *OrthoAxis1=-Axis1Sign; // Always move when mouse moves
+	}
+
+	// Special movement controls.
+	if( Buttons == BUT_LEFT )
+	{
+		// Left button: Move up/down/left/right.
+		*OrthoAxis1 = Camera->Actor->OrthoZoom/30000.0*(FLOAT)MouseX;
+		if      ((MouseX<0)&&(*OrthoAxis1==0)) *OrthoAxis1=-Axis1Sign;
 		else if ((MouseX>0)&&(*OrthoAxis1==0)) *OrthoAxis1=Axis1Sign;
-		//
-		*OrthoAxis2 = Axis2Sign*CameraInfo->OrthoZoom/30000.0*(FLOAT)MouseY;
+
+		*OrthoAxis2 = Axis2Sign*Camera->Actor->OrthoZoom/30000.0*(FLOAT)MouseY;
 		if      ((MouseY<0)&&(*OrthoAxis2==0)) *OrthoAxis2=-Axis2Sign;
 		else if ((MouseY>0)&&(*OrthoAxis2==0)) *OrthoAxis2=Axis2Sign;
-		}
-	else if (Buttons == (BUT_LEFT | BUT_RIGHT)) // Both buttons: Zoom in/out
-		{
-		CameraInfo->OrthoZoom -= CameraInfo->OrthoZoom/200.0 * (FLOAT)MouseY;
-		//
-		if (CameraInfo->OrthoZoom<500.0)    		CameraInfo->OrthoZoom = 500.0;
-		if (CameraInfo->OrthoZoom>2000000.0) 		CameraInfo->OrthoZoom = 2000000.0;
-		}
-	else if (Buttons == BUT_RIGHT) // Right button: Rotate
-		{
+	}
+	else if( Buttons == (BUT_LEFT | BUT_RIGHT) )
+	{
+		// Both buttons: Zoom in/out.
+		Camera->Actor->OrthoZoom -= Camera->Actor->OrthoZoom/200.0 * (FLOAT)MouseY;
+
+		if (Camera->Actor->OrthoZoom<500.0)    		Camera->Actor->OrthoZoom = 500.0;
+		if (Camera->Actor->OrthoZoom>2000000.0) 	Camera->Actor->OrthoZoom = 2000000.0;
+	}
+	else if( Buttons == BUT_RIGHT )
+	{
+		// Right button: Rotate.
 		if (OrthoAngle!=NULL) *OrthoAngle = -AngleSign*8.0*(FLOAT)MouseX;
-		};
-	UNGUARD("CalcFreeOrthoMoveRot");
-	};
+	}
+	DeltaRot.Pitch	= DeltaPitch;
+	DeltaRot.Yaw	= DeltaYaw;
+	DeltaRot.Roll	= DeltaRoll;
+
+	unguard;
+}
 
 //
 // Axial orthogonal movement.
@@ -148,113 +165,142 @@ void CalcFreeOrthoMoveRot (ICamera *CameraInfo,SWORD MouseX,SWORD MouseY,BYTE Bu
 // there should rotate about the respective axis, but this isn't feasible since brushes
 // just have P-Y-R rotations.  Can live with this.
 //
-void CalcAxialOrthoMove (ICamera *CameraInfo, SWORD MouseX,SWORD MouseY,BYTE Buttons,
-	FVector *Delta,FFloatRotation *DeltaRot)
+void CalcAxialOrthoMove
+(
+	UCamera		*Camera, 
+	FLOAT		MouseX,
+	FLOAT		MouseY,
+	DWORD		Buttons,
+	FVector		&Delta,
+	FRotation	&DeltaRot
+)
+{
+	guard(CalcAxialOrthoMove);
+	FLOAT *OrthoAxis1,*OrthoAxis2,Axis2Sign,Axis1Sign,*OrthoAngle,AngleSign;
+
+	FLOAT DeltaPitch = DeltaRot.Pitch;
+	FLOAT DeltaYaw   = DeltaRot.Yaw;
+	FLOAT DeltaRoll  = DeltaRot.Roll;
+
+	if( Camera->Actor->RendMap == REN_OrthXY )
 	{
-	FLOAT       *OrthoAxis1,*OrthoAxis2,Axis2Sign,Axis1Sign,*OrthoAngle,AngleSign;
-	//
-	GUARD;
-	if (CameraInfo->RendMap==REN_OrthXY)
-		{
-		OrthoAxis1 = &Delta->X;  		Axis1Sign=1.0;
-		OrthoAxis2 = &Delta->Y;  		Axis2Sign=1.0;
-		OrthoAngle = &DeltaRot->Yaw; 	AngleSign=1.0;
-		}
-	else if (CameraInfo->RendMap==REN_OrthXZ)
-		{
-		OrthoAxis1 = &Delta->X; 		Axis1Sign=1.0;
-		OrthoAxis2 = &Delta->Z; 		Axis2Sign=-1.0;
-		OrthoAngle = &DeltaRot->Pitch; 	AngleSign=1.0; // Should rotate about Y axis
-		}
-	else if (CameraInfo->RendMap==REN_OrthYZ)
-		{
-		OrthoAxis1 = &Delta->Y; 		Axis1Sign=1;
-		OrthoAxis2 = &Delta->Z; 		Axis2Sign=-1;
-		OrthoAngle = &DeltaRot->Roll; 	AngleSign=1.0; // Should rotate about X axis
-		}
+		OrthoAxis1 = &Delta.X;  	Axis1Sign = +1;
+		OrthoAxis2 = &Delta.Y;  	Axis2Sign = +1;
+		OrthoAngle = &DeltaYaw;		AngleSign = +1;
+	}
+	else if( Camera->Actor->RendMap == REN_OrthXZ )
+	{
+		OrthoAxis1 = &Delta.X; 		Axis1Sign = +1;
+		OrthoAxis2 = &Delta.Z;		Axis2Sign = -1;
+		OrthoAngle = &DeltaPitch; 	AngleSign = +1;
+	}
+	else if( Camera->Actor->RendMap == REN_OrthYZ )
+	{
+		OrthoAxis1 = &Delta.Y; 		Axis1Sign = +1;
+		OrthoAxis2 = &Delta.Z; 		Axis2Sign = -1;
+		OrthoAngle = &DeltaRoll; 	AngleSign = +1;
+	}
 	else
-		{
+	{
 		appError("Invalid rendering mode");
 		return;
-		};
-	//
-	// Special orthogonal view movement controls:
-	//
-	if (Buttons & (BUT_LEFT | BUT_RIGHT)) // Left, right, or both are pressed
+	}
+
+	// Special movement controls.
+	if( Buttons & (BUT_LEFT | BUT_RIGHT) )
+	{
+		// Left, right, or both are pressed.
+		if( Buttons & BUT_LEFT )
 		{
-		if (Buttons & BUT_LEFT) // Left button: Screen's X-Axis
-			{
-      		*OrthoAxis1 = CameraInfo->OrthoZoom/30000.0*(FLOAT)MouseX;
-      		if      ((MouseX<0)&&(*OrthoAxis1==0)) *OrthoAxis1=-Axis1Sign; // Always move when mouse moves
+			// Left button: Screen's X-Axis.
+      		*OrthoAxis1 = Camera->Actor->OrthoZoom/30000.0*(FLOAT)MouseX;
+      		if      ((MouseX<0)&&(*OrthoAxis1==0)) *OrthoAxis1=-Axis1Sign;
       		else if ((MouseX>0)&&(*OrthoAxis1==0)) *OrthoAxis1=Axis1Sign;
-			};
-		if (Buttons & BUT_RIGHT) // Right button: Screen's Y-Axis
-			{
-      		*OrthoAxis2 = Axis2Sign*CameraInfo->OrthoZoom/30000.0*(FLOAT)MouseY;
+		}
+		if( Buttons & BUT_RIGHT )
+		{
+			// Right button: Screen's Y-Axis.
+      		*OrthoAxis2 = Axis2Sign*Camera->Actor->OrthoZoom/30000.0*(FLOAT)MouseY;
       		if      ((MouseY<0)&&(*OrthoAxis2==0)) *OrthoAxis2=-Axis2Sign;
       		else if ((MouseY>0)&&(*OrthoAxis2==0)) *OrthoAxis2=Axis2Sign;
-			};
 		}
-	else if (Buttons == (BUT_MIDDLE)) // Middle button: Zoom in/out
-		{
-		CameraInfo->OrthoZoom -= CameraInfo->OrthoZoom/200.0 * (FLOAT)MouseY;
-		//
-		if (CameraInfo->OrthoZoom<500.0)    		CameraInfo->OrthoZoom = 500.0;
-		else if (CameraInfo->OrthoZoom>2000000.0) 	CameraInfo->OrthoZoom = 2000000.0;
-		};
-	UNGUARD("CalcAxialMoveRot");
-	};
+	}
+	else if( Buttons == (BUT_MIDDLE) )
+	{
+		// Middle button: Zoom in/out.
+		Camera->Actor->OrthoZoom -= Camera->Actor->OrthoZoom/200.0 * (FLOAT)MouseY;
+
+		if		(Camera->Actor->OrthoZoom<500.0)    	Camera->Actor->OrthoZoom = 500.0;
+		else if (Camera->Actor->OrthoZoom>2000000.0) 	Camera->Actor->OrthoZoom = 2000000.0;
+	}
+	DeltaRot.Pitch	= DeltaPitch;
+	DeltaRot.Yaw	= DeltaYaw;
+	DeltaRot.Roll	= DeltaRoll;
+
+	unguard;
+}
 
 //
 // Freeform perspective movement and rotation.
 //
-void CalcFreePerspMoveRot (ICamera *CameraInfo, SWORD MouseX,SWORD MouseY,BYTE Buttons,
-	FVector *Delta,FFloatRotation *DeltaRot)
+void CalcFreePerspMoveRot
+(
+	UCamera		*Camera, 
+	FLOAT		MouseX,
+	FLOAT		MouseY,
+	DWORD		Buttons,
+	FVector		&Delta,
+	FRotation	&DeltaRot
+)
+{
+	guard(CalcFreePerspMoveRot);
+	APawn *Actor = Camera->Actor;
+
+	if( Buttons == BUT_LEFT )
 	{
-	GUARD;
-	APawn *Actor = CameraInfo->Actor;
-	//
-	if (Buttons == BUT_LEFT) // Left button: move ahead and yaw
-		{
-		Delta->X=(FLOAT)(-MouseY) * GMath.CosTab(Actor->ViewRot.Yaw);
-		Delta->Y=(FLOAT)(-MouseY) * GMath.SinTab(Actor->ViewRot.Yaw);
-		//
-		DeltaRot->Yaw = (64.0 * (FLOAT)MouseX)/20.0;
+		// Left button: move ahead and yaw.
+		Delta.X      = -MouseY * GMath.CosTab(Actor->ViewRotation.Yaw);
+		Delta.Y      = -MouseY * GMath.SinTab(Actor->ViewRotation.Yaw);
+		DeltaRot.Yaw = MouseX * 64.0 / 20.0;
+	}
+	else if( Buttons == (BUT_LEFT | BUT_RIGHT) )
+	{
+		// Both buttons: Move up and left/right.
+		Delta.X      = MouseX * -GMath.SinTab(Actor->ViewRotation.Yaw);
+		Delta.Y      = MouseX *  GMath.CosTab(Actor->ViewRotation.Yaw);
+		Delta.Z      = -MouseY;
 		}
-	else if (Buttons == (BUT_LEFT | BUT_RIGHT)) // Both buttons: Move up and left/right
-		{
-		Delta->X += (FLOAT)(MouseX) * -GMath.SinTab(Actor->ViewRot.Yaw);
-		Delta->Y += (FLOAT)(MouseX) *  GMath.CosTab(Actor->ViewRot.Yaw);
-		//
-		Delta->Z += (FLOAT)-MouseY;
-		}
-	else if (Buttons == BUT_RIGHT) // Right button: Pitch and yaw
-		{
-		DeltaRot->Pitch=(64.0/12.0)*(FLOAT)-MouseY;
-		//
-		// Disabled Roll -- not useful for a viewing camera (replaced with second yaw):
-		//     DeltaRoll=MouseX/10;
-		//
-		DeltaRot->Yaw=(64.0/20.0) * (FLOAT)MouseX;
-		};
-	UNGUARD("CalcFreePerspMoveRot");
-	};
+	else if( Buttons == BUT_RIGHT )
+	{
+		// Right button: Pitch and yaw.
+		DeltaRot.Pitch = (64.0/12.0) * -MouseY;
+		DeltaRot.Yaw   = (64.0/20.0) * MouseX;
+	}
+	unguard;
+}
 
 //
 // Axial perspective movement.
 //
-void CalcAxialPerspMove (ICamera *CameraInfo, SWORD MouseX,SWORD MouseY,BYTE Buttons,
-	FVector *Delta,FFloatRotation *DeltaRot)
-	{
-	GUARD;
-	//
-	// Do single-axis movement:
-	//
-	if (Buttons == BUT_LEFT)					Delta->X = +MouseX;
-	else if (Buttons == BUT_RIGHT)				Delta->Y = +MouseX;
-	else if (Buttons == (BUT_LEFT | BUT_RIGHT)) Delta->Z = -MouseY;
-	UNGUARD("CalcAxialPerspMove");
-	};
+void CalcAxialPerspMove
+( 
+	UCamera		*Camera, 
+	SWORD		MouseX,
+	SWORD		MouseY,
+	DWORD		Buttons,
+	FVector		&Delta,
+	FRotation	&DeltaRot
+)
+{
+	guard(CalcAxialPerspMove);
+
+	// Do single-axis movement.
+	if		(Buttons == BUT_LEFT)				Delta.X = +MouseX;
+	else if (Buttons == BUT_RIGHT)				Delta.Y = +MouseX;
+	else if (Buttons == (BUT_LEFT | BUT_RIGHT)) Delta.Z = -MouseY;
+
+	unguard;
+}
 
 //
 // See if a scale is within acceptable bounds:
@@ -263,7 +309,7 @@ int ScaleIsWithinBounds (FVector *V, FLOAT Min, FLOAT Max)
 	{
 	FLOAT Temp;
 	//
-	GUARD;
+	guard(ScaleIsWithinBounds);
 	//
 	Temp = Abs (V->X);
 	if ((Temp<Min) || (Temp>Max)) return 0;
@@ -275,7 +321,7 @@ int ScaleIsWithinBounds (FVector *V, FLOAT Min, FLOAT Max)
 	if ((Temp<Min) || (Temp>Max)) return 0;
 	//
 	return 1;
-	UNGUARD("ScaleIsWithinBounds");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
@@ -285,97 +331,117 @@ int ScaleIsWithinBounds (FVector *V, FLOAT Min, FLOAT Max)
 //
 // Move and rotate camera freely.
 //
-void CameraMoveRot (ICamera *CameraInfo,FVector *Delta,FFloatRotation *DeltaRot)
-	{
-	GUARD;
-	CameraInfo->Actor->ViewRot.AddBounded   (DeltaRot->Pitch,DeltaRot->Yaw,DeltaRot->Roll);
-	CameraInfo->Actor->Location.MoveBounded (*Delta);
-	UNGUARD("CameraMoveRot");
-	};
+void CameraMoveRot
+(
+	UCamera		*Camera,
+	FVector		&Delta,
+	FRotation	&DeltaRot
+)
+{
+	guard(CameraMoveRot);
 
-//
-// Bound a vector to a cube.
-//
-void FBound (FVector *V, FLOAT Max)
-	{
-	if		(V->X > Max) 	V->X = Max;
-	else if (V->X < -Max)	V->X = -Max;
-	//
-	if 		(V->Y > Max) 	V->Y = Max;
-	else if (V->Y < -Max)	V->Y = -Max;
-	//
-	if 		(V->Z > Max) 	V->Z = Max;
-	else if (V->Z < -Max)	V->Z = -Max;
-	};
+	Camera->Actor->ViewRotation.AddBounded(DeltaRot.Pitch,DeltaRot.Yaw,DeltaRot.Roll);
+	Camera->Actor->Location.AddBounded(Delta);
+
+	unguard;
+}
 
 //
 // Move and rotate camera using gravity and collision where appropriate.
 //
-void CameraMoveRotWithPhysics (ICamera *CameraInfo,FVector *Delta,FFloatRotation *DeltaRot)
+void CameraMoveRotWithPhysics
+(
+	UCamera		*Camera,
+	FVector		&Delta,
+	FRotation	&DeltaRot
+)
+{
+	guard(CameraMoveRotWithPhysics);
+
+	// Update rotation.
+	Camera->Actor->ViewRotation.AddBounded
+	(
+		4.0*DeltaRot.Pitch,
+		4.0*DeltaRot.Yaw,
+		4.0*DeltaRot.Roll
+	);
+
+	//	Bound velocity and add it to delta.
+	Camera->Actor->Velocity = Camera->Actor->Velocity.BoundToCube(40.0);
+	Delta += Camera->Actor->Velocity;
+
+	if( (Camera->Actor->ShowFlags & SHOW_PlayerCtrl) &&
+		(!Camera->IsOrtho()) && 
+		(!(Camera->Level->Model->ModelFlags & MF_InvalidBsp)) )
 	{
-	GUARD;
-	//
-	// Update rotation
-	//
-	CameraInfo->Actor->ViewRot.AddBounded (4.0*DeltaRot->Pitch,4.0*DeltaRot->Yaw,4.0*DeltaRot->Roll);
-	//
-	//	Bound velocity and add it to delta:
-	//
-	FBound (&CameraInfo->Actor->Velocity,40.0);
-	*Delta += CameraInfo->Actor->Velocity;
-	//
-	if ((CameraInfo->ShowFlags & SHOW_PlayerCtrl) &&
-		(!CameraInfo->Camera->IsOrtho()) && 
-		(!(CameraInfo->Level.ModelInfo.ModelFlags & MF_InvalidBsp)))
+		// Move with collision; player is outside and collision is enabled.
+		FCheckResult Hit(1.0);
+		Camera->Level->Model->BoxLineCheck 
+		(
+			Hit,
+			NULL,
+			Camera->Actor->Location,
+			Camera->Actor->Location + Delta,
+			20.0,
+			24.0,
+			0
+		);
+		Camera->Actor->Location += Hit.Time * Delta;
+		if( Hit.Time == 0.0 )
 		{
-		if (CameraInfo->Level.ModelInfo.PointClass(CameraInfo->Actor->Location,NULL,0) != 0)
-			{
-			//
-			// Move with collision; player is outside and collision is enabled:
-			//
-			if (CameraInfo->Level.ModelInfo.SphereMove(CameraInfo->Actor->Location,*Delta,20.0,1,0)==0)
-				{
-				if (!(CameraInfo->ShowFlags&SHOW_PlayerCtrl)) CameraInfo->Actor->Velocity = GMath.ZeroVector;
-				};
-			}
-		else CameraInfo->Actor->Location.MoveBounded(*Delta); // Camera is trapped inside a wall, move freely
+			// Stuck, so allow free movement.
+			Camera->Actor->Location.AddBounded(Delta);
 		}
-	else CameraInfo->Actor->Location.MoveBounded(*Delta); // Move without collision
-	UNGUARD("CameraMoveRotWithPhysics");
-	};
+		else if( Hit.Time<1.0 && !(Camera->Actor->ShowFlags&SHOW_PlayerCtrl))
+		{
+			// Stop him.
+			Camera->Actor->Velocity = GMath.ZeroVector;
+		}
+	}
+	else
+	{
+		// Move without collision.
+		Camera->Actor->Location.AddBounded(Delta);
+	}
+	unguard;
+}
 
 //
 // Move the camera so that it's facing the rotated/moved brush in exactly the
 // same way as before.  Takes grid effects into account:
 //
-void CameraTrackBrush (ICamera *CameraInfo,FVector *Delta,FFloatRotation *DeltaRot)
-	{
-	IModel	BrushInfo,*ModelInfo;
+void CameraTrackBrush
+(
+	UCamera		*Camera,
+	FVector		&Delta,
+	FRotation	&DeltaRot
+)
+{
+	guard(CameraTrackBrush);
 	FVector		StartLocation,EndLocation;
 	FRotation	StartRotation,EndRotation;
-	//
-	GUARD;
-	//
-	ModelInfo = &CameraInfo->Level.ModelInfo;
-	CameraInfo->Level.Brush->Lock (&BrushInfo,LOCK_Read);
-	//
-	StartLocation = BrushInfo.Location; EndLocation = StartLocation;
-	StartRotation = BrushInfo.Rotation; EndRotation = StartRotation;
-	//
-	EndLocation.MoveBounded (*Delta);
-	EndRotation.AddBounded  (DeltaRot->Pitch,DeltaRot->Yaw,DeltaRot->Roll);
-	//
-	GUnrealEditor.constraintApply (ModelInfo,&BrushInfo,&StartLocation,&StartRotation,&GUnrealEditor.Constraints);
-	GUnrealEditor.constraintApply (ModelInfo,&BrushInfo,&EndLocation  ,&EndRotation,  &GUnrealEditor.Constraints);
-	//
-	// Now move camera accordinly:
-	//
-	CameraInfo->Actor->Location += EndLocation;
-	CameraInfo->Actor->Location -= StartLocation;
-	//
-	CameraInfo->Level.Brush->Unlock(&BrushInfo);
-	UNGUARD("CameraMoveRotWithPhysics");
-	};
+
+	UModel *Model = Camera->Level->Model;
+	UModel *Brush = Camera->Level->Brush();
+
+	Brush->Lock(LOCK_Read);
+
+	StartLocation = Brush->Location; EndLocation = StartLocation;
+	StartRotation = Brush->Rotation; EndRotation = StartRotation;
+
+	EndLocation.AddBounded(Delta);
+	EndRotation.AddBounded(DeltaRot.Pitch,DeltaRot.Yaw,DeltaRot.Roll);
+
+	GUnrealEditor.constraintApply( Model, Brush, &StartLocation, &StartRotation, &GUnrealEditor.Constraints );
+	GUnrealEditor.constraintApply( Model, Brush, &EndLocation  , &EndRotation,   &GUnrealEditor.Constraints );
+
+	// Now move camera accordinly.
+	Camera->Actor->Location += EndLocation;
+	Camera->Actor->Location -= StartLocation;
+
+	Brush->Unlock(LOCK_Read);
+	unguard;
+}
 
 //
 // If this is the first time the brush has moved since the user first
@@ -385,23 +451,23 @@ void CameraTrackBrush (ICamera *CameraInfo,FVector *Delta,FFloatRotation *DeltaR
 // Implicityly assumes that the selection set can't be changed between
 // NoteBrushMovement/FinishBrushMovement pairs.
 //
-void NoteBrushMovement (ICamera *CameraInfo)
+void NoteBrushMovement (UCamera *Camera)
 	{
 	FVector			WorldPivotLocation;
 	UModel			*Brush;
 	int 			i,n;
 	//
-	GUARD;
-	if ((!GTrans->Locked) && (!(CameraInfo->Camera->ClickFlags & CF_MOVE_BRUSH)))
+	guard(NoteBrushMovement);
+	if( !GTrans->IsLocked() && (!(Camera->ClickFlags & CF_MOVE_BRUSH)))
 		{
-		GTrans->Begin (CameraInfo->Level.Level,"Brush movement");
+		GTrans->Begin (Camera->Level,"Brush movement");
 		//
 		if (GUnrealEditor.MapEdit)
 			{
-			n = CameraInfo->Level.BrushArray->Num;
+			n = Camera->Level->BrushArray->Num;
 			for (i=0; i<n; i++)
 				{
-				Brush = CameraInfo->Level.BrushArray->Element(i);
+				Brush = Camera->Level->BrushArray->Element(i);
 				if ((Brush->ModelFlags & MF_Selected) || (i==0))
 					{
 					GTrans->NoteResHeader (Brush);
@@ -415,151 +481,152 @@ void NoteBrushMovement (ICamera *CameraInfo)
 						GUnrealEditor.constraintApply (NULL,NULL,&Brush->Location,&Brush->Rotation,&GUnrealEditor.Constraints);
 						WorldPivotLocation = Brush->Location + Brush->PostPivot;
 						};
-					Brush->Bound[1].Min.iTransform=0; // Note that transformed bounds are invalid
+					Brush->TransformedBound.IsValid=0;
 					};
 				};
 			}
 		else
 			{
-			GTrans->NoteResHeader (CameraInfo->Level.Brush);
-			CameraInfo->Level.Brush->Bound[1].Min.iTransform=0;
+			GTrans->NoteResHeader (Camera->Level->Brush());
+			Camera->Level->Brush()->TransformedBound.IsValid=0;
 			};
 		GTrans->End();
 		//
-		CameraInfo->Camera->ClickFlags |= CF_MOVE_BRUSH;
+		Camera->ClickFlags |= CF_MOVE_BRUSH;
 		};
-	UNGUARD("NoteBrushMovement");
+	unguard;
 	};
 
 //
 // Finish any snaps that were applied after NoteBrushMovement:
 //
-void FinishBrushMovement (ICamera *CameraInfo)
+void FinishBrushMovement(UCamera *Camera)
 	{
-	GUARD;
-	//
-	IModel		BrushInfo;
-	UModel		*Brush;
+	guard(FinishBrushMovement);
 	//
 	if (GUnrealEditor.MapEdit)
 		{
-		int n = CameraInfo->Level.BrushArray->Num;
+		int n = Camera->Level->BrushArray->Num;
 		for (int i=0; i<n; i++)
 			{
-			Brush = CameraInfo->Level.BrushArray->Element(i);
+			UModel *Brush = Camera->Level->BrushArray->Element(i);
 			if ((i==0) || (Brush->ModelFlags & MF_ShouldSnap))
 				{
-				Brush->Lock(&BrushInfo,LOCK_Trans);
-				GUnrealEditor.constraintApply (&CameraInfo->Level.ModelInfo,&BrushInfo,&BrushInfo.Location,&BrushInfo.Rotation,&GUnrealEditor.Constraints);
-				BrushInfo.ModelFlags &= ~MF_ShouldSnap;
-				Brush->Unlock(&BrushInfo);
+				Brush->Lock(LOCK_Trans);
+				GUnrealEditor.constraintApply(Camera->Level->Model,Brush,&Brush->Location,&Brush->Rotation,&GUnrealEditor.Constraints);
+				Brush->ModelFlags &= ~MF_ShouldSnap;
+				Brush->Unlock(LOCK_Trans);
 				};
 			if (Brush->ModelFlags & MF_Selected) Brush->BuildBound(1);
 			};
 		}
 	else
 		{
-		CameraInfo->Level.Brush->Lock(&BrushInfo,LOCK_Trans);
-		GUnrealEditor.constraintApply (&CameraInfo->Level.ModelInfo,&BrushInfo,&BrushInfo.Location,&BrushInfo.Rotation,&GUnrealEditor.Constraints);
-		CameraInfo->Level.Brush->Unlock(&BrushInfo);
-		//
-		CameraInfo->Level.Brush->BuildBound(1);
+		UModel *Brush = Camera->Level->Brush();
+		Brush->Lock(LOCK_Trans);
+		GUnrealEditor.constraintApply (Camera->Level->Model,Brush,&Brush->Location,&Brush->Rotation,&GUnrealEditor.Constraints);
+		Brush->Unlock(LOCK_Trans);
+		Brush->BuildBound(1);
 		};
-	UNGUARD("FinishBrushMovement");
+	unguard;
 	};
 
 //
 // If this is the first time called since first click, note all selected
-// brush polys:
+// actors:
 //
-void NoteActorMovement (ICamera *CameraInfo)
+void NoteActorMovement( UCamera *Camera )
+{
+	guard(NoteActorMovement);
+
+	int Found = 0;
+	if( !GTrans->IsLocked() && !(Camera->ClickFlags & CF_MOVE_ACTOR) )
 	{
-	AActor	*Actor;
-	INDEX	i,Found;
-	//
-	GUARD;
-	Found = 0;
-	if ((!GTrans->Locked) && (!(CameraInfo->Camera->ClickFlags & CF_MOVE_ACTOR)))
-		{
-		Actor = &CameraInfo->Level.Actors->Element(0);
-		for (i=0; i<CameraInfo->Level.Actors->Max; i++)
-			{			
-			if (Actor->bSelected)
+		for( int i=0; i<Camera->Level->Num; i++ )
+		{			
+			AActor *Actor = Camera->Level->Element(i);
+			if( Actor && Actor->bSelected )
+			{
+				if( !Found )
+					GTrans->Begin( Camera->Level, "Actor movement" );
+				Actor->Lock(LOCK_Trans);
+				Actor->Unlock(LOCK_Trans);
+				if( Actor->Brush )
 				{
-				if (!Found) GTrans->Begin (CameraInfo->Level.Level,"Actor movement");
-				GTrans->NoteActor (CameraInfo->Level.Actors,i);
-				if (Actor->Brush) GTrans->NoteResHeader (Actor->Brush);
+					Actor->Brush->Lock(LOCK_Trans);
+					Actor->Brush->Unlock(LOCK_Trans);
+				}
 				Found++;
-				};
-			Actor++;
-			};
-		if (Found) GTrans->End ();
-		//
-		CameraInfo->Camera->ClickFlags |= CF_MOVE_ACTOR;
-		};
-	UNGUARD("NoteActorMovement");
-	};
+			}
+		}
+		if( Found )
+			GTrans->End();
+
+		Camera->ClickFlags |= CF_MOVE_ACTOR;
+	}
+	unguard;
+}
 
 //
 // If this is the first time textures have been adjusted since the user first
 // pressed a mouse button, save selected polygons transactionally so this can
 // be undone/redone:
 //
-void NoteTextureMovement (ICamera *CameraInfo)
+void NoteTextureMovement (UCamera *Camera)
 	{
-	GUARD;
-	if ((!GTrans->Locked) && 
-		(CameraInfo->Level.ModelInfo.Trans) && 
-		(!(CameraInfo->Camera->ClickFlags & CF_MOVE_TEXTURE)))
+	guard(NoteTextureMovement);
+	if ( !GTrans->IsLocked() && 
+		!(Camera->ClickFlags & CF_MOVE_TEXTURE))
 		{
-		GTrans->Begin (CameraInfo->Level.Level,"Texture movement");
-		GTrans->NoteSelectedBspSurfs (&CameraInfo->Level.ModelInfo,1);
+		GTrans->Begin (Camera->Level,"Texture movement");
+		Camera->Level->Model->Surfs->ModifySelected(1);
 		GTrans->End ();
 		//
-		CameraInfo->Camera->ClickFlags |= CF_MOVE_TEXTURE;
+		Camera->ClickFlags |= CF_MOVE_TEXTURE;
 		};
-	UNGUARD("NoteTextureMovement");
+	unguard;
 	};
 
 //
 // Move and rotate brush.
 //
-void BrushMoveRot (ICamera *CameraInfo,FVector *Delta,FFloatRotation *DeltaRot)
+void BrushMoveRot
+(
+	UCamera		*Camera,
+	FVector		&Delta,
+	FRotation	&DeltaRot 
+)
+{
+	guard(BrushMoveRot);
+	NoteBrushMovement( Camera );
+
+	int Moved = 0;
+	if( GUnrealEditor.MapEdit )
 	{
-	IModel		BrushInfo;
-	UModel			*Brush;
-	int				i,n,Moved;
-	//
-	GUARD;
-	NoteBrushMovement (CameraInfo);
-	//
-	Moved = 0;
-	if (GUnrealEditor.MapEdit)
+		int n = Camera->Level->BrushArray->Num;
+		for( int i=0; i<n; i++ )
 		{
-		n = CameraInfo->Level.BrushArray->Num;
-		for (i=0; i<n; i++)
+			UModel *Brush = Camera->Level->BrushArray->Element(i);
+			if( Brush->ModelFlags & MF_Selected )
 			{
-			Brush = CameraInfo->Level.BrushArray->Element(i);
-			if (Brush->ModelFlags & MF_Selected)
-				{
-		   		Brush->Lock (&BrushInfo,LOCK_Trans);
-		   		BrushInfo.Location.MoveBounded(*Delta);
-				BrushInfo.Rotation.Add        (DeltaRot->Pitch,DeltaRot->Yaw,DeltaRot->Roll);
-		   		Brush->Unlock (&BrushInfo);
-				//
+		   		Brush->Lock(LOCK_Trans);
+		   		Brush->Location.AddBounded(Delta);
+				Brush->Rotation += DeltaRot;
+		   		Brush->Unlock(LOCK_Trans);
 				Moved = 1;
-				};
-			};
-		};
-	if (!Moved)
-		{
-   		CameraInfo->Level.Brush->Lock   (&BrushInfo,LOCK_Trans);
-   		BrushInfo.Location.MoveBounded	(*Delta);
-		BrushInfo.Rotation.Add			(DeltaRot->Pitch,DeltaRot->Yaw,DeltaRot->Roll);
-   		CameraInfo->Level.Brush->Unlock (&BrushInfo);
-		};
-	UNGUARD("BrushMoveRot");
-	};
+			}
+		}
+	}
+	if( !Moved )
+	{
+		UModel *Brush = Camera->Level->Brush();
+   		Brush->Lock(LOCK_Trans);
+   		Brush->Location.AddBounded(Delta);
+		Brush->Rotation += DeltaRot;
+   		Brush->Unlock(LOCK_Trans);
+	}
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
    Editor camera movement.
@@ -568,21 +635,20 @@ void BrushMoveRot (ICamera *CameraInfo,FVector *Delta,FFloatRotation *DeltaRot)
 //
 // Move the edit-camera.
 //
-void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl)
+void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, FLOAT MouseX, FLOAT MouseY, int Shift, int Ctrl)
 	{
-	ICamera 		CameraInfo;
-	IModel  		BrushInfo;
+	guard(FGlobalEditor::edcamMove);
 	FVector     	Delta,Vector,SnapMin,SnapMax,DeltaMin,DeltaMax,DeltaFree;
-	FFloatRotation	DeltaRot;
+	FRotation		DeltaRot;
 	FLOAT			TempFloat,TempU,TempV,Speed;
 	int				Temp;
 	static int		ForceXSnap=0,ForceYSnap=0,ForceZSnap=0;
 	static FLOAT	TextureAngle=0.0;
 	static INDEX	*OriginalUVectors = NULL,*OriginalVVectors = NULL,OrigNumVectors=0;
 	//
-	GUARD;
 	if (Camera->IsBrowser()) return;
-	if (!Camera->Lock(&CameraInfo)) return;
+	if (!Camera->Lock(LOCK_ReadWrite|LOCK_CanFail)) return;
+	UModel *Brush = Camera->Level->Brush();
 	//
 	Delta.X    		= 0.0;  Delta.Y  		= 0.0;  Delta.Z   		= 0.0;
 	DeltaRot.Pitch	= 0.0;  DeltaRot.Yaw	= 0.0;  DeltaRot.Roll	= 0.0;
@@ -592,17 +658,12 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 		//
 		// Reset flags that last for the duration of the click:
 		//
-		CameraInfo.Camera->ClickFlags &= ~(CF_MOVE_ALL);
+		Camera->ClickFlags &= ~(CF_MOVE_ALL);
 		//
-		CameraInfo.Level.Brush->Lock (&BrushInfo,LOCK_Trans);
+		Brush->Lock(LOCK_Trans);
 		if (GUnrealEditor.Mode==EM_BrushSnap)
 			{
-			if (!(BrushInfo.ModelFlags & MF_PostScale))
-				{
-				BrushInfo.ModelFlags |= MF_PostScale;
-				BrushInfo.PostScale   = GMath.UnitScale;
-				};
-			BrushInfo.TempScale = BrushInfo.PostScale;
+			Brush->TempScale = Brush->PostScale;
 			ForceXSnap = 0;
 			ForceYSnap = 0;
 			ForceZSnap = 0;
@@ -616,44 +677,40 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 			if (OriginalUVectors) appFree(OriginalUVectors);
 			if (OriginalVVectors) appFree(OriginalVVectors);
 			//
-			int Size = CameraInfo.Level.ModelInfo.NumBspSurfs * sizeof(INDEX);
+			int Size = Camera->Level->Model->Surfs->Num * sizeof(INDEX);
 			OriginalUVectors = (INDEX *)appMalloc(Size,"OriginalUVectors");
 			OriginalVVectors = (INDEX *)appMalloc(Size,"OriginalVVectors");
 			//
-			OrigNumVectors = CameraInfo.Level.ModelInfo.NumVectors;
+			OrigNumVectors = Camera->Level->Model->Vectors->Num;
 			//
-			for (int i=0; i<CameraInfo.Level.ModelInfo.NumBspSurfs; i++)
+			for (int i=0; i<Camera->Level->Model->Surfs->Num; i++)
 				{
-				FBspSurf *Surf = &CameraInfo.Level.ModelInfo.BspSurfs[i];
+				FBspSurf *Surf = &Camera->Level->Model->Surfs(i);
 				OriginalUVectors[i] = Surf->vTextureU;
 				OriginalVVectors[i] = Surf->vTextureV;
 				//
 				if (Surf->PolyFlags & PF_Selected)
 					{
-					if ((CameraInfo.Level.ModelInfo.NumVectors+2)<CameraInfo.Level.ModelInfo.MaxVectors)
-						{
-						int n			= CameraInfo.Level.ModelInfo.NumVectors++;
-						FVector *V		= &CameraInfo.Level.ModelInfo.FVectors[n];
-						*V				= CameraInfo.Level.ModelInfo.FVectors[Surf->vTextureU];
-						Surf->vTextureU = n;
-						//
-						n				= CameraInfo.Level.ModelInfo.NumVectors++;
-						V				= &CameraInfo.Level.ModelInfo.FVectors[n];
-						*V				= CameraInfo.Level.ModelInfo.FVectors[Surf->vTextureV];
-						Surf->vTextureV = n;
-						//
-						Surf->iLightMesh = INDEX_NONE; // Invalidate lighting mesh
-						}
-					else Surf->PolyFlags &= ~PF_Selected; // Overflow; prevent further rotation
+					int n			= Camera->Level->Model->Vectors->Add();
+					FVector *V		= &Camera->Level->Model->Vectors(n);
+					*V				= Camera->Level->Model->Vectors(Surf->vTextureU);
+					Surf->vTextureU = n;
+					//
+					n				= Camera->Level->Model->Vectors->Add();
+					V				= &Camera->Level->Model->Vectors(n);
+					*V				= Camera->Level->Model->Vectors(Surf->vTextureV);
+					Surf->vTextureV = n;
+					//
+					Surf->iLightMesh = INDEX_NONE; // Invalidate lighting mesh
 					};
 				};
 			TextureAngle = 0.0;
 			};
-		CameraInfo.Level.Brush->Unlock(&BrushInfo);
+		Brush->Unlock(LOCK_Trans);
 		};
 	if (Buttons & BUT_LASTRELEASE)
 		{
-		FinishBrushMovement(&CameraInfo);
+		FinishBrushMovement(Camera);
 		//
 		if (OriginalUVectors)
 			{
@@ -662,38 +719,35 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 			// vectors we've been adjusting by merging the new vectors in and eliminating
 			// duplicates:
 			//
-			int Size = CameraInfo.Level.ModelInfo.NumVectors * sizeof(FVector);
-			FVector *AllVectors = (FVector *)GMem.Get(Size);
-			memcpy(AllVectors,CameraInfo.Level.ModelInfo.FVectors,Size);
+			FMemMark Mark(GMem);
+			int Count = Camera->Level->Model->Vectors->Num;
+			FVector *AllVectors = new(GMem,Count)FVector;
+			memcpy(AllVectors,&Camera->Level->Model->Vectors(0),Count*sizeof(FVector));
 			//
-			CameraInfo.Level.ModelInfo.NumVectors = OrigNumVectors;
+			Camera->Level->Model->Vectors->Num = OrigNumVectors;
 			//
-			for (int i=0; i<CameraInfo.Level.ModelInfo.NumBspSurfs; i++)
+			for (int i=0; i<Camera->Level->Model->Surfs->Num; i++)
 				{
-				FBspSurf *Surf = &CameraInfo.Level.ModelInfo.BspSurfs[i];
+				FBspSurf *Surf = &Camera->Level->Model->Surfs(i);
 				if (Surf->PolyFlags & PF_Selected)
 					{
 					// Update master texture coordinates but not base:
-					polyUpdateMaster (&CameraInfo.Level.ModelInfo,i,1,0);
+					polyUpdateMaster (Camera->Level->Model,i,1,0);
 					// Add this poly's vectors, merging with the level's existing vectors:
-					Surf->vTextureU = bspAddVector(&CameraInfo.Level.ModelInfo,&AllVectors[Surf->vTextureU],0);
-					Surf->vTextureV = bspAddVector(&CameraInfo.Level.ModelInfo,&AllVectors[Surf->vTextureV],0);
+					Surf->vTextureU = bspAddVector(Camera->Level->Model,&AllVectors[Surf->vTextureU],0);
+					Surf->vTextureV = bspAddVector(Camera->Level->Model,&AllVectors[Surf->vTextureV],0);
 					};
 				};
-			GMem.Release(AllVectors);
+			Mark.Pop();
 			appFree(OriginalUVectors); OriginalUVectors=NULL;
 			appFree(OriginalVVectors); OriginalVVectors=NULL;
-			//
-			// Force an entire Bsp refresh to remove unneeded vectors:
-			//
-			bspRefresh(&CameraInfo.Level.ModelInfo,1);
 			};
 		};
 	switch (GUnrealEditor.Mode)
 		{
 		case EM_None: /* Editor disabled */
 			//
-			debug (LOG_Ed,"Editor is disabled");
+			debug (LOG_Problem,"Editor is disabled");
 			//
 			break;
 		case EM_CameraMove: /* Move camera normally */
@@ -702,38 +756,38 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 			//
 			if (Buttons & (BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE))
 				{
-				CameraInfo.Actor->Velocity = GMath.ZeroVector;
+				Camera->Actor->Velocity = GMath.ZeroVector;
 				}
 			else
 				{
    				if (!(Ctrl||Shift))
 					{
 					Speed = 0.30*GUnrealEditor.MovementSpeed;
-					if (CameraInfo.Camera->IsOrtho())
+					if (Camera->IsOrtho())
 						{
 						if (Buttons == BUT_RIGHT)
 							{
 							Buttons = BUT_LEFT;
 							Speed   = 0.60*GUnrealEditor.MovementSpeed;
 							};
-						CalcFreeOrthoMoveRot (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
+						CalcFreeOrthoMoveRot(Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
 						}
 					else
 						{
-						CalcFreePerspMoveRot (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
+						CalcFreePerspMoveRot(Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
 						};
 					Delta *= Speed;
-					CameraMoveRotWithPhysics (&CameraInfo,&Delta,&DeltaRot); // Move camera
+					CameraMoveRotWithPhysics(Camera,Delta,DeltaRot); // Move camera
 					}
 				else
 					{
-					if (CameraInfo.Camera->IsOrtho())	CalcFreeOrthoMoveRot  (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
-					else                				CalcAxialPerspMove    (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
+					if (Camera->IsOrtho())	CalcFreeOrthoMoveRot  (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
+					else                	CalcAxialPerspMove    (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
 					//
 					Delta *= GUnrealEditor.MovementSpeed*0.25;
 					//
-					if (Shift) CameraTrackBrush (&CameraInfo,&Delta,&DeltaRot);
-   					BrushMoveRot				(&CameraInfo,&Delta,&DeltaRot); // Move brush
+					if (Shift) CameraTrackBrush (Camera,Delta,DeltaRot);
+   					BrushMoveRot				(Camera,Delta,DeltaRot); // Move brush
 					};
 				};
 			break;
@@ -741,33 +795,33 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 			//
 			if (Buttons&(BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE))
 				{
-				CameraInfo.Actor->Velocity = GMath.ZeroVector;
+				Camera->Actor->Velocity = GMath.ZeroVector;
 				}
 			else
 				{
 				if (!(Ctrl||Shift))
 					{
-					if (CameraInfo.Camera->IsOrtho())	CalcFreeOrthoMoveRot (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
-					else                				CalcFreePerspMoveRot (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
+					if (Camera->IsOrtho())	CalcFreeOrthoMoveRot (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
+					else                	CalcFreePerspMoveRot (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
 					}
 				else
 					{
-					if (CameraInfo.Camera->IsOrtho())	CalcFreeOrthoMoveRot  (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
-					else                				CalcAxialPerspMove    (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
+					if (Camera->IsOrtho())	CalcFreeOrthoMoveRot  (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
+					else                	CalcAxialPerspMove    (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
 					};
 				Delta *= GUnrealEditor.MovementSpeed * 0.025;
 				//
-				CameraInfo.Actor->Velocity += Delta;
-				Delta = CameraInfo.Actor->Velocity;
+				Camera->Actor->Velocity += Delta;
+				Delta = Camera->Actor->Velocity;
 				//
    				if (!(Ctrl||Shift))
 	   				{
-					CameraMoveRotWithPhysics	(&CameraInfo,&Delta,&DeltaRot); // Move camera
+					CameraMoveRotWithPhysics	(Camera,Delta,DeltaRot); // Move camera
 					}
 				else
 					{
-					if (Shift) CameraTrackBrush (&CameraInfo,&Delta,&DeltaRot);
-					BrushMoveRot				(&CameraInfo,&Delta,&DeltaRot); // Move brush
+					if (Shift) CameraTrackBrush (Camera,Delta,DeltaRot);
+					BrushMoveRot				(Camera,Delta,DeltaRot); // Move brush
 					};
 				};
 			break;
@@ -775,7 +829,7 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 			//
 			if (Buttons & (BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE))
 				{
-				CameraInfo.Actor->Velocity = GMath.ZeroVector;
+				Camera->Actor->Velocity = GMath.ZeroVector;
 				}
 			else
 				{
@@ -786,22 +840,22 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 					Ctrl	= Temp;
 					goto CameraMove; // Just want to move camera and not brush!
 					};
-				if (CameraInfo.Camera->IsOrtho())	CalcFreeOrthoMoveRot (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
-				else                				CalcFreePerspMoveRot (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
+				if (Camera->IsOrtho())	CalcFreeOrthoMoveRot (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
+				else                	CalcFreePerspMoveRot (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
 				//
 				Delta *= GUnrealEditor.MovementSpeed * 0.25;
 				//
-				if (Shift || Ctrl) 		CameraMoveRotWithPhysics(&CameraInfo,&Delta,&DeltaRot); // Move camera
-   				if (1)				 	BrushMoveRot			(&CameraInfo,&Delta,&DeltaRot); // Move brush
+				if (Shift || Ctrl) 		CameraMoveRotWithPhysics(Camera,Delta,DeltaRot); // Move camera
+   				if (1)				 	BrushMoveRot			(Camera,Delta,DeltaRot); // Move brush
 				};
 			break;
 		case EM_BrushMove:		/* Move brush along one axis at a time */
 			//
 			if (Buttons & (BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE))
 				{
-				CameraInfo.Actor->Velocity = GMath.ZeroVector;
+				Camera->Actor->Velocity = GMath.ZeroVector;
 				}
-			else if (GApp->KeyDown[K_ALT])
+			else if( Camera->Input->KeyDown(IK_Alt) )
 				{
 				goto TextureSet;
 				}
@@ -814,115 +868,115 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 					Ctrl	= Temp;
 					goto CameraMove; // Just want to move camera and not brush!
 					};
-				if (CameraInfo.Camera->IsOrtho())	CalcAxialOrthoMove  (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
-				else                				CalcAxialPerspMove	(&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
+				if (Camera->IsOrtho())	CalcAxialOrthoMove  (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
+				else                	CalcAxialPerspMove	(Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
 				//
 				Delta *= GUnrealEditor.MovementSpeed*0.25;
 				//
-				if (Shift || Ctrl)	CameraMoveRotWithPhysics(&CameraInfo,&Delta,&DeltaRot); // Move camera
-   				if (1)				BrushMoveRot			(&CameraInfo,&Delta,&DeltaRot); // Move brush
+				if (Shift || Ctrl)	CameraMoveRotWithPhysics(Camera,Delta,DeltaRot); // Move camera
+   				if (1)				BrushMoveRot			(Camera,Delta,DeltaRot); // Move brush
 				};
 			break;
 		case EM_BrushRotate:		/* Rotate brush */
 			//
-			if (GApp->KeyDown[K_ALT]) goto TextureSet;
+			if (Camera->Input->KeyDown(IK_Alt)) goto TextureSet;
 			else if (!Ctrl) goto CameraMove;
 			//
-			NoteBrushMovement			(&CameraInfo);
-   			CameraInfo.Level.Brush->Lock(&BrushInfo,LOCK_Trans);
+			NoteBrushMovement(Camera);
+   			Brush->Lock(LOCK_Trans);
 			//
-			CalcAxialPerspMove			(&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
+			CalcAxialPerspMove(Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
 			//
-			BrushInfo.Rotation.Pitch += Delta.X * 4.0;
-			BrushInfo.Rotation.Yaw   += Delta.Y * 4.0;
-			BrushInfo.Rotation.Roll  += Delta.Z * 4.0;
+			Brush->Rotation.Pitch += Delta.X * 4.0;
+			Brush->Rotation.Yaw   += Delta.Y * 4.0;
+			Brush->Rotation.Roll  += Delta.Z * 4.0;
 			//
-			CameraInfo.Level.Brush->Unlock(&BrushInfo);
+			Brush->Unlock(LOCK_Trans);
 			break;
 		case EM_BrushSheer: /* Sheer brush */
 			//
-			if (GApp->KeyDown[K_ALT]) goto TextureSet;
+			if (Camera->Input->KeyDown(IK_Alt)) goto TextureSet;
 			else if (!Ctrl) goto CameraMove;
 			//
-			NoteBrushMovement(&CameraInfo);
-   			CameraInfo.Level.Brush->Lock (&BrushInfo,LOCK_Trans);
-			BrushInfo.Scale.SheerRate = Clamp(BrushInfo.Scale.SheerRate + (FLOAT)(-MouseY) / 240.0,-4.0,4.0);
-			CameraInfo.Level.Brush->Unlock (&BrushInfo);
+			NoteBrushMovement(Camera);
+   			Brush->Lock(LOCK_Trans);
+			Brush->Scale.SheerRate = Clamp(Brush->Scale.SheerRate + (FLOAT)(-MouseY) / 240.0,-4.0,4.0);
+			Brush->Unlock(LOCK_Trans);
 			break;
 		case EM_BrushScale:	/* Scale brush (proportionally along all axes) */
 			//			  
-			if (GApp->KeyDown[K_ALT]) goto TextureSet;
+			if (Camera->Input->KeyDown(IK_Alt)) goto TextureSet;
 			else if (!Ctrl) goto CameraMove;
 			//
-			NoteBrushMovement(&CameraInfo);
-   			CameraInfo.Level.Brush->Lock(&BrushInfo,LOCK_Trans);
-			Vector  = BrushInfo.Scale.Scale * (1 + (FLOAT)(-MouseY) / 256.0);
+			NoteBrushMovement(Camera);
+   			Brush->Lock(LOCK_Trans);
+			Vector  = Brush->Scale.Scale * (1 + (FLOAT)(-MouseY) / 256.0);
 			//
-			if (ScaleIsWithinBounds(&Vector,0.05,400.0)) BrushInfo.Scale.Scale = Vector;
-			CameraInfo.Level.Brush->Unlock (&BrushInfo);
+			if (ScaleIsWithinBounds(&Vector,0.05,400.0)) Brush->Scale.Scale = Vector;
+			Brush->Unlock(LOCK_Trans);
 			break;
 		case EM_BrushStretch: /* Stretch brush axially */
 			//
-			if (GApp->KeyDown[K_ALT]) goto TextureSet;
+			if (Camera->Input->KeyDown(IK_Alt)) goto TextureSet;
 			else if (!Ctrl) goto CameraMove;
 			//
-			NoteBrushMovement(&CameraInfo);
-   			CameraInfo.Level.Brush->Lock (&BrushInfo,LOCK_Trans);
+			NoteBrushMovement(Camera);
+   			Brush->Lock(LOCK_Trans);
 			//
-			if (CameraInfo.Camera->IsOrtho()) CalcAxialOrthoMove (&CameraInfo,MouseX,-MouseY,Buttons,&Delta,&DeltaRot);
-			else CalcAxialPerspMove (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
+			if (Camera->IsOrtho())	CalcAxialOrthoMove (Camera,MouseX,-MouseY,Buttons,Delta,DeltaRot);
+			else					CalcAxialPerspMove (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
 			//
-			Vector = BrushInfo.Scale.Scale;
+			Vector = Brush->Scale.Scale;
 			Vector.X *= (1 + Delta.X / 256.0);
 			Vector.Y *= (1 + Delta.Y / 256.0);
 			Vector.Z *= (1 + Delta.Z / 256.0);
 			//
-			if (ScaleIsWithinBounds(&Vector,0.05,400.0)) BrushInfo.Scale.Scale = Vector;
-			CameraInfo.Level.Brush->Unlock (&BrushInfo);
+			if (ScaleIsWithinBounds(&Vector,0.05,400.0)) Brush->Scale.Scale = Vector;
+			Brush->Unlock(LOCK_Trans);
 			break;
 		case EM_BrushSnap: /* Scale brush snapped to grid */
-			if (GApp->KeyDown[K_ALT]) goto TextureSet;
+			if (Camera->Input->KeyDown(IK_Alt)) goto TextureSet;
 			else if (!Ctrl) goto CameraMove;
 			//
-			NoteBrushMovement(&CameraInfo);
-   			CameraInfo.Level.Brush->Lock (&BrushInfo,LOCK_Trans);
+			NoteBrushMovement(Camera);
+   			Brush->Lock(LOCK_Trans);
 			//
-			if (CameraInfo.Camera->IsOrtho()) CalcAxialOrthoMove (&CameraInfo,MouseX,-MouseY,Buttons,&Delta,&DeltaRot);
-			else CalcAxialPerspMove (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
+			if (Camera->IsOrtho())	CalcAxialOrthoMove (Camera,MouseX,-MouseY,Buttons,Delta,DeltaRot);
+			else					CalcAxialPerspMove (Camera,MouseX,MouseY,Buttons,Delta,DeltaRot);
 			//
-			Vector = BrushInfo.TempScale.Scale;
+			Vector = Brush->TempScale.Scale;
 			Vector.X *= (1 + Delta.X / 400.0);
 			Vector.Y *= (1 + Delta.Y / 400.0);
 			Vector.Z *= (1 + Delta.Z / 400.0);
 			//
 			if (ScaleIsWithinBounds(&Vector,0.05,400.0))
 				{
-				BrushInfo.TempScale.Scale = Vector;
-				BrushInfo.PostScale.Scale = Vector;
+				Brush->TempScale.Scale = Vector;
+				Brush->PostScale.Scale = Vector;
 				//
-				if (CameraInfo.Level.Brush->Polys->Num==0) break;
+				if (Camera->Level->Brush()->Polys->Num==0) break;
 				//
-   				CameraInfo.Level.Brush->Unlock(&BrushInfo);
-				CameraInfo.Level.Brush->BuildBound(1);
-				FVector BoxMin=CameraInfo.Level.Brush->Bound[1].Min;
-				FVector BoxMax=CameraInfo.Level.Brush->Bound[1].Max;
-   				CameraInfo.Level.Brush->Lock (&BrushInfo,LOCK_Trans);
+   				Brush->Unlock(LOCK_Trans);
+				Brush->BuildBound(1);
+				FVector BoxMin=Camera->Level->Brush()->TransformedBound.Min;
+				FVector BoxMax=Camera->Level->Brush()->TransformedBound.Max;
+   				Brush->Lock(LOCK_Trans);
 				//
 				SnapMin   = BoxMin; constrainSimplePoint (&SnapMin,&GUnrealEditor.Constraints);
-				DeltaMin  = BrushInfo.Location + BrushInfo.PostPivot - SnapMin;
-				DeltaFree = BrushInfo.Location + BrushInfo.PostPivot - BoxMin;
-				SnapMin.X = BrushInfo.PostScale.Scale.X * DeltaMin.X/DeltaFree.X;
-				SnapMin.Y = BrushInfo.PostScale.Scale.Y * DeltaMin.Y/DeltaFree.Y;
-				SnapMin.Z = BrushInfo.PostScale.Scale.Z * DeltaMin.Z/DeltaFree.Z;
+				DeltaMin  = Brush->Location + Brush->PostPivot - SnapMin;
+				DeltaFree = Brush->Location + Brush->PostPivot - BoxMin;
+				SnapMin.X = Brush->PostScale.Scale.X * DeltaMin.X/DeltaFree.X;
+				SnapMin.Y = Brush->PostScale.Scale.Y * DeltaMin.Y/DeltaFree.Y;
+				SnapMin.Z = Brush->PostScale.Scale.Z * DeltaMin.Z/DeltaFree.Z;
 				//
 				SnapMax   = BoxMax; constrainSimplePoint (&SnapMax,&GUnrealEditor.Constraints);
-				DeltaMax  = BrushInfo.Location + BrushInfo.PostPivot - SnapMax;
-				DeltaFree = BrushInfo.Location + BrushInfo.PostPivot - BoxMax;
-				SnapMax.X = BrushInfo.PostScale.Scale.X * DeltaMax.X/DeltaFree.X;
-				SnapMax.Y = BrushInfo.PostScale.Scale.Y * DeltaMax.Y/DeltaFree.Y;
-				SnapMax.Z = BrushInfo.PostScale.Scale.Z * DeltaMax.Z/DeltaFree.Z;
+				DeltaMax  = Brush->Location + Brush->PostPivot - SnapMax;
+				DeltaFree = Brush->Location + Brush->PostPivot - BoxMax;
+				SnapMax.X = Brush->PostScale.Scale.X * DeltaMax.X/DeltaFree.X;
+				SnapMax.Y = Brush->PostScale.Scale.Y * DeltaMax.Y/DeltaFree.Y;
+				SnapMax.Z = Brush->PostScale.Scale.Z * DeltaMax.Z/DeltaFree.Z;
 				//
-				// Set PostScale so brush extents are gridsnapped
+				// Set PostScale so brush extents are grid snapped
 				// in all directions of movement:
 				//
 				if (ForceXSnap || (Delta.X!=0))
@@ -930,74 +984,77 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 					ForceXSnap = 1;
 					if ((SnapMin.X>0.05) &&
 						((SnapMax.X<=0.05) ||
-						(Abs(SnapMin.X-BrushInfo.PostScale.Scale.X) < Abs(SnapMax.X-BrushInfo.PostScale.Scale.X))))
-						BrushInfo.PostScale.Scale.X = SnapMin.X;
+						(Abs(SnapMin.X-Brush->PostScale.Scale.X) < Abs(SnapMax.X-Brush->PostScale.Scale.X))))
+						Brush->PostScale.Scale.X = SnapMin.X;
 					else if (SnapMax.X>0.05)
-						BrushInfo.PostScale.Scale.X = SnapMax.X;
+						Brush->PostScale.Scale.X = SnapMax.X;
 					};
 				if (ForceYSnap || (Delta.Y!=0))
 					{
 					ForceYSnap = 1;
 					if ((SnapMin.Y>0.05) &&
 						((SnapMax.Y<=0.05) ||
-						(Abs(SnapMin.Y-BrushInfo.PostScale.Scale.Y) < Abs(SnapMax.Y-BrushInfo.PostScale.Scale.Y))))
-						BrushInfo.PostScale.Scale.Y = SnapMin.Y;
+						(Abs(SnapMin.Y-Brush->PostScale.Scale.Y) < Abs(SnapMax.Y-Brush->PostScale.Scale.Y))))
+						Brush->PostScale.Scale.Y = SnapMin.Y;
 					else if (SnapMax.Y>0.05)
-						BrushInfo.PostScale.Scale.Y = SnapMax.Y;
+						Brush->PostScale.Scale.Y = SnapMax.Y;
 					};
 				if (ForceZSnap || (Delta.Z!=0))
 					{
 					ForceZSnap = 1;
 					if ((SnapMin.Z>0.05) &&
 						((SnapMax.Z<=0.05) ||
-						(Abs(SnapMin.Z-BrushInfo.PostScale.Scale.Z) < Abs(SnapMax.Z-BrushInfo.PostScale.Scale.Z))))
-						BrushInfo.PostScale.Scale.Z = SnapMin.Z;
+						(Abs(SnapMin.Z-Brush->PostScale.Scale.Z) < Abs(SnapMax.Z-Brush->PostScale.Scale.Z))))
+						Brush->PostScale.Scale.Z = SnapMin.Z;
 					else if (SnapMax.Z>0.05)
-						BrushInfo.PostScale.Scale.Z = SnapMax.Z;
+						Brush->PostScale.Scale.Z = SnapMax.Z;
 					};
 				};
-			CameraInfo.Level.Brush->Unlock (&BrushInfo);
+			Brush->Unlock(LOCK_Trans);
 			break;
 		case EM_MoveActor:		/* Move actor/light */
 		case EM_AddActor:		/* Add actor/light */
-			if (Buttons & (BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE))
-				{
-				CameraInfo.Actor->Velocity = GMath.ZeroVector;
-				}
+			if( Buttons & (BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE) )
+			{
+				Camera->Actor->Velocity = GMath.ZeroVector;
+			}
 			else
+			{
+   				if( !Ctrl )
 				{
-   				if (!Ctrl)
-					{
-					if (CameraInfo.Camera->IsOrtho())	CalcFreeOrthoMoveRot (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
-					else                				CalcFreePerspMoveRot (&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
-					//
+					// Move camera.
+					if( Camera->IsOrtho() )	CalcFreeOrthoMoveRot( Camera, MouseX, MouseY, Buttons, Delta, DeltaRot );
+					else                	CalcFreePerspMoveRot( Camera, MouseX, MouseY, Buttons, Delta, DeltaRot );
+
 					Delta *= GUnrealEditor.MovementSpeed * 0.25;
-					//
-					CameraMoveRotWithPhysics (&CameraInfo,&Delta,&DeltaRot); // Move camera
-					}
-				else if (MouseX||MouseY)
-					{
-					NoteActorMovement (&CameraInfo);
-					//
-					if (CameraInfo.Camera->IsOrtho())	CalcFreeOrthoMoveRot	(&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
-					else                				CalcAxialPerspMove  	(&CameraInfo,MouseX,MouseY,Buttons,&Delta,&DeltaRot);
-					//
+
+					CameraMoveRotWithPhysics( Camera, Delta, DeltaRot );
+				}
+				else if( MouseX || MouseY )
+				{
+					// Move actor.
+					NoteActorMovement( Camera );
+
+					if( Camera->IsOrtho() )	CalcFreeOrthoMoveRot( Camera, MouseX, MouseY, Buttons, Delta, DeltaRot );
+					else                	CalcAxialPerspMove  ( Camera, MouseX, MouseY, Buttons, Delta, DeltaRot );
+
 					Delta *= GUnrealEditor.MovementSpeed * 0.25;
-					//
+
 					DeltaRot.Pitch	*= 2;
 					DeltaRot.Yaw	*= 2;
 					DeltaRot.Roll	*= 2;
-					//
-					if (Shift) CameraMoveRot(&CameraInfo,&Delta,&DeltaRot);
-   					GUnrealEditor.edactMoveSelected(&CameraInfo.Level,&Delta,&DeltaRot); // Move actor
-					};
-				};
+
+					if( Shift )
+						CameraMoveRot( Camera, Delta, DeltaRot );
+   					edactMoveSelected(Camera->Level,Delta,DeltaRot);
+				}
+			}
 			break;
 		case EM_TexturePan:		/* Pan/scale textures */
 			//
 			if (!Ctrl) goto CameraMove;
 			//
-			NoteTextureMovement (&CameraInfo);
+			NoteTextureMovement (Camera);
 			//
 			if (Buttons == (BUT_LEFT | BUT_RIGHT)) // Scale
 				{
@@ -1013,20 +1070,20 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 				//
 				if ((TempU != 1.0) || (TempV != 1.0))
 					{
-					GUnrealEditor.polyTexScale (&CameraInfo.Level.ModelInfo,TempU,0.0,0.0,TempV,0);
+					GUnrealEditor.polyTexScale(Camera->Level->Model,TempU,0.0,0.0,TempV,0);
 					};
 				GFixScale &= 0xffff;
 				}
 			else if (Buttons == BUT_LEFT)
 				{
 				GFixPanU += Fix(MouseX)/16;  GFixPanV += Fix(MouseY)/16;
-				GUnrealEditor.polyTexPan (&CameraInfo.Level.ModelInfo,Unfix(GFixPanU),Unfix(0),0);
+				GUnrealEditor.polyTexPan(Camera->Level->Model,Unfix(GFixPanU),Unfix(0),0);
 				GFixPanU &= 0xffff; GFixPanV &= 0xffff;
 				}
 			else // Right
 				{
 				GFixPanU += Fix(MouseX)/16;  GFixPanV += Fix(MouseY)/16;
-				GUnrealEditor.polyTexPan (&CameraInfo.Level.ModelInfo,Unfix(0),Unfix(GFixPanV),0);
+				GUnrealEditor.polyTexPan(Camera->Level->Model,Unfix(0),Unfix(GFixPanV),0);
 				GFixPanU &= 0xffff; GFixPanV &= 0xffff;
 				}
 			break;
@@ -1039,31 +1096,23 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 		case EM_TextureRotate:	/* Rotate textures */
 			{
 			if (!Ctrl) goto CameraMove;
-			NoteTextureMovement (&CameraInfo);
+			NoteTextureMovement (Camera);
 			//
 			TextureAngle += (FLOAT)MouseX / 256.0;
 			//
-			for (int i=0; i<CameraInfo.Level.ModelInfo.NumBspSurfs; i++)
+			for (int i=0; i<Camera->Level->Model->Surfs->Num; i++)
 				{
-				FBspSurf *Surf = &CameraInfo.Level.ModelInfo.BspSurfs[i];
+				FBspSurf *Surf = &Camera->Level->Model->Surfs(i);
 				if (Surf->PolyFlags & PF_Selected)
 					{
-					FVector U		= CameraInfo.Level.ModelInfo.FVectors[OriginalUVectors[i]];
-					FVector V		= CameraInfo.Level.ModelInfo.FVectors[OriginalVVectors[i]];
+					FVector U		= Camera->Level->Model->Vectors(OriginalUVectors[i]);
+					FVector V		= Camera->Level->Model->Vectors(OriginalVVectors[i]);
 					//
-					FVector *NewU	= &CameraInfo.Level.ModelInfo.FVectors[Surf->vTextureU];
-					FVector *NewV	= &CameraInfo.Level.ModelInfo.FVectors[Surf->vTextureV];
+					FVector *NewU	= &Camera->Level->Model->Vectors(Surf->vTextureU);
+					FVector *NewV	= &Camera->Level->Model->Vectors(Surf->vTextureV);
 					//
 					*NewU			= U * cos(TextureAngle) + V * sin(TextureAngle);
 					*NewV			= V * cos(TextureAngle) - U * sin(TextureAngle);
-					//
-					NewU->Align		= FVA_None;
-					NewU->iTransform= MAXWORD;
-					NewU->Flags		= 0;
-					//
-					NewV->Align		= FVA_None;
-					NewV->iTransform= MAXWORD;
-					NewV->Flags		= 0;
 					};
 				};
 			};
@@ -1080,16 +1129,17 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 			break;
 		default:
 			//
-			debugf (LOG_Ed,"Unknown editor mode %i",GUnrealEditor.Mode);
+			debugf(LOG_Problem,"Unknown editor mode %i",GUnrealEditor.Mode);
 			goto CameraMove;
 			break;
 		};
-	if (CameraInfo.RendMap != REN_MeshView) CameraInfo.Actor->DrawRot = CameraInfo.Actor->ViewRot;
-	Camera->Unlock(&CameraInfo,0);
+	if (Camera->Actor->RendMap != REN_MeshView)
+		{
+		Camera->Actor->Rotation = Camera->Actor->ViewRotation;
+		};
+	Camera->Unlock(LOCK_ReadWrite,0);
 	//
-	UNGUARD_BEGIN
-	UNGUARD_MSGF("edcamMove(Mode=%i)",GUnrealEditor.Mode);
-	UNGUARD_END
+	unguardf(("(Mode=%i)",GUnrealEditor.Mode));
 	};
 
 /*-----------------------------------------------------------------------------
@@ -1102,8 +1152,7 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWOR
 //
 int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
 	{
-	GUARD;
-	ICamera CameraInfo;
+	guard(FGlobalEditor::edcamKey);
 	ULevel		*Level;
 	int			ModeClass;
 	int 		Processed=0;
@@ -1113,7 +1162,7 @@ int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
 	ModeClass = GUnrealEditor.edcamModeClass(GUnrealEditor.edcamMode(Camera));
 	Level     = Camera->Level;
 	//
-	if (GApp->KeyDown[K_SHIFT] || (Key==K_DELETE))  // Selection functions
+	if(Camera->Input->KeyDown(IK_Shift) || (Key==IK_Delete)) // Selection functions.
 		{
 		if (ModeClass==EMC_Actor) switch (toupper(Key))
 			{
@@ -1122,7 +1171,7 @@ int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
 			case 'Z': GUnrealEditor.Exec  ("ACTOR SELECT NONE");	return 1;
 			case 'Y': GUnrealEditor.Exec  ("ACTOR DELETE");			return 1;
 			case 'D': GUnrealEditor.Exec  ("ACTOR DUPLICATE");		return 1;
-			case K_DELETE: GUnrealEditor.Exec("ACTOR DELETE");		return 1;			
+			case IK_Delete: GUnrealEditor.Exec("ACTOR DELETE");		return 1;			
 			}
 		else if (GUnrealEditor.MapEdit) switch (toupper(Key))
 			{
@@ -1137,7 +1186,7 @@ int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
 			case 'P': GUnrealEditor.Exec  ("MAP BRUSH PUT");		return 1;
 			case 'S': GUnrealEditor.Exec  ("MAP SELECT NEXT");		return 1;
 			case 'X': GUnrealEditor.Exec  ("MAP SELECT PREVIOUS"); 	return 1;
-			case K_DELETE: GUnrealEditor.Exec  ("MAP DELETE");		return 1;
+			case IK_Delete: GUnrealEditor.Exec  ("MAP DELETE");		return 1;
 			}
 		else switch (toupper(Key))
 			{
@@ -1161,40 +1210,40 @@ int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
 			case 'O': GUnrealEditor.Exec  ("POLY SELECT MEMORY INTERSECT"); return 1;
 			};
 		}
-	else if (!GApp->KeyDown[K_ALT])
+	else if (!Camera->Input->KeyDown(IK_Alt))
 		{
-		if (Camera->Lock(&CameraInfo))
+		if( Camera->Lock(LOCK_ReadWrite|LOCK_CanFail) )
 			{
 			switch (toupper(Key))
 				{
 				case 'B': 		// Toggle brush visibility
-					CameraInfo.ShowFlags ^= SHOW_Brush;
+					Camera->Actor->ShowFlags ^= SHOW_Brush;
 					Processed=1;
 					break;
 				case 'K': 		// Toggle backdrop
-					CameraInfo.ShowFlags ^= SHOW_Backdrop;
+					Camera->Actor->ShowFlags ^= SHOW_Backdrop;
 					Processed=1;
 					break;
 				case 'P':		// Toggle player controls
-					CameraInfo.ShowFlags ^= SHOW_PlayerCtrl;
+					Camera->Actor->ShowFlags ^= SHOW_PlayerCtrl;
 					Processed=1;
 					GCameraManager->ResetModes();
 					break;
 				case 'U':		// Undo
-					Camera->Unlock(&CameraInfo,0);
-					if (GTrans->Undo(CameraInfo.Level.Level)) GCameraManager->RedrawLevel (Level);
-					Camera->Lock(&CameraInfo);
+					Camera->Unlock(LOCK_ReadWrite,0);
+					if (GTrans->Undo(Camera->Level)) GCameraManager->RedrawLevel (Level);
+					Camera->Lock(LOCK_ReadWrite);
 					Processed=1;
 					break;
 				case 'R':		// Redo
-					Camera->Unlock(&CameraInfo,0);
-					if (GTrans->Redo(CameraInfo.Level.Level)) GCameraManager->RedrawLevel (Level);
-					Camera->Lock(&CameraInfo);
+					Camera->Unlock(LOCK_ReadWrite,0);
+					if (GTrans->Redo(Camera->Level)) GCameraManager->RedrawLevel (Level);
+					Camera->Lock(LOCK_ReadWrite);
 					Processed=1;
 					break;
 				case 'L':		// Look ahead
-		        	CameraInfo.Actor->ViewRot.Pitch = 0;
-		        	CameraInfo.Actor->ViewRot.Roll  = 0;
+		        	Camera->Actor->ViewRotation.Pitch = 0;
+		        	Camera->Actor->ViewRotation.Roll  = 0;
 					Processed=1;
 					break;
 				case '1':	  // Movement speed
@@ -1209,70 +1258,63 @@ int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
 					GUnrealEditor.MovementSpeed = 16;
 					Processed=1;
 					break;
-				case K_ESCAPE:   // Escape, update screen
+				case IK_Escape:   // Escape, update screen
 					Processed=1;
 					break;
-				case K_DELETE:
-					Camera->Unlock(&CameraInfo,0);
+				case IK_Delete:
+					Camera->Unlock(LOCK_ReadWrite,0);
 					if (ModeClass==EMC_Actor) GUnrealEditor.Exec  ("ACTOR DELETE");
-					Camera->Lock(&CameraInfo);
+					Camera->Lock(LOCK_ReadWrite);
 					Processed=1;
 					break;
 				};
-			Camera->Unlock(&CameraInfo,0);
+			Camera->Unlock(LOCK_ReadWrite,0);
 			};
 		};
 	return Processed;
-	UNGUARD("edcamKey");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
    Coordinates.
 -----------------------------------------------------------------------------*/
 
-void cameraShowCoords (ICamera *CameraInfo)
+void cameraShowCoords(UCamera *Camera)
 	{
 	FVector			Location;
 	FRotation		Rotation;
 	UModel			*Brush;
-	IModel		BrushInfo;
-	AActor			*Actor;
 	int				ModeClass,X,Y,State,i,n;
 	char			XStr[40],YStr[40],ZStr[40],Descr[40],Fail[40];
 	//
-	GUARD;
+	guard(cameraShowCoords);
 	ModeClass 	= GUnrealEditor.edcamModeClass (GUnrealEditor.Mode);
-	State       = CameraInfo->Level.State;
+	State       = Camera->Level->GetState();
 	Fail[0]     = 0;
 	//
-	if ((CameraInfo->ShowFlags&SHOW_PlayerCtrl) || (State==LEVEL_UpPlay))
+	if ((Camera->Actor->ShowFlags&SHOW_PlayerCtrl) || (State==LEVEL_UpPlay))
 		{
-		sprintf (Descr,"%s",CameraInfo->Actor->Class->Name);
-		if (!CameraInfo->Actor->Name.IsNone())
-			{
-			sprintf (Descr+strlen(Descr)," %s",CameraInfo->Actor->Name.Name());
-			};
-		Location = CameraInfo->Actor->Location;
+		sprintf (Descr,"%s",Camera->Actor->GetClassName());
+		if( Camera->Actor->GetFName() != NAME_None )
+			sprintf (Descr+strlen(Descr)," %s",Camera->Actor->GetName());
+
+		Location = Camera->Actor->Location;
 		}
 	else if (ModeClass==EMC_Actor) // Location of first selected actor
 		{
-		Actor = &CameraInfo->Level.Actors->Element(0);
-		n     = CameraInfo->Level.Actors->Max;
-		//
-		for (i=0; i<n; i++)
+		for (i=0; i<Camera->Level->Num; i++)
 			{
-			if (Actor->Class && Actor->bSelected)
+			AActor *Actor = Camera->Level->Element(i);
+			if (Actor && Actor->bSelected)
 				{
-				sprintf (Descr,"%s",Actor->Class->Name);
-				if (!Actor->Name.IsNone())
-					{
-					sprintf (Descr+strlen(Descr)," %s",Actor->Name.Name());
-					};
+				sprintf (Descr,"%s",Actor->GetClassName());
+				if( Actor->GetFName() != NAME_None )
+					sprintf (Descr+strlen(Descr)," %s",Actor->GetName());
+
 				Location = Actor->Location;
-				Rotation = Actor->DrawRot;
+				Rotation = Actor->Rotation;
 				goto Found;
 				};
-			Actor++;
 			};
 		strcpy (Descr,"Actor");
 		strcpy (Fail, "None selected");
@@ -1281,16 +1323,16 @@ void cameraShowCoords (ICamera *CameraInfo)
 		{ 
 		if (GUnrealEditor.MapEdit) // Location of first selected brush
 			{
-			n = CameraInfo->Level.BrushArray->Num;
+			n = Camera->Level->BrushArray->Num;
 			//
 			for (i=0; i<n; i++)
 				{
-				Brush = CameraInfo->Level.BrushArray->Element(i);
+				Brush = Camera->Level->BrushArray->Element(i);
 				if (Brush->ModelFlags & MF_Selected)
 					{
 					Location = Brush->Location;
 					Rotation = Brush->Rotation;
-					strcpy (Descr,GUnrealEditor.csgGetName (Brush->CsgOper));
+					strcpy (Descr,GUnrealEditor.csgGetName((ECsgOper)Brush->CsgOper));
 					goto Found;
 					};
 				};
@@ -1298,14 +1340,15 @@ void cameraShowCoords (ICamera *CameraInfo)
 		//
 		// Location of default brush:
 		//
-		CameraInfo->Level.Brush->Lock (&BrushInfo,LOCK_Read);
-		strcpy (Descr,GUnrealEditor.csgGetName (BrushInfo.CsgOper));
+		Brush = Camera->Level->Brush();
+		Brush->Lock(LOCK_Read);
+		strcpy (Descr,GUnrealEditor.csgGetName((ECsgOper)Brush->CsgOper));
 		//
-		Location = BrushInfo.Location;
-		Rotation = BrushInfo.Rotation;
-		GUnrealEditor.constraintApply (&CameraInfo->Level.ModelInfo,&BrushInfo,&Location,&Rotation,&GUnrealEditor.Constraints);
+		Location = Brush->Location;
+		Rotation = Brush->Rotation;
+		GUnrealEditor.constraintApply(Camera->Level->Model,Brush,&Location,&Rotation,&GUnrealEditor.Constraints);
 		//
-		CameraInfo->Level.Brush->Unlock (&BrushInfo);
+		Brush->Unlock(LOCK_Read);
 		};
 	Found:
 	//
@@ -1314,40 +1357,38 @@ void cameraShowCoords (ICamera *CameraInfo)
 	sprintf (ZStr,"Z=%05i",(int)Location.Z);
 	//
 	X = 12;
-	Y = CameraInfo->SYR - 24;
+	Y = Camera->Y - 24;
 	//
-	GGfx.Printf (CameraInfo->Texture,X+ 0 ,Y,0,GGfx.MedFont,3,Descr);
+	GGfx.MedFont->Printf(Camera->Texture,X+0,Y,0,Descr);
 	//
 	if (Fail[0]!=0)
 		{
-		GGfx.Printf (CameraInfo->Texture,X+100,Y,0,GGfx.MedFont,3,Fail);
+		GGfx.MedFont->Printf(Camera->Texture,X+100,Y,0,Fail);
 		}
 	else
 		{
-		GGfx.Printf (CameraInfo->Texture,X+105,Y,0,GGfx.MedFont,3,XStr);
-		GGfx.Printf (CameraInfo->Texture,X+170,Y,0,GGfx.MedFont,3,YStr);
-		GGfx.Printf (CameraInfo->Texture,X+235,Y,0,GGfx.MedFont,3,ZStr);
+		GGfx.MedFont->Printf (Camera->Texture,X+105,Y,0,XStr);
+		GGfx.MedFont->Printf (Camera->Texture,X+170,Y,0,YStr);
+		GGfx.MedFont->Printf (Camera->Texture,X+235,Y,0,ZStr);
 		};
-	UNGUARD("cameraShowCoords");
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------
    Texture browser routines.
 -----------------------------------------------------------------------------*/
 
-void DrawViewerBackground(ICamera *CameraInfo)
-	{
-	GUARD;
-	//
-	GRend->DrawTiledTextureBlock(CameraInfo,GGfx.BkgndTexture,0,CameraInfo->SXR,0,CameraInfo->SYR,0,0);
-	//Alternatively: GGfx.Clearscreen(&CameraInfo,0);
-	//
-	UNGUARD("DrawViewerBackground");
-	};
+void DrawViewerBackground( UCamera *Camera )
+{
+	guard(DrawViewerBackground);
+	GRend->DrawTiledTextureBlock(Camera,GGfx.BkgndTexture,0,Camera->X,0,Camera->Y,0,0);
+	//Alternatively: GGfx.Clearscreen(&Camera,0);
+	unguard;
+}
 
 void DrawTextureRect
 (
-	ICamera		*Camera,
+	UCamera		*Camera,
 	UTexture	*Texture,
 	int			X,
 	int			Y,
@@ -1357,16 +1398,20 @@ void DrawTextureRect
 )
 {
 	guard(DrawTextureRect);
+	checkState(Texture->Palette!=NULL);
 
-	if (!Texture->Palette)
-		appError("No palette");
-	
-	FColor			*Palette = Texture->Palette->GetData();
-	BYTE			VShift,*TextureBits,B;
-	int				OrigY=Y,U,U1=1,V=0,XL=Size,YL=Size,i,j,VOfs,USize,VSize,MipLevel=0,UMask,VMask,D;
+	FTextureInfo TextureInfo;
+	Texture->Lock(TextureInfo,Camera->Texture,TL_RenderPalette);
+	RAINBOW_PTR Colors = TextureInfo.Colors;
+
+	BYTE	*TextureBits	= TextureInfo.Mips[0]->Data;
+	INT		USize			= TextureInfo.Mips[0]->USize;
+	INT		VSize			= TextureInfo.Mips[0]->VSize;
+
+	BYTE			VShift,B;
+	int				OrigY=Y,U,U1=1,V=0,XL=Size,YL=Size,i,j,VOfs,UMask,VMask,D;
 	char			Temp[80];
 
-	TextureBits = Texture->GetOriginalData(&MipLevel,&USize,&VSize);
 	VMask		= VSize-1;
 	UMask		= USize-1;
 	VShift		= FLogTwo(USize);
@@ -1374,11 +1419,10 @@ void DrawTextureRect
 
 	if (Y<0) {V -=Y*D; YL+=Y; Y=0;};
 	if (X<0) {U1-=X*D; XL+=X; X=0;};
-	if ((Y+YL)>Camera->SYR) YL = Camera->SYR-Y;
-	if ((X+XL)>Camera->SXR) XL = Camera->SXR-X;
+	if ((Y+YL)>Camera->Y) YL = Camera->Y-Y;
+	if ((X+XL)>Camera->X) XL = Camera->X-X;
 
-	FCacheItem *Item;
-	RAINBOW_PTR Dest,Dest1,Table = Texture->Palette->GetColorDepthPalette(Item,Camera->Texture);
+	RAINBOW_PTR Dest,Dest1;
 	Dest1.PtrBYTE = &Camera->Screen[(X + Y*Camera->Stride)*Camera->ColorBytes];
 
 	for( i=0; i<YL; i++ )
@@ -1386,18 +1430,17 @@ void DrawTextureRect
 		Dest = Dest1;
 		U    = U1;
 		VOfs = (Unfix(V) & VMask) << VShift;
-
 		if( Camera->ColorBytes==1 )
 		{
 			if( !(Texture->PolyFlags & PF_Masked)) for (j=0; j<XL; j++ )
 			{
-				*Dest.PtrBYTE++ = Table.PtrBYTE[TextureBits [VOfs + (Unfix(U)&UMask)]];
+				*Dest.PtrBYTE++ = Colors.PtrBYTE[TextureBits [VOfs + (Unfix(U)&UMask)]];
 				U += D;
 			}
 			else for( j=0; j<XL; j++ )
 			{
 				B = TextureBits [VOfs + (Unfix(U)&UMask)];
-				if (B) *Dest.PtrBYTE = Table.PtrBYTE[B];
+				if (B) *Dest.PtrBYTE = Colors.PtrBYTE[B];
 				Dest.PtrBYTE++; U += D;
 			}
 		}
@@ -1405,13 +1448,13 @@ void DrawTextureRect
 		{
 			if( !(Texture->PolyFlags & PF_Masked) ) for( j=0; j<XL; j++ )
 			{
-				*Dest.PtrWORD++ = Table.PtrWORD[TextureBits [VOfs + (Unfix(U)&UMask)]];
+				*Dest.PtrWORD++ = Colors.PtrWORD[TextureBits [VOfs + (Unfix(U)&UMask)]];
 				U += D;
 			}
 			else for( j=0; j<XL; j++ )
 			{
 				B = TextureBits [VOfs + (Unfix(U)&UMask)];
-				if (B) *Dest.PtrWORD = Table.PtrWORD[B];
+				if (B) *Dest.PtrWORD = Colors.PtrWORD[B];
 				Dest.PtrWORD++; U += D;
 			}
 		}
@@ -1419,13 +1462,13 @@ void DrawTextureRect
 		{
 			if( !(Texture->PolyFlags & PF_Masked) ) for( j=0; j<XL; j++ )
 			{
-				*Dest.PtrDWORD++ = Table.PtrDWORD[TextureBits [VOfs + (Unfix(U)&UMask)]];
+				*Dest.PtrDWORD++ = Colors.PtrDWORD[TextureBits [VOfs + (Unfix(U)&UMask)]];
 				U += D;
 			}
 			else for( j=0; j<XL; j++ )
 			{
 				B = TextureBits [VOfs + (Unfix(U)&UMask)];
-				if (B) *Dest.PtrDWORD = Table.PtrDWORD[B];
+				if (B) *Dest.PtrDWORD = Colors.PtrDWORD[B];
 				Dest.PtrDWORD++; U += D;
 			}
 		}
@@ -1434,77 +1477,90 @@ void DrawTextureRect
 	}
 	if( DoText )
 	{
-		strcpy(Temp,Texture->Name);
+		strcpy(Temp,Texture->GetName());
 		if (Size>=128) sprintf(Temp+strlen(Temp)," (%ix%i)",Texture->USize,Texture->VSize);
-		GGfx.StrLen (&XL,&YL,(Size>=128)?-1:0,0,GGfx.MedFont,Temp);
+		GGfx.MedFont->StrLen (XL,YL,(Size>=128)?-1:0,0,Temp);
 		X = X+(Size-XL)/2;
-		GGfx.Printf (Camera->Texture,X,OrigY+Size+1,-1,GGfx.MedFont,3,Temp);
+		GGfx.MedFont->Printf(Camera->Texture,X,OrigY+Size+1,-1,Temp);
 	}
-	Item->Unlock();
-	unguard;
+	Texture->Unlock(TextureInfo);
+	unguardf(("(%s)",Texture->GetName()));
 }
 
 int CDECL ResNameCompare(const void *A, const void *B)
 {
-	return stricmp((*(UResource **)A)->Name,(*(UResource **)B)->Name);
+	return stricmp((*(UObject **)A)->GetName(),(*(UObject **)B)->GetName());
 }
 
-void DrawTextureBrowser(ICamera *CameraInfo)
+void DrawTextureBrowser( UCamera *Camera )
+{
+	guard(DrawTextureBrowser);
+
+	TArray<UTexture*>* Array = (TArray<UTexture*>*)Camera->MiscRes;
+
+	FMemMark Mark(GMem);
+	enum {MAX=16384};
+	UTexture	**List  = new(GMem,MAX)UTexture*;
+	INT			Size	= Camera->Actor->Misc1;
+	INT			PerRow	= Camera->X/Size;
+	INT			Space	= (Camera->X - Size*PerRow)/(PerRow+1);
+	INT			VSkip	= (Size>=64) ? 10 : 0;
+
+	// Make the list.
+	int n = 0;
+	if( !Array )
 	{
-	GUARD;
-	UTexture *Texture,**List;
-	int i,n,Size,PerRow,Space,VSkip,YOfs,YL,All,X,Y;
-	//
-	if (CameraInfo->Camera->MiscName.IsNone()) return;
-	All = !stricmp(CameraInfo->Camera->MiscName.Name(),"(All)");
-	//
-	List   = (UTexture **)GMem.Get(32768*sizeof(UTexture *));
-	Size   = CameraInfo->Actor->Misc1;
-	PerRow = CameraInfo->SXR/Size;
-	Space  = (CameraInfo->SXR - Size*PerRow)/(PerRow+1);
-	if (Size>=64) VSkip=10;
-	else VSkip=0;
-	//
-	n=0;
-	FOR_ALL_TYPED_RES(Texture,RES_Texture,UTexture)
+		// All textures.
+		UTexture *Texture;
+		FOR_ALL_TYPED_OBJECTS(Texture,UTexture)
 		{
-		if ((All && (!Texture->FamilyName.IsNone())) || (Texture->FamilyName==CameraInfo->Camera->MiscName))
-			{
-			if(!Texture->bUntiled) List[n++] = Texture;
-			};
+			if( n<MAX && !(Texture->TextureFlags & TF_NoTile) )
+				List[n++] = Texture;
 		}
-	END_FOR_ALL_TYPED_RES;
-	//
-	qsort(&List[0],n,sizeof(UTexture *),ResNameCompare);
-	//
-	YL = Space+(Size+Space+VSkip)*((n+PerRow-1)/PerRow);
-	if (YL>0)
+		END_FOR_ALL_TYPED_OBJECTS;
+	}
+	else
+	{
+		// Just textures in this texture set.
+		for(int i=0; i<Array->Num; i++)
 		{
-		YOfs = -((CameraInfo->Actor->Misc2*CameraInfo->SYR)/512);
-		for (i=0; i<n; i++)
+			if( n<MAX && !(Array->Element(i)->TextureFlags & TF_NoTile) )
+				List[n++] = Array->Element(i);
+		}
+	}
+
+	// Sort textures by name.
+	qsort(&List[0],n,sizeof(UTexture *),ResNameCompare);
+
+	// Draw them.
+	int YL = Space+(Size+Space+VSkip)*((n+PerRow-1)/PerRow);
+	if( YL > 0 )
+	{
+		int YOfs = -((Camera->Actor->Misc2*Camera->Y)/512);
+		for( int i=0; i<n; i++ )
+		{
+			int X = (Size+Space)*(i%PerRow);
+			int Y = (Size+Space+VSkip)*(i/PerRow)+YOfs;
+
+			if( ((Y+Size+Space+VSkip)>0) && (Y<Camera->Y) )
 			{
-			X = (Size+Space)*(i%PerRow);
-			Y = (Size+Space+VSkip)*(i/PerRow)+YOfs;
-			//
-			if (((Y+Size+Space+VSkip)>0) && (Y<CameraInfo->SYR))
-				{
-				if (GUnrealEditor.Scan.Active) GUnrealEditor.Scan.PreScan();
-				//
-				if (List[i]==GUnrealEditor.CurrentTexture)
-					{
-					GGfx.BurnRect(CameraInfo->Texture,X+1,X+Size+Space*2-2,Y+1,Y+Size+Space*2+VSkip-2,1);
-					};
-				DrawTextureRect(CameraInfo,List[i],X+Space,Y+Space,Size,(Size>=64),0);
-				//
-				if (GUnrealEditor.Scan.Active) GUnrealEditor.Scan.PostScan(EDSCAN_BrowserTex,(int)List[i],0,0,&GMath.ZeroVector);
-				};
-			};
-		};
-	GMem.Release(List);
-	//
-	GLastScroll = Max(0,(512*(YL-CameraInfo->SYR))/CameraInfo->SYR);
-	UNGUARD("DrawTextureBrowser");
-	};
+				if( GUnrealEditor.Scan.Active )
+					GUnrealEditor.Scan.PreScan();
+
+				if( List[i]==GUnrealEditor.CurrentTexture )
+					Camera->Texture->BurnRect(X+1,X+Size+Space*2-2,Y+1,Y+Size+Space*2+VSkip-2,1);
+
+				DrawTextureRect( Camera, List[i], X+Space, Y+Space, Size, (Size>=64), 0 );
+
+				if( GUnrealEditor.Scan.Active )
+					GUnrealEditor.Scan.PostScan(EDSCAN_BrowserTex,(int)List[i],0,0,&GMath.ZeroVector);
+			}
+		}
+	}
+	Mark.Pop();
+	GLastScroll = Max(0,(512*(YL-Camera->Y))/Camera->Y);
+	unguardf(("(%s)",Camera->MiscRes->GetName()));
+}
 
 /*-----------------------------------------------------------------------------
    Camera frame drawing.
@@ -1513,13 +1569,13 @@ void DrawTextureBrowser(ICamera *CameraInfo)
 //
 // Draw an onscreen mouseable button.
 //
-int DrawButton (ICamera *CameraInfo,UTexture *Texture,int X, int Y, int ScanCode)
+int DrawButton (UCamera *Camera,UTexture *Texture,int X, int Y, int ScanCode)
 	{
 	if (GUnrealEditor.Scan.Active)
 		GUnrealEditor.Scan.PreScan();
 	GRend->DrawScaledSprite
 	(
-		CameraInfo,
+		Camera,
 		Texture,
 		X+0.5,
 		Y+0.5,
@@ -1538,215 +1594,234 @@ int DrawButton (ICamera *CameraInfo,UTexture *Texture,int X, int Y, int ScanCode
 //
 // Draw the camera view:
 //
-void FGlobalEditor::edcamDraw (UCamera *Camera, int DoScan)
-	{
-	ICamera 			CameraInfo;
+void FGlobalEditor::edcamDraw( UCamera *Camera, int DoScan )
+{
 	FVector				OriginalLocation;
 	FRotation			OriginalRotation;
-	PCalcView			ViewInfo;
-	IMeshMap			MeshMapInfo;
-	DWORD				ShowFlags;
+	DWORD				ShowFlags=0;
 	char				Temp[80];
-	int					InvalidBsp,ButtonX=2,Mode,ModeClass,RealClass;
-	static DWORD		LastTicks=0;
-	GUARD;
-	//
-	// Lock the camera:
-	//
-	if (!Camera->Lock(&CameraInfo))
-		{
-		debug (LOG_Ed,"Couldn't lock camera for drawing");
+	int					InvalidBsp,ButtonX=2,Mode=0,ModeClass,RealClass;
+	static FLOAT		LastTimeSeconds=0.0;
+	guard(FGlobalEditor::edcamDraw);
+
+	// Lock the camera.
+	if( !Camera->Lock(LOCK_ReadWrite|LOCK_CanFail) )
+	{
+		debug(LOG_Problem,"Couldn't lock camera for drawing");
 		return;
-		};
-	//
-	// Init scanner if desired:
-	//
-	if (DoScan) Scan.Init(&CameraInfo); // Caller must set Scan.X, Scan.Y.
-	else Scan.Active = 0;
-	//
-	GRend->PreRender(&CameraInfo);
-	CameraInfo.Camera->Console->PreRender(&CameraInfo);
-	GGfx.PreRender(&CameraInfo);
-	//
-	GRend->RendIter++;
-	//
-	APawn *Actor			= CameraInfo.Actor;
+	}
+
+	// Init scanner if desired.
+	if( DoScan )
+		Scan.Init(Camera); // Caller must set Scan.X, Scan.Y.
+	else
+		Scan.Active = 0;
+
+	GRend->PreRender(Camera);
+	Camera->Console->PreRender(Camera);
+	GGfx.PreRender(Camera);
+
+	APawn *Actor			= Camera->Actor;
 	ShowFlags				= Actor->ShowFlags;
-	//
-	switch (Actor->RendMap)
-		{
+
+	switch( Actor->RendMap )
+	{
 		case REN_TexView:
+		{
 			Actor->bHiddenEd = 1;
 			Actor->bHidden   = 1;
-			DrawViewerBackground(&CameraInfo);
-			DrawTextureRect(&CameraInfo,(UTexture *)CameraInfo.Camera->MiscRes,4,4,128,128,1);
+			DrawViewerBackground(Camera);
+			DrawTextureRect(Camera,(UTexture *)Camera->MiscRes,4,4,128,128,1);
 			goto Out;
+		}
 		case REN_TexBrowser:
+		{
 			Actor->bHiddenEd = 1;
 			Actor->bHidden   = 1;
-			DrawViewerBackground(&CameraInfo);
-			DrawTextureBrowser(&CameraInfo);
+			DrawViewerBackground(Camera);
+			DrawTextureBrowser(Camera);
 			goto Out;
+		}
 		case REN_MeshView:
+		{
+			Camera->Texture->Clearscreen(0xe8);
+
+			FVector NewLocation = Camera->Coords.ZAxis * (-Actor->Location.Size());
+			if( FDist(Actor->Location, NewLocation) > 0.05 )
+				Actor->Location = NewLocation;
+
+			UMesh *Mesh = (UMesh*)Camera->MiscRes;
+			if( Actor->Misc1 < Mesh->AnimSeqs->Num )
+				Actor->AnimSequence = Mesh->AnimSeqs( Actor->Misc1 ).Name;
+			else
+				Actor->AnimSequence = NAME_None;
+
+			FMeshAnimSeq *Seq  = Mesh->GetAnimSeq( Actor->AnimSequence );
+			Camera->BuildCoords();
+
+			// Auto rotate if wanted.
+			if( Actor->ShowFlags & SHOW_RealTime )
 			{
-			GGfx.Clearscreen(&CameraInfo,0xe8);
-			//
-			Actor->Location = CameraInfo.Coords.ZAxis * (-Actor->Location.Size());
-			CameraInfo.BuildCoords();
-			//
-			OriginalLocation	= Actor->Location;
-			OriginalRotation	= Actor->ViewRot;
-			Actor->Location		= GMath.ZeroVector;		
-			Actor->bHiddenEd	= 1;
-			Actor->bHidden		= 1;
-			Actor->DrawType		= DT_MeshMap;
-			Actor->MeshMap		= (UMeshMap *)CameraInfo.Camera->MiscRes;
-			Actor->AnimSeq		= Actor->Misc1;
-			Actor->Zone			= 0;
-			Actor->bCollideWorld = 0;
-			Actor->bCollideActors = 0;
-			//
-			UMeshMap *MeshMap = (UMeshMap*)CameraInfo.Camera->MiscRes;
-			MeshMap->Lock(&MeshMapInfo);
-			//
-			if (ShowFlags&SHOW_Brush) Actor->DrawRot.Yaw+=Min(4,(int)(GServer.Ticks-LastTicks))*256;
-			LastTicks=GServer.Ticks;
-			//
-			if (ShowFlags&SHOW_Backdrop) Actor->AnimBase=(GServer.Ticks/2) % MeshMapInfo.AnimSeqs[Actor->AnimSeq].SeqNumFrames;
-			else Actor->AnimBase=Actor->Misc2;
-			//
-			if		(ShowFlags&SHOW_Frame)		CameraInfo.RendMap = REN_Wire;
-			else if	(ShowFlags&SHOW_Coords)		CameraInfo.RendMap = REN_Polys;
-			else								CameraInfo.RendMap = REN_PlainTex;
-			//
-			MeshMap->Unlock(&MeshMapInfo);
-			//
-			GRend->DrawActor (&CameraInfo,CameraInfo.iActor);
+				static FLOAT Time=0.0;
+				FLOAT NewTime = ((SQWORD)GApp->MicrosecondTime())/1000000.0;
+				if( NewTime - Time < 1.0 )
+					Actor->ViewRotation.Yaw += (NewTime - Time) * 8192.0;
+				Time = NewTime;
+			}
+
+			// Remember.
+			OriginalLocation		= Actor->Location;
+			OriginalRotation		= Actor->ViewRotation;
+			Actor->Location			= GMath.ZeroVector;		
+			Actor->bHiddenEd		= 1;
+			Actor->bHidden			= 1;
+			Actor->DrawType			= DT_Mesh;
+			Actor->Mesh				= Mesh;
+			Actor->ZoneNumber		= 0;
+			Actor->Zone				= NULL;
+			Actor->bCollideWorld	= 0;
+			Actor->bCollideActors	= 0;
+
+			// Update mesh.
+			Mesh->Lock(LOCK_Read);
+			FLOAT NumFrames = Seq ? Seq->NumFrames : 1.0;
+			if( ShowFlags & SHOW_Brush )
+			{
+				Actor->Rotation.Yaw += Min( 4, (int)(GServer.TimeSeconds-LastTimeSeconds) )*8.0;
+			}
+			if( ShowFlags & SHOW_Backdrop )
+			{
+				Actor->AnimFrame += Min( 1.0, (GServer.TimeSeconds-LastTimeSeconds)*30.0 / NumFrames);
+				Actor->AnimFrame -= floor(Actor->AnimFrame);
+			}
+			else Actor->AnimFrame = Actor->Misc2 / NumFrames;
+
+			LastTimeSeconds = GServer.TimeSeconds;
+
+			if     ( ShowFlags & SHOW_Frame  )	Camera->Actor->RendMap = REN_Wire;
+			else if( ShowFlags & SHOW_Coords )	Camera->Actor->RendMap = REN_Polys;
+			else								Camera->Actor->RendMap = REN_PlainTex;
+
+			Mesh->Unlock(LOCK_Read);
+
+			// Draw it.
+			GRend->DrawActor( Camera, (AActor*)Camera->Actor );
 			sprintf
-				(
+			(
 				Temp,"%s, Seq %i, Frame %i",
-				CameraInfo.Camera->MiscRes->Name,CameraInfo.Actor->Misc1,
-				(int)Actor->AnimBase
-				);
-			GGfx.Printf (CameraInfo.Texture,4,CameraInfo.SYR-12,-1,GGfx.MedFont,3,Temp);
-			//
-			CameraInfo.RendMap	= REN_MeshView;
-			Actor->Location		= OriginalLocation;
-			Actor->DrawType		= DT_None;
+				Camera->MiscRes->GetName(),
+				Camera->Actor->Misc1,
+				(int)(Actor->AnimFrame / NumFrames)
+			);
+			GGfx.MedFont->Printf( Camera->Texture, 4, Camera->Y-12, -1, Temp );
+
+			Camera->Actor->RendMap	= REN_MeshView;
+			Actor->Location			= OriginalLocation;
+			Actor->DrawType			= DT_None;
 			goto Out;
-			};
+		}
 		case REN_MeshBrowser:
-			DrawViewerBackground(&CameraInfo);
+		{
+			DrawViewerBackground(Camera);
 			goto Out;
-		};
+		}
+	}
 	Mode 		= edcamMode(Camera);
 	ModeClass	= edcamModeClass(Mode);
 	RealClass   = edcamModeClass(Mode);
-	//
-	if (CameraInfo.Camera->IsOrtho()||(Actor->ShowFlags & SHOW_NoCapture)) Actor->bHiddenEd=1;
-	else Actor->bHiddenEd=0;
-	//
-	if (CameraInfo.ShowFlags & SHOW_PlayerCtrl)
-		{
+
+	if( Camera->IsOrtho() || (Actor->ShowFlags & SHOW_NoCapture) )
+		Actor->bHiddenEd=1;
+	else
+		Actor->bHiddenEd=0;
+
+	if( Camera->Actor->ShowFlags & SHOW_PlayerCtrl )
+	{
 		OriginalLocation = Actor->Location;
-		OriginalRotation = Actor->ViewRot;
-		//
-		ViewInfo.Coords			= &CameraInfo.Coords;
-		ViewInfo.Uncoords		= &CameraInfo.Uncoords;
-		ViewInfo.ViewLocation	= Actor->Location;
-		ViewInfo.ViewRotation	= Actor->ViewRot;
-		CameraInfo.Level.SendMessage(CameraInfo.iActor,ACTOR_PlayerCalcView,&ViewInfo);
-		Actor->Location			= ViewInfo.ViewLocation;
-		Actor->ViewRot			= ViewInfo.ViewRotation;
-		//
-		// Rebuild coordinate system:
-		//
-		CameraInfo.BuildCoords();
-		//
-		Actor->Location = OriginalLocation;
-		Actor->ViewRot  = OriginalRotation;
+		OriginalRotation = Actor->ViewRotation;
+
+		PCalcView ViewInfo( Actor->Location, Actor->ViewRotation );
+		Camera->Actor->Process( NAME_PlayerCalcView, &ViewInfo );
+		Actor->Location			= ViewInfo.CameraLocation;
+		Actor->ViewRotation		= ViewInfo.CameraRotation;
+
+		// Rebuild coordinate system.
+		Camera->BuildCoords();
+		Actor->Location         = OriginalLocation;
+		Actor->ViewRotation     = OriginalRotation;
+	}
+
+	// Handle case if Bsp is invalid.
+	InvalidBsp = (Camera->Level->Model->ModelFlags & MF_InvalidBsp) &&
+		!(Camera->IsOrtho() || Camera->IsRealWire());
+
+	// Draw background.
+	if (Camera->IsOrtho() || Camera->IsWire() || 
+		Camera->IsInvalidBsp() || !(Camera->Actor->ShowFlags & SHOW_Backdrop))
+		{
+		if (Camera->IsOrtho())	Camera->Texture->Clearscreen(OrthoBackground);
+		else					Camera->Texture->Clearscreen(WireBackground);
+		GEdRend->DrawWireBackground(Camera);
 		};
-	//
-	// Handle case if Bsp is invalid:
-	//
-	InvalidBsp = (CameraInfo.Level.ModelInfo.ModelFlags & MF_InvalidBsp) &&
-		!(CameraInfo.Camera->IsOrtho() || CameraInfo.Camera->IsRealWire());
-	//
-	// Init stats:
-	//
-	STAT(mymemset(GRend->Stat,0,sizeof(FRenderStats)));
-	GRend->LastEndTime   = GRend->ThisEndTime;
-	GRend->ThisStartTime = GApp->MicrosecondTime()/1000;
-	//
-	// Draw background:
-	//
-	if (CameraInfo.Camera->IsOrtho() || CameraInfo.Camera->IsWire() || 
-		CameraInfo.Camera->IsInvalidBsp() || !(CameraInfo.ShowFlags & SHOW_Backdrop))
+
+	// Draw the level.
+	if( Camera->IsOrtho() || Camera->IsWire() || InvalidBsp )
+	{
+		GEdRend->DrawLevelBrushes(Camera);
+		if (Camera->Actor->ShowFlags & SHOW_Actors)
+			GEdRend->DrawLevelActors( Camera, (AActor*)Camera->Actor );
+		if (Camera->Actor->ShowFlags & SHOW_MovingBrushes)
+			GEdRend->DrawMovingBrushWires(Camera);
+	}
+	else GRend->DrawWorld(Camera);
+
+	if( Camera->Actor->ShowFlags & SHOW_Brush )
+	{
+		if( ModeClass==EMC_Camera || ModeClass==EMC_Brush )
 		{
-		if (CameraInfo.Camera->IsOrtho())	GGfx.Clearscreen(&CameraInfo,WireBackground);
-		else								GGfx.Clearscreen(&CameraInfo,BlackColor);
-		GRend->DrawWireBackground(&CameraInfo);
-		};
-	//
-	// Draw the level:
-	//
-	if (CameraInfo.Camera->IsOrtho() || CameraInfo.Camera->IsWire() || InvalidBsp)
-		{
-		GRend->DrawLevelBrushes(&CameraInfo);
-		if (CameraInfo.ShowFlags & SHOW_Actors) GRend->DrawLevelActors (&CameraInfo,CameraInfo.iActor);
-		if (CameraInfo.ShowFlags & SHOW_MovingBrushes) GRend->DrawMovingBrushWires(&CameraInfo);
-		}
-	else GRend->DrawWorld(&CameraInfo);
-	//
-	if (CameraInfo.ShowFlags & SHOW_Brush)
-		{
-		if ((ModeClass==EMC_Camera)||(ModeClass==EMC_Brush))
+			GEdRend->DrawActiveBrush(Camera);
+			if( GUnrealEditor.Mode==EM_BrushSnap )
 			{
-			GRend->DrawActiveBrush(&CameraInfo);
-			if (GUnrealEditor.Mode==EM_BrushSnap)
-				{
-				if (!CameraInfo.Level.Brush->Bound[1].Min.iTransform)
-					{
-					CameraInfo.Level.Brush->BuildBound(1);
-					};
-				constrainSimplePoint(&CameraInfo.Level.Brush->Bound[1].Min,&Constraints);
-				constrainSimplePoint(&CameraInfo.Level.Brush->Bound[1].Max,&Constraints);
-				//
-				GRend->DrawBoundingRect(&CameraInfo,&CameraInfo.Level.Brush->Bound[1]);
-				};
-			};
-		};
-	//
-	// Draw status:
-	//
-	if (CameraInfo.ShowFlags & SHOW_Coords) cameraShowCoords(&CameraInfo);
-	if (InvalidBsp)
-		{
-		GGfx.Printf (CameraInfo.Texture,8,20,0,GGfx.MedFont,3,"Map view - Geometry must be rebuilt");
-		};
-	if ((CameraInfo.Level.Level->GetState()==LEVEL_UpEdit) &&
-		(!GCameraManager->FullscreenCamera) &&
-		(!(CameraInfo.ShowFlags & SHOW_NoButtons)))
-		{
+				if( !Camera->Level->Brush()->TransformedBound.IsValid )
+					Camera->Level->Brush()->BuildBound(1);
+
+				constrainSimplePoint(&Camera->Level->Brush()->TransformedBound.Min,&Constraints);
+				constrainSimplePoint(&Camera->Level->Brush()->TransformedBound.Max,&Constraints);
+
+				GEdRend->DrawBoundingRect(Camera,&Camera->Level->Brush()->TransformedBound);
+			}
+		}
+	}
+
+	// Draw status.
+	if( Camera->Actor->ShowFlags & SHOW_Coords )
+		cameraShowCoords(Camera);
+	
+	if( InvalidBsp )
+		GGfx.MedFont->Printf(Camera->Texture,8,20,0,"Map view - Geometry must be rebuilt");
+
+	if
+	(	(Camera->Level->GetState()==LEVEL_UpEdit)
+	&&	(!GCameraManager->FullscreenCamera)
+	&&	(!(Camera->Actor->ShowFlags & SHOW_NoButtons)) )
+	{
 		ButtonX +=
-			DrawButton(&CameraInfo,(CameraInfo.ShowFlags&SHOW_Menu)?GGfx.MenuUp:GGfx.MenuDn,ButtonX,2,1);
-		if (!CameraInfo.Camera->IsOrtho()) ButtonX +=
-			DrawButton (&CameraInfo, (CameraInfo.ShowFlags&SHOW_PlayerCtrl)?GGfx.PlyrOn:GGfx.PlyrOff,
+			DrawButton(Camera,(Camera->Actor->ShowFlags&SHOW_Menu)?GGfx.MenuUp:GGfx.MenuDn,ButtonX,2,1);
+		if (!Camera->IsOrtho()) ButtonX +=
+			DrawButton (Camera, (Camera->Actor->ShowFlags&SHOW_PlayerCtrl)?GGfx.PlyrOn:GGfx.PlyrOff,
 			ButtonX,2,2);
-		};
+	}
+
 	Out:
-	//
-	GGfx.PostRender(&CameraInfo);
-	CameraInfo.Camera->Console->PostRender(&CameraInfo,ButtonX);
-	GRend->PostRender(&CameraInfo);
-	//
+	GGfx.PostRender(Camera);
+	Camera->Console->PostRender(Camera,ButtonX);
+	GRend->PostRender(Camera);
+
 	Scan.Exit();
-	Camera->Unlock (&CameraInfo,!DoScan);
-	//
-	UNGUARD_BEGIN
-	UNGUARD_MSGF("edcamDraw(Cam=%s,Mode=%i,Flags=%i",Camera->Name,Mode,ShowFlags);
-	UNGUARD_END
-	};
+	Camera->Unlock(LOCK_ReadWrite,!DoScan);
+
+	unguardf(("(Cam=%s,Mode=%i,Flags=%i",Camera->GetName(),Mode,ShowFlags));
+}
 
 /*-----------------------------------------------------------------------------
    Brush pivot setting.
@@ -1757,294 +1832,355 @@ void FGlobalEditor::edcamDraw (UCamera *Camera, int DoScan)
 // This transforms the point into the brush's coordinate system and takes
 // care of all the thorny details.
 //
-void SetWorldPivotPoint (ILevel *LevelInfo,UModel *Brush,FVector *PivotLocation,int SnapPivotToGrid)
+void SetWorldPivotPoint( ULevel *Level, UModel *Brush, FVector *PivotLocation, int SnapPivotToGrid )
+{
+	guard(SetWorldPivotPoint);
+	if( GUnrealEditor.MapEdit )
 	{
-	GUARD;
-	if (GUnrealEditor.MapEdit)
+		int n = Level->BrushArray->Num;
+		for( int i=0; i<n; i++ )
 		{
-		int n = LevelInfo->BrushArray->Num;
-		for (int i=0; i<n; i++)
-			{
-			Brush = LevelInfo->BrushArray->Element(i);
-			if ((Brush->ModelFlags&MF_Selected) || (i==0))
-				{
-				Brush->SetPivotPoint (PivotLocation,SnapPivotToGrid);
-				};
-			};
+			Brush = Level->BrushArray->Element(i);
+			if( (Brush->ModelFlags&MF_Selected) || (i==0) )
+				Brush->SetPivotPoint( PivotLocation, SnapPivotToGrid );
 		}
-	else if (Brush)
-		{
-		Brush->SetPivotPoint (PivotLocation,SnapPivotToGrid);
-		}
-	else LevelInfo->Brush->SetPivotPoint (PivotLocation,SnapPivotToGrid);
-	UNGUARD("SetWorldPivotPoint");
-	};
+	}
+	else if( Brush )
+	{
+		Brush->SetPivotPoint( PivotLocation, SnapPivotToGrid );
+	}
+	else Level->Brush()->SetPivotPoint(PivotLocation,SnapPivotToGrid);
+	
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
    Camera mouse click handling.
 -----------------------------------------------------------------------------*/
 
 //
-// Handle a mouse click in the camera window
+// Handle a mouse click in the camera window.
 //
-void FGlobalEditor::edcamClick (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD MouseY,
-	int Shift, int Ctrl)
-	{
-	GUARD;
+void FGlobalEditor::edcamClick
+(
+	UCamera *Camera, 
+	BYTE Buttons, 
+	SWORD MouseX, 
+	SWORD MouseY,
+	int Shift, 
+	int Ctrl
+)
+{
+	guard(FGlobalEditor::edcamClick);
 	POLY_CALLBACK	Callback;
-	ICamera 		CameraInfo;
-	IModel 			*ModelInfo;
 	UModel			*Brush;
 	FBspNode	  	*Node;
 	FBspSurf		*Poly;
 	FVector			V;
-	FPoly			*MasterFPoly;
 	AActor			*Actor;
-	INDEX			iActor;
 	int				i,UpdateWindow=0;
 	int				Mode,ModeClass;
 	char			Temp[80];
-	//
+
 	GUnrealEditor.Scan.X = MouseX;
 	GUnrealEditor.Scan.Y = MouseY;
-	//
-	Camera->Draw (1);
-	//
-	Mode      = GUnrealEditor.edcamMode(Camera);
-	ModeClass = GUnrealEditor.edcamModeClass(Mode);
-	//
-	if (!Camera->Lock(&CameraInfo)) return;
-	ModelInfo = &CameraInfo.Level.ModelInfo;
-	//
-	// Check scan results:
-	//
-	if ((Mode == EM_AddActor) && (Buttons == BUT_LEFT) && 
-		(Scan.Type != EDSCAN_Actor) && 
-		(Scan.Type != EDSCAN_UIElement) && 
-		(AddClass  != NULL))
+
+	Camera->Draw( 1 );
+
+	Mode          = GUnrealEditor.edcamMode(Camera);
+	ModeClass     = GUnrealEditor.edcamModeClass(Mode);
+	UModel *Model = Camera->Level->Model;
+
+	if( !Camera->Lock(LOCK_ReadWrite|LOCK_CanFail) )
+		return;
+
+	// Check scan results.
+	if( (Mode == EM_AddActor) && (Buttons == BUT_LEFT)
+	&&	(Scan.Type != EDSCAN_Actor)
+	&&	(Scan.Type != EDSCAN_UIElement)
+	&&	(CurrentClass != NULL))
+	{
+		guard(AddActor);
+		if( CurrentClass->ClassFlags & CLASS_Abstract )
 		{
-		if (AddClass->DefaultActor.bTemplateClass)
-			{
 			char Temp[256];
-			sprintf(Temp,"Class %s is a base class.  You can't add actors of this type to the world.",AddClass->Name);
+			sprintf(Temp,"Class %s is abstract.  You can't add actors of this type to the world.",CurrentClass->GetName());
 			GApp->MessageBox(Temp,"Can't add actor",0);
-			}
-		else if (GRend->Deproject(&CameraInfo,MouseX,MouseY,&V,1,AddClass->DefaultActor.CollisionRadius))
-			{
-			GTrans->Begin         (CameraInfo.Level.Level,"Add Actor");
-			GTrans->NoteResHeader (CameraInfo.Level.Actors);
-			//
-			if (!AddClass) AddClass = GClasses.Light;
-			iActor = CameraInfo.Level.SpawnActor(AddClass,NAME_NONE,&V);
-			//
-			if (iActor != INDEX_NONE)
-				{
-				AActor *Actor				= &CameraInfo.Level.Actors->Element(iActor);
-				Actor->bTempDynamicLight	= 1;
-				if (CameraInfo.Level.FarMoveActor(iActor,&V))
-					{
-					debug (LOG_Ed,"Added actor successfully");
-					}
-				else
-					{
-					debug (LOG_Ed,"Actor doesn't fit there");
-					CameraInfo.Level.DestroyActor(iActor);
-					};
-				if (AddClass->DefaultActor.Brush)
-					{
-					Actor->Brush = csgDuplicateBrush(Camera->Level,AddClass->DefaultActor.Brush,0,0);
-					Actor->UpdateBrushPosition(&CameraInfo.Level,iActor,1);
-					};
-				};
-			GTrans->End();
-			};
 		}
-	else switch (GUnrealEditor.Scan.Type)
+		else if( GEdRend->Deproject(Camera,MouseX,MouseY,&V,1,CurrentClass->GetDefaultActor().CollisionRadius) )
 		{
-		case EDSCAN_BspNodePoly:
-			GTrans->Begin (CameraInfo.Level.Level,"Poly Click");
-			//
-			Node 			= &ModelInfo->BspNodes [GUnrealEditor.Scan.Index];
-			Poly 			= &ModelInfo->BspSurfs [Node->iSurf];
-			MasterFPoly		= GUnrealEditor.polyFindMaster (ModelInfo,Node->iSurf);
-			//
-			if (Mode == EM_TextureSet)
+			Camera->Level->Unlock(LOCK_ReadWrite);
+			GTrans->Begin         (Camera->Level,"Add Actor");
+			GTrans->NoteResHeader (Camera->Level);
+			Camera->Level->Lock(LOCK_Trans);
+
+			if( !CurrentClass )
+				CurrentClass = new("Light",FIND_Existing)UClass;
+			Actor = Camera->Level->SpawnActor(CurrentClass,NULL,NAME_None,&V,NULL,NULL);
+
+			if( Actor )
+			{
+				Actor->bDynamicLight = 1;
+				if( Camera->Level->FarMoveActor( Actor, &V ) )
 				{
-				if (Buttons == BUT_RIGHT) // Get
-					{
+					debug(LOG_Info,"Added actor successfully");
+				}
+				else
+				{
+					debug(LOG_Info,"Actor doesn't fit there");
+					Camera->Level->DestroyActor( Actor );
+				}
+				if( CurrentClass->GetDefaultActor().Brush )
+				{
+					Actor->Brush = csgDuplicateBrush( Camera->Level, CurrentClass->GetDefaultActor().Brush, 0, 0, 0, 1 );
+					Actor->UpdateBrushPosition(Camera->Level,1);
+				}
+			}
+			Camera->Level->Unlock(LOCK_Trans);
+			GTrans->End();
+			Camera->Level->Lock(LOCK_ReadWrite);
+		}
+		unguard;
+	}
+	else switch( GUnrealEditor.Scan.Type )
+	{
+		case EDSCAN_BspNodePoly:
+		{
+			guard(EDSCAN_BspNodePoly);
+			GTrans->Begin (Camera->Level,"Poly Click");
+
+			Node = &Model->Nodes (GUnrealEditor.Scan.Index);
+			Poly = &Model->Surfs (Node->iSurf);
+
+			if( Mode == EM_TextureSet )
+			{
+				if( Buttons == BUT_RIGHT )
+				{
 					GUnrealEditor.CurrentTexture = Poly->Texture;
 					GApp->EdCallback(EDC_CurTexChange,0);
-					}
-				else // Set
-					{
-					if (GApp->KeyDown[K_SHIFT]) // Set to all selected
-						{
-						GTrans->NoteSelectedBspSurfs (ModelInfo,1);
-						for (INDEX i=0; i<ModelInfo->NumBspSurfs; i++)
-							{
-							if (ModelInfo->BspSurfs[i].PolyFlags & PF_Selected)
-								{
-								ModelInfo->BspSurfs[i].Texture = GUnrealEditor.CurrentTexture;
-								GUnrealEditor.polyUpdateMaster (ModelInfo,i,0,0);
-								};
-							};
-						}
-					else // Set to the one polygon clicked on
-						{
-						GTrans->NoteBspSurf 	(ModelInfo,Node->iSurf,0);
-						Poly->Texture = GUnrealEditor.CurrentTexture;
-						GUnrealEditor.polyUpdateMaster(ModelInfo,Node->iSurf,0,0);
-						};
-					};
 				}
-			else
+				else
 				{
-				if (Buttons==BUT_RIGHT) 
+					if( Camera->Input->KeyDown(IK_Shift) )
 					{
-					// If nothing is selected, select just this:
-					if (!(Poly->PolyFlags & PF_Selected)) GUnrealEditor.polySetAndClearPolyFlags (ModelInfo, 0, PF_Selected,0,0);
-					GUnrealEditor.polyFindByBrush(ModelInfo,Poly->Brush,Poly->iBrushPoly,SelectPolyFunc);
-					// Tell editor to bring up the polygon properties dialog:
+						// Set to all selected.
+						Model->Surfs->Lock(LOCK_Trans);
+						Model->Surfs->ModifySelected(1);
+						for( INDEX i=0; i<Model->Surfs->Num; i++ )
+						{
+							if( Model->Surfs(i).PolyFlags & PF_Selected )
+							{
+								Model->Surfs(i).Texture = GUnrealEditor.CurrentTexture;
+								GUnrealEditor.polyUpdateMaster (Model,i,0,0);
+							}
+						}
+						Model->Surfs->Unlock(LOCK_Trans);
+					}
+					else
+					{
+						// Set to the one polygon clicked on.
+						Model->Surfs->Lock(LOCK_Trans);
+						Model->Surfs->ModifyItem(Node->iSurf,0);
+						Model->Surfs->Unlock(LOCK_Trans);
+						Poly->Texture = GUnrealEditor.CurrentTexture;
+						GUnrealEditor.polyUpdateMaster(Model,Node->iSurf,0,0);
+					}
+				}
+			}
+			else
+			{
+				if( Buttons == BUT_RIGHT ) 
+				{
+					// If nothing is selected, select just this.
+					Model->Surfs->Lock(LOCK_Trans);
+					if (!(Poly->PolyFlags & PF_Selected)) GUnrealEditor.polySetAndClearPolyFlags(Model, 0, PF_Selected,0,0);
+					GUnrealEditor.polyFindByBrush(Model,Poly->Brush,Poly->iBrushPoly,SelectPolyFunc);
+					Model->Surfs->Unlock(LOCK_Trans);
+
+					// Tell editor to bring up the polygon properties dialog.
 					GApp->EdCallback(EDC_SelPolyChange,0);
 					GApp->EdCallback(EDC_RtClickPoly,0);
-					}
-				else
-					{
-					if (Poly->PolyFlags & PF_Selected)  Callback = DeselectPolyFunc;
-					else								Callback = SelectPolyFunc;
-					//
-					if (!GApp->KeyDown[K_CTRL]) GUnrealEditor.polySetAndClearPolyFlags (ModelInfo, 0, PF_Selected,0,0);
-					GUnrealEditor.polyFindByBrush(ModelInfo,Poly->Brush,Poly->iBrushPoly,Callback);
-					//
-					GApp->EdCallback(EDC_SelPolyChange,0);
-					};
 				}
+				else
+				{
+					if( Poly->PolyFlags & PF_Selected ) Callback = DeselectPolyFunc;
+					else								Callback = SelectPolyFunc;
+
+					Model->Surfs->Lock(LOCK_Trans);
+					if( !Camera->Input->KeyDown(IK_Ctrl) )
+						GUnrealEditor.polySetAndClearPolyFlags(Model, 0, PF_Selected,0,0);
+					GUnrealEditor.polyFindByBrush(Model,Poly->Brush,Poly->iBrushPoly,Callback);
+					Model->Surfs->Unlock(LOCK_Trans);
+
+					GApp->EdCallback(EDC_SelPolyChange,0);
+				}
+			}
 			GTrans->End ();
 			break;
+			unguard;
+		}
 		case EDSCAN_BspNodeSide:
+		{
+			guard(EDSCAN_BspNodeSide);
 			break;
+			unguard;
+		}
 		case EDSCAN_BspNodeVertex:
+		{
+			guard(EDSCAN_BspNodeVertex);
 			break;
+			unguard;
+		}
 		case EDSCAN_BrushPoly:
 		case EDSCAN_BrushSide:
-			if (GUnrealEditor.MapEdit)
+		{
+			guard(EDSCAN_BrushPoly);
+			if( GUnrealEditor.MapEdit )
+			{
+				GTrans->Begin( Camera->Level, "Select brush" );
+				if( Buttons==BUT_RIGHT )
 				{
-				GTrans->Begin  (CameraInfo.Level.Level,"Select brush");
-				//
-				if (Buttons==BUT_RIGHT)
+					for( i=0; i<Camera->Level->BrushArray->Num; i++ )
 					{
-					for (i=0; i<CameraInfo.Level.BrushArray->Num; i++)
+						Brush = Camera->Level->BrushArray->Element(i);
+						if( Brush->ModelFlags & MF_Selected )
 						{
-						Brush = CameraInfo.Level.BrushArray->Element(i);
-						if (Brush->ModelFlags & MF_Selected)
-							{
 							GTrans->NoteResHeader(Brush);
 							Brush->ModelFlags &= ~MF_Selected;
-							};
-						};
-					};
+						}
+					}
+				}
 				Brush = (UModel *)GUnrealEditor.Scan.Index;
 				GTrans->NoteResHeader (Brush);
-				//
 				Brush->ModelFlags ^= MF_Selected;
-				//
 				GTrans->End ();
-				};
+			}
 			break;
+			unguard;
+		}
 		case EDSCAN_BrushVertex:
-			{
+		{
+			guard(EDSCAN_BrushVertex);
+
 			UModel *Brush = (UModel *)GUnrealEditor.Scan.Index;
-			GTrans->Begin		(CameraInfo.Level.Level,"Brush Vertex Selection");
-			SetWorldPivotPoint	(&CameraInfo.Level,Brush,&GUnrealEditor.Scan.V,(Buttons==BUT_RIGHT));
-			GTrans->End			();
-			//
-			// If this was a moving brush, update its actor accordingly:
-			//
-			AActor *Actor = &CameraInfo.Level.Actors->Element(0);
-			for (int i=0; i<CameraInfo.Level.Actors->Max; i++)
-				{
-				if (Actor->Brush==Brush) Actor->UpdateBrushPosition(&CameraInfo.Level,i,1);
-				Actor++;
-				};
-			};
+			GTrans->Begin( Camera->Level, "Brush Vertex Selection" );
+			SetWorldPivotPoint( Camera->Level, Brush, &GUnrealEditor.Scan.V, (Buttons==BUT_RIGHT) );
+			GTrans->End();
+
+			// If this was a moving brush, update its actor accordingly.
+			for( int i=0; i<Camera->Level->Num; i++ )
+			{
+				AActor *Actor = Camera->Level->Element(i);
+				if( Actor && Actor->Brush==Brush )
+					Actor->UpdateBrushPosition(Camera->Level,1);
+			}
 			break;
+			unguard;
+		}
 		case EDSCAN_Actor:
-			iActor	= GUnrealEditor.Scan.Index;
-			Actor	= &CameraInfo.Level.Actors->Element(iActor);
-			//
-			if( !Actor->IsKindOf("Camera") )
+		{
+			guard(EDSCAN_Actor);
+			Actor = (AActor*)GUnrealEditor.Scan.Index;
+			if( !Actor->IsA("View") )
+			{
+				GTrans->Begin(Camera->Level,"clicking on actors");
+				if( Buttons == BUT_RIGHT )
 				{
-				GTrans->Begin(CameraInfo.Level.Level,"clicking on actors");
-				if (Buttons==BUT_RIGHT)
-					{
-					if (!Actor->bSelected) GUnrealEditor.edactSelectNone(&CameraInfo.Level);
-					GTrans->NoteActor (CameraInfo.Level.Actors,iActor);
+					if( !Actor->bSelected )
+						GUnrealEditor.edactSelectNone(Camera->Level);
+
+					Actor->Lock(LOCK_Trans);
 					Actor->bSelected=1;
+					Actor->Unlock(LOCK_Trans);
+
 					GApp->EdCallback(EDC_SelActorChange,0);
 					GApp->EdCallback(EDC_RtClickActor,0);
-					}
+				}
 				else
-					{
-					if (GApp->KeyDown[K_ALT]) // Set default add-class
-						{
-						AddClass = Actor->Class;
-						GApp->EdCallback(EDC_CurClassChange,0);
-						}
-					else // Select/deselect actor
-						{
-						if (!GApp->KeyDown[K_CTRL]) GUnrealEditor.edactSelectNone(&CameraInfo.Level);
-						GTrans->NoteActor (CameraInfo.Level.Actors,iActor);
-						Actor->bSelected ^= 1;
-						GApp->EdCallback(EDC_SelActorChange,0);
-						};
-					};
-				GTrans->End();
-				};
-			break;
-		case EDSCAN_UIElement:
-			switch(GUnrealEditor.Scan.Index)
 				{
-				case 1: // Menu on/off button
-					CameraInfo.ShowFlags ^= SHOW_Menu;
+					if( Camera->Input->KeyDown(IK_Alt) )
+					{
+						// Set default add-class.
+						CurrentClass = Actor->GetClass();
+						GApp->EdCallback(EDC_CurClassChange,0);
+					}
+					else
+					{
+						// Select/deselect actor.
+						if( !Camera->Input->KeyDown(IK_Ctrl) )
+							edactSelectNone(Camera->Level);
+
+						Actor->Lock(LOCK_Trans);
+						Actor->bSelected ^= 1;
+						Actor->Unlock(LOCK_Trans);
+
+						GApp->EdCallback(EDC_SelActorChange,0);
+					}
+				}
+				GTrans->End();
+			}
+			break;
+			unguard;
+		}
+		case EDSCAN_UIElement:
+		{
+			guard(EDSCAN_UIElement);
+			switch(GUnrealEditor.Scan.Index)
+			{
+				case 1:
+					// Menu on/off button.
+					Camera->Actor->ShowFlags ^= SHOW_Menu;
 					UpdateWindow=1;
 					break;
-				case 2: // Player controls
-					CameraInfo.ShowFlags ^= SHOW_PlayerCtrl;
-					CameraInfo.Camera->Console->Logf(LOG_Info,"Player controls are %s",
-						CameraInfo.ShowFlags&SHOW_PlayerCtrl ? "On" : "Off");
+				case 2:
+					// Player controls.
+					Camera->Actor->ShowFlags ^= SHOW_PlayerCtrl;
+					Camera->Logf(LOG_Info,"Player controls are %s",
+						Camera->Actor->ShowFlags&SHOW_PlayerCtrl ? "On" : "Off");
 					GCameraManager->ResetModes();
 					break;
-				}; 
+			}
 			break;
+			unguard;
+		}
 		case EDSCAN_BrowserTex:
-			Camera->Unlock(&CameraInfo,0);
-			if (Buttons==BUT_LEFT)
-				{
-				strcpy(Temp,"POLY DEFAULT TEXTURE="); strcat(Temp,((UResource *)GUnrealEditor.Scan.Index)->Name);
+		{
+			guard(EDSCAN_BrowserTex);
+			Camera->Unlock(LOCK_ReadWrite,0);
+			if( Buttons == BUT_LEFT )
+			{
+				strcpy(Temp,"POLY DEFAULT TEXTURE="); strcat(Temp,((UObject *)GUnrealEditor.Scan.Index)->GetName());
 				GUnrealEditor.Exec (Temp);
-				strcpy(Temp,"POLY SET TEXTURE="); strcat(Temp,((UResource *)GUnrealEditor.Scan.Index)->Name);
+				strcpy(Temp,"POLY SET TEXTURE="); strcat(Temp,((UObject *)GUnrealEditor.Scan.Index)->GetName());
 				GUnrealEditor.Exec (Temp);
 				GApp->EdCallback(EDC_CurTexChange,0);
-				}
-			else if (Buttons==BUT_RIGHT)
-				{
+			}
+			else if( Buttons == BUT_RIGHT )
+			{
 				GUnrealEditor.CurrentTexture=(UTexture *)GUnrealEditor.Scan.Index;
 				GApp->EdCallback(EDC_RtClickTexture,0);
-				};
-			if (!Camera->Lock(&CameraInfo)) return;
+			}
+			if( !Camera->Lock(LOCK_ReadWrite|LOCK_CanFail) )
+				return;
 			break;
+			unguard;
+		}
 		case EDSCAN_None:
-			if (Buttons==BUT_RIGHT) GApp->EdCallback(EDC_RtClickWindow,0);
+		{
+			guard(EDSCAN_None);
+			if( Buttons == BUT_RIGHT )
+				GApp->EdCallback( EDC_RtClickWindow, 0 );
 			break;
-		};
-	Camera->Unlock(&CameraInfo,0);
-	//
-	if (UpdateWindow) Camera->UpdateWindow();
-	//
-	UNGUARD_BEGIN
-	UNGUARD_MSGF("edcamClick(Mode=%i)",GUnrealEditor.Mode);
-	UNGUARD_END
-	};
+			unguard;
+		}
+	}
+	Camera->Unlock(LOCK_ReadWrite,0);
+
+	if( UpdateWindow )
+		Camera->UpdateWindow();
+
+	unguardf(("(Mode=%i)",GUnrealEditor.Mode));
+}
 
 /*-----------------------------------------------------------------------------
    Editor camera mode.
@@ -2053,59 +2189,52 @@ void FGlobalEditor::edcamClick (UCamera *Camera, BYTE Buttons, SWORD MouseX, SWO
 //
 // Set the editor mode.
 //
-void FGlobalEditor::edcamSetMode (int Mode)
-	{
+void FGlobalEditor::edcamSetMode( int Mode )
+{
 	int i;
-	//
-	// Clear old mode:
-	//
-	GUARD;
-	if (GUnrealEditor.Mode != EM_None)
-		{
-		for (i=0; i<GCameraManager->CameraArray->Num; i++)
-			{
-			edcamMove (GCameraManager->CameraArray->Element(i),BUT_EXITMODE,0,0,0,0);
-			};
-		};
-	//
-	// Set new mode:
-	//
+
+	// Clear old mode.
+	guard(FGlobalEditor::edcamSetMode);
+	if( GUnrealEditor.Mode != EM_None )
+		for( i=0; i<GCameraManager->CameraArray->Num; i++ )
+			edcamMove(GCameraManager->CameraArray->Element(i),BUT_EXITMODE,0,0,0,0);
+
+	// Set new mode.
 	GUnrealEditor.Mode = Mode;
-	if (GUnrealEditor.Mode != EM_None)
-		{
-		for (i=0; i<GCameraManager->CameraArray->Num; i++)
-			{
+	if( GUnrealEditor.Mode != EM_None )
+		for( i=0; i<GCameraManager->CameraArray->Num; i++ )
 			edcamMove (GCameraManager->CameraArray->Element(i),BUT_SETMODE,0,0,0,0);
-			};
-		};
-	UNGUARD("edcamSetMode");
-	};
+
+	unguard;
+}
 
 //
 // Return editor camera mode given GUnrealEditor.Mode and state of keys.
 // This handlers special keyboard mode overrides which should
 // affect the appearance of the mouse cursor, etc.
 //
-int FGlobalEditor::edcamMode (UCamera *Camera)
+int FGlobalEditor::edcamMode( UCamera *Camera )
+{
+	guard(FGlobalEditor::edcamMode);
+	checkInput(Camera!=NULL);
+
+	switch( Camera->Actor->RendMap )
 	{
-	GUARD;
-	if (Camera) switch (Camera->GetActor().RendMap)
-		{
-		case REN_TexView:							return EM_TexView;
-		case REN_TexBrowser:						return EM_TexBrowser;
-		case REN_MeshView:							return EM_MeshView;
-		case REN_MeshBrowser:						return EM_MeshBrowser;
-		};
-	switch (GUnrealEditor.Mode)
-		{
+		case REN_TexView:		return EM_TexView;
+		case REN_TexBrowser:	return EM_TexBrowser;
+		case REN_MeshView:		return EM_MeshView;
+		case REN_MeshBrowser:	return EM_MeshBrowser;
+	}
+	switch( GUnrealEditor.Mode )
+	{
 		case EM_None:
 			return GUnrealEditor.Mode;
 		case EM_CameraMove:
 		case EM_CameraZoom:
-			if (GApp->KeyDown[K_ALT]) 				return EM_TextureSet;
-			else if (GApp->KeyDown[K_CTRL])			return EM_BrushMove;
-			else if (GApp->KeyDown[K_SHIFT])		return EM_BrushMove;
-			else									return GUnrealEditor.Mode;
+			if( Camera->Input->KeyDown(IK_Alt) ) return EM_TextureSet;
+			else if( Camera->Input->KeyDown(IK_Ctrl) ) return EM_BrushMove;
+			else if( Camera->Input->KeyDown(IK_Shift) ) return EM_BrushMove;
+			else return GUnrealEditor.Mode;
 			break;
 		case EM_BrushFree:
 		case EM_BrushMove:
@@ -2115,32 +2244,32 @@ int FGlobalEditor::edcamMode (UCamera *Camera)
 		case EM_BrushStretch:
 		case EM_BrushWarp:
 		case EM_BrushSnap:
-			if		(GApp->KeyDown[K_ALT])  		return EM_TextureSet;
-			else if (GApp->KeyDown[K_CTRL])			return GUnrealEditor.Mode;
-			else if (GApp->KeyDown[K_SHIFT])		return EM_BrushMove;
-			else									return EM_CameraMove;
+			if( Camera->Input->KeyDown(IK_Alt) ) return EM_TextureSet;
+			else if( Camera->Input->KeyDown(IK_Ctrl) ) return GUnrealEditor.Mode;
+			else if( Camera->Input->KeyDown(IK_Shift) ) return EM_BrushMove;
+			else return EM_CameraMove;
 			break;
 		case EM_AddActor:
 		case EM_MoveActor:
 			return GUnrealEditor.Mode;
 			break;
 		case EM_TextureSet:
-			if (GApp->KeyDown[K_CTRL])				return EM_CameraMove;
-			else									return GUnrealEditor.Mode;
+			if( Camera->Input->KeyDown(IK_Ctrl) ) return EM_CameraMove;
+			else return GUnrealEditor.Mode;
 		case EM_TexturePan:
 		case EM_TextureRotate:
 		case EM_TextureScale:
-			if (GApp->KeyDown[K_ALT])  				return EM_TextureSet;
-			else									return GUnrealEditor.Mode;
+			if( Camera->Input->KeyDown(IK_Alt) ) return EM_TextureSet;
+			else return GUnrealEditor.Mode;
 			break;
 		case EM_Terraform:
 			return GUnrealEditor.Mode;
 			break;
 		default:
 			return GUnrealEditor.Mode;
-		};
-	UNGUARD("edcamMode");
-	};
+	}
+	unguard;
+}
 
 //
 // Return classification of current mode:
@@ -2182,20 +2311,20 @@ int FGlobalEditor::edcamModeClass (int Mode)
 -----------------------------------------------------------------------------*/
 
 AUTOREGISTER_TOPIC("Ed",EdTopicHandler);
-void EdTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, char *Data)
+void EdTopicHandler::Get(ULevel *Level, const char *Item, FOutputDevice &Out)
 	{
-	GUARD;
+	guard(EdTopicHandler::Get);
 	//
-	if		(!stricmp(Item,"LASTSCROLL"))	itoa (GLastScroll,Data,10);
-	else if (!stricmp(Item,"CURTEX"))		strcpy(Data,GUnrealEditor.CurrentTexture ? GUnrealEditor.CurrentTexture->Name : "None");
-	else if (!stricmp(Item,"CURCLASS"))		strcpy(Data,GEditor->AddClass ? GEditor->AddClass->Name : "None");
+	if		(!stricmp(Item,"LASTSCROLL"))	Out.Logf("%i",GLastScroll);
+	else if (!stricmp(Item,"CURTEX"))		Out.Log(GUnrealEditor.CurrentTexture ? GUnrealEditor.CurrentTexture->GetName() : "None");
+	else if (!stricmp(Item,"CURCLASS"))		Out.Log(GEditor->CurrentClass ? GEditor->CurrentClass->GetName() : "None");
 	//
-	UNGUARD("EdTopicHandler::Get");
+	unguard;
 	};
-void EdTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, const char *Data)
+void EdTopicHandler::Set(ULevel *Level, const char *Item, const char *Data)
 	{
-	GUARD;
-	UNGUARD("EdTopicHandler::Set");
+	guard(EdTopicHandler::Set);
+	unguard;
 	};
 
 /*-----------------------------------------------------------------------------

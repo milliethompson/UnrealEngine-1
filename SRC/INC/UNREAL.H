@@ -1,48 +1,26 @@
 /*=============================================================================
 	Unreal.h: Main header for the Unreal engine
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
 		* Created by Tim Sweeney
+		* include unpath.h SEP 3/97
 =============================================================================*/
 
 #ifndef _INC_UNREAL
 #define _INC_UNREAL
 
 /*----------------------------------------------------------------------------
-	Low level includes.
+	General includes.
 ----------------------------------------------------------------------------*/
 
-//
-// Version info and compile options specific to this build of the Unreal engine
-//
-#ifndef  _INC_UNBUILD
-#include "UnBuild.h"
-#endif
-
-//
-// Unreal Platform-specific defines for portability
-//
-#ifndef  _INC_UNPORT
-#include "UnPort.h" 
-#endif
-
-//
-// All platform-independent hooks visible to Unreal which
-// call platform-specific routines elsewhere
-//
-#ifndef _INC_UNPLATFM
-#include "UnPlatfm.h"
-#endif
-
-//
-// Debugging, checking, and guarding:
-//
-#ifndef _INC_CHECKS
-#include "UnChecks.h"
-#endif
+#include "UnBuild.h"	// Version specific info.
+#include "UnObjVer.h"	// Object version info.
+#include "UnPort.h"		// Portability code.
+#include "UnPlatfm.h"	// Platform dependent hooks.
+#include "UnChecks.h"	// Debugging, checking, and guarding.
 
 /*-----------------------------------------------------------------------------
 	Global variables.
@@ -52,119 +30,77 @@
 // Every major, Unreal subsystem has a global class associated with it,
 // and a global variable named GSomthing.
 //
-UNREAL_API extern class FUnrealEngine			GUnreal;
-UNREAL_API extern class FGlobalResourceManager	GRes;
-UNREAL_API extern class FUnrealServer			GServer;
-UNREAL_API extern class FGlobalDefaults			GDefaults;
-UNREAL_API extern class FGlobalPlatform			*GApp;
-UNREAL_API extern class FGlobalTopicTable		GTopics;
-UNREAL_API extern class FGlobalClasses			GClasses;
-UNREAL_API extern class FMemoryCache			GCache;
-UNREAL_API extern class FMemPool				GMem,GDynMem;
-UNREAL_API extern class FGlobalGfx				GGfx;
-UNREAL_API extern class FGlobalMath				GMath;
-UNREAL_API extern class FGlobalAudio			GAudio;
-UNREAL_API extern class FGlobalRender			*GRend;
-UNREAL_API extern class FCameraManager			*GCameraManager;
-UNREAL_API extern class UTransBuffer			*GTrans;
-UNREAL_API extern class FGlobalEditor			*GEditor;
-UNREAL_API extern class FGameBase				*GGameBase;
-UNREAL_API extern class NManager				*GNetManager;
+UNENGINE_API extern class FGlobalUnrealEngine		GUnreal;
+UNENGINE_API extern class FGlobalObjectManager		GObj;
+UNENGINE_API extern class FGlobalUnrealServer		GServer;
+UNENGINE_API extern class FGlobalDefaults			GDefaults;
+UNENGINE_API extern class FGlobalPlatform*			GApp;
+UNENGINE_API extern class FGlobalTopicTable			GTopics;
+UNENGINE_API extern class FMemCache					GCache;
+UNENGINE_API extern class FMemStack					GMem,GDynMem;
+UNENGINE_API extern class FGlobalGfx				GGfx;
+UNENGINE_API extern class FGlobalMath				GMath;
+UNENGINE_API extern class FGlobalAudio				GAudio;
+UNENGINE_API extern class FRenderBase*				GRend;
+UNENGINE_API extern class FCameraManagerBase*		GCameraManager;
+UNENGINE_API extern class UTransBuffer*				GTrans;
+UNENGINE_API extern class FTransactionTracker*		GUndo;
+UNENGINE_API extern class FGlobalEditor*			GEditor;
+UNENGINE_API extern class FEditorRenderBase*		GEdRend;
+UNENGINE_API extern class FGameBase*				GGameBase;
+UNENGINE_API extern class FMovingBrushTrackerBase&	GBrushTracker;
+UNENGINE_API extern class NManager*					GNetManager;
 
 /*-----------------------------------------------------------------------------
-	High-level includes.
+	Unreal engine includes.
 -----------------------------------------------------------------------------*/
 
-#ifndef _INC_UNFILE		// Low-level, platform-independent file functions.
-#include "UnFile.h"
-#endif
+#include "UnNames.h"	// Hardcoded names.
+#include "UnArc.h"		// Archiver code.
+#include "UnFile.h"		// Low-level, platform-independent file functions.
+#include "UnMath.h"		// Vector math functions.
+#include "UnCache.h"	// In-memory object caching.
+#include "UnMem.h"		// Fast memory pool allocation.
+#include "UnName.h"	    // Global name system.
+#include "UnStack.h"    // UnrealScript stack definition.
+#include "UnObjBas.h"	// Object base class.
+#include "UnParams.h"	// Parameter parsing routines.
+#include "UnCID.h"		// Cache identifiers.
+#include "UnObj.h"		// Standard object definitions.
+#include "UnPrim.h"		// Primitive class.
+#include "UnModel.h"	// Model class.
+#include "UnTopics.h"	// Topic handlers for editor/server communication.
+#include "Root.h"		// All actor classes.
+#include "UnActLst.h"	// Actor list object class definition.
+#include "UnProp.h"		// Actor class property definitions.
+#include "UnClass.h"	// Actor class object class definition.
+#include "UnScript.h"	// Script object class.
+#include "UnMsgPar.h"	// Actor message parameter classes.
+#include "UnPath.h"		// path building and reachspec creation and management SEP 3/97
+#include "UnLevel.h"	// Level object.
+#include "UnIn.h"		// Input system.
+#include "UnCamera.h"	// Camera subsystem.
+#include "UnFGAud.h"	// Audio subsystem FGlobalAudio.
+#include "UnSound.h"	// Sound subsystem main.
+#include "UnMusic.h"	// Music.
+#include "UnGfx.h"		// Graphics subsystem.
+#include "UnServer.h"	// Unreal server.
+#include "UnDeflts.h"	// Unreal defaults.
+#include "UnEngine.h"	// Unreal engine.
+#include "UnGamBas.h"	// Game base class.
+#include "UnDynBsp.h"	// Dynamic Bsp objects.
+#include "UnMesh.h"     // Mesh objects.
+#include "UnActor.h"	// Actor inlines.
 
-#ifndef _INC_UNMATH		// Vector math functions.
-#include "UnMath.h"
-#endif
+/*-----------------------------------------------------------------------------
+	Unreal editor includes.
+-----------------------------------------------------------------------------*/
 
-#ifndef _INC_UNPARAMS	// Parameter parsing routines.
-#include "UnParams.h"
-#endif
-
-#ifndef _INC_UNCACHE	// In-memory object caching.
-#include "UnCache.h"
-#endif
-
-#ifndef _INC_UNCID		// Cache identifiers.
-#include "UnCID.h"
-#endif
-
-#ifndef _INC_UNMEM		// Fast memory pool allocation.
-#include "UnMem.h"
-#endif
-
-#ifndef _INC_UNRESTYP	// Resource type definitions.
-#include "UnResTyp.h"
-#endif
-
-#ifndef _INC_UNRES		// Resource manager.
-#include "UnRes.h"
-#endif
-
-#ifndef _INC_UNTOPICS	// Topic handlers for editor/server communication.
-#include "UnTopics.h"
-#endif
-
-#ifndef _INC_UNACTOR	// Actor subsystem.
-#include "UnActor.h"
-#endif
-
-#ifndef _INC_UNLEVEL	// Level resource.
-#include "UnLevel.h"
-#endif
-
-#ifndef _INC_UNCAMERA	// Camera subsystem.
-#include "UnCamera.h"
-#endif
-
-#ifndef _INC_UNFGAUD	// Audio subsystem FGlobalAudio.
-#include "UnFGAud.h"
-#endif
-
-#ifndef _INC_UNSOUND	// Audio subsystem main.
-#include "UnSound.h"
-#endif
-
-#ifndef _INC_UNGFX		// Graphics subsystem.
-#include "UnGfx.h"
-#endif
-
-#ifndef _INC_UNSERVER	// Unreal server.
-#include "UnServer.h"
-#endif
-
-#ifndef _INC_UNDEFLTS	// Unreal defaults.
-#include "UnDeflts.h"
-#endif
-
-#ifndef _INC_UNENGINE	// Unreal engine.
-#include "UnEngine.h"
-#endif
-
-#ifndef _INC_UNVGAME	// Virtual game class.
-#include "UnVGame.h"
-#endif
-
-//
-// Files required by the Unreal editor
-//
 #if EDITOR
-
-	#ifndef _INC_UNEDITOR	// Unreal editor.
-	#include "UnEditor.h"
-	#endif
-
-	#ifndef _INC_UNEDTRAN	// Transaction tracking system.
-	#include "UnEdTran.h"
-	#endif
-
+#include "UnEditor.h"	// Unreal editor.
+#include "UnEdTran.h"	// Transaction tracking system.
 #endif
+
 /*-----------------------------------------------------------------------------
 	The End.
 -----------------------------------------------------------------------------*/

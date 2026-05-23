@@ -1,48 +1,66 @@
 /*=============================================================================
 	UnFile.h: General-purpose file utilities.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 =============================================================================*/
 
-#ifndef _INC_UNFILE // Prevent header from being included multiple times
+#ifndef _INC_UNFILE // Prevent header from being included multiple times.
 #define _INC_UNFILE
 
 /*-----------------------------------------------------------------------------
 	Platform independent convenience functions.
 -----------------------------------------------------------------------------*/
 
-//
 // File functions.
-//
-UNREAL_API long	fsize 				(const char *fname);
-UNREAL_API char *fgetdir			(char *dir);
-UNREAL_API int 	fsetdir				(const char *dir);
-UNREAL_API int 	fmkdir				(const char *dir);
-UNREAL_API int 	fdelete 			(const char *fname);
-UNREAL_API int 	frename 			(const char *oldname, const char *newname);
-UNREAL_API const char *fext			(const char *fname);
-UNREAL_API const char *spc			(int num);
+UNENGINE_API long	fsize 				(const char *fname);
+UNENGINE_API char   *fgetdir			(char *dir);
+UNENGINE_API int 	fsetdir				(const char *dir);
+UNENGINE_API int 	fmkdir				(const char *dir);
+UNENGINE_API int 	fdelete 			(const char *fname);
+UNENGINE_API int 	frename 			(const char *oldname, const char *newname);
+UNENGINE_API const char *fext			(const char *fname);
+UNENGINE_API const char *spc			(int num);
+
+// Other functions.
+UNENGINE_API char *mystrncpy			(char *dest, const char *src, int maxlen);
+UNENGINE_API char *mystrncat			(char *dest, const char *src, int maxlen);
+UNENGINE_API const char *mystrstr		(const char *str, const char *find);
+
+// CRC and hashing.
+UNENGINE_API unsigned long memcrc       (const unsigned char *Data, int Length);
+UNENGINE_API DWORD GCRCTable[];
+
+// Exceptions.
+UNENGINE_API void VARARGS throwf        (char *Fmt, ...);
+
+/*-----------------------------------------------------------------------------
+	Hashing.
+-----------------------------------------------------------------------------*/
 
 //
-// Other functions.
+// Case insensitive string hash function.
 //
-UNREAL_API char *mystrncpy			(char *dest, const char *src, int maxlen); // Safe strncpy
-UNREAL_API char *mystrncat			(char *dest, const char *src, int maxlen); // Safe strcat
-UNREAL_API const char *mystrstr		(const char *str, const char *find); // Find string in string, case insensitive, non-alnum lead-in
-UNREAL_API unsigned long strhash	(const char *Data, int NumKeys); // Hash value computer
-UNREAL_API unsigned long strcrc		(const unsigned char *Data, int Length); // CRC32 computer
-UNREAL_API void mymemset			(void *Dest,char c,int Count);
-UNREAL_API int mymemeq				(void *P1, void *P2, int n);
+inline unsigned long strihash( const char *Data )
+{
+	guardSlow(strihash);
+
+	unsigned long Hash = 0;
+	while( *Data )
+		Hash = ((Hash >> 8) & 0x00FFFFFF) ^ GCRCTable[(Hash ^ toupper(*Data++)) & 0x000000FF];
+
+	return Hash;
+	unguardSlow;
+}
 
 /*-----------------------------------------------------------------------------
 	General templates.
 -----------------------------------------------------------------------------*/
 
 //
-// Swap two variables.
+// Exchange two variables.
 //
-template<class T> inline void Swap(T& A, T& B)
+template<class T> inline void Exchange(T& A, T& B)
 {
 	const T Temp = A;
 	A = B;
@@ -72,7 +90,7 @@ template<class T> inline void Swap(T& A, T& B)
 //	struct MyLong {
 //		long Value;
 //		friend inline int Compare(const CLong &A, const CLong &B)
-//			{return (A.Value>B.Value)-(B.Value<A.Value);};
+//			{return (A.Value>B.Value)-(B.Value>A.Value);};
 //	};
 //	void f()
 //	{
@@ -132,7 +150,7 @@ Recurse:
 			}
 			// A[i] <= A[max] for lo <= i <= hi.
 
-			Swap(*Max, *NewHi);
+			Exchange( *Max, *NewHi );
 			// A[i] <= A[hi] for i <= hi, so A[i] <= A[j] for i <= j, j >= hi.
 
 			NewHi--;
@@ -153,7 +171,7 @@ Recurse:
         // performance.
 
         Mid = Lo + (Size / 2); // Find middle element.
-        Swap(*Mid, *Lo);     // Swap it to beginning of array.
+        Exchange( *Mid, *Lo ); // Exchange it to beginning of array.
 
         // We now wish to partition the array into three pieces, one
         // consisiting of elements <= partition element, one of elements
@@ -198,7 +216,7 @@ Recurse:
             // A[loguy] > A[lo], A[higuy] < A[lo],
             // loguy < hi, highy > lo.
 
-            Swap(*LoGuy, *HiGuy);
+            Exchange( *LoGuy, *HiGuy );
 
             // A[loguy] < A[lo], A[higuy] > A[lo]; so condition at top
             // of loop is re-established.
@@ -212,7 +230,7 @@ Recurse:
         //     A[i] <= A[lo] for lo <= i <= higuy,
         //     A[i] = A[lo] for higuy < i < loguy.
 
-        Swap(*Lo, *HiGuy); // put partition element in place
+        Exchange( *Lo, *HiGuy ); // put partition element in place
 
         // A[i] >= A[higuy] for loguy <= i <= hi,
         // A[i] <= A[higuy] for lo <= i < higuy
@@ -268,6 +286,17 @@ Recurse:
     }
 
 	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	Shuffle an array randomly.
+-----------------------------------------------------------------------------*/
+
+// Card deck shuffler.
+template<class T> inline void QShuffle( T *Array, int Num )
+{
+	for( int i=0; i<Num; i++ )
+		Exchange(Array[i], Array[rand() % Num]);
 }
 
 /*-----------------------------------------------------------------------------

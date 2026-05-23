@@ -1,25 +1,25 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{A8B3B723-0B5A-101B-B22E-00AA0037B2FC}#1.0#0"; "GRID32.OCX"
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "comctl32.ocx"
 Begin VB.Form frmActorProperties 
    BorderStyle     =   5  'Sizable ToolWindow
    Caption         =   "Actor Properties"
-   ClientHeight    =   6780
-   ClientLeft      =   6720
-   ClientTop       =   3315
-   ClientWidth     =   5115
+   ClientHeight    =   6810
+   ClientLeft      =   6180
+   ClientTop       =   2160
+   ClientWidth     =   5145
    ForeColor       =   &H80000008&
-   Height          =   7140
    HelpContextID   =   113
    Icon            =   "ActPrp.frx":0000
    KeyPreview      =   -1  'True
-   Left            =   6660
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
    MinButton       =   0   'False
-   ScaleHeight     =   6780
-   ScaleWidth      =   5115
+   PaletteMode     =   1  'UseZOrder
+   ScaleHeight     =   6810
+   ScaleWidth      =   5145
    ShowInTaskbar   =   0   'False
-   Top             =   3015
-   Width           =   5235
    Begin VB.CommandButton NextCat 
       Caption         =   ">"
       Height          =   285
@@ -82,13 +82,13 @@ Begin VB.Form frmActorProperties
       Begin VB.CommandButton peBrowse 
          Caption         =   ".."
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   700
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   220
          Left            =   4500
@@ -135,10 +135,10 @@ Begin VB.Form frmActorProperties
          Top             =   2475
          Visible         =   0   'False
          Width           =   2715
-         _Version        =   65536
          _ExtentX        =   4789
          _ExtentY        =   423
-         _StockProps     =   64
+         _Version        =   327680
+         MouseIcon       =   "ActPrp.frx":030A
          LargeChange     =   32
          SmallChange     =   8
          Max             =   255
@@ -146,7 +146,7 @@ Begin VB.Form frmActorProperties
       End
       Begin MSGrid.Grid PropGrid 
          Height          =   6225
-         Left            =   -45
+         Left            =   0
          TabIndex        =   5
          Top             =   0
          Width           =   4920
@@ -156,6 +156,15 @@ Begin VB.Form frmActorProperties
          _StockProps     =   77
          ForeColor       =   0
          BackColor       =   16777215
+         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          BorderStyle     =   0
          Rows            =   1
          Cols            =   4
@@ -185,7 +194,9 @@ Begin VB.Form frmActorProperties
    End
 End
 Attribute VB_Name = "frmActorProperties"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 '
@@ -253,15 +264,15 @@ End Sub
 '
 ' Get properties from a class's default actor
 '
-Public Sub GetClassDefaultActor(Classname As String)
+Public Sub GetClassDefaultActor(ClassName As String)
     '
     EndEdit (True)
     '
     GActorPropsAction = AP_Class
-    GPropString = "DefaultProperties CLASS=" & Quotes(Classname)
-    GCatString = "DefaultPropCats CLASS=" & Quotes(Classname)
+    GPropString = "DefaultProperties CLASS=" & Quotes(ClassName)
+    GCatString = "DefaultPropCats CLASS=" & Quotes(ClassName)
     '
-    Caption = Classname + ": Default Properties"
+    Caption = ClassName + ": Default Properties"
     '
     ParsePropList
 End Sub
@@ -275,7 +286,7 @@ Public Sub GetLevelProperties()
     '
     GActorPropsAction = AP_Level
     GPropString = "LevelProperties"
-    GCatString = "DefaultPropCats CLASS=" & Quotes("LevelDescriptor")
+    GCatString = "DefaultPropCats CLASS=" & Quotes("LevelInfo")
     '
     Caption = "Level Properties"
     '
@@ -303,25 +314,25 @@ Private Sub Category_Click()
 End Sub
 
 Private Sub Form_Load()
-    '
+    OldWidth = 4900
     WasEmpty = True
-    OldWidth = ScaleWidth - PropScroll.Width
-    '
+
     Call Ed.SetOnTop(Me, "ActorProperties", TOP_NORMAL)
+    Form_Resize
+
     CurProp = -1
     PressedEsc = False
-    '
+    
     CellHeight = PropGrid.RowHeight(0)
-    '
+    
     PropGrid.Width = 8000
     PropGrid.Left = 0
     PropGrid.ColWidth(0) = 1480
     PropGrid.ColWidth(1) = 6000
     PropGrid.ColWidth(2) = 500
     PropGrid.ColWidth(3) = 500
-    '
+    
     CurCategory = ""
-    '
 End Sub
 
 Private Sub FixTopRow()
@@ -348,12 +359,10 @@ End Sub
 Private Sub ResizeButtons()
     Dim NewWidth As Integer
     Dim DW As Integer
-    '
-    NewWidth = ScaleWidth
-    If PropScroll.Visible Then NewWidth = NewWidth - PropScroll.Width
-    '
+
+    NewWidth = ScaleWidth - IIf(PropScroll.Visible, PropScroll.Width, 0)
     DW = NewWidth - OldWidth
-    '
+
     peText.Width = peText.Width + DW
     peSlider.Width = peSlider.Width + DW
     peComboHolder.Left = peComboHolder.Left + DW
@@ -362,63 +371,64 @@ Private Sub ResizeButtons()
     peClear.Left = peClear.Left + DW
     peCurrent.Left = peCurrent.Left + DW
     peBrowse.Left = peBrowse.Left + DW
-    '
+    
     OldWidth = NewWidth
 End Sub
 
 Private Sub Form_Resize()
     Dim PerfectHeight As Integer, CellHeight As Integer
     Dim NonGridHeight As Integer, DW As Integer
-    '
+    
     Scrolling = Scrolling + 1
     If Resizing = 0 Then
         Resizing = Resizing + 1
         EndEdit (True)
-        '
+        
         CellHeight = PropGrid.RowHeight(0) + Screen.TwipsPerPixelY
         NonGridHeight = Height - ScaleHeight - PropHolder.Top + Screen.TwipsPerPixelY
-        '
+        
         If Width < MinWidth Then
             Width = MinWidth
         ElseIf Width > MaxWidth Then
             Width = MaxWidth
         End If
-        '
+        
         ScreenRows = (Height - NonGridHeight) / CellHeight
-        '
+        
         If ScreenRows < 6 Then ScreenRows = 6
         PerfectHeight = ScreenRows * CellHeight + NonGridHeight
-        '
+        
         If Height <> PerfectHeight Then
             Height = PerfectHeight
         End If
-        '
+        
         PropHolder.Height = ScaleHeight - PropHolder.Top
         PropHolder.Width = ScaleWidth
-        '
+        
         SetPropGridHeight
-        '
+        
         PropScroll.Left = ScaleWidth - PropScroll.Width - 1 * Screen.TwipsPerPixelX
         PropScroll.Height = ScaleHeight - PropScroll.Top - 1 * Screen.TwipsPerPixelY
         Category.Width = ScaleWidth - Category.Left
-        '
+
         ScreenRows = PropHolder.ScaleHeight / CellHeight
-        '
+        
         UpdateScroller
         PropGrid.LeftCol = 0
-        '
+        
         FixTopRow
-        '
-        ' Resize/move hidden controls
-        '
+        
+        ' Resize/move hidden controls.
         ResizeButtons
-        '
+        
         Resizing = Resizing - 1
     End If
     Scrolling = Scrolling - 1
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
+    Unload frmEditRotation
+    Unload frmEditVector
     GActorPropsAction = AP_None
     Call Ed.EndOnTop(Me)
     Set HolderForm = Nothing
@@ -444,13 +454,13 @@ Private Sub peText_Change()
 End Sub
 
 Private Sub peSlider_Change()
-    If Sliding = 0 Then
+    If Sliding = 0 And Scrolling = 0 Then
         Sliding = Sliding + 1
-        '
+        
         SetValue (Str(peSlider.Value))
         peSlider.Value = Val(GetValue())
         peText.Text = GetValue()
-        '
+        
         Sliding = Sliding - 1
     End If
 End Sub
@@ -752,8 +762,7 @@ Private Sub ParsePropList()
     ' If was empty previously, set default category
     ' ---------------------------------------------
     '
-    S = (Ed.Server.GetProp("Actor", GPropString & " NAME=DefaultEdCategory"))
-    Call GetString(S, "DefaultEdCategory=", DefCat)
+    DefCat = Ed.Server.GetProp("Actor", GPropString & " NAME=DefaultEdCategory RAW=1")
     '
     If WasEmpty Then
         CurCategory = DefCat
@@ -891,10 +900,10 @@ Private Sub BeginEdit()
         Temp = PropExtra()
         If Temp = "" Then
             peText.Top = StartPos + 2 * Screen.TwipsPerPixelY
-            peText.Text = GetValue()
             peText.Visible = True
             peText.SelStart = 0
             peText.SelLength = 0
+            peText.Text = GetValue()
             peText.SetFocus
             peSlider.Top = StartPos
             peSlider.Value = Val(GetValue())
@@ -1106,10 +1115,10 @@ Private Sub peCurrent_Click()
         Case "Sound":
             Cur = Ed.GetBrowserCurrentItem("SoundFX")
             If Cur <> "" Then SetValue (Cur)
-        Case "Ambient":
-            Cur = Ed.GetBrowserCurrentItem("Ambient")
+        Case "Music":
+            Cur = Ed.GetBrowserCurrentItem("Music")
             If Cur <> "" Then SetValue (Cur)
-        Case "MeshMap":
+        Case "Mesh":
             Cur = frmMeshViewer.GetCurrent()
             If Cur <> "" Then SetValue (Cur)
         Case "Model":
@@ -1144,7 +1153,7 @@ Private Sub peBrowse_Click()
             Ed.SetBrowserTopic ("Ambient")
         Case "Sound":
             Ed.SetBrowserTopic ("SoundFX")
-        Case "MeshMap":
+        Case "Mesh":
             frmMeshViewer.Show
         End Select
         Scrolling = Scrolling - 1

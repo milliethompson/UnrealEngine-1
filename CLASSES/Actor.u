@@ -1,0 +1,758 @@
+DeclareClass Name=Mover
+DeclareClass Name=Music
+DeclareClass Name=Pawn
+DeclareClass Name=Brush
+DeclareClass Name=Sound
+DeclareClass Name=Script
+DeclareClass Name=Mesh
+DeclareClass Name=Camera
+DeclareClass Name=Texture
+DeclareClass Name=Model
+DeclareClass Name=Class
+DeclareClass Name=Font
+DeclareClass Name=Player
+DeclareClass Name=Level
+DeclareClass Name=Actor
+DeclareClass Name=Inventory
+DeclareClass Name=Projectile
+DeclareClass Name=Keypoint
+DeclareClass Name=Info
+DeclareClass Name=Pyrotechnics
+DeclareClass Name=Light
+DeclareClass Name=Triggers
+DeclareClass Name=Decoration
+DeclareClass Name=Explosion
+DeclareClass Name=TentacleProjectile
+DeclareClass Name=PawnHit
+DeclareClass Name=Explode1
+DeclareClass Name=StatusInfo
+DeclareClass Name=Weapon
+DeclareClass Name=EightBall
+DeclareClass Name=Human
+DeclareClass Name=PlayerStart
+DeclareClass Name=Fireball
+DeclareClass Name=Fireball2
+DeclareClass Name=BulletProjectile
+DeclareClass Name=ShellProjectile
+DeclareClass Name=StingerProjectile
+DeclareClass Name=BruteProjectile
+DeclareClass Name=SkaarjProjectile
+DeclareClass Name=Dragon
+DeclareClass Name=Skaarj
+DeclareClass Name=Brute
+DeclareClass Name=Gasbag
+DeclareClass Name=Manta
+DeclareClass Name=Tentacle
+DeclareClass Name=Scout
+DeclareClass Name=View
+DeclareClass Name=Kraal
+DeclareClass Name=Creaturepoint
+DeclareClass Name=ZoneInfo
+DeclareClass Name=Satellite
+DeclareClass Name=TorchFlame
+DeclareClass Name=Spotlight
+DeclareClass Name=BlockMonsters
+DeclareClass Name=BlockAll
+DeclareClass Name=AmbientSound
+DeclareClass Name=PathNode
+DeclareClass Name=TextMessage
+DeclareClass Name=CreatureFactory
+DeclareClass Name=Pickup
+DeclareClass Name=ClipExplosion
+DeclareClass Name=ShellExplosion
+DeclareClass Name=TarydiumExplosion
+DeclareClass Name=Trigger
+DeclareClass Name=Counter
+DeclareClass Name=Dispatcher
+DeclareClass Name=Teleporter
+DeclareClass Name=Vase
+DeclareClass Name=Chandelier
+DeclareClass Name=Hammok
+DeclareClass Name=PlayerRespawn
+DeclareClass Name=TeleportIn
+DeclareClass Name=TeleportOut
+DeclareClass Name=WallHit
+DeclareClass Name=BruteGunFlash
+DeclareClass Name=SkaarjGunFlash
+DeclareClass Name=GasBagBelchFlash
+DeclareClass Name=Explode2
+DeclareClass Name=Explode3
+DeclareClass Name=ArchAngel
+DeclareClass Name=PowerUp
+DeclareClass Name=AutoMag
+DeclareClass Name=QuadShot
+DeclareClass Name=FlameGun
+DeclareClass Name=Stinger
+DeclareClass Name=Ammo
+DeclareClass Name=Patrolpoint
+DeclareClass Name=LevelInfo
+DeclareClass Name=Ambushpoint
+DeclareClass Name=HomeBase
+DeclareClass Name=Spawnpoint
+DeclareClass Name=UnrealStatusInfo
+DeclareClass Name=Clip
+DeclareClass Name=Health
+DeclareClass Name=Shells
+DeclareClass Name=StingerAmmo
+DeclareClass Name=Armor
+
+Begin Class Name=Actor
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Actor: The base class of all actors.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class Actor expands Object
+	abstract
+	intrinsic
+	package(UnEngine);
+
+#exec Texture Import File=..\Graphics\S_Actor.pcx Name=S_Actor Palette=Palette Mips=Off Flags=2
+
+//-----------------------------------------------------------------------------
+// Enumerations.
+
+// Input buttons.
+enum EButton
+{
+	BUT_None,
+	BUT_Zoom,
+	BUT_Run,
+	BUT_Look,
+	BUT_Duck,
+	BUT_Strafe,
+	BUT_Fire,
+	BUT_AltFire,
+	BUT_Jump,
+	BUT_Extra7,
+	BUT_Extra6,
+	BUT_Extra5,
+	BUT_Extra4,
+	BUT_Extra3,
+	BUT_Extra2,
+	BUT_Extra1,
+	BUT_Extra0
+};
+
+// Input axes.
+enum EAxis
+{
+	AXIS_None,
+	AXIS_BaseX,
+	AXIS_BaseY,
+	AXIS_BaseZ,
+	AXIS_Forward,
+	AXIS_Turn,
+	AXIS_Strafe,
+	AXIS_Up,
+	AXIS_LookUp,
+	AXIS_Extra6,
+	AXIS_Extra5,
+	AXIS_Extra4,
+	AXIS_Extra3,
+	AXIS_Extra2,
+	AXIS_Extra1,
+	AXIS_Extra0
+};
+
+//-----------------------------------------------------------------------------
+// Major actor properties.
+
+// Scriptable.
+var       const Actor     Owner;         // Owner actor.
+var       const LevelInfo Level;         // Level this actor is on.
+var       const Level     XLevel;        // Level object.
+var(Main) const name      Tag;			 // Actor's name.
+var(Main) const name      State;         // Actor's current state.
+var(Main) name            Event;         // The event this actor causes.
+var(Main) name            Group;         // Group this actor belongs to.
+var Actor                 Target;        // Actor we're aiming at (other uses as well).
+var Pawn                  Instigator;    // Pawn responsible for damage.
+var Inventory             Inventory;     // Inventory chain.
+var const Actor           Floor;         // Moving brush actor we're standing on.
+var const ZoneInfo        Zone;          // The zone this actor is in.
+
+// Internal.
+var const int             LatentAction;  // Index of latent action in progress.
+var const byte            StandingCount; // Count of actors standing on this actor.
+var const byte            ZoneNumber;    // Number of the zone we're in.
+var const byte            MiscNumber;    // Internal use.
+var const byte            LatentByte;    // Internal latent function use.
+var const int             LatentInt;     // Internal latent function use.
+var const float           LatentFloat;   // Internal latent function use.
+var const actor           LatentActor;   // Internal latent function use.
+var const actor           Touching[4];   // List of touching actors.
+var const transient actor Hash;          // Next actor in this collision hash bucket.
+var const transient actor Deleted;       // Next actor in just-deleted chain.
+var const transient int   CollisionTag;  // Internal collision tag.
+
+//-----------------------------------------------------------------------------
+// Internal flags.
+var(Advanced) const bool  bStatic;       // Does not move or change over time.
+var(Advanced) bool        bHidden;       // Is hidden during gameplay.
+var(Advanced) bool        bHiddenEd;     // Is hidden during editing.
+var(Advanced) bool        bDirectional;  // Actor shows direction arrow during editing.
+var const bool            bSelected;     // Is selected in UnrealEd.
+var const bool            bNoDelete;     // Cannot be deleted during play.
+var const bool            bAnimFinished; // Unlooped animation sequence has finished.
+var const bool            bAnimLoop;     // Whether animation is looping.
+var const bool            bAnimNotify;   // Whether a notify is applied to the current sequence.
+var transient const bool  bTempEditor;   // Internal UnrealEd.
+var transient const bool  bDeleteMe;     // About to be deleted.
+var transient const bool  bAssimilated;  // Actor dynamics are assimilated in world geometry.
+var transient const bool  bTicked;       // Actor has been updated.
+var bool                  bLightChanged; // Recalculate this light's lighting now.
+var bool                  bDynamicLight; // Temporarily treat this as a dynamic light.
+var bool                  bTimerLoop;    // Timer loops (else is one-shot).
+
+//-----------------------------------------------------------------------------
+// Collision flags.
+var(Collision) const bool bCollideActors;// Collides with other actors.
+var(Collision) bool       bCollideWorld; // Collides with the world.
+var(Collision) bool       bBlockActors;	 // Blocks other nonplayer actors.
+var(Collision) bool       bBlockPlayers; // Blocks other player actors.
+var(Collision) bool       bProjTarget;   // Projectiles should potentially target this actor.
+
+//-----------------------------------------------------------------------------
+// The actor's position and rotation.
+var(Main) const vector    Location;      // Actor's location; use Move to set.
+var       const vector    OldLocation;   // Actor's old location one tick ago.
+var       const vector    ColLocation;   // Actor's old location one move ago.
+var(Main) vector          Velocity;      // Velocity.
+var(Main) rotation        Rotation;      // Rotation.
+var       vector          Acceleration;  // acceleration
+
+//-----------------------------------------------------------------------------
+// Display.
+
+// Drawing effect.
+var(Display) enum EDrawType
+{
+	DT_None,
+	DT_Sprite,
+	DT_Mesh,
+	DT_Brush
+} DrawType;
+
+// Blitting effect.
+var(Display) enum EBlitType
+{
+	BT_None,
+	BT_Normal,
+	BT_Transparent
+} BlitType;
+
+// Other display properties.
+var(Display) texture     Texture;		 // Sprite texture if DrawType=DT_Sprite.
+var(Display) mesh        Mesh;           // Mesh if DrawType=DT_Mesh.
+var(Display) const exportobject model Brush; // Brush if DrawType=DT_Brush.
+var(Display) float       DrawScale;		 // Scaling factor, 1.0=normal size.
+var(Display) byte        AmbientGlow;    // Base brightness when no lights hit it.
+var(Display) byte        Fatness;        // Fatness (mesh distortion).
+
+//-----------------------------------------------------------------------------
+// Ambient sound and feedback.
+var(Display) byte        SoundRadius;	// Radius of ambient sound.
+var(Display) byte        SoundVolume;	// Volume of amient sound.
+var(Display) byte        SoundPitch;	// Sound pitch shift, 64.0=none.
+var(Display) const sound AmbientSound;  // Ambient sound effect.
+var(Display) enum EAmbientForceType
+{
+	AFT_None,							// No ambient force.
+	AFT_Machinery,                      // Machinery effect.
+	AFT_Rumble,                         // Rumble effect.
+	AFT_Shake,                          // Shaking effect.
+} AmbientForceType;
+
+//-----------------------------------------------------------------------------
+// Collision.
+var(Collision) const float CollisionRadius; // Radius of collision cyllinder.
+var(Collision) const float CollisionHeight; // Half-height cyllinder.
+
+//-----------------------------------------------------------------------------
+// Lighting.
+
+// Type of lighting modulation to perform.
+var(Lighting) enum ELightType
+{
+	LT_None,
+	LT_Steady,
+	LT_Pulse,
+	LT_Blink,
+	LT_Flicker,
+	LT_Strobe,
+	LT_BackdropLight
+} LightType;
+
+// Spatial light effect to use.
+var(Lighting) enum ELightEffect
+{
+	LE_None,
+	LE_TorchWaver,
+	LE_FireWaver,
+	LE_WateryShimmer,
+	LE_Searchlight,
+	LE_SlowWave,
+	LE_FastWave,
+	LE_CloudCast,
+	LE_StaticSpot,
+	LE_Shock,
+	LE_Disco,
+	LE_Warp,
+	LE_Spotlight,
+	LE_StolenQuakeWater,
+	LE_ChurningWater,
+	LE_Satellite,
+	LE_Interference,
+	LE_Cylinder,
+	LE_Rotor,
+	LE_Unused
+} LightEffect;
+
+// Lighting info.
+var(Lighting) byte
+	LightBrightness,
+	LightHue,
+	LightSaturation,
+	LightRadius,
+	LightPeriod,
+	LightPhase,
+	LightCone,
+	VolumeBrightness,
+	VolumeRadius;
+
+//-----------------------------------------------------------------------------
+// Rendering flags.
+
+// Lighting
+var(Lighting) bool	     bSpecialLit;	 // Only affects special-lit surfaces.
+var(Lighting) bool	     bOnHorizon;     // Satellite on horizon.
+var(Lighting) bool	     bActorShadows;  // Light casts actor shadows.
+
+// Display.
+var(Display)  bool       bUnlit;         // Lights don't affect actor.
+var(Display)  bool       bNoSmooth;      // Don't smooth actor's texture.
+
+// Advanced.
+var(Advanced) bool       bOnlyOwnerSee;  // Only owner can see this actor.
+
+// Not yet implemented.
+var(Display) bool        bMeshEnviroMap; // Mesh is environment mapped.
+var(Display) bool        bMeshCurvy;     // Curvy mesh.
+var(Display) bool        bShadowCast;    // Mesh casts shadows.
+
+//-----------------------------------------------------------------------------
+// User definable flags you can use for anything you want.
+var bool bUser3, bUser2, bUser1, bUser0;
+
+//-----------------------------------------------------------------------------
+// Physics.
+
+// Actor's current physics mode.
+var(Movement) enum EPhysics
+{
+	PHYS_None,
+	PHYS_Walking,
+	PHYS_Falling,
+	PHYS_Swimming,
+	PHYS_Flying,
+	PHYS_Rotating,
+	PHYS_Projectile,
+	PHYS_Pathing,
+	PHYS_Splining
+} Physics;
+
+var(Main) float           Mass;          // Mass of this actor.
+var(Main) float           Buoyancy;      // Water buoyancy.
+var(Movement) bool        bMomentum;     // Automatic momentum support.
+var(Movement) bool        bBounce;       // Bounces when hits ground fast.
+var(Movement) bool        bPitch;        // Physics controls pitch.
+var(Movement) bool        bYaw;          // Physics controls yaw.
+var(Movement) bool        bRoll;         // Physics controls roll.
+var(Movement) bool        bEnginePhysics; // Physics automatically performed by Engine
+							// disable if want to use scripted physics
+var(Movement) bool		  bFixedRotationDir; //fix direction of rotation (with bYawClockwise and bPitchClockwise)
+var(Movement) bool		  bYawClockwise; //if true yaw rotation done in clockwise direction
+var(Movement) bool 	      bPitchClockwise; 
+var(Movement) bool        bRollClockwise;
+var(Movement) int  		  RotationSpeed; //Change in rotation per second (0 to 65536).
+var(Movement) rotation    DesiredRotation;   //physics will rotate pawn to this (modified by TurnTo, etc.)
+var(Advanced) const float LifeSpan;   // How old the object lives before dying, 0=forever.
+
+//-----------------------------------------------------------------------------
+// Animation.
+
+// Animation variables.
+var(Display) name         AnimSequence;  // Animation sequence we're playing.
+var(Display) float        AnimFrame;     // Current animation frame, 0.0 to 1.0.
+var(Display) float        AnimRate;      // Animation rate in frames per second, 0=none, negative=velocity scaled.
+var          float        AnimEnd;       // Last frame, 0.0=loop at natural end.
+var          float        AnimMinRate;   // Minimum rate for velocity-scaled animation.
+
+//-----------------------------------------------------------------------------
+// What kind of play scenarios to appear in.
+var(Main) bool            bDifficulty1;  // Appear in difficulty 1.
+var(Main) bool            bDifficulty2;  // Appear in difficulty 2.
+var(Main) bool            bDifficulty3;  // Appear in difficulty 3.
+var(Main) bool            bSinglePlayer; // Appear in single player.
+var(Main) bool            bNet;          // Appear in regular network play.
+var(Main) bool            bNetSpecial;   // Appear in special network play mode.
+
+//-----------------------------------------------------------------------------
+// About this actor.
+var(Advanced) bool        bCanTeleport;  // This actor can be teleported.
+var(Advanced) bool        bIsSecretGoal; // This actor counts in the "secret" total.
+var(Advanced) bool        bIsKillGoal;   // This actor counts in the "death" toll.
+var(Advanced) bool        bIsItemGoal;   // This actor counts in the "item" count.
+
+//-----------------------------------------------------------------------------
+// Script execution and timers.
+var float                 TickRate;		// Seconds between ticks, 0=always tick, <0=never tick.
+var float                 TimerRate;    // Timer event, 0=no timer.
+var const float           TickCounter;	// Counts up until it reaches TickRate.
+var const float           TimerCounter;	// Counts up until it reaches TimerRate.
+
+//-----------------------------------------------------------------------------
+// UnrealEd related.
+var(Advanced) name DefaultEdCategory;   // Default category to edit in UnrealEd.
+
+//=============================================================================
+// Actor error handling.
+
+// Handle an error and kill this one actor.
+intrinsic(233) final function ActorError( coerce string[255] S ); // Error, kills actor.
+
+//=============================================================================
+// General functions.
+
+// Latent functions.
+intrinsic(256) final latent function Sleep( float Seconds );
+
+// Goto state and label.
+intrinsic(112) final function Goto      ( name Label );
+intrinsic(113) final function GotoState ( optional name NewState, optional name Label );
+
+// State info.
+intrinsic(114) final function bool IsProbing ( name ProbeFunc );
+intrinsic(115) final function bool IsLabel   ( name Label );
+intrinsic(116) final function bool IsState   ( name TestState, optional name Label );
+
+// Probe messages.
+intrinsic(117) final function Enable ( name ProbeFunc );
+intrinsic(118) final function Disable( name ProbeFunc );
+
+// Collision.
+intrinsic(262) final function SetCollision( optional bool NewColActors, optional bool NewBlockActors, optional bool NewBlockPlayers );
+intrinsic(283) final function bool SetCollisionSize( float NewRadius, float NewHeight );
+intrinsic(298) function SetFloor( actor NewFloor );
+intrinsic(284) final function CollisionTrace
+(
+	out vector      HitLocation,
+	out vector      HitNormal,
+	vector          TraceEnd,
+	optional vector TraceStart,
+	optional float  Radius,
+	optional float  Height,
+	optional bool   bReboundAdjust
+);
+
+// Movement.
+intrinsic(266) final function bool Move( vector Delta );
+intrinsic(267) final function bool SetLocation( vector NewLocation );
+intrinsic(299) final function bool SetRotation( rotation NewRotation );
+intrinsic(3969) final function bool MoveSmooth( vector Delta );
+
+// Reckoning.
+intrinsic(270) final  function float DistanceTo( actor Other );//todo: Kill
+intrinsic(271) engine function bool  CanSee    ( actor Other );//todo: Kill
+
+// Relations.
+intrinsic(272) final function SetOwner( actor NewOwner );
+
+//=============================================================================
+// Animation.
+
+// Animation functions.
+intrinsic(259) final function PlayAnim( name Sequence, optional float Rate, optional bool TweenInfo );
+intrinsic(260) final function LoopAnim( name Sequence, optional float Rate, optional bool TweenInfo, optional float MinRate );
+intrinsic(294) final function TweenAnim( name Sequence, float Time );
+intrinsic(282) final function StopAnim();
+intrinsic(261) final latent function FinishAnim();
+
+// Animation notifications.
+engine function AnimEnd();
+
+//=========================================================================
+// Physics 
+//
+// default physics implementation.  If bEnginePhysics is true, these
+// are automatically called every frame.  If not, you can explicitly call them, or
+// implement your own
+
+//intrinsic(3968) final function EnginePhysics( float deltaTime );
+
+
+//=============================================================================
+// Engine notification functions.
+
+// Spawned/Destroyed notifications.
+engine function Spawned();
+engine function Destroyed();
+engine function Expired();
+
+// Gaining/losing actors.
+engine function GainedChild( Actor Other );
+engine function LostChild( Actor Other );
+engine function LostReference( name VarName, int ArrayIndex );
+
+// Triggers.
+engine function Trigger( Actor Other );
+engine function UnTrigger( Actor Other );
+
+// Physics & world interaction.
+engine function Timer( int TimerTicks );
+engine function HitWall(vector HitNormal);
+engine function Falling();
+engine function Landed();
+engine function ZoneChange( ZoneInfo NewZone );
+engine function Touch( Actor Other );
+engine function UnTouch( Actor Other );
+engine function Bump( Actor Other );
+engine function StepOn( Actor Other );
+engine function StepOff( Actor Other );
+engine function SteppedOnBy( Actor Other );
+engine function SteppedOffBy( Actor Other );
+engine function KillCredit( Actor Other );
+
+// Damage and kills.
+engine function Die();
+engine function Damage( int Damage, Actor instigatedBy, Vector hitlocation, 
+						Vector momentum);
+
+// Trace a line and see what it collides with first.
+// Takes this actor's collision properties into account.
+// Returns first hit actor, Level if hit level, or None if hit nothing.
+intrinsic(277) final function Actor Trace
+(
+	out vector      HitLocation,
+	out vector      HitNormal,
+	vector          TraceEnd,
+	optional vector TraceStart,
+	optional bool   bTraceActors
+);
+
+// Spawn an actor. Returns an actor of the specified class, not
+// of class Actor (this is hardcoded in the compiler). Returns None
+// if the actor could not be spawned (either the actor wouldn't fit in
+// the specified location, or the actor list is full).
+// Defaults to spawning at the spawner's location.
+intrinsic(278) final function Actor Spawn
+(
+	class             SpawnClass,
+	optional actor	  SpawnOwner,
+	optional name     SpawnTag,
+	optional vector   SpawnLocation,
+	optional rotation SpawnRotation
+);
+
+// Destroy this actor. Returns true if destroyed, false if indestructable.
+// Destruction is latent. It occurs at the end of the tick.
+intrinsic(279) final function bool Destroy();
+
+//=============================================================================
+// Timing.
+
+// Timer (0.0=disable).
+intrinsic(280) final function SetTimer( float NewTimerRate, bool bLoop );
+
+// Tick rate (0.0=always, <0=never).
+intrinsic(281) final function SetTickRate( float NewTickRate );
+
+//=============================================================================
+// Sound functions.
+intrinsic(263) final function AmbientSoundSet( sound NewAmbientSound );
+intrinsic(264) final function PlaySound( sound Sound, optional float Volume, optional float Radius, optional float Pitch );
+intrinsic(265) final function PlayPrimitiveSound( sound Sound, optional float Volume, optional float Pitch );
+
+//=============================================================================
+// AI functions.
+
+//MakeNoise() is used to inform other creatures that you've made a noise
+//they might hear (they are sent a HearNoise message)
+intrinsic(512) final function MakeNoise(float Loudness);
+
+//=============================================================================
+// Regular engine functions.
+
+// Teleportation.
+engine function PreTeleport( Teleporter InTeleporter );
+engine function PostTeleport( Teleporter OutTeleporter );
+
+// Inventory.
+engine function InventoryCalcView();
+
+// Level state.
+engine function BeginPlay();
+
+//=============================================================================
+// Functions.
+
+//
+// Called immediately before gameplay begins.
+//
+engine function PreBeginPlay()
+{
+	// Handle autodestruction if desired.
+	if
+	(   (Level.Difficulty==0 && !bDifficulty1   )
+	||  (Level.Difficulty==1 && !bDifficulty2   )
+	||  (Level.Difficulty==2 && !bDifficulty3   )
+	||  (Level.NetMode==0	 && !bSinglePlayer  )
+	||  (Level.NetMode==1    && !bNet           )
+	||  (Level.NetMode==2    && !bNetSpecial    ) )
+	{
+		// Destroy.
+		Destroy();
+	}
+    else
+    {
+        // Update the level info goal counts.
+        if( bIsSecretGoal )
+           Level.SecretGoals++;
+
+        if( bIsItemGoal )
+           Level.ItemGoals++;
+
+        if( bIsKillGoal )
+           Level.KillGoals++;
+	}
+}
+
+//
+// Called immediately after gameplay begins.
+//
+engine function PostBeginPlay()
+{
+	// Reset the ambient sound.
+	AmbientSoundSet(AmbientSound);
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Owner=None
+      Level=None
+      XLevel=None
+      Tag=None
+      State=None
+      Event=None
+      Group=None
+      Target=None
+      Instigator=None
+      Inventory=None
+      Floor=None
+      Zone=None
+      LatentAction=0
+      ZoneNumber=0
+      MiscNumber=0
+      LatentByte=0
+      LatentInt=0
+      LatentFloat=+00000.000000
+      LatentActor=None
+      Touching(0)=None
+      Touching(1)=None
+      Touching(2)=None
+      Touching(3)=None
+      bStatic=False
+      bHidden=False
+      bHiddenEd=False
+      bDirectional=False
+      bSelected=False
+      bNoDelete=False
+      bAnimFinished=False
+      bAnimLoop=False
+      bLightChanged=False
+      bDynamicLight=False
+      bTimerLoop=False
+      bCollideActors=False
+      bCollideWorld=False
+      bBlockActors=False
+      bBlockPlayers=False
+      bProjTarget=False
+      Location=(+00000.000000,+00000.000000,+00000.000000)
+      OldLocation=(+00000.000000,+00000.000000,+00000.000000)
+      ColLocation=(+00000.000000,+00000.000000,+00000.000000)
+      Velocity=(+00000.000000,+00000.000000,+00000.000000)
+      Rotation=(0,0,0)
+      Acceleration=(+00000.000000,+00000.000000,+00000.000000)
+      DrawType=DT_Sprite
+      BlitType=BT_Normal
+      Texture=S_Actor
+      Mesh=None
+      Brush=None
+      DrawScale=+00001.000000
+      AmbientGlow=0
+      SoundRadius=32
+      SoundVolume=128
+      SoundPitch=64
+      AmbientSound=None
+      CollisionRadius=+00022.000000
+      CollisionHeight=+00022.000000
+      LightType=LT_None
+      LightEffect=LE_None
+      LightBrightness=0
+      LightHue=0
+      LightSaturation=0
+      LightRadius=0
+      LightPeriod=0
+      LightPhase=0
+      LightCone=0
+      VolumeBrightness=0
+      VolumeRadius=0
+      bSpecialLit=False
+      bOnHorizon=False
+      bActorShadows=False
+      bUnlit=False
+      bNoSmooth=False
+      bOnlyOwnerSee=False
+      bMeshWet=False
+      bShadowCast=False
+      bMeshEnviroMap=False
+      bUser3=False
+      bUser2=False
+      bUser1=False
+      bUser0=False
+      Physics=PHYS_None
+      Mass=+00100.000000
+      Buoyancy=+00000.000000
+      bMomentum=False
+      bBounce=False
+      bPitch=False
+      bYaw=False
+      bRoll=False
+      bEnginePhysics=False
+	  bMeshCurvy=True
+      LifeSpan=+00000.000000
+      AnimSequence=0
+      AnimFrame=+00000.000000
+      AnimRate=+00000.000000
+      AnimEnd=+00000.000000
+      MinAnimRate=+00000.000000
+      bDifficulty1=True
+      bDifficulty2=True
+      bDifficulty3=True
+      bSinglePlayer=True
+      bNet=True
+      bNetSpecial=True
+      bCanTeleport=False
+      bIsSecretGoal=False
+      bIsKillGoal=False
+      bIsItemGoal=False
+      TickRate=+00000.000000
+      TimerRate=+00000.000000
+      TickCounter=+00000.000000
+      TimerCounter=+00000.000000
+      DefaultEdCategory=General
+   End DefaultProperties
+End Class
+

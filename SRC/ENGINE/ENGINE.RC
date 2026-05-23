@@ -105,12 +105,19 @@ IDR_MAINFRAME           ICON    DISCARDABLE     "..\\Res\\Unreal.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //
+// Cursor
+//
+
+IDC_CURSOR2             CURSOR  DISCARDABLE     "..\\res\\cursor2.cur"
+
+/////////////////////////////////////////////////////////////////////////////
+//
 // String Table
 //
 
 STRINGTABLE DISCARDABLE 
 BEGIN
-    IDS_DESCRIPTION         "******** Unreal engine text ********"
+    IDS_DESCRIPTION         "Drop"
 END
 
 #endif    // English (U.S.) resources

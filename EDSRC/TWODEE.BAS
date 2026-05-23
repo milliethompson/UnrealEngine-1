@@ -49,9 +49,11 @@ Public Const MaxLines = MaxMeshes * MaxSides  'Figure this out logically
 Public NumMesh As Integer
 Public NumTriangles As Integer
 Public Mesh(MaxMeshes) As MeshType
+Public MeshUndo(MaxMeshes) As MeshType
 Public Loaded(MaxLines) As Integer
 'Public GLoaded(40) As Integer 'Grid
 
+Public LastMesh As Integer
 Public CurMesh As Integer
 Public CurVertex As Integer
 Public CurSide As Integer
@@ -69,4 +71,5 @@ Public Zoom As Single
 Public DragPoint As Integer
 Public Grid As Integer
 Public AngleLimit As Integer
+
 

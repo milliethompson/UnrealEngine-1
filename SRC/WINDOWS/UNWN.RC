@@ -79,7 +79,7 @@ FONT 8, "MS Sans Serif"
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,11,17,18,20
     LTEXT           "Unreal",IDC_STATIC,40,18,119,8,SS_NOPREFIX
-    LTEXT           "Copyright © 1996 Epic MegaGames, Inc.",IDC_STATIC,39,28,
+    LTEXT           "Copyright © 1997 Epic MegaGames, Inc.",IDC_STATIC,39,28,
                     119,8
     DEFPUSHBUTTON   "No Way!",IDOK,170,7,40,14,WS_GROUP
 END
@@ -114,18 +114,18 @@ STYLE DS_MODALFRAME | DS_CENTER | WS_MINIMIZEBOX | WS_POPUP | WS_VISIBLE |
     WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_APPWINDOW
 CAPTION "Unreal Log"
-FONT 8, "MS Sans Serif"
+FONT 8, "MS Sans Serif", 0, 0, 0x1
 BEGIN
-    EDITTEXT        IDC_CMDLOG,0,0,262,151,ES_MULTILINE | ES_AUTOHSCROLL | 
+    EDITTEXT        IDC_CMDLOG,0,0,262,150,ES_MULTILINE | ES_AUTOHSCROLL | 
                     ES_READONLY | ES_WANTRETURN | WS_VSCROLL,
                     WS_EX_STATICEDGE
     EDITTEXT        IDC_CMDLINE,0,150,248,16,0,WS_EX_DLGMODALFRAME
     DEFPUSHBUTTON   "!",IDC_EXECUTE,248,150,13,16,NOT WS_TABSTOP,
                     WS_EX_DLGMODALFRAME
-    CONTROL         103,IDC_SPLASHER,"Static",SS_BITMAP | SS_CENTERIMAGE | 
+    CONTROL         163,IDC_SPLASHER,"Static",SS_BITMAP | SS_CENTERIMAGE | 
                     SS_SUNKEN | WS_BORDER,0,0,261,155
-    CTEXT           "Copyright 1996 Epic MegaGames, Inc.",IDC_COPYRT,0,156,
-                    260,10
+    CTEXT           "Unreal Virtual Machine, Copyright 1997 Epic MegaGames, Inc.",
+                    IDC_COPYRT,0,156,260,10
 END
 
 IDD_SERVER DIALOGEX 0, 0, 270, 131
@@ -299,30 +299,42 @@ BEGIN
     PUSHBUTTON      "Cancel",IDCANCEL,129,54,50,14
 END
 
-IDD_AUDIO DIALOG DISCARDABLE  0, 0, 249, 174
+IDD_AUDIO DIALOG DISCARDABLE  0, 0, 249, 214
 STYLE DS_CONTROL | WS_CHILD
 FONT 8, "MS Sans Serif"
 BEGIN
-    GROUPBOX        "Volume",-1,7,3,235,52
-    LTEXT           "&Music",-1,13,18,35,11,NOT WS_GROUP
+    GROUPBOX        "Volume",IDC_STATIC,7,7,235,68
+    LTEXT           "&Music",IDC_STATIC,13,18,35,11,NOT WS_GROUP
     CONTROL         "Slider1",IDC_MUSIC_VOLUME,"msctls_trackbar32",TBS_BOTH | 
                     TBS_NOTICKS | WS_GROUP | WS_TABSTOP,89,13,107,15
-    LTEXT           "&Sound Effects",-1,13,38,53,11,NOT WS_GROUP
+    LTEXT           "&Sound Effects",IDC_STATIC,13,49,53,11,NOT WS_GROUP
     CONTROL         "Slider1",IDC_SOUND_VOLUME,"msctls_trackbar32",TBS_BOTH | 
-                    TBS_NOTICKS | WS_GROUP | WS_TABSTOP,89,33,107,14
+                    TBS_NOTICKS | WS_GROUP | WS_TABSTOP,89,44,107,14
     CONTROL         "Enable &DirectSound (if supported by your hardware)",
                     IDC_USE_DIRECT_SOUND,"Button",BS_AUTOCHECKBOX | WS_GROUP | 
-                    WS_TABSTOP,16,91,219,11
-    LTEXT           "Off",-1,75,18,12,10,NOT WS_GROUP
-    LTEXT           "Loud",-1,200,18,20,10,NOT WS_GROUP
-    LTEXT           "Off",-1,75,38,12,10,NOT WS_GROUP
-    LTEXT           "Loud",-1,200,38,20,10,NOT WS_GROUP
-    LTEXT           "NOTE:  Changes to these setting will not take effect until the next time Unreal is run.",
-                    -1,16,106,211,20
+                    WS_TABSTOP,16,165,219,11
+    LTEXT           "Min",IDC_STATIC,75,18,12,10,NOT WS_GROUP
+    LTEXT           "Max",IDC_STATIC,200,18,20,10,NOT WS_GROUP
+    LTEXT           "Min",IDC_STATIC,75,49,12,10,NOT WS_GROUP
+    LTEXT           "Max",IDC_STATIC,200,49,20,10,NOT WS_GROUP
     CONTROL         "Enable dynamic interpolation &filter (fast PC recommended)",
                     IDC_ENABLE_FILTER,"Button",BS_AUTOCHECKBOX | WS_GROUP | 
-                    WS_TABSTOP,16,79,218,10
-    GROUPBOX        "Switches",-1,7,65,235,68
+                    WS_TABSTOP,16,151,218,10
+    GROUPBOX        "Switches",IDC_STATIC,7,138,235,59
+    CONTROL         "&11 KHz",IDC_RATE11KHZ,"Button",BS_AUTORADIOBUTTON | 
+                    WS_GROUP | WS_TABSTOP,15,93,191,10
+    CONTROL         "&22 KHz",IDC_RATE22KHZ,"Button",BS_AUTORADIOBUTTON,15,
+                    104,197,10
+    CONTROL         "&44 KHz  (fast PC recommended)",IDC_RATE44KHZ,"Button",
+                    BS_AUTORADIOBUTTON,15,114,201,10
+    GROUPBOX        "Mixing Rate",IDC_STATIC,7,82,235,48
+    CONTROL         "Enable 1&6-bit playback (if supported by your hardware)",
+                    IDC_ENABLE_16BIT,"Button",BS_AUTOCHECKBOX | WS_GROUP | 
+                    WS_TABSTOP,16,180,213,10
+    CONTROL         "Mute",IDC_MUSIC_DISABLE,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,94,27,36,10
+    CONTROL         "Mute",IDC_SFX_DISABLE,"Button",BS_AUTOCHECKBOX | 
+                    WS_TABSTOP,94,58,36,10
 END
 
 
@@ -765,14 +777,13 @@ BEGIN
     POPUP "&Properties"
     BEGIN
         MENUITEM "&Options...",                 ID_PROPERTIES_PROPERTIES2
+        MENUITEM "&Always on top",              ID_WIN_TOP
         MENUITEM SEPARATOR
         MENUITEM "Show Active &Brush",          ID_SHOW_BRUSH, CHECKED
         MENUITEM "Show &Moving Brushes",        ID_SHOW_MOVINGBRUSHES
         , CHECKED
         MENUITEM "Show Bac&kdrop",              ID_SHOW_BACKDROP
         MENUITEM "Show &Coordinates",           ID_SHOW_COORDS
-        MENUITEM SEPARATOR
-        MENUITEM "&Always on top",              ID_WIN_TOP
     END
     POPUP "&Actors"
     BEGIN
@@ -816,6 +827,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Show &Log",                   ID_SHOWLOG
         MENUITEM "&Always on top",              ID_WIN_TOP
+        MENUITEM "&Hardware 3D",                ID_HARDWARE_3D
     END
     POPUP "&Window"
     BEGIN
@@ -858,6 +870,7 @@ END
 //
 
 IDB_SPLASH              BITMAP  DISCARDABLE     "Res\\UnSplash.bmp"
+IDB_SPLASH2             BITMAP  DISCARDABLE     "Res\\UnSplash2.bmp"
 
 /////////////////////////////////////////////////////////////////////////////
 //

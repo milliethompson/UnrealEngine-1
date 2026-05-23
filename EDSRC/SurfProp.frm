@@ -1,46 +1,45 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{BDC217C8-ED16-11CD-956C-0000C04E4C0A}#1.1#0"; "tabctl32.ocx"
 Begin VB.Form frmSurfaceProps 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Surface Properties"
    ClientHeight    =   2595
-   ClientLeft      =   4530
-   ClientTop       =   8115
+   ClientLeft      =   3840
+   ClientTop       =   8865
    ClientWidth     =   6360
    BeginProperty Font 
-      name            =   "Arial"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "Arial"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   2955
    HelpContextID   =   124
    Icon            =   "SurfProp.frx":0000
-   Left            =   4470
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   2595
    ScaleWidth      =   6360
    ShowInTaskbar   =   0   'False
-   Top             =   7815
-   Width           =   6480
    Begin VB.CommandButton Help 
       Caption         =   "&Help"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   5460
-      TabIndex        =   26
+      TabIndex        =   23
       Top             =   600
       Width           =   855
    End
@@ -49,17 +48,17 @@ Begin VB.Form frmSurfaceProps
       BackColor       =   &H80000005&
       Caption         =   "&Reset All"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   5460
-      TabIndex        =   25
+      TabIndex        =   22
       Top             =   120
       Width           =   855
    End
@@ -69,17 +68,17 @@ Begin VB.Form frmSurfaceProps
       Cancel          =   -1  'True
       Caption         =   "&Close"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   5460
-      TabIndex        =   27
+      TabIndex        =   24
       Top             =   2160
       Width           =   855
    End
@@ -89,118 +88,134 @@ Begin VB.Form frmSurfaceProps
       TabIndex        =   4
       Top             =   120
       Width           =   5295
-      _Version        =   65536
       _ExtentX        =   9340
       _ExtentY        =   4260
-      _StockProps     =   15
-      Caption         =   "Scale"
-      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
-      EndProperty
-      TabsPerRow      =   6
-      Tab             =   4
-      TabOrientation  =   0
-      Tabs            =   6
+      _Version        =   327680
       Style           =   1
-      TabMaxWidth     =   0
+      Tabs            =   6
+      TabsPerRow      =   6
       TabHeight       =   494
       ShowFocusRect   =   0   'False
+      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
+      EndProperty
       TabCaption(0)   =   "Effects"
       Tab(0).ControlCount=   1
-      Tab(0).ControlEnabled=   0   'False
+      Tab(0).ControlEnabled=   -1  'True
       Tab(0).Control(0)=   "PolyFlagsHolder"
+      Tab(0).Control(0).Enabled=   0   'False
       TabCaption(1)   =   "Rotate "
       Tab(1).ControlCount=   1
       Tab(1).ControlEnabled=   0   'False
       Tab(1).Control(0)=   "Frame6"
+      Tab(1).Control(0).Enabled=   -1  'True
       TabCaption(2)   =   "Pan "
       Tab(2).ControlCount=   3
       Tab(2).ControlEnabled=   0   'False
       Tab(2).Control(0)=   "Frame4"
+      Tab(2).Control(0).Enabled=   -1  'True
       Tab(2).Control(1)=   "Frame3"
+      Tab(2).Control(1).Enabled=   -1  'True
       Tab(2).Control(2)=   "PanReset"
+      Tab(2).Control(2).Enabled=   -1  'True
       TabCaption(3)   =   "Align "
       Tab(3).ControlCount=   13
       Tab(3).ControlEnabled=   0   'False
-      Tab(3).Control(0)=   "WallPan"
-      Tab(3).Control(1)=   "OneTile"
-      Tab(3).Control(2)=   "AlignGrade"
-      Tab(3).Control(3)=   "WallColumn"
-      Tab(3).Control(4)=   "Unalign"
-      Tab(3).Control(5)=   "AlignWall"
+      Tab(3).Control(0)=   "Label3"
+      Tab(3).Control(0).Enabled=   -1  'True
+      Tab(3).Control(1)=   "Label8"
+      Tab(3).Control(1).Enabled=   -1  'True
+      Tab(3).Control(2)=   "Label7"
+      Tab(3).Control(2).Enabled=   -1  'True
+      Tab(3).Control(3)=   "Label6"
+      Tab(3).Control(3).Enabled=   -1  'True
+      Tab(3).Control(4)=   "Label5"
+      Tab(3).Control(4).Enabled=   -1  'True
+      Tab(3).Control(5)=   "Label9"
+      Tab(3).Control(5).Enabled=   -1  'True
       Tab(3).Control(6)=   "ColumnTexels"
-      Tab(3).Control(7)=   "Label9"
-      Tab(3).Control(8)=   "Label5"
-      Tab(3).Control(9)=   "Label6"
-      Tab(3).Control(10)=   "Label7"
-      Tab(3).Control(11)=   "Label8"
-      Tab(3).Control(12)=   "Label3"
+      Tab(3).Control(6).Enabled=   -1  'True
+      Tab(3).Control(7)=   "AlignWall"
+      Tab(3).Control(7).Enabled=   -1  'True
+      Tab(3).Control(8)=   "Unalign"
+      Tab(3).Control(8).Enabled=   -1  'True
+      Tab(3).Control(9)=   "WallColumn"
+      Tab(3).Control(9).Enabled=   -1  'True
+      Tab(3).Control(10)=   "AlignGrade"
+      Tab(3).Control(10).Enabled=   -1  'True
+      Tab(3).Control(11)=   "OneTile"
+      Tab(3).Control(11).Enabled=   -1  'True
+      Tab(3).Control(12)=   "WallPan"
+      Tab(3).Control(12).Enabled=   -1  'True
       TabCaption(4)   =   "Scale"
       Tab(4).ControlCount=   2
-      Tab(4).ControlEnabled=   -1  'True
+      Tab(4).ControlEnabled=   0   'False
       Tab(4).Control(0)=   "Frame5"
+      Tab(4).Control(0).Enabled=   -1  'True
       Tab(4).Control(1)=   "Frame2"
+      Tab(4).Control(1).Enabled=   -1  'True
       TabCaption(5)   =   "Editor"
-      Tab(5).ControlCount=   3
+      Tab(5).ControlCount=   2
       Tab(5).ControlEnabled=   0   'False
       Tab(5).Control(0)=   "Frame1"
-      Tab(5).Control(1)=   "Frame8"
-      Tab(5).Control(2)=   "Frame7"
+      Tab(5).Control(0).Enabled=   -1  'True
+      Tab(5).Control(1)=   "Frame7"
+      Tab(5).Control(1).Enabled=   -1  'True
       Begin VB.Frame Frame1 
          Caption         =   "Surface Stats"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   795
          Left            =   -74880
-         TabIndex        =   56
+         TabIndex        =   53
          Top             =   1500
          Width           =   4995
          Begin VB.Label Label10 
             Alignment       =   1  'Right Justify
             Caption         =   "Mesh size:"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Index           =   2
             Left            =   120
-            TabIndex        =   64
+            TabIndex        =   61
             Top             =   480
             Width           =   915
          End
          Begin VB.Label MeshSize 
             Caption         =   "###x###"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1140
-            TabIndex        =   63
+            TabIndex        =   60
             Top             =   480
             Width           =   735
          End
@@ -208,35 +223,35 @@ Begin VB.Form frmSurfaceProps
             Alignment       =   1  'Right Justify
             Caption         =   "Meshels:"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Index           =   1
             Left            =   3180
-            TabIndex        =   62
+            TabIndex        =   59
             Top             =   240
             Width           =   1035
          End
          Begin VB.Label SurfCache 
             Caption         =   "###"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   4320
-            TabIndex        =   61
+            TabIndex        =   58
             Top             =   240
             Width           =   615
          End
@@ -244,51 +259,51 @@ Begin VB.Form frmSurfaceProps
             Alignment       =   1  'Right Justify
             Caption         =   "Dynamic lights: "
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1560
-            TabIndex        =   60
+            TabIndex        =   57
             Top             =   240
             Width           =   1215
          End
          Begin VB.Label DynamicLights 
             Caption         =   "###"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2820
-            TabIndex        =   59
+            TabIndex        =   56
             Top             =   240
             Width           =   435
          End
          Begin VB.Label StaticLights 
             Caption         =   "###"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1140
-            TabIndex        =   58
+            TabIndex        =   55
             Top             =   240
             Width           =   435
          End
@@ -296,18 +311,18 @@ Begin VB.Form frmSurfaceProps
             Alignment       =   1  'Right Justify
             Caption         =   "Static lights: "
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Index           =   0
             Left            =   60
-            TabIndex        =   57
+            TabIndex        =   54
             Top             =   240
             Width           =   1035
          End
@@ -315,43 +330,43 @@ Begin VB.Form frmSurfaceProps
       Begin VB.PictureBox PolyFlagsHolder 
          BorderStyle     =   0  'None
          Height          =   1995
-         Left            =   -74940
+         Left            =   60
          ScaleHeight     =   1995
          ScaleWidth      =   5175
-         TabIndex        =   51
+         TabIndex        =   48
          Top             =   360
          Width           =   5175
       End
       Begin VB.Frame Frame2 
          Caption         =   "Simple Scaling"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1215
-         Left            =   240
-         TabIndex        =   48
+         Left            =   -74760
+         TabIndex        =   45
          Top             =   600
          Width           =   1335
          Begin VB.ComboBox ScaleList 
             BackColor       =   &H00FFFFFF&
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   315
             Left            =   120
-            TabIndex        =   50
+            TabIndex        =   47
             Text            =   "1.0"
             Top             =   360
             Width           =   1095
@@ -359,17 +374,17 @@ Begin VB.Form frmSurfaceProps
          Begin VB.CommandButton Command8 
             Caption         =   "&Apply"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   49
+            TabIndex        =   46
             Top             =   720
             Width           =   1095
          End
@@ -377,49 +392,49 @@ Begin VB.Form frmSurfaceProps
       Begin VB.Frame Frame5 
          Caption         =   "Custom Scaling"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1215
-         Left            =   1800
-         TabIndex        =   41
+         Left            =   -73200
+         TabIndex        =   38
          Top             =   600
          Width           =   3255
          Begin VB.TextBox U 
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   315
             Left            =   1080
-            TabIndex        =   45
+            TabIndex        =   42
             Text            =   "1.0"
             Top             =   360
             Width           =   1095
          End
          Begin VB.TextBox V 
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   315
             Left            =   1080
-            TabIndex        =   44
+            TabIndex        =   41
             Text            =   "1.0"
             Top             =   720
             Width           =   1095
@@ -427,34 +442,34 @@ Begin VB.Form frmSurfaceProps
          Begin VB.CommandButton Command5 
             Caption         =   "&Apply"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2280
-            TabIndex        =   43
+            TabIndex        =   40
             Top             =   360
             Width           =   735
          End
          Begin VB.CommandButton Command7 
             Caption         =   "&Reset"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2280
-            TabIndex        =   42
+            TabIndex        =   39
             Top             =   720
             Width           =   735
          End
@@ -462,17 +477,17 @@ Begin VB.Form frmSurfaceProps
             Alignment       =   1  'Right Justify
             Caption         =   "Texture U:"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   47
+            TabIndex        =   44
             Top             =   360
             Width           =   855
          End
@@ -480,17 +495,17 @@ Begin VB.Form frmSurfaceProps
             Alignment       =   1  'Right Justify
             Caption         =   "Texture V:"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   46
+            TabIndex        =   43
             Top             =   720
             Width           =   855
          End
@@ -500,17 +515,17 @@ Begin VB.Form frmSurfaceProps
          BackColor       =   &H80000005&
          Caption         =   "Wall Pan"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   39
+         TabIndex        =   36
          Top             =   1200
          Width           =   1215
       End
@@ -519,17 +534,17 @@ Begin VB.Form frmSurfaceProps
          BackColor       =   &H80000005&
          Caption         =   "One Tile"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   28
+         TabIndex        =   25
          Top             =   600
          Width           =   1215
       End
@@ -538,17 +553,17 @@ Begin VB.Form frmSurfaceProps
          BackColor       =   &H80000005&
          Caption         =   "Floor/Ceiling"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   30
+         TabIndex        =   27
          Top             =   375
          Width           =   1215
       End
@@ -557,17 +572,17 @@ Begin VB.Form frmSurfaceProps
          BackColor       =   &H80000005&
          Caption         =   "Wall Column"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   36
+         TabIndex        =   33
          Top             =   1440
          Width           =   1215
       End
@@ -576,17 +591,17 @@ Begin VB.Form frmSurfaceProps
          BackColor       =   &H80000005&
          Caption         =   "Unalign"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   31
+         TabIndex        =   28
          Top             =   1800
          Width           =   1215
       End
@@ -595,97 +610,48 @@ Begin VB.Form frmSurfaceProps
          BackColor       =   &H80000005&
          Caption         =   "Wall Direction"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -74520
-         TabIndex        =   29
+         TabIndex        =   26
          Top             =   960
          Width           =   1215
       End
       Begin VB.TextBox ColumnTexels 
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   285
          Left            =   -71235
-         TabIndex        =   38
+         TabIndex        =   35
          Text            =   "256"
          Top             =   1410
          Width           =   930
       End
-      Begin VB.Frame Frame8 
-         Caption         =   "Selected Polys"
-         BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
-         EndProperty
-         Height          =   975
-         Left            =   -71580
-         TabIndex        =   18
-         Top             =   420
-         Width           =   1695
-         Begin VB.CommandButton SetGrpName 
-            Caption         =   "Set Item Name"
-            BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
-            EndProperty
-            Height          =   300
-            Left            =   120
-            TabIndex        =   23
-            Top             =   240
-            Width           =   1455
-         End
-         Begin VB.TextBox ItemName 
-            BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
-            EndProperty
-            Height          =   315
-            Left            =   120
-            TabIndex        =   24
-            Top             =   600
-            Width           =   1455
-         End
-      End
       Begin VB.Frame Frame7 
          Caption         =   "Cutaway Zones"
+         Enabled         =   0   'False
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   975
          Left            =   -74880
@@ -695,68 +661,68 @@ Begin VB.Form frmSurfaceProps
          Begin VB.CommandButton CutHideAll 
             Caption         =   "Hide All"
             BeginProperty Font 
-               name            =   "Arial"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "Arial"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   20
+            TabIndex        =   19
             Top             =   600
             Width           =   855
          End
          Begin VB.CommandButton CutHideSel 
             Caption         =   "Hide Selected"
             BeginProperty Font 
-               name            =   "Arial"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "Arial"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1080
-            TabIndex        =   22
+            TabIndex        =   21
             Top             =   600
             Width           =   1335
          End
          Begin VB.CommandButton CutShowAll 
             Caption         =   "Show All"
             BeginProperty Font 
-               name            =   "Arial"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "Arial"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   19
+            TabIndex        =   18
             Top             =   360
             Width           =   855
          End
          Begin VB.CommandButton CutShowSel 
             Caption         =   "Show Selected"
             BeginProperty Font 
-               name            =   "Arial"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "Arial"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1080
-            TabIndex        =   21
+            TabIndex        =   20
             Top             =   360
             Width           =   1335
          End
@@ -764,13 +730,13 @@ Begin VB.Form frmSurfaceProps
       Begin VB.Frame Frame6 
          Caption         =   "Simple Rotation"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1095
          Left            =   -74400
@@ -780,81 +746,81 @@ Begin VB.Form frmSurfaceProps
          Begin VB.CommandButton RotMD 
             Caption         =   "Big Diagonal"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2280
-            TabIndex        =   55
+            TabIndex        =   52
             Top             =   720
             Width           =   1575
          End
          Begin VB.CommandButton RotD 
             Caption         =   "Small Diagonal"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2280
-            TabIndex        =   54
+            TabIndex        =   51
             Top             =   360
             Width           =   1575
          End
          Begin VB.CommandButton Rot45 
             Caption         =   "+45"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   840
-            TabIndex        =   53
+            TabIndex        =   50
             Top             =   720
             Width           =   615
          End
          Begin VB.CommandButton RotM45 
             Caption         =   "-45"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   840
-            TabIndex        =   52
+            TabIndex        =   49
             Top             =   360
             Width           =   615
          End
          Begin VB.CommandButton FlipV 
             Caption         =   "FlipV"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1560
@@ -865,13 +831,13 @@ Begin VB.Form frmSurfaceProps
          Begin VB.CommandButton FlipU 
             Caption         =   "Flip U"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1560
@@ -882,13 +848,13 @@ Begin VB.Form frmSurfaceProps
          Begin VB.CommandButton RotM90 
             Caption         =   "-90"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -899,13 +865,13 @@ Begin VB.Form frmSurfaceProps
          Begin VB.CommandButton Rot90 
             Caption         =   "+90"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -917,13 +883,13 @@ Begin VB.Form frmSurfaceProps
       Begin VB.Frame Frame4 
          Caption         =   "Pan Amount"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1335
          Left            =   -72960
@@ -933,13 +899,13 @@ Begin VB.Form frmSurfaceProps
          Begin VB.OptionButton Pan1 
             Caption         =   "1"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -951,13 +917,13 @@ Begin VB.Form frmSurfaceProps
          Begin VB.OptionButton Pan4 
             Caption         =   "4"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -968,13 +934,13 @@ Begin VB.Form frmSurfaceProps
          Begin VB.OptionButton Pan16 
             Caption         =   "16"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -985,13 +951,13 @@ Begin VB.Form frmSurfaceProps
          Begin VB.OptionButton Pan64 
             Caption         =   "64"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -1003,13 +969,13 @@ Begin VB.Form frmSurfaceProps
       Begin VB.Frame Frame3 
          Caption         =   "Pan Buttons"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1335
          Left            =   -74400
@@ -1018,13 +984,13 @@ Begin VB.Form frmSurfaceProps
          Width           =   1215
          Begin VB.CommandButton PanVM 
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   700
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   700
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   480
@@ -1034,13 +1000,13 @@ Begin VB.Form frmSurfaceProps
          End
          Begin VB.CommandButton PanUM 
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   700
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   700
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   240
@@ -1050,13 +1016,13 @@ Begin VB.Form frmSurfaceProps
          End
          Begin VB.CommandButton PanU 
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   700
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   700
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   720
@@ -1066,13 +1032,13 @@ Begin VB.Form frmSurfaceProps
          End
          Begin VB.CommandButton PanV 
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   700
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   700
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   480
@@ -1084,13 +1050,13 @@ Begin VB.Form frmSurfaceProps
       Begin VB.CommandButton PanReset 
          Caption         =   "Reset"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -71400
@@ -1101,109 +1067,111 @@ Begin VB.Form frmSurfaceProps
       Begin VB.Label Label9 
          Caption         =   "Align wall texture vertical panning"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   40
+         TabIndex        =   37
          Top             =   1200
          Width           =   3015
       End
       Begin VB.Label Label5 
          Caption         =   "Align wall columns. Texels:"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   37
+         TabIndex        =   34
          Top             =   1440
          Width           =   2055
       End
       Begin VB.Label Label6 
          Caption         =   "Reset to default unaligned state"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   35
+         TabIndex        =   32
          Top             =   1800
          Width           =   3015
       End
       Begin VB.Label Label7 
          Caption         =   "Align wall texture directions"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   34
+         TabIndex        =   31
          Top             =   960
          Width           =   3015
       End
       Begin VB.Label Label8 
          Caption         =   "Align floor, ceiling, and slope textures"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   33
+         TabIndex        =   30
          Top             =   375
          Width           =   3015
       End
       Begin VB.Label Label3 
          Caption         =   "Stretch texture to tile it exactly once"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -73200
-         TabIndex        =   32
+         TabIndex        =   29
          Top             =   600
          Width           =   3015
       End
    End
 End
 Attribute VB_Name = "frmSurfaceProps"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 Dim InPan As Integer
@@ -1430,10 +1398,6 @@ Private Sub ScaleList_Click()
             End If
         End If
     End If
-End Sub
-
-Private Sub SetGrpName_Click()
-    Ed.Server.Exec "POLY SET ITEM=" & ItemName.Text
 End Sub
 
 Private Sub Unalign_Click()

@@ -1,65 +1,264 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmMeshViewer 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Mesh Browser"
-   ClientHeight    =   5490
-   ClientLeft      =   5070
-   ClientTop       =   4065
-   ClientWidth     =   7050
-   Height          =   5850
+   ClientHeight    =   5460
+   ClientLeft      =   945
+   ClientTop       =   3150
+   ClientWidth     =   7035
    Icon            =   "MeshView.frx":0000
-   Left            =   5010
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
    MinButton       =   0   'False
-   ScaleHeight     =   5490
-   ScaleWidth      =   7050
+   PaletteMode     =   1  'UseZOrder
+   ScaleHeight     =   5460
+   ScaleWidth      =   7035
    ShowInTaskbar   =   0   'False
-   Top             =   3765
-   Width           =   7170
+   Begin VB.Frame Frame2 
+      Caption         =   "Texture"
+      BeginProperty Font 
+         Name            =   "Arial"
+         Size            =   9.75
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   5355
+      Left            =   7080
+      TabIndex        =   22
+      Top             =   60
+      Width           =   4275
+      Begin VB.CommandButton ApplyTexture 
+         Caption         =   "Apply"
+         Height          =   255
+         Left            =   1560
+         TabIndex        =   39
+         Top             =   480
+         Width           =   1335
+      End
+      Begin VB.CommandButton Command5 
+         Caption         =   "<- Add"
+         Height          =   255
+         Left            =   3000
+         TabIndex        =   30
+         Top             =   540
+         Width           =   1155
+      End
+      Begin VB.CommandButton Command4 
+         Caption         =   "Remove ->"
+         Height          =   255
+         Left            =   3000
+         TabIndex        =   29
+         Top             =   840
+         Width           =   1155
+      End
+      Begin VB.CommandButton Command3 
+         Caption         =   "Browse"
+         Height          =   255
+         Left            =   3000
+         TabIndex        =   28
+         Top             =   240
+         Width           =   1155
+      End
+      Begin VB.CommandButton Command2 
+         Caption         =   "<"
+         Height          =   315
+         Left            =   60
+         TabIndex        =   27
+         Tag             =   "Previous mesh"
+         Top             =   780
+         Width           =   210
+      End
+      Begin VB.CommandButton Command1 
+         Caption         =   ">"
+         Height          =   315
+         Left            =   270
+         TabIndex        =   26
+         Tag             =   "Next mesh"
+         Top             =   780
+         Width           =   210
+      End
+      Begin VB.ComboBox Combo1 
+         Height          =   315
+         Left            =   540
+         TabIndex        =   24
+         Text            =   "Combo1"
+         Top             =   780
+         Width           =   2355
+      End
+      Begin VB.PictureBox Picture1 
+         BackColor       =   &H00000000&
+         Height          =   4110
+         Left            =   120
+         ScaleHeight     =   270
+         ScaleMode       =   3  'Pixel
+         ScaleWidth      =   266
+         TabIndex        =   23
+         Top             =   1140
+         Width           =   4050
+      End
+      Begin VB.Label Label5 
+         Caption         =   "Current Texture:"
+         Height          =   255
+         Left            =   120
+         TabIndex        =   25
+         Top             =   540
+         Width           =   1455
+      End
+   End
    Begin VB.Frame Frame1 
       Caption         =   "Animation Control"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   9.75
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   9.75
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
-      Height          =   5295
+      Height          =   5355
       Left            =   4560
       TabIndex        =   1
-      Top             =   120
+      Top             =   60
       Width           =   2415
+      Begin VB.CheckBox AutoDolly 
+         Caption         =   "Auto Dolly"
+         Height          =   255
+         Left            =   120
+         TabIndex        =   42
+         Tag             =   "Continuously rotate the mesh"
+         Top             =   3540
+         Width           =   1275
+      End
+      Begin VB.CommandButton Command6 
+         Caption         =   "Home"
+         Height          =   255
+         Left            =   1500
+         TabIndex        =   41
+         Top             =   3480
+         Width           =   795
+      End
+      Begin VB.CheckBox ShowSelection 
+         Caption         =   "Show selection"
+         Height          =   255
+         Left            =   120
+         TabIndex        =   40
+         Top             =   4020
+         Width           =   1755
+      End
+      Begin VB.CommandButton PanDown 
+         BeginProperty Font 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         Height          =   255
+         Left            =   1740
+         TabIndex        =   38
+         Top             =   3120
+         Width           =   255
+      End
+      Begin VB.CommandButton PanRight 
+         BeginProperty Font 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         Height          =   255
+         Left            =   1980
+         TabIndex        =   37
+         Top             =   2880
+         Width           =   255
+      End
+      Begin VB.CommandButton PanLeft 
+         BeginProperty Font 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         Height          =   255
+         Left            =   1500
+         TabIndex        =   36
+         Top             =   2880
+         Width           =   255
+      End
+      Begin VB.CommandButton PanUp 
+         BeginProperty Font 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         Height          =   255
+         Left            =   1740
+         TabIndex        =   35
+         Top             =   2640
+         Width           =   255
+      End
+      Begin VB.OptionButton ModeView 
+         Caption         =   "View It"
+         Height          =   255
+         Left            =   120
+         TabIndex        =   33
+         Tag             =   "See texture-mapped mesh"
+         Top             =   4620
+         Width           =   855
+      End
+      Begin VB.OptionButton ModeTexture 
+         Caption         =   "Texture It"
+         Height          =   255
+         Left            =   1200
+         TabIndex        =   32
+         Tag             =   "See mesh polygons"
+         Top             =   4620
+         Width           =   1095
+      End
+      Begin VB.CheckBox RotateAround 
+         Caption         =   "Rotate Around"
+         Height          =   255
+         Left            =   120
+         TabIndex        =   31
+         Top             =   3780
+         Value           =   1  'Checked
+         Width           =   1755
+      End
       Begin VB.OptionButton ViewPolys 
          Caption         =   "Polygons"
          Height          =   255
          Left            =   120
-         TabIndex        =   22
+         TabIndex        =   21
          Tag             =   "See mesh polygons"
-         Top             =   3000
+         Top             =   2940
          Width           =   1335
       End
       Begin VB.CommandButton Close 
          Cancel          =   -1  'True
          Caption         =   "&Close"
-         Height          =   375
-         Left            =   1560
+         Height          =   315
+         Left            =   1620
          TabIndex        =   3
          Tag             =   "Close this window"
-         Top             =   4800
-         Width           =   735
-      End
-      Begin VB.CheckBox AutoDolly 
-         Caption         =   "Auto Dolly"
-         Height          =   255
-         Left            =   120
-         TabIndex        =   20
-         Tag             =   "Continuously rotate the mesh"
-         Top             =   3840
-         Width           =   1095
+         Top             =   4980
+         Width           =   675
       End
       Begin VB.CommandButton SeqMinus 
          Caption         =   "<"
@@ -99,11 +298,11 @@ Begin VB.Form frmMeshViewer
       End
       Begin VB.CommandButton Refresh 
          Caption         =   "&Refresh"
-         Height          =   375
+         Height          =   315
          Left            =   840
          TabIndex        =   15
          Tag             =   "Refresh the mesh list"
-         Top             =   4800
+         Top             =   4980
          Width           =   735
       End
       Begin VB.OptionButton ViewTextured 
@@ -112,7 +311,7 @@ Begin VB.Form frmMeshViewer
          Left            =   120
          TabIndex        =   14
          Tag             =   "See texture-mapped mesh"
-         Top             =   2760
+         Top             =   2700
          Value           =   -1  'True
          Width           =   1335
       End
@@ -161,7 +360,7 @@ Begin VB.Form frmMeshViewer
          Top             =   1320
          Width           =   1815
       End
-      Begin VB.ComboBox MeshMapCombo 
+      Begin VB.ComboBox MeshCombo 
          Height          =   315
          Left            =   540
          Sorted          =   -1  'True
@@ -173,27 +372,35 @@ Begin VB.Form frmMeshViewer
       End
       Begin VB.CommandButton Help 
          Caption         =   "&Help"
-         Height          =   375
+         Height          =   315
          Left            =   120
          TabIndex        =   2
          Tag             =   "Get help"
-         Top             =   4800
-         Width           =   735
+         Top             =   4980
+         Width           =   675
       End
-      Begin VB.Label Label3 
-         Caption         =   "Misc:"
+      Begin VB.Label Label6 
+         Caption         =   "Mode:"
          Height          =   255
          Left            =   120
-         TabIndex        =   21
-         Top             =   3600
+         TabIndex        =   34
+         Top             =   4380
          Width           =   1095
+      End
+      Begin VB.Label Label3 
+         Caption         =   "Options:"
+         Height          =   255
+         Left            =   120
+         TabIndex        =   20
+         Top             =   3300
+         Width           =   1455
       End
       Begin VB.Label Label4 
          Caption         =   "View:"
          Height          =   255
          Left            =   120
          TabIndex        =   13
-         Top             =   2520
+         Top             =   2460
          Width           =   1095
       End
       Begin VB.Label FrameLabel 
@@ -213,7 +420,7 @@ Begin VB.Form frmMeshViewer
          Width           =   1575
       End
       Begin VB.Label Label1 
-         Caption         =   "MeshMap:"
+         Caption         =   "Mesh:"
          Height          =   255
          Left            =   120
          TabIndex        =   4
@@ -234,7 +441,9 @@ Begin VB.Form frmMeshViewer
    End
 End
 Attribute VB_Name = "frmMeshViewer"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 Dim FramePos As Integer
@@ -246,7 +455,7 @@ Dim Playing As Integer
 '
 
 Public Function GetCurrent() As String
-    GetCurrent = MeshMapCombo.Text
+    GetCurrent = MeshCombo.Text
 End Function
 
 '
@@ -273,19 +482,18 @@ End Sub
 '
 
 Sub UpdateMeshList()
-    Dim S As String
-    MeshMapCombo.Clear
-    Ed.Server.Exec "RES QUERY TYPE=MESHMAP"
+    Dim Result As String, S As String
+    MeshCombo.Clear
+    Result = Ed.Server.GetProp("Res", "Query Type=Mesh")
     Do
-        S = Trim(Ed.Server.GetProp("Res", "QueryRes"))
+        S = Trim(GrabCommaString(Result))
         If S = "" Then Exit Do
-        Debug.Print "<" & S & ">"
         S = Trim(Mid(S, InStr(S, " ")))
         S = Trim(Left(S, InStr(S, "|") - 1))
         
-        MeshMapCombo.AddItem S
+        MeshCombo.AddItem S
     Loop
-    If MeshMapCombo.ListCount > 0 Then MeshMapCombo.ListIndex = 0
+    If MeshCombo.ListCount > 0 Then MeshCombo.ListIndex = 0
     UpdateFrameList
 End Sub
 
@@ -295,12 +503,12 @@ Sub UpdateFrameList()
     Dim S As String
     '
     AnimSeqCombo.Clear
-    If MeshMapCombo.ListIndex >= 0 Then
+    If MeshCombo.ListIndex >= 0 Then
         N = Val(Ed.Server.GetProp("MESH", "NUMANIMSEQS" & _
-            " NAME=" & Quotes(MeshMapCombo.List(MeshMapCombo.ListIndex))))
+            " NAME=" & Quotes(MeshCombo.List(MeshCombo.ListIndex))))
         For i = 0 To N - 1
             S = Trim(Ed.Server.GetProp("MESH", "ANIMSEQ" & _
-                " NAME=" & Quotes(MeshMapCombo.List(MeshMapCombo.ListIndex)) & _
+                " NAME=" & Quotes(MeshCombo.List(MeshCombo.ListIndex)) & _
                 " NUM=" & Trim(Str(i))))
             If S <> "" Then
                 AnimSeqCombo.AddItem S
@@ -327,15 +535,15 @@ Sub UpdateFrameCaption()
     Else
         FrameLabel.Caption = "Frame " & Trim(Str(FramePos + 0)) & " of " & Trim(Str(NumFrames))
     End If
-    '
-    If MeshMapCombo.ListCount <= 0 Then
+    
+    If MeshCombo.ListCount <= 0 Then
         Ed.Server.Exec "CAMERA CLOSE NAME=MeshViewCam"
     Else
         Ed.Server.Exec "CAMERA OPEN " & _
             " NAME=MeshViewCam X=0 Y=0 FOV=75" & _
             " XR=" & Trim(Str(MeshCamHolder.ScaleWidth)) & _
             " YR=" & Trim(Str(MeshCamHolder.ScaleHeight)) & _
-            " MESH=" & Quotes(MeshMapCombo.Text) & _
+            " MESH=" & Quotes(MeshCombo.Text) & _
             " REN=" & Trim(Str(REN_MESHVIEW)) & _
             " FLAGS=" & Trim(Str(SHOW_AS_CHILD + SHOW_NOBUTTONS + IIf(Playing, SHOW_BACKDROP, 0) + IIf(Playing = 1 Or AutoDolly.Value, SHOW_REALTIME, 0) + IIf(AutoDolly.Value, SHOW_BRUSH, 0) + IIf(ViewPolys.Value, SHOW_COORDS, 0))) & _
             " HWND=" & Trim(Str(MeshCamHolder.hwnd)) & _
@@ -387,7 +595,7 @@ Private Sub Refresh_Click()
     UpdateMeshList
 End Sub
 
-Private Sub MeshMapCombo_Click()
+Private Sub MeshCombo_Click()
     UpdateFrameList
 End Sub
 
@@ -396,25 +604,24 @@ Private Sub AnimSeqCombo_Click()
 End Sub
 
 Private Sub MeshMinus_Click()
-    If MeshMapCombo.ListIndex >= 0 Then
-        If MeshMapCombo.ListIndex > 0 Then
-            MeshMapCombo.ListIndex = MeshMapCombo.ListIndex - 1
-        ElseIf MeshMapCombo.ListCount > 0 Then
-            MeshMapCombo.ListIndex = MeshMapCombo.ListCount - 1
+    If MeshCombo.ListIndex >= 0 Then
+        If MeshCombo.ListIndex > 0 Then
+            MeshCombo.ListIndex = MeshCombo.ListIndex - 1
+        ElseIf MeshCombo.ListCount > 0 Then
+            MeshCombo.ListIndex = MeshCombo.ListCount - 1
         End If
     End If
 End Sub
 
 Private Sub MeshPlus_Click()
-    If MeshMapCombo.ListIndex >= 0 Then
-        If MeshMapCombo.ListIndex + 1 < MeshMapCombo.ListCount Then
-            MeshMapCombo.ListIndex = MeshMapCombo.ListIndex + 1
+    If MeshCombo.ListIndex >= 0 Then
+        If MeshCombo.ListIndex + 1 < MeshCombo.ListCount Then
+            MeshCombo.ListIndex = MeshCombo.ListIndex + 1
         Else
-            MeshMapCombo.ListIndex = 0
+            MeshCombo.ListIndex = 0
         End If
     End If
 End Sub
-
 
 Private Sub SeqMinus_Click()
     If AnimSeqCombo.ListIndex >= 0 Then

@@ -1,4 +1,5 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{BDC217C8-ED16-11CD-956C-0000C04E4C0A}#1.1#0"; "tabctl32.ocx"
 Begin VB.Form LevelInfo 
    BorderStyle     =   1  'Fixed Single
    Caption         =   "Level Properties"
@@ -6,69 +7,86 @@ Begin VB.Form LevelInfo
    ClientLeft      =   2430
    ClientTop       =   2175
    ClientWidth     =   6690
-   Height          =   4440
    Icon            =   "LevelInf.frx":0000
-   Left            =   2370
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   4080
    ScaleWidth      =   6690
-   Top             =   1875
-   Width           =   6810
    Begin TabDlg.SSTab LevelTab 
       Height          =   3975
       Left            =   60
       TabIndex        =   7
       Top             =   60
       Width           =   6555
-      _Version        =   65536
       _ExtentX        =   11562
       _ExtentY        =   7011
-      _StockProps     =   15
-      Caption         =   "Read-only "
-      TabsPerRow      =   3
-      Tab             =   2
-      TabOrientation  =   0
-      Tabs            =   3
+      _Version        =   327680
       Style           =   1
-      TabMaxWidth     =   0
+      Tab             =   2
       TabHeight       =   529
       ShowFocusRect   =   0   'False
       TabCaption(0)   =   "Settings "
       Tab(0).ControlCount=   10
       Tab(0).ControlEnabled=   0   'False
       Tab(0).Control(0)=   "AutoLaunch"
+      Tab(0).Control(0).Enabled=   -1  'True
       Tab(0).Control(1)=   "ServerParms"
+      Tab(0).Control(1).Enabled=   -1  'True
       Tab(0).Control(2)=   "MaxWatchers"
+      Tab(0).Control(2).Enabled=   -1  'True
       Tab(0).Control(3)=   "MaxPlayers"
+      Tab(0).Control(3).Enabled=   -1  'True
       Tab(0).Control(4)=   "Close1"
+      Tab(0).Control(4).Enabled=   -1  'True
       Tab(0).Control(5)=   "Label4"
+      Tab(0).Control(5).Enabled=   0   'False
       Tab(0).Control(6)=   "Label5"
+      Tab(0).Control(6).Enabled=   0   'False
       Tab(0).Control(7)=   "Label3"
+      Tab(0).Control(7).Enabled=   0   'False
       Tab(0).Control(8)=   "Label1"
+      Tab(0).Control(8).Enabled=   0   'False
       Tab(0).Control(9)=   "Label2"
+      Tab(0).Control(9).Enabled=   0   'False
       TabCaption(1)   =   "Passwords "
       Tab(1).ControlCount=   9
       Tab(1).ControlEnabled=   0   'False
       Tab(1).Control(0)=   "WatcherPassword"
+      Tab(1).Control(0).Enabled=   -1  'True
       Tab(1).Control(1)=   "PlayerPassword"
+      Tab(1).Control(1).Enabled=   -1  'True
       Tab(1).Control(2)=   "AdminPassword"
+      Tab(1).Control(2).Enabled=   -1  'True
       Tab(1).Control(3)=   "Close2"
+      Tab(1).Control(3).Enabled=   -1  'True
       Tab(1).Control(4)=   "Label7"
+      Tab(1).Control(4).Enabled=   0   'False
       Tab(1).Control(5)=   "Label14"
+      Tab(1).Control(5).Enabled=   0   'False
       Tab(1).Control(6)=   "Label13"
+      Tab(1).Control(6).Enabled=   0   'False
       Tab(1).Control(7)=   "Label15"
+      Tab(1).Control(7).Enabled=   0   'False
       Tab(1).Control(8)=   "Label6"
+      Tab(1).Control(8).Enabled=   0   'False
       TabCaption(2)   =   "Read-only "
       Tab(2).ControlCount=   7
       Tab(2).ControlEnabled=   -1  'True
       Tab(2).Control(0)=   "Label8"
+      Tab(2).Control(0).Enabled=   0   'False
       Tab(2).Control(1)=   "Label9"
+      Tab(2).Control(1).Enabled=   0   'False
       Tab(2).Control(2)=   "Label10"
+      Tab(2).Control(2).Enabled=   0   'False
       Tab(2).Control(3)=   "GateInfo"
+      Tab(2).Control(3).Enabled=   0   'False
       Tab(2).Control(4)=   "LevelInfo"
+      Tab(2).Control(4).Enabled=   0   'False
       Tab(2).Control(5)=   "GatePassword"
+      Tab(2).Control(5).Enabled=   0   'False
       Tab(2).Control(6)=   "Close3"
+      Tab(2).Control(6).Enabled=   0   'False
       Begin VB.CommandButton Close3 
          Caption         =   "&Close"
          Height          =   315
@@ -115,6 +133,7 @@ Begin VB.Form LevelInfo
       End
       Begin VB.TextBox WatcherPassword 
          Height          =   285
+         IMEMode         =   3  'DISABLE
          Left            =   -72120
          PasswordChar    =   "*"
          TabIndex        =   5
@@ -124,6 +143,7 @@ Begin VB.Form LevelInfo
       End
       Begin VB.TextBox PlayerPassword 
          Height          =   285
+         IMEMode         =   3  'DISABLE
          Left            =   -72120
          PasswordChar    =   "*"
          TabIndex        =   4
@@ -133,6 +153,7 @@ Begin VB.Form LevelInfo
       End
       Begin VB.TextBox AdminPassword 
          Height          =   285
+         IMEMode         =   3  'DISABLE
          Left            =   -72120
          PasswordChar    =   "*"
          TabIndex        =   3
@@ -300,7 +321,9 @@ Begin VB.Form LevelInfo
    End
 End
 Attribute VB_Name = "LevelInfo"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' LevelInf.frm: GateClient form with information about

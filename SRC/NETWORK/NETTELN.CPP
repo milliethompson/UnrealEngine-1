@@ -1,7 +1,7 @@
 /*=============================================================================
 	NetTeln.cpp: Unreal Internet telnet interface
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -13,13 +13,12 @@
 #include <windows.h>
 #include <windowsx.h>
 #include "UnBuild.h"
-#include "UnPlatfm.h"
 #include "Net.h"
 #include "NetPrv.h"
 #include "NetINet.h"
 #include "Resource.h"
 
-int UNREAL_API GEngineExec(const char *Cmd,FOutputDevice *Out);
+int UNENGINE_API GEngineExec(const char *Cmd,FOutputDevice *Out);
 
 /*------------------------------------------------------------------------------
 	Telnet task definition and implementation
@@ -54,11 +53,6 @@ int FTaskTelnet::Exec(const char *Cmd,FOutputDevice *Out)
 			};
 		return 1;
 		}
-	else if (NetGetCMD(&Str,"HELP") || NetGetCMD(&Str,"_HELP"))
-		{
-		Out->Log("   LOGIN - Log in to UnrealServer");
-		return GEngineExec(Cmd,Out);
-		}
 	else return GEngineExec(Cmd,Out);
 	};
 
@@ -73,9 +67,9 @@ void FTaskTelnet::Send(const char *Str)
 //
 // Implementation of FOutputDevice-derived Log function for Telnet console.
 //
-void FTaskTelnet::Log(ELogType MsgType, const char *Text)
+void FTaskTelnet::Write(const void *Data,int Length,ELogType MsgType)
 	{
-	Send(Text);
+	Send((char *)Data);
 	Send("\r\n");
 	};
 
@@ -93,7 +87,8 @@ void FTaskTelnet::Init(SOCKET NewSocket,SOCKADDR_IN NewSockAddr)
 	//
 	GTaskManager->AddTask(this,NULL,GApp,PRIORITY_Realtime,0);
 	//
-	SpawnConsoleMessage();
+	Logf(CONSOLE_SPAWN_1);
+	Logf(CONSOLE_SPAWN_2);
 	Logf("Guest access granted.  Type 'LOGIN name password' for regular access.");
 	Logf("");
 	Send("(> ");
@@ -103,9 +98,9 @@ void FTaskTelnet::Init(SOCKET NewSocket,SOCKADDR_IN NewSockAddr)
 // Handle a timer tick on the telnet console.  This is the one and only
 // place where the FTaskTelnet object can be destroyed.
 //
-void FTaskTelnet::TaskTick()
+void FTaskTelnet::TaskTick( FLOAT DeltaSeconds )
 	{
-	GUARD;
+	guard(FTaskTelnet::TaskTick);
 	//
 	char Buffer[4096];
 	int Result = recv(Socket,Buffer,4096,0);
@@ -161,7 +156,7 @@ void FTaskTelnet::TaskTick()
 			c++;
 			};
 		};
-	UNGUARD("FTaskTelnet::TaskTick");
+	unguard;
 	};
 
 //
@@ -169,11 +164,11 @@ void FTaskTelnet::TaskTick()
 //
 void FTaskTelnet::TaskExit()
 	{
-	GUARD;
+	guard(FTaskTelnet::TaskExit);
 	//
 	closesocket(Socket);
 	//
-	UNGUARD("FTaskTelnet::TaskExit");
+	unguard;
 	};
 
 //
@@ -181,13 +176,13 @@ void FTaskTelnet::TaskExit()
 //
 char *FTaskTelnet::TaskStatus(char *Name,char *Desc)
 	{
-	GUARD;
+	guard(FTaskTelnet::TaskStatus);
 	//
 	sprintf(Name,"Telnet");
 	sprintf(Desc,UserName);
 	return Name;
 	//
-	UNGUARD("FTaskTelnet::TaskStatus");
+	unguard;
 	};
 
 /*------------------------------------------------------------------------------

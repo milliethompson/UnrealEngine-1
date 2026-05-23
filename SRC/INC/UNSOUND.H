@@ -18,12 +18,19 @@ HISTORY:
 
 /*
 ** USound:
-** Class used to store information about each sound effect resource.
-** This is derived from the UResource class.
+** Class used to store information about each sound effect object.
+** This is derived from the UObject class.
 */
-class UNREAL_API USound : public UResource
-	{
-	RESOURCE_CLASS(USound,BYTE,RES_Sound)
+class UNENGINE_API USound : public UObject
+{
+	DECLARE_CLASS(USound,UObject,NAME_Sound,NAME_UnEngine)
+
+	/*
+	** Identification.
+	*/
+	enum {BaseFlags = CLASS_Intrinsic | CLASS_Swappable | CLASS_ScriptWritable};
+	enum {GUID1=0,GUID2=0,GUID3=0,GUID4=0};
+
 	/*
 	** Variables.
 	*/
@@ -32,28 +39,31 @@ class UNREAL_API USound : public UResource
 	INT	DataSize;
 
 	/* Name of the sound effect family to which this sound belongs. */
-	FName	FamilyName;
+	FName FamilyName;
 
 	/* Sound ID of this sound when it is registered with the sound drivers. */
-	INT	SoundID;
-
-	/* For future expansion. */
-	BYTE	Pad[256];	/* For future expansion. */
+	INT SoundID;
 
 	/*
-	** Resource function overriden from UResource.
+	** Object function overriden from UObject.
 	*/
-	void Register(FResourceType *Type);
-	void InitHeader(void);
-	void InitData(void);
-	int  QuerySize(void);
-	int  QueryMinSize(void);
+	void InitHeader();
+	int  QuerySize();
 	const char *Import(const char *Buffer, const char *BufferEnd, const char *FileType);
 	char *Export(char *Buffer,const char *FileType,int Indent);
-	void QueryHeaderReferences(FResourceCallback &Callback);
-	void QueryDataReferences(FResourceCallback &Callback);
-	void Flip();
-	};
+
+	/*
+	** Serialization.
+	*/
+	void SerializeData(FArchive &Ar);
+	void SerializeHeader(FArchive &Ar)
+	{
+		guard(USound::SerializeHeader);
+		UObject::SerializeHeader(Ar);
+		Ar << DataSize << FamilyName;
+		unguard;
+	}
+};
 
 #endif // _INC_UNSOUND
 

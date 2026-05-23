@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-	tim@epicgames.com: Work log
+	Tim Sweeney, tim@epicgames.com
 -----------------------------------------------------------------------------*/
 
 Legend:	(blank)	Need to do it
@@ -8,204 +8,133 @@ Legend:	(blank)	Need to do it
 		??		Look into this
 		X		Decided not to
 		>>		A heading
+		====	Denotes a new working version
 
-<savant> i'm going to make Worldcraft a better Unreal editor than 
-UnrealEd.
+"History shows that users place a great deal of emphasis on binary compatibility."
+-- Byte Magazine
 
-///////////////////////////////////////////////////////////////////////////////
->>Changes to be wary of for error symptoms
+The architecture for trinity is well underway, and it will be dramatically 
+better in many ways. In fact, this next generation has more distinction than 
+any before it, because it is the first of the transition from the pixel to 
+the texture mapped triangle. Assumptions change and new capabilities arise 
+beyond what a simple processor speed increase would have given. Pushing the 
+technology is a long way from over, trust me. -- John Carmack
 
-	INDEX_NONE = MAXDWORD
-	ARoot/AActor reorg
-	FClassProperty::AddToFrame change
-	Actor properties are now 4-aligned with #pragma pack (push,4)
-	Actors.Num != Actors.Max
-	GClasses.Associate,GGame.Init order
-	UnEngine.cpp game init order
-	Debugger says overreading/overwriting ShadeData
-	NF_Bounded
-	Unres.cpp: UnclaimedNames->Element(i).Kill();
+"Even the strongest of men are crushed like bugs under the feet of time" -- Tran
 
-///////////////////////////////////////////////////////////////////////////////
-Notes for others
+"Unreal is super cool" -- Bill Gates
 
->>Mark & Ammon:
-	Anything that includes <windows.h> or relies on any of the Windows DLL's (winmm.dll,
-		etc) needs to go in the Windows project.
+"But Microsoft has added a new wrinkle, a backup plan, that IBM did not: to 
+embrace any technology it perceives as a threat... It has taken us a few years 
+to realize the entire PC industry is just a value-added reseller for Intel and Microsoft." 
+-- Upside Magazine.
 
->>Ammon:
-	Can you always include a debug version of SoundEng.lib along with the release
-		version in the future? Just name it dSound.lib.
-	The sound system has been acting quite stably since the last merge, good job
-		Ammon & Carlo!
-
->>Mark:
-	It's not worthwhile merging any of the stuff in the Game project at the moment.
-		As I prepare for scripting, this is going to undergo so many changes that the
-		best strategy is to reconcile all of the code after my work on scripting
-		is done. In the meantime the code in the Game project is a warzone.
-
-	I'm not sure that I merged your Delta84 properly, because I found that most of the files
-		I'd checked were unchanged changed (relative to the original I posted)...
-
-	I merged some of my debugging code into your UnChecks.h, and now that's available 
-		everywhere for convenience.
-
-	Note the new "#if defined(_DEBUG) || defined(CHECK_ALL)" in UnChecks.h - CHECK_ALL is
-		useful for enabling checks in individual files during development.
-
-	You have some memory leaks. See the "Unfreed:" entries in the log upon exit for a 
-		list of them.
-
-	And now we need a "Video" tab with these options...
-		Texture smoothing (note: no performance impact)
-			Full texture smoothing
-			Adaptive texture smoothing (high-res only) <- default
-			No texture smoothing
-		Default color depth
-			8-bit color
-			16-bit color (recommended on Pentiums)
-			32-bit color (recommended on PentiumPro's)
-			Always use current Windows color depth <- default
-		Use MMX Multimedia Extensions (a checkbox; default is checked, but must 
-			be greyed when no MMX support is available. You can detect this with GApp->MMX).
-		Use Direct3D Hardware Acceleration (a checkbox; default is checked, but must be 
-			greyed when no Direct3D support is available. This isn't detectable yet.)
-
->>James:
-	Mesh skins need 1-pixel drawn boundary on all sides due to dithering; see the dark lines down
-		the woman's face in the mesh viewer to see an example.
-
->>Art crue:
-	Important: If there are more than 16 different texture palettes in view, performance
-		will be significantly decreased. So, use as many common palettes as you can.
-		16 is an actual, hardcoded limit (due to memory limitations): 16 or fewer textures 
-		in view will be fast, more than 16 will be much, much slower.
-	We need a good font (not the cheesy one we have now). Check out the awesome,
-		kick-ass Age of Wonders intro font for an example of a font that doesn't suck.
-	Need several cool backdrop textures for the sky. You can load and replaced the ones
-		in UnrealEd to test them out. Be sure to use a full 256-color ramp; the sky texture
-		in there now only uses about 64 colors so it's not very smooth.
-	Make sure that the # of unique palettes are reasonably small in each texture set.
-		The reason that the engine jerks when you go around corners and see new areas
-		is because Unreal has to build a bunch of 128K palette lighting tables, so reducing
-		the number of palettes helps to smooth out the performance.
-	Need truecolor skins for everything (alien dragon, etc).
-	Please use mixed-case filenames for anything that is visible within UnrealEd, such
-		as texture filenames (use WinZip CabArc instead of PKZIP.EXE to compress files 
-		and preserve case).
-	Seed some cool marble base textures like we used to have. Bring on the texture CD's!
-	Need icons for
-		All actor classes
-		Need 1 pixel border on all sides
-	Need a really awesome, fine-tuned backdrop!
-	Smooth out sample cloud texture beautifully, possibly use blur effect
+Human brain: 1,000,000,000 mips, 10,000 gigabytes of storage
+PentiumPro:            200 mips,      2 gigabytes of storage
+Moore's law: Microprocessors double in speed every 9 months.
+-- Microprocessor report:
 
 ///////////////////////////////////////////////////////////////////////////////
-Major subsystem tasks to do
+>>Notes for others
 
-	>>Scripting
-		Need static variables, init once per class. Can be edited, but only in default props.
-		Need static const's.
-		Non-class code modules?
-		Special commands
-			Let with proper type checking and conversion
-			SetState, Goto, Label
-			While, For, If, Select with address fixup
-		Functions
-			Overhaul all intrinsics
-			StateStr
-			IIf
-			Print
-			C Function pointer prebinding for fast intrinsics
-		Member operator
-			GetContextExpr (function or variable)
-			Deal with vector and rotation components properly
-			Actor references, use of context class pointer in expr evaluator
-		Resource and actor class hierarchies
-			Need strong type checking on resource and actor types
-			Recognize generic resource type and generic actor type somehow?
-		Script query and expr query work 100% as-is
-		Type conversions
-			Compile all basic conversions as intrinsic fast autoconversions in Root.tcx
-			Call explicit conversions
-			FindConversion(srctype,desttype)
-			Function-caller use two passes: Exact-match, followed by conversion attempt
-		Type conversions
-			Non-precedenced binary operators with exact-match and simple type conversion
-			Operator precedence option, enforce overload/override matching
-			Precedenced operators
-			Torture test all expression error handling
-			Proper type checking in all cases
-		All actors need
-			Const class
-			Const StateHierarchy[MAX_STATE_HIERARCHY], NumStateHierarchy to represent current state
-			FScriptExecutionThread
-		Execution
-			QuakeC stolen ideas
-				Runaway counter to prevent infinite loops
-				Profile counter for each function
-			Server log function
-			and/or short circuit logic
-		Maybe define anim seqs and stuff in script?
-		Need a Fork function for actors duplicating themselves in order to preserve weapon
-			pickup properties, for example?
-		Support bSleeping to avoid ticking, ScriptRate, ScriptCountdown, ScriptTickRate.
-		Timer messages.
-		RayHit auto aiming.
+	James & Dave:
+		All anim seqs need rate definition, default 30.
+		Please use mixed-case filenames for anything that is visible within UnrealEd,
+			such as meshes, scripts, and textures.
 
-	>>Scripts
-		triggerable lights, bTempLightingChange.
+	Art crue:
+		All texture names need to be globally unique.
+		Use as many common palettes as possible; performance will be best when there is a small
+			number of palettes in view, like 8-12.
+		We need a good font. Check out awesome Age of Wonders font.
+		Please use mixed-case filenames for anything that is visible within UnrealEd, such
+			as meshes, scripts, and textures.
+		Need icons for all actors classes.
+
+///////////////////////////////////////////////////////////////////////////////
+Major subsystem work to do
+
+	>>Audio.
+		Running into wall sounds / feedback hooks
+		Scraping along wall sounds / feedback hooks
+		Floor surface roughness feedback hooks
+		Floor footstep sounds
+		Floor surface hurt
+
+	>>Scripting.
+		UType's replace CPT_'s for complete generic typing.
+		UDatabase = scriptable dynamic array of UType's.
+		Solve fragile base class problem by loading/saving with class/name for vars and
+			stack node indices.
+		Multiactor spawning hierarchies?
+
+	>>Scripts.
+		Triggerable lights, bTempLightingChange.
 		Zone name text messages
-		Dispatcher
-			One input, up to 8 outputs
-			OutputEvent(8)
-			OutputDelay(8)
-		Timer
-			Can be on/off, can be turned off by an optional trigger
-			Can fire 1-8 events in sequence (default 1) on a specified period
-		Overall brightness scaling value!
+		Overall brightness scaling value for screen!
 		First mesh texture is script replaceable by resource (doable).
-		Messages
-		>>Is it possible for you to code a new MoverTriggerType called
-		>>ProximityToggle.  The brush would move to key frame 1 when the player moves
-		>>within its collision radius and would only move back to key frame 0 when the
-		>>player again moves near the brush.  This MoverTriggerType would be useful in
-		>>conjunction with brushes that are triggers with the TriggerOnceOnly property
-		>>set to true.  An example would be a switch that would recede into the wall,
-		>>and not come back out,  to open a door permanently.  Currently in the
-		>>editor, you can set a brush to trigger once only, however, the brush will
-		>>still move back and forth between key frames 0 and 1 (since you have to set
-		>>the brush's MoverTriggerType to ProximityOpenTimed), even though it's not
-		>>triggering the event anymore.  This looks silly, as in the switch example
-		>>above.  This added functionality would help alot.  Thanks.  TTYL!
 
-		Lights respond to triggers
+	>>Input system.
+		Intellimouse support.
+		Joystick axis support.
+		Joystick buttons support.
+		Other DirectInput device support.
 
-		Script animation:
-			PlayAnim/LoopAnim/PlayAnimWait,LoopAnimWait <SeqName>, [<Start>], [<Count>], [<FramesPerTickFloat>]
-			' Plays animation sequence once then continues with script execution.
-			' MeshMap implied.
-			' Speed is optional, otherwise uses AnimSpeed (CurrentAnimSpeed).
-			' Set speed to 0 if you want to play a still frame
+	>>Object manager.
+		UResource owners, like root? Would solve name resolution problems and provide scoping.
+		Ultrascrutinize resource file format.
+		Use hash as resource name starting point.
+		No GC geditor.currenttexture/class, etc. by doing USubsystem.
+		Current GC setup will toss resources that were referenced by
+			records that are held only within the transaction tracker. To 
+			avoid this problem, the transaction tracker must serialize all
+			database items (via pointer to item <<serialize function).
 
-			PlaySound <SoundName>,[<VolumeScaler>],[<PitchScaler>]
-			' Play one-shot sound (set AmbientSound if you want to play an ambient).
+	>>D3D junk.
+		Create Z-buffer BEFORE IDirect3DDevice!
+		Am I in a non-d3d mode?
+		This sucks.
+		Allocate Z-buffer before querying for device.
+		Full flatshaded rendering.
+		Device
+			Software rendering in a window
+			Software rendering DirectDraw
+			Software rendering DirectDraw on 3dfx
+			Direct3D fullscreen
+			Direct3D fullscreen on 3dfx
+			Direct3D fullscreen on NEC PowerVR
+			3dfx Glide fullscreen
+			OpenGL in a window
+			----
+			Fullscreen modes (select to launch)
+		FindRenderDevice -> CreateRenderDevice
+		Transparency
 
-			BreakAnim
-			' Breaks the animation sequence.
+	>>AJudge actor type.
+		Contains rules about letting players enter/leave including approving
+			their persistent stats and accepting/rejecting them.
+		Contains network play rules.
+		PlayerEnter
+		PlayerLeave
 
-			FinishAnim
-			' Waits until the current animation sequence is finished.
-
-			Open questions:
-			* If you play multiple animations without waiting or finishing, do they queue up
-			  or is there only one pending at a time?
-
-			BlockEvents, HoldEvents, ReleaseEvents
-			Sleep <# tics>
-
-	>>Rendering
+	>>Rendering.
+		Must must must must do floor reflections from a floorsurf pvs, oh yes!
+		If do mirrors, do water refraction.
+		Caustic overlay textures!
+		Gary's lazy evaluation rendering trick for dynamic
+			shadows by prerendering lightviews and filtering.
+		Volumetric fog with too many lightsources crashes.
+		Lattice code must max/min clip Z to within X% on high slopes to prevent vmetric errors.
+		Must worst-axis subdivide to reduce lattice sizes!
+		Try specular bump mapping with regular lights based on 
+			viewer's direct angle-off-texture-to-light.
+			Account for truecolor, intermixed lightsources.
+			Also handle lattice effects like flickering.
+		Can palette table code efficiently handle Num<Max palettes?
+		Can palette table code account for smaller/larger shade ramps?
+		Add a TextureInfo to GBlit and use it in common between software/hw rendering.
+		Ground fog! Yes yes yes yes yes!
+		Laser site weapon, handled in fog and in point illuminataion.
 		Optimizations - n*log n is a LOT less than n*n!
 		Temporal oversampling possibilities
 		Optimize SetupForPoly (1.2 msec for nothing)
@@ -240,8 +169,24 @@ Major subsystem tasks to do
 		Build clipping span buffer rather than current awful raster clipping hack
 		Optimize for speed
 		Spanline z-buffer em
+		Sunbeam effects like polybounded volumetric lights.
+		Radiosity precomputation.
+		Volumetric spotlights.
+		Volumetric ground fog.
+		Texture refraction coefficients.
+		World cube sky option in addition to sky sheets.
+		Infinite distance sprites like sun, moon.
+		Two separate sky textures, top and bottom.
+		Rope sprites.
+		Store light mesh tetrisization information, to save mucho space.
+		FLightMeshIndex iLightActor: inefficiencies due to a hardcoded limit
+			of lights per surface: eats up a lot of memory but is still limited.
+			How about storing a variable length list, and building an additional
+			linked list at dynamic lighting time.
+		Generate light mesh info when adding a surface to the BSP; trim it after
+			BSP rebuild.
 
-	>>Actors
+	>>Actors.
 		WeaponCalcView is limited.  Should:
 			Call for each thing in the inventory
 			Draw each thing that returns a 1 from CalcView, as it returns it
@@ -252,7 +197,18 @@ Major subsystem tasks to do
 		Projectiles need Hit and HitNotify logic
 		Compute ray/actor-sphere intersection and do the appropriate pyrotechnics spawns
 
-	>>Volumetric lighting extras
+	>>Extreme compression.
+	*	Break up point components into unique floats (within a threshold),
+		index them into a table, and huffman compress them by frequency, explicitly
+		storing the very infrequent ones.
+	*	RLE the shadow maps and huffman compress them by run length.
+	*	FIF the textures and their mips.
+	*	Delta compress all actor classes wrt their parent class.
+	*	Delta compress all databases wrt the previous.
+	*	Eliminate duplicate brushes and things.
+	*	Can probably get 5:1 compression overall.
+
+	>>Volumetric lighting extras.
 		Tag leaves with v-light idynamics and manage list of active v-lights as traverse
 			bsp from front to back, with stats.
 		Implement polygon-sphere-cone rejection, or reject with simple sphere--plane
@@ -260,7 +216,7 @@ Major subsystem tasks to do
 		C dual light and fog code with full darkening integration.
 		Mask overflow problems with zmin/zmax checking.
 
-	>>Moving brushes
+	>>Moving brushes.
 		Test moving brush ambient sounds
 		Test doors that don't exist on particular net levels or difficulty settings
 		Moving brush view in UnrealEd
@@ -284,8 +240,13 @@ Major subsystem tasks to do
 			Re-add moving brush stuff after csg, loads, saves
 		Mover proximity stuff - don't fool with actor sphere, just place refs at all leaves
 			below owned nodes and use Touch messages with slightly enlarged radius.
+		Articulated cumulative rotation/movement slave brushes???
 
-	>>Networking (handed over to Mark)
+	>>Networking (handed over to Mark).
+		Weird TcpDaemon idea.
+			LevelInfo could spawn TcpDaemon actors as TCP connections are started/ended on a port.
+			Slow TcpDaemon to TcpDaemon function calls like RPC.
+		Desired player type spec for entering a level as something.
 		DPlay UI, code
 		WinSock UI, code
 		Pending connection UI clean
@@ -307,36 +268,10 @@ Major subsystem tasks to do
 			Unpacketize packet, merging actors based on uniqueness
 			Use AUnknown class
 
-	>>Textures
-		FireEngine support
-		Animating texture support
-
-	>>Resource subsystem
-		Occasional LRU data purge?
-		Res add keep file open via CreateFileMapping?
-		Use hash as resource name and global name starting point?
-		Need a compelling way to manage multiple resources and disk cached resources
-
-	>>Lighting
-		Lights need QWORD zone masks saying which zones their rays hit
-			and which zones their radii fall into volumetrically, set in raytracer
-			and in DoDynamicLighting.
-
-	>>Internal format changes:
-		Reduce memory usage
-			PreLoadQuery shrink:
-				Actor list
-				Bsp nodes
-				Bsp surfaces
-				Points
-				Vectors
-				VertPool
-				Bound
-				Terrain
-			Don't load level brushes for play at all
-			Do purge
-		Don't add Root.ucx when playing game?
-		Teleporter load/save
+	>>Textures.
+		FireEngine support.
+		Animating texture support.
+		DLL-ize.
 
 	>>Teleporters:
 		Handle same-level URL's
@@ -344,7 +279,7 @@ Major subsystem tasks to do
 		Stub [unreal:][//]server[/[level]] URL's
 		Spawn Web browser on http:// ??
 
-	Level brushes = actors w/ associated breps/bsps?  Cool for editability, one less thing to track.
+	>>Level brushes = actors w/ associated breps/bsps?  Cool for editability, one less thing to track.
 		Can store brushes as classes
 		CSG_Add, CSG_Subtract, etc.
 		Brush selection popups (map edit mode & non) for setting properties
@@ -355,21 +290,25 @@ Major subsystem tasks to do
 		Implement demo
 		Load/save game, load level + proper resource purge
 
-	>>Server/User/Player/Camera/Task association
-
-		Server - controls one level
-			* Server mode (local server)
-			* Server spoof mode (remote server)
-
-		Camera - client's perception of a player
-			* A camera resource always corresponds to a window on the local machine
-			* Separate task?
-
-		User - server's perception of a player
-			* Corresponds to??
-			* Separate task?
-
 	>>UnrealEd projects
+		Outline editor.
+		Outline revolver, extruder, path extruder.
+		Implement FMeshUV sharing by breaking out FMeshUV into a separate resource.
+		Make note of when verts with common texture violate
+		New editor features:
+			- Brush "source" is always saved for each brush; this is
+			  the solid-builder's base parms for solid-builder brushes,
+			  or the 2d outline for 2d editor brushes. There is no source for
+			  imported, intersected, or deintersected brushes.
+			- Solid builder logic -> UnrealScript?
+		New editor modes:
+			- Move individual brush vertex.
+			- Draw brush clipping line.
+			- Draw event connector.
+			- Draw 2D outline which is automatically extruded?
+		New commands:
+			- Group actors/brushes.
+			- Subtract one brush from another brush?
 		Texture properties
 		Sound properties
 		.BMP importer/exporter
@@ -388,6 +327,39 @@ Major subsystem tasks to do
 		UnrealEd -> UnrealStudio?
 		Eventually need drag box and brush grouping, group showing/hiding?
 		Need Edit Brush option! Yeah!
+		* Better brush stretching functions for making brushes fit.
+		* 2D shape editor - no diagonals, great gridsnap, vertex deletion,
+		  simple Doom features.
+		* Post "add to world" solid editting--I.E. take a column and beam and group
+		  them together--pull vertices around to change their configuration.
+		* Cutting and pasting (being able to select a group of solids and copy them to
+		  a new loacation w/o having to draw them in mid-air and de-intersect-save-etc....
+		* The ability to edit any brush at any time.
+		* Quick resizing of any brush with a mouse drag. (Lets you quickly match the
+		  length of a brush with another, or avoid filling any dialogue boxes.)
+		* Clipping planes. (Creating a plane with 3 points, then using it to subtract
+		  a portion of the selected brush on one side of the plane.)
+		* Vertice manipulation of 3D brushes.
+		* Clipping can be used to make *any* shape brush in seconds.  Absolutely no
+		  restrictions.  Clumsy subtractions are never necessary.
+		* Don't try anything but BSP.  BSP has every bit of functionality of the other
+		  editors, plus a ton more. (Including clipping!)  It is also the most stable
+		  of the bunch. (It hasn't crashed on me since v.12a)
+		* Edit-brush option: Vertex manipilation, retexturing.
+		* In any 2-d window, 2 or 3 'clipping points' can be placed with shift-right
+		  click.  If 2 are placed, then the 3rd point for the clipping plane lies on
+		  the visible line created by the first 2 points, in whatever 2d view you are
+		  placing them.  After these points are placed, BSP shows only what lies to
+		  one side of the plane that is created by these 3 points.  (The 'normal' of
+		  the plane can be flipped with a button, causing the other side of the brush
+		  to be missing.)  At this point, any of the clipping points can be moved in
+		  any of the 2-d windows, altering the clipping plane, as well as the selected
+		  brush.  Once you have it exaclty like you want, just hit the clip button.
+		  BSP actually deletes the old brush and puts the new one in its place.  There
+		  is no information saved on the actual 'subtraction' process. 
+		* Subtraction actually changes the target brush, instead of placing 
+		  'subtraction' brushes. Yes, intersect/deintersect actually chages the brush 
+		  too, but only for the current brush.  Revision is a huge part of editing!
 
 	Main loop
 		Start in clean, no-level play state (later demo loop etc)
@@ -413,7 +385,7 @@ Major subsystem tasks to do
 		Xmas lighting
 		Volumetrically lit fog with proper Z-clipping
 
-	Game ideas:
+	>>Game ideas:
 		Girders with high-res masked textures
 		Huge spider with thick legs
 		Flashlight, perhaps gun-mounted
@@ -432,7 +404,6 @@ Major subsystem tasks to do
 		Indestructable admin players, can become invisible etc.
 
 	>>Edge renderer
-
 		Hedge links
 		Perfect ael clipping and sorting
 		Debug checks from hell
@@ -521,947 +492,1122 @@ Major subsystem tasks to do
 		they don't speed up (or slow down) the engine anymore.
 
 ///////////////////////////////////////////////////////////////////////////////
+Things to ponder
+
+* In Fourier theory convolution in the space domain is equivalant to 
+  multiplication in the frequency domain. One can perform collision checking 
+  using just a point by convolving the world with the collision volume of an 
+  object. Is there a representation of polygon objects that is analogous to 
+  the frequency domain of a signal, which would enable easy convolution of
+  the world?
+
+* Is there a way to perform texture mapping directly from a texture stored in
+  its frequency domain?  If so, this would be an extremely powerful technique
+  because:
+    - Filtering quality would be ideal, because there would be no bilinear/bicubic
+      artifacts.
+    - Antialiasing would be ideal, since the source texture could simple be
+      convolved (multiplied) by an anisotropic filter kernel which is a function
+	  of the current texel's distance, orientation, and slant from the viewer.
+    - Microtexturing would be natural, because a microtexture could be applied with
+      a different tile size than the source texture.
+  o(n*m) per pixel method:
+    - It is trivial to perform slow fourier synthesis texture mapping simply by
+      computing the n*m cos terms of the fourier expansion for each point.
+    - The n*m method could be accelerated by following the n*m cosine terms
+      along the rational linear path corresponding to a scanline. Mathematically
+	  this can be accelerated by using a cos lookup table, or by using the
+	  cos(a+b)=cos(a)sin(b)-cos(b)sin(a) expansion where [or something like that]
+	  cos(a+b*t) can be determined with a sqrt but no cos/sin terms.
+  o(n+m) per pixel method:
+    - Perform a simple separation of variables and perform 1D fourier transforms.
+  o(??) per pixels methods:
+    - Use the FFT to reduce computational complexity.
+  o(a*b) method:
+	- The sinc filter analogy of this is the basis of more traditional anisotropic
+	  texture filtering methods.
+  Is this tractable in realtime?
+
+* Volumetric lighting.
+  - Clip spherical integration to arbitrary shapes like cones.
+  - Clip spherical integration to a polygon-bounded hull or BSP using boundary raytracing.
+  - Integrate a cone function.
+
+* Audio.
+  - Precompute a raytraced or radiosity-like solution to the sound dampening/echoing problem
+    per node/zone, taking into account room geometry and absorptivity of materials/material 
+	families and interpolate between adjacent nodes/zones as the player walks along. This
+	would require convolving the output sound stream by the precomputed filter. Is this
+	tractable in realtime?
+
+Here it is: Recently, style sheets were introduced
+to the web. They allow web sites to write some basic HTML, and
+then reference a separate file that applys a style (like
+all headers are green witha black background, etc.) If you want to change the style of your web site, you just
+reference a new style sheet. - all of your web content stays the same.(the actual text.) My idea is this:
+why not have a similar concept in UnrealEd?
+
+Environment postprocessing - adding things like snow/moss/damage to levels based on
+algorithms. Very applicable to terrain, perhaps also to regular geometry.
+
+•You should be able to see yourself. Look to the side, you see your shoulder. Look down, 
+you see your feet. You fire downward... make sure not to blow your toes off!
+•Guns, ammo, powerups, etc... actually *LIE* on the floor, not hovering there spinning and 
+making you wonder what keeps them up. Yes, this does occasionally make them harder to see, 
+but that would make it more interesting :)
+•In multiplayer, you can actually _see_ what weapon your opponent carries, and base your 
+tactics on that knowlege, rather than waiting till he fires. That is too often 
+fatally too late.
+•For the next generation of games: the water reflects slightly :)
+•Enemies, when gibbed, leave their gibs behind, rather than Quake's rampant heads (or, 
+leaves a random body part behind)
+•Deformation of walls when hit (at the very least, sprite bulletholes, etc...) 'Twould 
+be very cool: you fire tarydium at a wall. Some stick into it, while others shatter, leaving 
+tarydium dust and shards on the floor).
+
+Fix the friggin zone bugs
+searchlights should upd in UnrealEd
+Camera w/ player controls w/o focus sucks CPU time
+Import loses panning bug
+Turning player controls on then off screws up some dyn lite fx in UnrealEd Sky8 well
+fix counter %i
+
+///////////////////////////////////////////////////////////////////////////////
 	Past work log entries are in TimOld.txt
 
-///////////////////////////////////////////////////////////////////////////////
-10-24-96
+///////////////////////////////////////////////////////////////////
 
-+			Unzoned polys are drawing with backdrop shading
-+			DaySkyBrightness, NightSkyBrightness
-+			Scale backdrop lights by brightness, use effects
-+		Backdrop lights zero effect on surfaces
-+		Finish up any remaining needed parametrization (level entry text)
-+		Change BT_'s to remove ghost, glow.
-+		Bumped MAX_CLASS_PROPERTIES=384.
+===0.863d
++	Actors.
++		LevelInfo sky needs no-smooth option: bNoSmoothSky
++		AActor Fatness
+X		Add SkyShader to LevelInfo sky, use in UnLight.
 
-+	Kill UnrealEd farceiling.
-+	Rearranged UnrealEd surface flags
-+	Mirror sky option
-X	UnrealEd NoteClassChange leaves unwanted slider visible -> Gone?
-+	No GServer refs in rendering code!
++	UnrealEd.
++		Import after rebuild crash?
++		Closing the mesh browser still sucks away CPU cycles. Close its window.
 
-+	Merged Mark's latest code. Piece o' cake!
-+	Added all .tcx files to a new 'Classes' project in project for convenience.
+===0.863e
++		Make sure all dlgs support long filenames's including multiselect ones.
++		Fixed all common dialogs to support long filenames.
++		Can't load read-only files in load-actor-class (.u).
++		Test all the loaders with read-only files.
+
++		Retest the suites.
 
-+	Better solution to requiring power of two textures in fonts -> now they don't show up in browser
-+	Renamed bStaticActor to bStatic
-+	Added bNoDelete to inhibit actor deletion
-+	LevelDescriptor = non-static, nodelete
-
-+	Pawn needs editable 'Camera' properties tab for fov and other cool params.
-+	Changed unused bInactive to bSleeping, will be used to indicate that an actor need not be
-+		ticked.
-+	Changed bPegged to bUnused4.
-
-+	Added ScriptRate, which defaults to 1. This is the number of ticks between script updating for
-+	each actor, so that actor scripts don't have to continually execute for low priority actors.
+///////////////////////////////////////////////////////////////////
+
+===0.863f
++	UnrealEd script editor.
++		Find must highlight word.
++		Find and replace.
++		Save and restore cursor position between recompiles.
++		^C/^V and edit-copy/edit-paste use different clipboard? Use Clipboard.Clear.
+
++		Undo/redo cursor and top positioning.
++		Torture test undo/redo.
 
-+	Added ASpotlight to ALight
++		Shift-tab autoindent doesn't indent last line.
++		Autoindent misses last line.
+
++		Enter mark undo point.
 
-///////////////////////////////////////////////////////////////////////////////
-10-25-96
-
-+	Implemented volumetric lighting.  Unbelievably cool!
-+	It is unlikely that anybody will accuse the volumetric lighting code of being too fast.
-X	Only get 640x400x16 on 2meg cards? -> Must be your DirectDraw driver
-
-///////////////////////////////////////////////////////////////////////////////
-10-26-96
++		Remember script window pos and top.
++		Remember script window pos and top for undos.
++		Tweak undo/redo usability.
 
-+	V-lighting improvements:
-+		Sphere fast intersect rejection at the point level.
-+		What's up with the random artifacts?
-+		Adjust smoothly to avoid interior and edge aliasing of volumetric regions.
-+		Any more inner loop optimizations
++		Save ALL scripts when press F6/F7 or when focus changes.
++		Remove UnrealEd "save class" - now there is only "savebelow".
 
-+		Separate volumetric and regular lighting via zone, systemize the code.
++		Enter conserve cursor position if before last tab.
+X		Autosave no setfocus; kills DirectDraw.
 
->	That virtual memory bug is on your list, right?
->	The bug where, if you scroll through the texture browser too much by holding
->	the slider bar, the editor crashes.
-+	Fixed, I think. Send log if anyone sees this again.
++		Fix message loop time sucker when we don't have focus.
 
-+	Wavy bug in unshaded mode.
++	Importing more than one map messes up the texture browser window.
 
-+	SIOBHAN26a.ZIP in my directory under /maps has this problem with the
-+	rotating bridge... You'll see it as soon as you walk through the door and
-+	come to the top of the ramp. (Doors and simple lifts aren't a problem. ) 
+///////////////////////////////////////////////////////////////////
+5-17-97
 
-+	Fake Backdrop etc should equate to unlit.
+===0.863g
++	Generalize mesh rendering code to hardware and software.
++	Mesh phong shading.
 
-+	no alt enter in camera children
+===0.863h
++	Clean up FTransform.
 
-+	Lessen ambient scaling, 0.5 or 0.3 (is this nonlinear?)
+===0.863i
++	Made FScreenBounds floating point.
++	Eliminated FTemp.
 
->	I get a 'Error 13 Type Mismatch' and a massive crash when I type two
->	periods (as in 1..0 instead of 1.0) in the custom scaling number fields
->	on the Polygon Properties request and then select 'apply' 
->	This is 100% reproducible. 
->	I attached the log if you need it.
-+	Fixed
+===0.863j
++	Added Normal to FTransSample.
++	Phong shading.
++	Subdivision with t-junction removal.
 
->	BTW An autosave with number will be cool : auto01 , auto02 ... (One more
->	Barracuda please :-)) - as an *option*.
-+	One barracuda implemented, see preferences for option.
+===0.863k
++	Fatness.
++	Backfacing.
++	Colors not being clipped?
++	Alpha interpolate in.
+X	Teleport-in effect
 
-+	dbg ver fails link
+///////////////////////////////////////////////////////////////////
 
-///////////////////////////////////////////////////////////////////////////////
-10-27-96
+===0.863m
++	Animation tweening setup.
++		UMesh::GetFrame return a cached set of FVector's; no UCamera parm.
 
-+	Renamed all FVirtualXyz classes to FXyzBase for better class browsing.
-+	Renamed all AXyzHelper classes to AXyzBase for consistency.
-+	Had to change UNGAME_API to DLL_EXPORT in Root.h to prevent linker errors.
+===0.863n
++	Tweening setup.
++		Looped and one-shot animations now both generate AnimEnd messages at frame n-1,
++			even though looped animations loop at frame n.
++		FinishAnim from a loop finishes with frame n-1.
++		ULevel::Tick update.
 
-+	Rewrote creature rendering code adding good support for 16/32-bit.
-+	16/32-bit texture viewer works!
-
-+	16/32-bit texture viewer and span drawing code (q&d)
-
-///////////////////////////////////////////////////////////////////////////////
-10-28-96
-
-+	Changed cheetah to cheat. Quirky != fun.
-+	Added FVector::Normalize.
-+	Fix flatshaded drawing code.
-+	Fix highlighting in high color modes.
-+	Icons.
-
-+	Creature optimization.
-+		Build and save out span buffers, skipping empty span buffers.
-+		Sped up creature rendering in the game by a factor of 2, with a
-+			brilliant optimization -- stop drawing them twice per frame. :-P
-X		Chunk pool, reuse nonleaf chunks as filter new ones down.
-+		Prepare rasterization cutter for optimization.
-+		Span clipped flat shaded.
-+		Separate span rendering loop into two passes for better MMX support.
-
-///////////////////////////////////////////////////////////////////////////////
-10-29-96
-
-+	Common sense optimizations:
-+		MeshesGen!=0 with all static lighting! -> No player lightsource.
-+		Eliminated stupid iUniquePlane usage.
-+		Discovered and fixed many zone-related moving brush bugs. :-P
-+		Fixed moving brushes
-+		Fixed moving brush coplanar bug (Kootch et al)
-+		Gack!!! Actor lighting code was performing O(n^3*log n) line of sight logic! I'm an idiot!
-+		Optimize all physics code using PlaneDot!
-
-+	Quick test: Rebuild bsp heuristic that tries hard to minimize the number of
-+		zones that are shared between front and back. -> Bizarre unbalanced performance,
-+		why???
-
-///////////////////////////////////////////////////////////////////////////////
-
-New rendering technique:
-
-L1 cache thrashing due to span buffering and bsp traversal in the occlusion 
-phase of Unreal is now the main performance bottleneck, and will become a 
-larger and larger bottleneck as levels grow in complexity.  As a result, I am
-trying to switch to a new, non-bsp portal rendering mechanism which has the 
-following characteristics:
-
- - Generates seamless, not necessarily convex, zones bounded by occluding 
-   polygons and by portals.
-
- - For game rendering, zones contain only linked sidelists, in no special order.
-
- - Begins by active-edge-table rendering the edges in the viewer's zone and 
-   adding edges from adjacent zones as visible portals are encountered using
-   seh.
-
- - Zoning process generates fewer zones than Bsp leaves, opting to merge adjacent
-   convex volumes when generating portals would be wasteful.
-
- - Rebuilds the Bsp with the intent of minimizing portal area and balancing the tree.
-
- - Maybe perform interpenetration checking between world polys and moving brush polys so
-   that moving brushes need not be added to the Bsp.
-
- - Eliminates redudent sides (sides which have the same surface on both sides).
-
- - Generates merged spans, as do the current routines.
-
- - Processes creatures using the same technique, by placing cutout feelers in the
-   aet and using seh to generate creature polys on demand.
-
- - The resulting solid world spans are drawn in order of texture than light mesh,
-   while masked spans are drawn in order of polygon z-sort.
-
-Note that this requires no Bsp traversal, is entirely L1 cacheable, and can
-be designed with o(n log n) sorting throughout.
-
-On 3D hardware, the same setup can be used with a vertical intersection
-algorithm to compute the numerically exact list of visible polys to render
-without resorting to any rasterization or discretization.  Note that vertical
-intersection can be ordered with o(n log n) sorting which requires only floating
-point multiplies.  This is awesome for exploiting concurrency between the rendering
-hardware and the processor.
-
-On multiprocessor PC's, and on 3D accelerated PC's, one processor can be set to do 
-all dynamic lighting calculations for the previous frame's set of visible polys 
-(using a locked caching mechanism) and v-lighting, while the other performs 
-visibility computations and texture mapping.
-
-///////////////////////////////////////////////////////////////////////////////
-10-30-96
-
-+	Fixed way off msec timer
-+	Edge list experimentation
-
-///////////////////////////////////////////////////////////////////////////////
-10-31-96 Halloween
-
-+	Fixed sidelink crack bug.
-+	Edge renderer work.
-+	Note: 1000 polygons @ 640x480 = 300  pixels each, 25 scanlines each = 300K span buffer mem.
-+	Note: 200 polygons  @ 640x480 = 1500 pixels each, 60 scanlines each = 150K span buffer mem.
-
-///////////////////////////////////////////////////////////////////////////////
-11-1-96 & 11-2-96 & 11-3-96
-
-+	Optimized transformation cache.
-
-	+	Worst case occlusion performance in Jorus at starting point =
-	+	33.0 msec to begin with.
-	+	25.0 with removal of intrasurface edges.
-	+	23.0 with duplicate division removal.
-	+	22.0 with assembly language clipper and outcode generator.
-	+	21.0 with some FGlobalRender statics.
-	+	20.5 with some branch minimization.
-	+	19.5 with some lameass VC++ workarounds.
-	+	19.0 with better cache alignment of FTransforms and extraneous edge removal.
-	+	20.0 after implementing surface cache.
-	+	18.5 after backface rejection.
-	+	16.7 by changing backface order.
-	+	20.5 after fixing bug preventing all vertices from being recognized. :-P
-	+	20.4 after full, proper cosidal merge.
-	+	19.9 by customizing optimization options (shouldn't have effect!) Augh.
-	+	17.3 by disabling guard mechanism. Aha!
-	+	17.2 with minor GetPoint optimization.
-	+	15.4 after previous-frame coherent pretransformation outcode reject.
-	+	14.4 with some simple reorg to appease the VC++ optimizer.
-	+	14.3 by padding FTransform and performing memset optimizations.
-	+	14.2 by merging duplicate surfs (should be a huge rendertime improvement though!).
-	+	14.0 after merging duplicate points (expected more).
-	+	13.9 by fixing broken merging code.
-	+	13.8 by eliminating collapsed polygon fragments.
-	+	11.5 by removing semisolids and reoptimizing Bsp. Wow!
-	+	11.0 by hellishly optimizing Bsp.
-	+	10.9 by modifying point cache code to improve branch prediction.
-	+	10.8 by minor improving conditional branching.
-	+	11.1 with surface cleanup routine (will be faster on average).
-	+	Overall: 3X speedup, not bad.
-
-	+	PentiumPro has some strange alignment<->performance characteristics. It often
-	+		favors 8-aligned stuff for no apparent reason.
-	X	Early backface reject based on side's last-frame backfacing. -> Complexity slowdown.
-	+	Fast bitvector code (asm get/set).
-	X	Optimize backface removal for caching with surface plane table -> Slowdown due to L2 usage.
-	X	Optimize GetPoint. -> Slower for some reason.
-
-+	Properly-clipped convex volume renderer:
-+		Flatshade routine.
-+		Properly set LeftSurf, RightSurf according to up/down facing.
-+		Perfect unclipped convex volume rendering.
-
-///////////////////////////////////////////////////////////////////////////////
-11-4-96, 11-5-96
-
-+	Active edge list x-clipper.
-+	Struggling with active edge list clipping logistics.
-
-///////////////////////////////////////////////////////////////////////////////
-11-6-96
-
-+	Phase 1.
-+		Build list of all edges in the world excluding duplicates, pass to code.
-+		Draw edges as 3D lines.
-+		Clip edges as 3D lines.
-+		Proper start bucket and active edge tracking and line rendering.
-
-///////////////////////////////////////////////////////////////////////////////
-11-7-96
-
-+	Created IUnrealServer Ole interface to UnrealServer.
-
-///////////////////////////////////////////////////////////////////////////////
-11-8-96
-
-+	Full UnrealGate user interface prototype.
-
-///////////////////////////////////////////////////////////////////////////////
-11-9-96
-
-+	UnrealGate protocol design.
-+	UnrealGate basic server implementation.
-
-///////////////////////////////////////////////////////////////////////////////
-11-10-96
-
-+	UnrealGate client design.
-+	UnrealGate client & server communication.
-
-///////////////////////////////////////////////////////////////////////////////
-11-11-96
-
-+	Research RFC1459
-
-+	Notes:
-+		Spanning tree master server architecture or peer master servers?
-+		Operator class users = server admins or dm's? Figure out hierarchy.
-+		Freeform client channel creation? Reserved channels?
-+		#channelname
-+		invite & kick
-+		topic
-
-+		Names:
-+		#Channel
-+		*Server
-+		@Operator
-+		!Admin
-
-+	Morn:
-+	>  Well, we could have a basic rfc1459-like message format like this
-+	>
-+	>[:<nick>!<username>@<hostname>] <command> [<par1> [<par2> [...]]]
-+	>[:<trailing>]
-+	>
-+	>  This is basically how IRC works... ok, now let's say someone enters a
-+	>level/chatroom/whatever, the message would be
-+	>
-+	>  :Tim!tim@timpentium.epicgames.com JOIN 2
-+	>
-+	>  ..."2" being the level number on the server. Now every player on that
-+	>level would get a message "Tim has joined the game. Feel his wrath". :)
-+	>
-+	>  A message would be this:
-+	>
-+	>  :Tim!tim@timpentium.epicgames.com SAY 2 :Hey guys... you will die now!
-+	>
-+	>  ...and everyone on that level (2) would get the message "Tim says: Hey
-+	>guys... you will die now!".
-+	>
-+	>  A message to an "external" channel would work like this:
-+	>
-+	>  :Tim!tim@timpentium.epicgames.com INVITE Morn unreal.epicgames.com 12999
-+	>
-+	>  ...this would invite "Morn" to join the game running at
-+	>unreal.epicgames.com port 12999... a message would pop up in Morn's client
-+	>saying "Tim has invited you to join his game at unreal.epicgames.com. What
-+	>would you like to do? Join/Get level info/Deny"... etc, I think you get the
-+	>idea.
-
-+	Neutral zones?
-+	Cult homeworlds?
-+	Cult skin accumulators?
-
-+	UnrealGate testing & experimentation
-
-///////////////////////////////////////////////////////////////////////////////
-11-12-96 & 11-13-96
-
-+	Speedup geometry rebuild while keeping exactness of bsp rebuild.
-
-X	Reduce ULevel locks per frame to 1 (collision locking is very very slow).
-X	Only perform collision and moving brush work when locking level for tick.
-X	Don't lock collision stuff for rendering. -> Eliminated speed impact.
-
-X	>Engine limitations may prevent this, but what would be truly 
-X	>awesome and realistic, IMHO, is for light to flood a room
-X	>when opening a door to a bright room, from say a very dark room.
-X	>It would be truly incredible to do, to see a beam of light illuiminate
-X	>a section of floor (fanning out) and perhaps cast a bright light on 
-X	>an opposing wall in the room, perhaps revealing a secret etc....
-X	>When the door closes, the light is gone, just as would happen in 
-X	>a real situation. Is there any way to accomplish this?
-X	-> Maybe later.
-
-+	>>If I try to select "INVISIBLE COLLISION HULL" from the "ADD SPECIAL"
-+	>>dialogue box, I get a RTE 380- Invalid Property Value.
-+	Fixed invisible collision hulls.
-	
-+	Moving brush coplanar bug: Kootch entryway.
-+	Fixed all known moving brush bugs.
-
-///////////////////////////////////////////////////////////////////////////////
-11-14-96
-
-+	The CyberLore team are experiencing an UnrealEd crash when entering numbers
-+	in the primitives properties boxes. This is on a fairly regular but random
-+	basis. I've sent their log files (2) to the /bugs directory.
-+	Line(4) bug, fixed.  What the heck is this about Windows font smoothing???
-
-+	>>The other thing we're doing now is to save it as a T3D, and then import it
-+	>>in the current map. What we need to do then is to select all brushes in this
-+	>>sub-map, and move the whole selection around.
-+	>When you import a new map into the current map, the new brushes should all
-+	>be selected.  Are they not?
-+	They're not selected when you import them into an existing map.
-
-+	debugf (LOG_Info,"Error opening %s",DataFile);
-+	where data file is of type FILE *.  -> Thanx Mike
-
-///////////////////////////////////////////////////////////////////////////////
-11-15-96
-
-+	Gatekeeper protocol definition.
-+	Gatekeeper experimentation.
-
-///////////////////////////////////////////////////////////////////////////////
-11-16-96
-
-+	Gatekeeper Ole interface.
-
-///////////////////////////////////////////////////////////////////////////////
-11-17-96
-
-+	Gatekeeper remote property editing and browsing.
-+	Scrapped Ole interface in favor of cleaner TCP interface.
-
-///////////////////////////////////////////////////////////////////////////////
-11-18-96
-
-+	Rewrote Gatekeeper using database/subscriber paradigm.
-
-///////////////////////////////////////////////////////////////////////////////
-11-19-96
-
-+	Silhoette edge occluded experimentation
-+	Integrated Eric's new spanbuffer code
-
-///////////////////////////////////////////////////////////////////////////////
-11-20-96
-
-+	Gatekeeper database grid updating
-
-///////////////////////////////////////////////////////////////////////////////
-11-21-96
-
-+	Researched HTTP protocol.
-+	Researched FTP protocol.
-+	Revised Gatekeeper protocol.
-
-///////////////////////////////////////////////////////////////////////////////
-11-22-96
-
-+	Gatekeeper docs overhaul
-+	Started gatekeeper discussion group
-+	Experimented with edge rendering code some more
-
-///////////////////////////////////////////////////////////////////////////////
-11-23-96
-
-+	Next generation gaming interview - cool!
-+	Played a bunch of new games.
-+		Sorry but Tomb Raiders looks and plays awful.
-+		Amok is extremely cool - I think this team will go on to produce major hits.
-
-///////////////////////////////////////////////////////////////////////////////
-11-24-96
-
-+	Worked on Gatekeeper stuff.
-
-///////////////////////////////////////////////////////////////////////////////
-11-25-96
-
-+	Gatekeeper level launching and crash detection
-+	Unreal 0.85 cleanup
-
-///////////////////////////////////////////////////////////////////////////////
-11-26-96
-
-+	Can't click on menu-down in add-actors mode.
-+	Highlight meshes in 3d views.
-
-+	jschreiber bug indicates that 24-bit (or some weird colordepth?) crashes. -> Fixed it.
-	
-X	Texture browser needs Find filter (checkbox, goes to all). -> No it doesnt get out of
-X	the DOS ages my friend.
-
-X	>I can't select individual verticies of moving brushes in order to make them
-X	>pivot on a particular vertex. (used to be able to)
-X	-> You HAVE to select your pivot before you add it as a moving brush.
-
-+	We used to be able to replace a moving brush in MapEdit mode by loading the
-+	desired brush, going to Display on the moving brush properties, and then
-+	hitting Use Current under Brush. This isn't working anymore, in case no one
-+	else noticed (or did I miss an earlier post). -> Fixed
-
-+	UnrealEd fixes
-+		After load tex fam, try to go to that family
-+		New Level while actor props dialog is up crashes
-
-+	Rotating brushes need to move the player according to their rotation: Kootch.
-
-X	Make copy-to-brush work w/ moving brushes. -> No way to select them.
-
-+	Invisible polys: cast no shadows.
-+	Eliminate unused special brush types.
-
-+	Pawn:
-+		Player-name=string
-+		Player-team=string
-+		Renamed Woman to Human.
-
-+	ZoneDescriptor:
-X		NoBot zones.
-+		Team-only zones.
-
-+	Zone color and volumetry screwed when not in a zone
-
-+	Root:
-X		MeshSkin1 & MeshSkin2 -> handle via team name associations (separate system).
-+		SoundRadius, SoundVolume
-
-+	Major actor class overhaul.
-
-X	FName -> FName pointer! -> It's faster not to, since names can be hashed consistently.
-
-+	Show actor selection with meshes by highlighting them.
-
-///////////////////////////////////////////////////////////////////////////////
-11-27-96
-
-+	Gatekeeper level launching and management
-
-///////////////////////////////////////////////////////////////////////////////
-11-28-96
-
-+	Scripting experimentation.
-+	Played Tomb Raiders.
-+	Played Amok.
-
-///////////////////////////////////////////////////////////////////////////////
-11-29-96
-
-+	Thanksgiving and stuff.
-
-///////////////////////////////////////////////////////////////////////////////
-11-30-96
-
-+	Pawn needs buttons & axes
-
-+	FovAngle
-+	Bump ResFile version
-+	PF_Gouraud for Gouraud surfaces? This is getting messy...
-
-+	Lighting fixes
-X		Dynamic lights should have no incidence effects. -> Looks weird.
-
-+	Test unguardf
-+	Eliminate #ifdef PARANOID
-+	Added string array support
-+	Fixed alignment problem with class inheretance.
-
-+	NameAddHardcoded "None!"
-+	No purge hardcoded names.
-
-+	Internal fixes
-+		UnBuild version
-
-+	Use IsPerActor! No AActorBase::EPropertyBins directly.
-+	Remove (void)s
-+	FClassProperty::IsTrue -> Deleted.
-+	FClassProperty::Compare
-
-+	Event lines are drawn with NAME_NONE!
-+	Fix header exporting.
-
-///////////////////////////////////////////////////////////////////////////////
-12-1-96 & 12-2-96
-
-+	Rewrote FMemoryCache
-+		This is an example of the kind of subsystem implementation that is
-+			appropriate for Unreal:
-+			- Simple design.
-+			- Algorithmically fast implementation.
-+			- Minimal use of weird advanced C++ features.
-+			- No extraneous class definitions, typedefs, etc.
-+		Get is >4X faster!
-+		Create is >50% faster.
-+		Can see what's happening with the cache graphically.
-+		Half as much code.
-+		Time to implement and debug, 11 hours.
-
-+	Importing maps needs to remap actor indices (right now to account for
-+		leveldescriptors and for merge imports). Test carefully.
-+	Sensible cache stats: Num gets, num creates, create time.
-
-+	Load texture family is broken!
-+	ExportActorProperty: Unknown name in light class.
-
-+	Static variables - SCRAP THEM! AUGH!
-
-X	Astoundingly bizarre frame of reference bug with moving brushes! -> Fixed.
-
-///////////////////////////////////////////////////////////////////////////////
-12-3-96
-
-+	Flush: Unhashed item after rebuild.
-+	After full flush assure that there's only one item.
-+	Changing zone properties doesn't always cause relight.
-+	No Actor Index=, just use Me=...
-+	Weird new node disappearing rendering problem. Seems to have disappeared (great).
-+	Delete old tmapping code.
-
-+	Consolidated Cache ID's.
-+	Now have a global system for assigning cache id's (no overwrites anymore).
-
-+	Totally moronic bug found: The reason 8-bit color thrashes so horribly is because
-+	I was allocating >10 times the amount of space that's actually required. 
-+	(Stupid programmer!)
-
-+	Full proper cache locking everywhere in highcolor.
-+	Proper cache locking in 256-color (gets each texture 8 times).
-+	16-bit palette scalers are busted.
-+	Tex remapping allocating more space than needed for each mip?
-+	Must allow for multiple locks properly - one unlock per lock. Underflow check.
-
-+	Standard zone palette lookup table functions for actor shading.
-+	UnrealEd with cache locking.
-
-+	Is TexSetup doing unnecessary cache lookups?
-+	FGlobalSpanTextureMapper::SetupForPoly needs to hold lock.
-
-+	Get rid of GBlit.Setup stuff, use ITexture instead (somehow).
-+	Get proper zone lighting table for actors.
-+	Check !!
-+	Compute and show fps even if stats not defined.
-
+	Animation system variables.
+		AnimSequence  = Animation sequence to play or tween to.
+		AnimRate      = Normalized animation rate, or (Tweening Rate / NumFrames).
+		AnimFrame     = Current position in animation, 0.0-1.0, negative indicates tweening-to.
+		AnimEnd       = Sequence end for PlayAnim.
+
+		bAnimFinished = Indicates animation or tweening has finished.
+		bAnimLoop     = Indicates animation should loop.
+		bAnimNotify   = Whether the animation sequence has any notifies.
+
+	Tweening caveats:
+
+		To support tweening perfectly would require too much memory and network bandwidth, so I
+		use a frame-cache approximation to tweening which works well nearly all of the time.
+		The case where it may look strange is when an actor first comes into view when
+		it's in the middle of a tween. In this case, the tween source may not be the correct
+		frame, so the actor's animation may look strange. This is always safe and won't cause
+		any harm, but it may look strange in some infrequent cases.
+
+///////////////////////////////////////////////////////////////////
+5-17-97
+
+===0.863o
++		Backup.
++		TweenAnim work.
++			Proper FinishAnim() handling.
++			Proper AnimEnd handling.
+
+===0.863p
++		Frame tweening.
++			Test tweening with random interruptions.
++			Tweening is now continuous.
+
++		Tweening must be able to lead into a PlayAnim/LoopAnim smoothly.
++		PlayAnim's must morph together.
++		execTweenAnim.
++		UMesh::GetFrame update.
++		Playing single frame animations must work (tween only).
+
+///////////////////////////////////////////////////////////////////
+
+===0.863q
++		SpawnActor needs an owner.
++		Remove ETrace.
+
++		Fix ULevel::Trace.
+
+===0.863r
++		Updated the scripts.
+
+///////////////////////////////////////////////////////////////////
+
+	Move towards the new "primitive tree" rendering architecture:
+	1. Separate UModel and ULevel.
+	2. Merge ULevel and UActors.
+	3. Eliminate the ALevelInfo actor class (now use ULevel directly).
+
+///////////////////////////////////////////////////////////////////
+
+===0.864a
++	Separate UModel and ULevel.
+
+===0.864b
++	Separate collision hash table into FCollisionHash.
+
+===0.864c
++	Merge ULevel and UActors.
++	Level->Max problem.
++	ULevel::Lock is complicated which is bad for StandardSerializeData.
++	Update import/export code to handle this new approach.
++	Torture test importing/exporting/playing.
+
+///////////////////////////////////////////////////////////////////
+5-20-97
+
+	Force feedback: There are three kinds of force feedback support coming
+	in Unreal:
+
+	* Ambient forces, which are directly related to ambient sounds
+	  (ambient forces share paramters with ambient sounds); these are
+	  emitted by one actor at a specific location, and they affect all
+	  actors in their ambient radius.
+
+	* Surface forces, which are generated by the texture the player is
+	  standing on; one of these surface forces can be set for
+	  a player representing the force feedback related to his moving over
+	  a blumpy surface, or through water.
+
+	* Impulse forces, instantaneous force feedback responses that are
+	  generated by PlayForce script calls, and affect a certain player.
+
+	All actors variables:
+		enum AmbientForceType.
+			AFT_None
+			AFT_Machinery.
+			AFT_Rumble.
+			AFT_Shake.
+
+	Pawn variables:
+		enum SurfaceForceType.
+			SFT_None: No surface force feedback.
+			SFT_StillWater: Still water.
+			SFT_FlowingWater: Flowing water.
+			SFT_Rocky: Walking over a rocky surface.
+			SFT_Grate: Walking over a grate.
+		byte SurfaceForcePeriod: Period of the surface force, negative means scale
+			it by the player's velocity.
+		byte SurfaceForceMagnitude: Magnitude of the surface force.
+
+	Pawn commands:
+		enum EPlayForceType
+			PFT_SquareWave: Stay at full impulse for entire time.
+			PFT_RampUp:     Ramp up to full impulse then stop.
+			PFT_RampDown:   Start at full impulse then ramp down.
+			PFT_Smooth:     Smoothly ramp up then back down.
+			PFT_Decay:      Start at full force then decay exponentially.
+		PlayForce( PlayForceType Type, vector Direction, float Time );
+
+///////////////////////////////////////////////////////////////////
+5-22-97
+
+===0.864f
++	Test exporting!
++	Fix the ugly sky.
++	Separate cloudcast texture.
+
++	intrinsic(295) final function PlayForce( EPlayForceType Type, vector Direction, float Time );
++	intrinsic(296) final operator(16) vector *     ( vector A, vector B );
++	intrinsic(297) final operator(34) vector *=    ( out vector A, vector B );
+
++	Componentwise vector*vector(296).
+
+===0.864g
++	Cleaned up UnrealFile format.
+
+===0.864h
++	Eliminated object-header-size fragility in UnrealFiles.
++		This solves the "fragile base class" problem for class loading and saving,
++		though is still remains in script variable references.
+
+===0.864i
++	RF_Import.
++	Merge exports and imports, NumImports+NumExports->NumObjects.
+
+===0.864j
++	Clean up imports and exports.
++	Mesh no-curve flag.
++		bMeshCurvy.
+
+===0.864k
++	int FGlobalPlatform::FindFile( const char *InFilename, char *OutFilename );
++	FIND_PATHS
++	Proper map loading from paths, command line operation.
+
++	Retest game loading/saving.
++		Saving is fine.
++		Fixed load spawning an extra player.
++	Retest the suites.
+
++	3dfx.
++		Now properly handles fullscreen 3dfx mode (two monitors not required!)
++		New GoHard console command (can place in bind.mac).
+
+===0.864m
 +	UnrealEd
-+		PF_Gouraud
-+		Version
-+		Results window - move down.
-+		curved stair text
-+		Isn't going to default category on select anymore?
++		When add new class below and highlight the new class, need to select it
++			in the edserver.
++		Fixed bug adding actor to the world immediately after adding new class.
 
-X	Add more noise to mips to hide shadow flaws.
++		Merge imports and exports together, imports need RF_Import, so that resources
++			can be exported/imported in proper order.
++		Hardcoding Export.FileLoadHeaderSize exposes the fragile base class problem; this should
++			only represent the properties defined in the particular class, and be relevant to
++			the parent class.
++		Eliminate the remaining class-loading hacks.
 
-X		AllowEdit, PreventEdit in scripts to retract/publish parent properties
-X		Use saved last-CacheIDs
-+		Proper cache item locking/unlocking
-X		Need 'update zones' button
-X		Semisolid -> 'detail' brush, allow subtractive?
-+		Build and merge creature clipping span buffer as filter through BSP
-+		Draw polys clipped to span, with 2-pass setup
+///////////////////////////////////////////////////////////////////
 
-+		Zone fog enabling, use existing ambient and nonambient parameters.
-+	Fix player standing on moving brushes that rotate
-+		Test touch/untouch carefully
-+		The moving brushes sometimes disappear (when frame 0)?
-+		The moving brushes disapppear when in same plane of Zone Portal?
-+		Compute all light brightnesses once per frame, and share them
-+	Implement NF_SEE_THROUGH, NF_SHOOT_THROUGH
-+		Pause key & menu option FUnreal.Pause, IsPaused() (Mark did this)
-+		Collision exclusion (blocks monsters, only triggered by players, only hit by projectiles)
-+			(Mark did this)
-+		Touch detection bugs - fixed a while ago
-+		Object cache size impact on performance -> if working set exceeds cache size
-+			then thrashing is the least of your problems.
+==== CONFIDENTIAL ====
 
-+		Actor variables
-+			ScriptCountdown for slow script execution
-+			TimerCountdown for the user timer
-X		Preload fire/alpha palettes.
+New features / changes.
+* To bring up the command line, press Tab or '~' (was 'T' in previous versions).
+* To fly, type Tab + "Server Fly" + Enter. To walk, use "Server Walk".
+* New status bar rendering is not in this version.
+* Loading and saving single player games works. The savegame files are huge at the moment, but they will later be reduced from a few megs each to a few hunded K each (storing only the changed objects).
+* We now support both 256-color .pcx files and 256-color .bmp files, so you can use whichever format is most convenient.
+* Geomtry size is now unlimited; there are no more overflow errors.
+* Great actor/world and actor/actor collision.
+* Great player controls.
+* Invisible collision brushes are now supported (but HighLedgeBlock is no longer supported).
 
-X		Tasks -> No multitasking
-X			Separate server task for each level?
-X			Separate task for each remote player?
-X			Proper player/camera associations in
-X				Local server, local client
-X				Local server, remote client
-X				Remote server, local client
-X			No server task in UnrealEd
+UnrealScript:
+* Java/C++ style object oriented scripting language.
+* Full range of standard C++/Java datatypes and operators, including advanced types like vector, rotation, object, actor, etc.
+* Latent, time-based execution.
+* Large documentation file coming soon.
+* Four-way calling interface (U->U, U->C, C->U, C->C).
+* Support for automatic runtime loading of the appropriate game DLL's.
 
-X		UnrealEd External tools interface -> not very useful
-X			Tools interface
-X			Example tool
-X			Tools documentation
+Rendering features:
+* Curved surface rendering for meshes (supports phong shading). bCurvy turns curved surface rendering on/off for particular actors (only affects meshes, not level geometry).
+* 3dfx support with colored lighting.
 
-+	Lighting fixes
-+		Stat for palette and texture regens
-+		Synchronize CloudCast, CloudReflect to backdrop.
-+		Fixed cylinder lighting.
-+		Make sure not rebuilding meshes unnecessarily.
-X		CloudReflect? -> Killed it, didn't work out, new effect coming soon.
-+		Cyllinder is static unless otherwise tagged dynamic.
-+		Fine tune spotlight class -> Use LightCone! Very cool!
-+		Static spotlights & dynamic spotlights.
-X		Update brightness via tick, from day & night bright.
-+		Count palette regenerates. Is this slowing things down? -> No.
+Gotchas:
+* Textures with extreme aspect ratios (like 1x8 or 8x1) don't display yet on 3dfx.
+* Moving brushes and actors don't collide; actors can walk through moving brushes. This is the next major thing I'm working on but everyone wanted 0.86 now rather than waiting for the brush fix.
+* 3dfx gamma correction isn't quite right.
+* Dynamic lighting sometimes "sticks" to surfaces.
+
+What I'm working on next:
+* Fixing moving brush collision.
+* New status bar rendering code.
+* UnrealScript docs.
+* 3dfx rendering improvements (fixing the sky, speed).
+
+///////////////////////////////////////////////////////////////////
+
+===0.864n
++	Prep for release.
++	Graphics.zip
++	Models.zip
+
+///////////////////////////////////////////////////////////////////
+
+===0.864o
++	3dfx.
++		Fix the status bar!
++		Automatic texture aspect ratio adjustment.
++		Fix the border.
++		Fixed transparency (was broken).
++		Test 3dfx masked textures.
++		rgba masked textures.
+
+===0.864p
++	Merged with Steven.
++	msvcrt.dll.
++	comdlg32.ocx.
++	oleaut32.dll
+
+///////////////////////////////////////////////////////////////////
+5-23-97
+
++	Fix 2d shaper (input but no dlgs).
++	Fix Delete.
+
++	Brightened actors in 3dfx.
++	Fixed bug causing a crash when selecting a brush vertex.
++	Fixed adding a moving brush is undoable.
+
++	Actor collision bug in Unreal.unr -> this bug was caused by Steven's workaround
++		to my old actor collision bug.
+
++	//  It is illegal to call out while inside message filter.
++	#define RPC_E_CANTCALLOUT_INEXTERNALCALL _HRESULT_TYPEDEF_(0x80010005L)
++	Fixed this! It was an RPC limitation: you can't make recursive RPC calls. 
++	Though this can be avoided, it really underscores some of the reasons why
++	OLE is a crappy framework to build applications on.
+
+===0.864q
++	Test release to Inoxx and Jeremy.
+
+///////////////////////////////////////////////////////////////////
+
+Fixed since initial 0.86:
+
+* Fixed problem with some (but not all) 3dfx boards seeing random colored
+  incorrect textures all over the place.
+* 3dfx now uses the same meaning of hue, saturation, and brightness as 
+  software rendering (was inverted).
+* The file-load and file-import dialogs were broken on some machines (the
+  installer now includes COMDLG32.OCX).
+* 3dfx masking and transparency weren't working (fixed).
+* Fixed broken 2d editor.
+* Fixed amazingly annoying "Runtime : 2147418107 (80010005)" problem.
+* Fixed problem: Player got stuck when standing on an actor.
+* Note: The texture format hasn't changed since the previous 0.86 so you can
+  keep your old textures. However, you will need to reimport your maps from .t3d.
+
+Notes for this version of 0.86:
+
+* AutoUPan, AutoVPan and wavy effects don't work with 3dfx yet.
+
+* When clicking on an actor, don't use the "Subclass and edit script": it's broken.
+
+* If you have any ZoneDescriptors in your level which you want to reimport
+  into 0.86 (such as Inoxx), you need to do this: Load your old .t3d file from 0.84
+  into Notepad.exe, and do a search-and-replace: replace all occurances of
+  the text "ZoneDescriptor" with "ZoneInfo". Then import it into 0.84.
+
+* When using masked textures (where color 0 is transparent), you also
+  need to make color 0 black. If color 0 is not black, you will get a
+  weird colored transparency effect on 3dfx.
+
+* Spotlights work, but I've extended them and maps imported from previous
+  versions might not contain all of the new properties. Make sure the following
+  properties are set for spotlight actors:
+
+  LightType = LT_StaticSpot (for static spotlights), or LT_Spotlight (for dynamic spotlights).
+      Most spotlights should be static. The only case where you need to make a spotlight
+	  dynamic is when you're going to write a script to rotate it.
+  bDirectional = True
+  LightCone = 128 (or some other value indicating the spotlight cone angle but NOT 0!)
+
+* The shadows on polygons with aspect ratios outside of the range 1:8 to 8:1 will
+  render incorrectly on 3dfx (possibly as weird blobby incorrect colored shadows).
+  I'll be working on this shortly.
+
+* 3dfx gamma correction is strange. To adjust gamma, type something like the following 
+  while in fullscreen 3dfx mode:
+  RENDEV SET GAMMA=2.0
+  RENDEV SET GAMMA=1.5
+  RENDEV SET GAMMA=1.0
+
+* Coplanar sheet brushes (made using the 'build sheet brush' and 'add special'
+  dialogs) aren't going to work anymore for decorations placed on walls. That
+  technique creates some major inefficiencies with hardware rendering and with
+  the new software rendering optimizations I'm planning. The problem is due to two
+  polygons overlapping. To get the same visual effect, now you need to add a cube 
+  (or some other brush) flush with the wall. This creates more polygons, but there
+  is no overlap. Sorry!
+
+Other notes:
+
+	The meaning of Hue (color wheel):
+		0     = red
+		27    = orange
+		39    = yellow
+		85    = green
+		123   = aqua
+		137   = light blue
+		170   = deep blue
+		194   = purple
+		255   = back to red again
+
+///////////////////////////////////////////////////////////////////
+
+ascention texture mapping
+-------------------------
+
+;
+; Pass 0: Init chunk table.
+;
+;-Init TexAddr
+;-Init FogAddr
+
+;
+; Pass 1: Texture and shader address setup. 6 c/p.
+;
+; eax = Temp address.
+; ebx = [g|vl].
+; ecx = [texel|loop counter]
+; edx = Texture base address.
+; esi = [vh|ul|uh].
+; edi = Chunk setup table.
+; ebp = [dg|dvl].
+; esp = [dvh|dvl|duh].
+;
+; Always works on 4-pixel wide aligned stripes.
+;
+; Variations:
+;   4 trilinears.
+;   12 usize.
+;
+mov eax,[mask]      ; Load texture address mask.
+and eax,esi         ; Get masked texture address.
+add ebx,ebp         ; Update g,vl.
+adc esi,esp         ; Update vh,ul,uh.
+add ebx,const       ; Dither const.
+adc esi,const       ; Dither const.
+mov [edi+5],bh      ; Store shader.
+rol eax,const       ; Maneuver address around.
+mov cl,[eax+edx]    ; Get texel.
+mov [edi+1],cl      ; Store in table.
+
+;
+; Pass 2: Fog and mapping = 8 c/p.
+;
+; eax = Texture address.
+; ebx = Fog address.
+; ecx = Texel.
+; edx = 
+; esi = Chunk setup table.
+; edi = Screen destination.
+; ebp = 
+; esp = 
+;
+; Variations:
+;   Pentium and MMX.
+;   8, 16, 32-bit color.
+;   Masked, transparent, fire.
+;   1 & 4 pixel spans.
+;
+mov eax,[esi]       ; Get address of shader + texel + light.
+mov ebx,[esi+4]     ; Get address of fogger.
+mov cx, [eax*2]     ; Get 16-bit color texel.
+mov dx, [ebx*4]     ; Get fog value.
+add cx,dx           ; Merge em.
+mov [edi],cx        ; Write to screen.
+
+Pentium:
+ 256-color palettized texture + single component ramp color + ?fog?
+
+MMX:
+ 256-color palettized texture + single component ?? color + rgb light + rgb fog.
+
+;
+; Lighting bilerp pass = 24c / 8 pixels = 3 c/p.
+;
+; eax =
+; ebx = 
+; ecx = 
+; edx = 
+; esi = 
+; edi = 
+; esp = 
+; ebp = 
+;
+add al,bl
+adc cl,dl
+add ah,bh
+adc ch,dh
+mov [temp+0],cl
+mov [temp+1],ch
+mov [fdu+0],al
+mov [fdv+1],ah
+
+mov eax,[temp]
+
+fld  [eax*4 + 0x001]
+fsub [eax*4 + 0x000]
+fmul [fdu]
+fadd [eax*4 + 0x000]
+
+fld  [eax*4 + 0x101]
+fsub [eax*4 + 0x100]
+fmul [fdu]
+fadd [eax*4 + 0x100]
+
+fsub st(1)
+fmul [fdv]
+faddp st(1),st
+
+fstp [edi]
+
+Things to keep in mind:
+ - Handle both creature polys and world polys.
+ - Handle all fx.
+
+///////////////////////////////////////////////////////////////////
+5-24-97
+
+===0.864r
++	threed32.ocx, grid32.ocx, msoutl32.ocx require mfc40.dll.
++		Can eliminate 1 meg distribution size later.
+
+===0.864s
++	Cleaned up UnrealEd files.
++	Light Hue for 3DFX is strange , 0 is blue , 170 is red the numbers are different than the ramphue settings.
+
+===0.864t
++	Fixed 3dfx problem on some cards with random textures being drawn.
+
+===0.864u
++	Merged with Steven's code.
+
+===0.864v
++	Merged Robert's code.
++	Posted for testing.
+
+===0.864w
++	Fixed compiler ambiguity James discovered:
++		function f(inventory inv) {ActivateWeapon( weapon(inv) );}
+
++	StandMover   -> StepOn
++	UnStandMover -> StepOff
++	SteppedOn    -> SteppedOnBy
++	UnSteppedOn  -> SteppedOffBy
++	Added StandingCount: Count of other actors standing on this actor.
+
+///////////////////////////////////////////////////////////////////
+
+===0.864x
++	Added stubs for all new floor related code.
+
+====0.864y
+	physWalking handling of standing on other actors.
+	MoveActor handle moving hierarchy.
+	Scrunch notification.
+	SetFloor intrinsic.
+	SetRotation intrinsic.
+	Jump must clear out Floor.
+
+///////////////////////////////////////////////////////////////////
+
+	3dfx support: I do get weird white triangles and lines flashing on the 
+	screen occasionally, as well as lockups after running around for a 
+	minute or so. (total lock) I don't know what else to tell you about 
+	this one, happens in any map that has decent size and it just freezes 
+	(like it is taking a screenshot.)
+	Only one sprite chunk is hardware-rendered. On hardware, render source
+		points unclipped.
+
+	Portals not displayed.
+	Subclass and edit new is broken.
+	Sometimes the textures browser is replaced by a camera view.
+	I'm not able to import Extreme.
+
+    Zones Merged in extreme.
+	Dig.unr: Minor geometry problems.
+
+    Pressing mouse right button AND up or down moves the player's head.
+	New axes.
+		BaseX, BaseY
+		MouseX, MouseY
+		JoyX, JoyY, JoyZ, JoyW
+
+	3dfx.
+		3dfx texture panning.
+		Modulation blend the detail textures.
+			Set up so DE can start experimenting with detail textures!
+		3dfx light mesh problems. Need to properly tetrisize light meshes and perform partial merges.
+
+		Find out what's needed for glide redist. glide.dll? sst1init.dll?
+		What's wrong with DepthBufferEnable?
+		3dfx volumetric lighting and ground fog.
+		Ping pong z buffer to eliminate the need for z clears.
+
+		3dfx brightness/gamma setting.
+		3dfx normalize detail textures?
+		Detail alpha must be perspectively linear.
+		Multitmu support.
+		Individual mip uploads?
+
+	Negative lights, for spawning post-explosions.
+
+///////////////////////////////////////////////////////////////////
+
+intrinsic iterator function f( out actor OtherActor )
+
+	foreach AllActors( OtherActor, NoName, Pawn )
+	{
+		// No latent commands are allowed in here.
+		// Can't goto into a foreach.
+		// Can break out of a foreach (EX_IteratorPop first).
+		// Can goto out of a foreach (EX_IteratorPop first).
+		// Can return from a function here (EX_IteratorPop first).
+	}
+
+	Implementation:
+		EX_IteratorCall [functioncall info] [endoffset]
+			start:
+			code...
+			EX_IteratorNext [startoffset]
+		end;
+
+	Iterator functions.
+		AllActors(var,tag,class)
+		ChildActors(var)
+		SubhierarchyActors(var)
+		TouchingActors(var)
+		GroupActors(var,name)
+		TraceActors(var,loc,dir,loc,norm)
+		RadiusActors(var,loc,rad)
+		PvsActors(var,loc)
+		VisibleActors(var,loc)
+
+///////////////////////////////////////////////////////////////////
+
+//
+// Information about an object stored in (or imported by) this ULinker's
+// UnrealFile.
+//
+class FStoredObject
+{
+	// Variables.
+	UObject* Object;		   // Object in memory, NULL if not mapped into memory.
+	FName    ObjectName;	   // Name of object.
+	FName    ClassName;        // Name of object's class.
+	ULinker* ImportFrom;       // Linker to import it from, NULL = this one.
+	DWORD    FileHeaderOffset; // Where this resides in this file, 0=imported.
+	DWORD    FileHeaderSize;   // File header size (for debugging only).
+	DWORD    Flags;            // Object flags.
+
+	// Constructors.
+	FStoredObject( UObject* InObject, DWORD InFlags, ULinker *InImportLinker )
+	:	Object				(InObject)
+	,	ObjectName			(InObject->GetFName())
+	,	ObjectName			(InObject->GetClass()->GetFName())
+	,	ImportFrom			(InImportLinker)
+	,	FileHeaderOffset	(0)
+	,	FileHeaderSize		(0)
+	,	Flags				(InFlags)
+	{}
+	FStoredObject( UObject* InObject, DWORD InFlags, DWORD InFileHeaderOffset, DWORD InFileHeaderSize )
+	:	Object				(InObject)
+	,	ObjectName			(InObject->GetFName())
+	,	ObjectName			(InObject->GetClass()->GetFName())
+	,	ImportFrom			(NULL)
+	,	FileHeaderOffset	(InFileHeaderOffset)
+	,	FileHeaderSize		(InFileHeaderSize)
+	,	Flags				(InFlags)
+	{}
+};
+
+	// Save: convert ImportFrom linker.
+	// Load: Must be able to gracefully handle failing due to not locating the
+	//       proper imports.
+
+	ConstructLinkerFor(file):
+		Construct linker object.
+		Load summary.
+		For each import in summary.
+			If file is a dll.
+				Verify that dll is found.
+			ElseIf linker doesn't already exist for file.
+				ConstructLinker(imported file).
+		Load names.
+		Build FStoredObject table.
+		If any ConstructLinker files, clean up gracefully - loading a file must
+			be able to fail cleanly if imports aren't ok.
+
+	Loadfile(file):
+		ConstructLinkerFor(file).
+			If failed, skip gracefully.
+		Check that all objects in the file are properly imported.
+			If failed, skip gracefully.
+		LoadAllObjects(file).
+
+	Save in absolutely no specific order: loading is responsible for
+		sequencing things properly
+
+///////////////////////////////////////////////////////////////////
+
+	Fix CollisionTrace.
+		execCollisionTrace
+		Test CollisionTrace for the behind-view.
+	Fan rotating (rolling) is bound-clipped totally wrong. Doesn't handle rolling!
+
+	Scripts & intrinsics.
+		Fix UnrealScript CollisionTrace: UModel, ULevel.
+		Add UnrealScript CollisionCheck: UModel, ULevel.
+		Set reverb & force parms when start, change zone, possess.
+		When change zones void ReverbParamsSet(INT Space, INT Depth);
+
+	PreTeleport, Teleport, PostTeleport, full in-level teleporting.
+
+	Standard dependencies:
+		Unreal.ucx
+		Unreal.gfx
+		Unreal.tab
+		...Texture sets
+		...Sound sets
+
+///////////////////////////////////////////////////////////////////
+
+	New status bar rendering code.
+
+	UnrealEd
+		Work out all actor naming issues, ability to rename individual actors in UnrealEd.
+		Before save-for-play, perform root make and validation step.
+		Save map files relative to the specified dependencies.
+
+	Input.
+		Separate mouse and keyboard input axes.
+		Mouse look should not affect keyboard movements.
+		Console and input system work in editor with or without player controls.
+		Arrow keys work in editor.
+		Option: Game capture mouse till esc or lost focus.
+		DMouse.vxd option.
+		Mouse clip cursor to entire screen not teensy little window.
+
+	Recruit somebody to try a clean Win95 UnrealEd installation.
+
+119-127, 300+
+///////////////////////////////////////////////////////////////////
+	AActor::IsOverlapping?
+
+//
+// Transform an origin-centered bounding box by this coordinate system.
+// Note: The transformation expands the bounding box as necessary.
+//
+void FCoords::TransformBoundingBox
+(
+	FVector			&Min,
+	FVector			&Max,
+	const FVector	&InMin,
+	const FVector	&InMax
+)
+{
+	FLOAT X0 = InMin | XAxis; FLOAT X1 = InMax | XAxis; if(X0 > X1 ) Exchange(X0,X1);
+	FLOAT Y0 = InMin | YAxis; FLOAT Y1 = InMax | YAxis; if(Y0 > Y1 ) Exchange(Y0,Y1);
+	FLOAT Z0 = InMin | ZAxis; FLOAT Z1 = InMax | ZAxis; if(Z0 > Z1 ) Exchange(Z0,Z1);
+	Min      = FVector( X0, Y0, Z0 );
+	Max      = FVector( X1, Y1, Z1 );
+}
+
+	AActor::GetCollisionExtent:   support movers properly.
+	UActors::collisionPointCheck: support movers.
+	UActors::collisionLineCheck:  support movers.
+
+	Line check.
+		Cyllinder-Cyllinder & Point-Cyllinder.
+		Point-Model.
+		Box-Model.
+
+	Point check.
+		Cyllinder-Cyllinder & Point-Cyllinder.
+		Point-Model.
+		Box-Model.
+
+	Actor collision code treat world as any other brush.
+	Way of performing line and point checks with "query" array approach: hit array!
+	UActors: Derive from Primitive, and perform delegation of collision checks? Hmmm.
+
+	Actor collision query function - make inline, optionally delegate to primitive.
+
+	Rotation variance of collision volume problem. Could actually transform collision
+	BSP hulls and operate on the transformed versions (simply skipping the bounding boxes).
+
+//////////////////////////////////////////////////////////////////////////////
+
+	Proper moving of actors standing on moving brushes.
+	Separate mover script code from mover C++ code.
+	Proper mover bump handling, all options.
+	Proper moving brush Stand/UnStand messages.
+	Proper moving brush Touch/UnTouch messages (brush relative, outed by cumulative collision info!)
+
+//////////////////////////////////////////////////////////////////////////////
+
+	E3
+		Light <-> Convex volume association via simple portal rendering?
+			Light extent.
+			Volumetric extent.
+		Truecolor creature lighting.
+		Metallic monster - creature environment mapping.
+		FireEngine texture support and texture hierarchies including bump maps.
+
+//////////////////////////////////////////////////////////////////////////////
+
+UnrealScript manifesto
+	Language reference
+		Inspiration
+			Java style simplicity, object orientation, and compile-time error checking
+			Pointerless
+			Object based
+			Game support - latent functions
+		Example program structure
+			General style (Java/C like, braces, semicolons)
+		The class declaration
+			Explain inheretance
+			Class specifiers
+		Variables
+			Base types
+			Arrays
+			Objects and actors
+			Initializing variables
+			Specifiers
+			Editable properties
+			Enumerations
+			Regular, local, and static variables
+		Functions
+			Local variables
+			Return value
+			Specifiers
+			Virtual functions vs. Final functions
+		States
+			Concept
+			Explain latent execution of code
+			Explain state scoping and overriding of functions, labels
+			Auto
+			Ignores
+		Constants
+			Regular constants
+			String constants
+			Vector, Rotation constants
+			Object/Actor constants, None
+			Name constants, NoName
+			Self
+			SizeOf, EnumCount, ArrayCount
+		Expressions
+			Assignment
+			Operators
+				Regular operators
+				Advanced operators
+				Precedence
+			Accessing objects and actors
+				The . operator, explanation of null context handling
+				Vector, rotation . operator
+			Conversions
+				Automatic promotion/demotion
+				Actor casts
+				Vector, rotation casts
+			Function calling
+				Explain state and class scoping
+				CallParent, CallGlobal, CallClass
+				Broadcast
+		Flow control
+			For, Do, While, Until, Break
+			If, Else If, Else
+			Select, Case, Default, Break
+			Labels and goto
+		UnrealEd macro stream
+	Intrinsic functions
+		State
+			GotoState, Goto
+			Explain probes, Disable, Enable
+		Logging and debugging
+			Logging
+			Assert
+		Object related
+		Actor related
+			Spawn
+			Destroy, describe latency issues
+		String
+			Explain concatenation
+		Physics
+		AI
+	Classes
+		Actor
+			bStatic meaning
+			Each major property category
+	Technical overview
+		Garbage collected
+		Virtual machine interpretter
+		Two-pass
+	Interfacing with C++ code
+		Creating intrinsic classes, generating root.h
+		Creating intrinsic functions
+
+//////////////////////////////////////////////////////////////////////////////
+
+	Compiler speed is 99% limited by property and UClass lookups! Duh!
+		Could include 16*2 property hash entries in class for 16x faster prop lookup.
+		Can hash resources by name/type.
+	Saving actors - Save properties as tagged deltas, so that actors can easily be
+		auto-upgraded in a typesafe way.
+
+//////////////////////////////////////////////////////////////////////////////
+
+		Fix cmd line run iface (no file=..\.. stuff).
+		Dynamic light "sticking" problem - since only tracking 1 bit.
+
+		SpawnActor.
+			Perform initial touch testing.
+			Refuse to spawn if blocked.
+
+		execCollideActorsSet
+			Perform initial Touch, or UnTouch.
+			Refuse if blocked.
+
+		execSetCollisionSize
+			Perform Touch, UnTouch, succeed/fail.
+
+		UnrealScript CollisionTrace function.
+
+//////////////////////////////////////////////////////////////////////////////
+
+	Resource file format with imports and exports merged.
+	Add a FileIndex variable to UObject to go along with ULinker.
+		XLinker
+
+//////////////////////////////////////////////////////////////////////////////
+
+	Actors can either be owned by other actors or by Level (None is not an option?)
+	Then unowned actors would be in line for deletion.
+
+//////////////////////////////////////////////////////////////////////////////
+
+	Primitive rendering.
+		Merge actor Brush and Mesh properties into one UPrimitive; fix
+			UnrealEd UI to handle this.
+		Eliminate actor EDrawType.
+
+		UnrealEd: When displaying objects in the actor properties dialog, 
+		include their type in UnrealScript form, for example "Mesh 'Bigman'" 
+		instead of just "Bigman".
+
+//////////////////////////////////////////////////////////////////////////////
+
+	Rendering.
+		Generalize colored lighting code to support merge fx.
+
+//////////////////////////////////////////////////////////////////////////////
+
+	My physics modes.
+		PHYS_Interpolate, PHYS_CubicSpline.
+		Generalize to moving brushes.
+		PhysAlpha, PhysRate -> Root. Negative rate is ok.
+		Linear interpolate between Target and Target.Target.
+		Cubic interpolate between Target.Instigator, Target, Target.Target, Target.Target.Target.
+
+//////////////////////////////////////////////////////////////////////////////
+
+	Need simply animated textures (tex-00, text-01, etc).
+	UnrealEd ed def props - modify all actors if they are using default.
 
 ///////////////////////////////////////////////////////////////////////////////
-12-4-96
 
-+		New properties: VolumetricRadius, VolumetricBrightness.
-X		Investigate overwriting shadow meshes with lighting when possible.
-+		New zone inconsistencies.
-X		Move LightSqrt to GRender for speed.
-+		Investigate second degree interpolation instead of SizeSquared() -> Done!
-+		Good default light volumetric properties.
-+		All lights act volumetric in fog zones, no special type.
-+		Adaptive subdivision criteria in fog zones based on projected light v-radius.
-+		Fix fog and ambients not coexisting.
-+		WorldRaytraceKey works.
-
-+	>I don't know exactly how to use the brushRaytrace key but it seems to be
-+	>broken in 0.83, the brushes always have the lighting of the key "0"
-+	Fixed all of this stuff.
-
-+	Efficiency of RLE light mesh encoding vs. bitmask:
-+		Timstros: 142K Meshpts, 12K Changes
-+		SPQR: 142K/41K
-+		Aug: 515K/135K
-+		Conclusion: Bitmasks are fine.
-
-///////////////////////////////////////////////////////////////////////////////
-12-5-96
-
-+	UnrealEd: When switching actors from zone descriptor to other, doesn't set
-+		default category.
-
-+	Subtracting huge brush gives error on EdcamMove - easily repeatable.
-
-+	Sine fx use sine table.
-
-X	Tag moving brush surfaces for relighting when they move (PF_DynamicLight).
-X		-> This just exacerbases the lack of dynamic shadows.
-
-+	Fix enviro map water.
-
-+	UnrealEd command line for ignoring registry settings.
-
-+	Rotate actor in UnrealEd set bTempLightingChange for static spotlights but
-+		not bTempDynamicLight.
-
-+	Test new .ucx.
-
-+	Don't require .UCX for play.
-+	Builtin classes referenced in FGlobalClasses:
-+		Actor:				Must be in memory.
-+		Camera:				Must be in memory.
-+		LevelDescriptor:	Is required.
-+		Light:				Editor only.
-+		Projectile:			Not needed.
-+		Pawn:				Not needed.
-+		Human:				Not needed.
-+		PlayerStart:		Not needed.
-+		Inventory:			Not needed.
-+		Weapon:				Not needed.
-+		Pickup:				Not needed.
-+		Mover:				Not needed.
-+		ZoneDescriptor:		Not needed.
-+		Ammo:				Not needed.
-+		PowerUp:			Not needed.
-+	Need: UClass.IsKindOfNamed, UClass.IsNamed (same for AActorBase).
-
-+	Test possession.
-+	Test basic gameplay.
-+	Fix player scaling.
-+	New KillMonsters bug.
-
-+	Documented console commands in Console.txt.
-
-///////////////////////////////////////////////////////////////////////////////
-12-6-96
-
-+	Meetings
-
-///////////////////////////////////////////////////////////////////////////////
-12-7-96
-
-+	UnBlastC.cpp is overly bright without ASM.
-+	Zone building code still isn't quite right (6) -> Fixed it!
-
-+	Legend map:
-+		I broke Unlit again.
-X		Light numbers are mapped wrong! -> They are ok.
-+		Fix spotlight class!
-+		New disappearing polys problem is with bounds -> Fixed, was zoning bug.
-+		Make Legend map work in 0.84 properly!
-+		Panning >256? No. Keep textures <256x256 if you want to pan them. That's final.
-
-///////////////////////////////////////////////////////////////////////////////
-12-8-96
-
-+	Mult shared sides = due to microslivers!
-+	Opt geom after zoning?
-+	Fixed that awful light edge bug.
-
-+	MergeZonePortals should be redundent.
-
-///////////////////////////////////////////////////////////////////////////////
-12-9-96
-
-X	Handle bTempLightChange for non-visible cached surfs (flush surf from cache!)
-X	Lighting change propagation:
-X		Set bTempLightChange in:
-X			UnActLst.cpp (editing actor)
-X		MakeCacheID(CID_ResultantMap,iLightMesh); <- How to change?
-X		MakeCacheID(CID_StaticMap,iLightMesh); <- How to change?
-X		MakeCacheID(CID_IlluminationMap,iLightMesh,Info-FirstLight); <- Could replace w/ iActor.
-X		Zone palettes & zone scalers <- Easy enough.
-X	Can do all of this later via update tagging.
-
-X	Reintegrate creature dithering -> Later, will rewrite.
-
-X	Wielding process often misses lots of sides. -> Expand later in gameopt rebuilder.
-
-+	Internal fixes
-+		Crashes with stats on when you make the window really small.
-+		Resource services: Purge & display output, memory used by resource type & total.
-+		Figure out Unreal and UnrealEd working set sizes.
-
-+	Count items in cache.
-
-+	Fixed Legend mesh import bug (was an overflow).
-+	Fix busted timer in Win95.
-+	Flush when change cdepth.
-
-+	Unreal 0.84 prerelease.
-+		Test import & rebuild.
-+		UnrealEd sanity check.
-
-///////////////////////////////////////////////////////////////////////////////
-12-10-96
-
-+	No .htm file, launch URL directly.
-+	Kill screenshot key.
-
-+	One cannot import a .3d file (from James' tool) into UnrealEd  if the .3d file 
-+	is read-only. Makes storing .3d files in SourceSafe inconvenient. meshImport() 
-+	opens the file with "r+b" permission which fails, though I don't think the .3d 
-+	is ever modified. You might want to change it in the original source. -> Fixed.
-+	Kill launch web.
-
-+	Flame:
-+	Light steady
-+	Effect Fire Waver
-+	Light Brightness 40
-+	Light Radius 32
-
-+	Fix ver - says 0.85.
-+	VB remove unneeded control associations.
-X	Set version number to autoincrement -> Couldn't find an option for this.
-+	Downgrade to VC++ 4.0. :(
-+	UNREAL.EXE
-+	Make comprehensive file list.
-
-X	Legend mesh backfacing problem -> This is not a bug, there's nothing
-X	texture mapped on his back. Just texture map his back.
-
-+	ddExit no fail if crashing.
-+	Mesh viewer contents has zone or backdrop tint.
-
-+	Unreal 0.84 release
-+		UnrealEd installation & test on clean system.
-+		Unreal installation.
-+		Graphics directory.
-+		Models directory.
-+		Classes directory.
-+		UnSrc installation (include Gate).
-
-///////////////////////////////////////////////////////////////////////////////
-Major changes from 0.83 to 0.84:
-
-Actor properties:
-	* Setting bNoSmoth=True turns off dithering of the actor's mesh.
-
-Rendering:
-	* Creatures and sprites now render in 8, 16, and 32-bit color.
-	* Volumetric fog now works. This is somewhat limited in its current incarnation
-	  and only works decently in small levels. On non-MMX machines, fog and shadows
-	  won't coexist so use for zone sparingly.
-	* Cool new backdrop code: go into "Level Properties" to fool around with the sky
-	  properties. Everything is very versatile now.
-	* Static and dynamic spotlights are now supported, with adjustable beam width.
-	* Fixed all known portal bugs.
-	* New Cylinder lights - great for placing near light textures on walls.
-
-Optimizations:
-	* Rewrote and optimized caching.
-	* Optimized a lot of the dynamic lighting code, but many more optimizations remain.
-	* Fixed major problem that caused 8-bit color to be extremely slow.
-
-UnrealEd:
-	* Check out the cool new "Level Properties" options!
-     	* In the 'surface properties' popup, 'editor' tab, you can see how many static and dynamic lights are incident on the surfaces you have selected, as well as the amount of memory 
-     	  occupied by the light meshes.
-	* The world now starts out "filled" and you begin level building by subtracting
-	  rather than adding. This shouldn't impact any existing maps (you can just
-	  delete your world cubes now).
-	* New "Level Properties" dialog.
-	* Run UnrealEd with the parameter "Reset", i.e. "UnrealEd RESET", to
-	  reset all of your settings to their defaults. Useful if your settings
-	  get corrupted somehow.
-	* Show-radii modes now shows collision and light radii.
-     	* Fixed major bug in portals that are flush with other surfaces in the world. Coplanar portals are now ok, and more efficient than non-flush portals.
-
-Level design recommendations:
-	* Don't cut holes in the floor, ceiling, and walls for your moving brushes to
-	  go into. This adds a lot of polygons and messes up collision. The better
-	  approach is to design your moving brushes so that they never go completely
-	  through the wall. That way, they look physically realistic, and they don't
-	  require extra polygons.
-	Use low shadow detail everywhere you can, especially in large areas.
-	    Shadowing/lighting time is killing performance in a lot of our levels.
-
-Limitations:
-	* Fog zones don't mix properly with:
-	  - Portals to non-fog zones.
-	  - The sky.
-	  - Environment mapped water.
-	  This is a general limitation with the fogging method on non-MMX machines and
-	  this is not going to change, so restrict levels accordingly.
-
-Known problems:
-	* When you reimport maps in 0.84, you will need to manually reset the "Event"
-	  properties of all of your triggers and moving brushes which trigger other
-	  properties. Alternatively: If you have a lot of triggers, that would be a
-	  pain, so you can update your .t3d file manually. Just:
-	  1. Edit your *.t3d file with Notepad or Wordpad.
-	  2. Replace all occurances of "EventName=" with "Event=".
-      3. Save it.
-	  4. Import it.
-	* Player collision is still sloppy.
-	* The player jumping and rotation controls aren't scaled well.
-	* Texture mapping and visibility code needs major optimizations.
-	* I haven't integrated with the new version of the sound system, so sound
-	  support is the same (still limited) as 0.83. I'll have an update soon
-	  once I've merged Ammon's latest code into 0.84.
-	* Creature drawing code needs major optimizations.
-	* UnrealEd is still quite the memory hog. If you get messages like
-	  "Unreal has run out of virtual memory; you need to free up more hard disk space"
-	  then that means, surprise! Unreal has run out of memory; you need to free up
-	  more hard disk space. This is not a bug.
-	* Creatures are always unlit. Creature lighting will be back later.
-	* Transparent and masked textures don't display in most video modes. They will be 
-	  back much later.
-
-I will attend to the above once scripting is done.  I want to get the engine 
-feature complete first, and then work on perfecting it, so that we can all get the 
-most work done in parallel. Otherwise we'll be 6 months down the road and have the 
-fastest rendering and physics engine around but no game elements and scripting 
-language.  The current approach is the lesser of the two evils...
+	UnrealFiles.
+		Update file tag.
+		App tag separate from file version.
+		Package tag?
+		Dependencies: Fully variable length, specify *location*.
+		Allow data areas of items to be expanded for forward compatibility via general functions.
+		File store minver, maxver for forward compatibility where applicable.
 
 ///////////////////////////////////////////////////////////////////////////////
 
-	Map edit "To brush" causes brush to max out! Thanx for finding this Danc.
-	Scripting prep.
-		Cleanse Game.
-		UnRandom.h.
-		Input system.
-
-	Later
-		Light rect regions for small dynamic lights.
-		Sporadic collision fragments.
-		Merge world and creature rendering code? With fog?
-		Creature vertex shading.
-		Using a fractional coherent beam bundle filter would be best for avoiding shadow aliasing?
-		Replace UTexture::GetData, UTexture::GetOriginalData with UTexture::Lock,
-			only lock mipmaps once! Eliminate mips from GBlit. Update rendDrawAcrossSetup.
-
+	Terrastuff
+		Volcano you go in - entrance to volcano!
+		Crater to walk down into.
+		Face anomaly like on Mars.
+		Strip mine with descending ramps - entrance to mine.
+		Lake shores.
+		Valleys.
+		Impassible rivers with bridges.
 
 ///////////////////////////////////////////////////////////////////////////////
+
+	Safe recompiles.
+		After a compile, must postload and reimport the actorlist to refresh the 
+			bin pointers or only do this at runtime and let UClass have its own 
+			bin struct? Ugh. Maybe just need a RemapBin function to remap 
+			properties from one class to another by name. Could keep the original
+			classes around (and rename after compile).
+
+///////////////////////////////////////////////////////////////////////////////
+
+	UnrealEd later.
+		Brush and actors as same basic things.
+		Actors can be 'movement locked' like brushes when map edit mode is off.
+		Cut and paste actors + brushes.
+		Easy grouping and auto zoning.
+		Dragging cameras around like any other actors.
+
+///////////////////////////////////////////////////////////////////////////////
+
+	Thing that still suck in Unreal:
+		Global name scoping of all resources -> name scoping should be hierarchical, names optional.
+		Separation of the actor list and brush list. -> Can merge them with a little work.
+		Terribly slow moving brush code. -> Can fix with rendering rewrite.
+		Lack of grouping in UnrealEd. -> Can add grouping pretty trivially.
+		Lack of 2d ops in UnrealEd. -> Can add with 2-3 weeks of work.
+		Switch() approach to class properties -> Implement UType and UnrealScript struct command.
+
+//////////////////////////////////////////////////////////////////////////////

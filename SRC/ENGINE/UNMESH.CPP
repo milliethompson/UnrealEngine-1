@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnMesh.cpp: Unreal mesh animation functions
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Note: See DRAGON.MAC for a sample import macro
@@ -14,278 +14,288 @@
 #include "UnRender.h"
 
 /*-----------------------------------------------------------------------------
-	Mesh info (only used in this file, not globally).
+	Mesh related object implementation.
 -----------------------------------------------------------------------------*/
 
-static void GetMeshResInfo( IMesh *MeshInfo, UMesh *Mesh, BYTE *MeshData )
-{
-	guard(GetMeshResInfo);
-
-	// Get maximums.
-	MeshInfo->TriMax      		= (int)Mesh->MaxTriangles  * sizeof (FMeshTriangle);
-	MeshInfo->VertexMax   		= (int)Mesh->MaxAnimFrames * (int)Mesh->MaxVertices * sizeof (FMeshVertex);
-	MeshInfo->VertLinkIndexMax	= (int)Mesh->MaxVertices   * sizeof (FMeshVertLinkIndex);
-	MeshInfo->VertLinkMax		= (int)Mesh->MaxVertLinks  * sizeof (WORD);
-	MeshInfo->BoundMax      	= (int)Mesh->MaxAnimFrames * sizeof (FBoundingRect);
-	MeshInfo->AnimMax     		= (int)Mesh->MaxAnimSeqs   * sizeof (FMeshAnimSeq);
-
-	// Calc total.
-	MeshInfo->TotalMax			= 	MeshInfo->TriMax + MeshInfo->VertexMax +
-									MeshInfo->VertLinkIndexMax + MeshInfo->VertLinkMax +
-									MeshInfo->BoundMax + MeshInfo->AnimMax;
-
-	// Get pointers.
-	MeshInfo->Triangles			= (FMeshTriangle		*) (MeshData += 0);
-	MeshInfo->Vertex			= (FMeshVertex			*) (MeshData += MeshInfo->TriMax);
-	MeshInfo->VertLinkIndex		= (FMeshVertLinkIndex	*) (MeshData += MeshInfo->VertexMax);
-	MeshInfo->VertLinks			= (WORD 				*) (MeshData += MeshInfo->VertLinkIndexMax);
-	MeshInfo->Bound        		= (FBoundingRect		*) (MeshData += MeshInfo->VertLinkMax);
-	MeshInfo->AnimSeqs			= (FMeshAnimSeq			*) (MeshData += MeshInfo->BoundMax);
-
-	unguard;
-}
-
-//
-// Lock a mesh for reading (doesn't handle writing).
-// This just fills in the MeshMapInfo structure for easy manipulation.
-//
-void UMesh::GetInfo(IMesh *MeshInfo)
-{
-	guard(UMesh::GetInfo);
-	GetMeshResInfo (MeshInfo,this,GetData());
-	unguard;
-}
+IMPLEMENT_DB_CLASS(UMeshVerts);
+IMPLEMENT_DB_CLASS(UMeshTris);
+IMPLEMENT_DB_CLASS(UMeshAnimSeqs);
+IMPLEMENT_DB_CLASS(UMeshAnimNotifys);
+IMPLEMENT_DB_CLASS(UMeshVertConnects);
 
 /*-----------------------------------------------------------------------------
-	UMesh resource implementation.
+	UMesh object implementation.
 -----------------------------------------------------------------------------*/
 
-void UMesh::Register(FResourceType *Type)
-{
-	guard(UMesh::Register);
-	
-	Type->HeaderSize = sizeof (UMesh);
-	Type->RecordSize = 0;
-	Type->Version    = 1;
-	strcpy (Type->Descr,"Mesh");
-	
-	unguard;
-}
 void UMesh::InitHeader()
 {
 	guard(UMesh::InitHeader);
 
-	// Init resource header to defaults.
-	NumAnimFrames	= 0;	MaxAnimFrames = 0;
-	NumVertices		= 0;	MaxVertices   = 0;
-	NumVertLinks	= 0;	MaxVertLinks  = 0;
-	NumTriangles	= 0;	MaxTriangles  = 0;
+	// Init parent.
+	UPrimitive::InitHeader();
+	bCheckCollision = 0;
 
+	// Init objects.
+	Verts			= (UMeshVerts		*)NULL;
+	Tris			= (UMeshTris		*)NULL;
+	AnimSeqs		= (UMeshAnimSeqs	*)NULL;
+	Connects		= (UMeshVertConnects*)NULL;
+	Bounds			= (UBounds			*)NULL;
+	VertLinks		= (UWords			*)NULL;
+	Textures		= (TArray<UTexture*>*)NULL;
+	Notifys			= (UMeshAnimNotifys *)NULL;
+
+	// Counts.
+	FrameVerts		= 0;
+	AnimFrames		= 0;
+
+	// Scaling.
+	Scale			= GMath.UnitScaleVect;
 	Origin			= GMath.ZeroVector;
 	RotOrigin		= GMath.ZeroRotation;
-	
-	unguard;
-}
-void UMesh::InitData()
-{
-	guard(UMesh::InitData);
 
-	NumAnimFrames	= 0;
-	NumVertices		= 0;
-	NumVertLinks	= 0;
-	NumTriangles	= 0;
-	
-	unguard;
-}
-int UMesh::QuerySize()
-{
-	guard(UMesh::QuerySize);
-
-	IMesh MeshInfo;
-	GetMeshResInfo (&MeshInfo,this,GetData());
-	return MeshInfo.TotalMax;
-
-	unguard;
-}
-int UMesh::QueryMinSize()
-{
-	guard(UMesh::QueryMinSize);
-	return QuerySize();
-	unguard;
-}
-void UMesh::QueryDataReferences(FResourceCallback &Callback)
-{
-	guard(UMesh::QueryDataReferences);
-
-	IMesh		MeshInfo;
-	GetMeshResInfo (&MeshInfo,this,GetData());
-
-	for( int i=0; i<NumAnimSeqs; i++ )
-	{
-		Callback.Name (this,&MeshInfo.AnimSeqs[i].SeqName,0);
-	}
-	unguard;
-}
-void UMesh::Flip()
-{
-	guard(UMesh::Flip);
-
-	UResource::Flip();
-	//todo:
-
-	unguard;
-}
-AUTOREGISTER_RESOURCE(RES_Mesh,UMesh,0xB2D90858,0xCCD211cf,0x91360000,0xC028B992);
-
-/*-----------------------------------------------------------------------------
-	UMeshMap resource implementation.
------------------------------------------------------------------------------*/
-
-void UMeshMap::Register(FResourceType *Type)
-{
-	guard(UMeshMap::Register);
-
-	Type->HeaderSize = sizeof (UMeshMap);
-	Type->RecordSize = 0;
-	Type->Version    = 1;
-	Type->TypeFlags  = RTF_ScriptReferencable;
-	strcpy (Type->Descr,"MeshMap");
-	
-	unguard;
-}
-void UMeshMap::InitHeader()
-{
-	guard(UMeshMap::InitHeader);
-
-	Mesh			= NULL;
-	MaxTextures		= 0;
-	AndFlags		= MAXWORD;
+	// Other info.
+	AndFlags		= ~(DWORD)0;
 	OrFlags			= 0;
-	Scale			= GMath.UnitScaleVect;
+
+	// Editing info.
+	CurPoly			= 0;
+	CurVertex		= 0;
 
 	unguard;
 }
-void UMeshMap::InitData()
+void UMesh::PostLoadHeader( DWORD PostFlags )
 {
-	guard(UMeshMap::InitData);
+	guard(UMesh::PostLoad);
 
-	for (DWORD i=0; i<MaxTextures; i++) 
-		GetData()[i] = NULL;
-	
-	unguard;
-}
-int UMeshMap::QuerySize()
-{
-	guard(UMeshMap::QuerySize);
-	return MaxTextures * sizeof (UTexture *);
-	unguard;
-}
-int UMeshMap::QueryMinSize()
-{
-	guard(UMeshMap::QueryMinSize);
-	return QuerySize();
-	unguard;
-}
-void UMeshMap::QueryHeaderReferences(FResourceCallback &Callback)
-{
-	guard(UMeshMap::QueryHeaderReferences);
-	Callback.Resource (this,(UResource **)&Mesh,0);
-	unguard;
-}
-void UMeshMap::QueryDataReferences(FResourceCallback &Callback)
-{
-	guard(UMeshMap::QueryDataReferences);
+	// Postload parent.
+	UPrimitive::PostLoadHeader( PostFlags );
 
-	for (DWORD i=0; i<MaxTextures; i++)
-	{
-		Callback.Resource (this,(UResource **)&GetData()[i],0);
-	}
-	unguard;
-}
-void UMeshMap::Flip()
-{
-	guard(UMeshMap::Flip);
+	// Check that all objects are in place.
+	checkState(Tris!=NULL);
+	checkState(AnimSeqs!=NULL);
+	checkState(Verts!=NULL);
+	checkState(Connects!=NULL);
+	checkState(Bounds!=NULL);
+	checkState(VertLinks!=NULL);
+	checkState(Textures!=NULL);
+	checkState(Notifys!=NULL);
 
-	UResource::Flip();
-	//todo:
+	// Check all sizes.
+	checkState(Verts->Num==FrameVerts*AnimFrames);
+	checkState(Connects->Num==FrameVerts);
+	checkState(Bounds->Num==AnimFrames);
 
 	unguard;
 }
-AUTOREGISTER_RESOURCE(RES_MeshMap,UMeshMap,0xB2D90859,0xCCD211cf,0x91360000,0xC028B992);
+IMPLEMENT_CLASS(UMesh);
 
 /*-----------------------------------------------------------------------------
-	Mesh sprite functions.
+	UMesh collision interface.
 -----------------------------------------------------------------------------*/
 
 //
-// Lock a sprite for reading (doesn't handle writing).
-// This just fills in the MeshMapInfo structure for easy manipulation.
+// Get the world bounding volume for this primitive, as owned by Owner.
 //
-void UMeshMap::Lock(IMeshMap *MeshMapInfo)
+FBoundingRect UMesh::GetBoundingRect( AActor *Owner )
 {
-	guard(UMeshMap::Lock);
-	IMesh MeshInfo;
+	guard(UMesh::GetBoundingRect);
+	FBoundingRect Bound;
 
-	// Get mesh info.
-	Mesh->GetInfo(&MeshInfo);
-
-	// Set all MeshMapInfo properties.
-	MeshMapInfo->MeshMap		= this;
-	MeshMapInfo->Mesh			= Mesh;
-
-	MeshMapInfo->NumTriangles	= Mesh->NumTriangles;
-	MeshMapInfo->NumVertices	= Mesh->NumVertices;
-	MeshMapInfo->NumVertLinks	= Mesh->NumVertLinks;
-	MeshMapInfo->NumAnimFrames	= Mesh->NumAnimFrames;
-	MeshMapInfo->NumAnimSeqs	= Mesh->NumAnimSeqs;
-	MeshMapInfo->MaxTextures	= MaxTextures;
-
-	MeshMapInfo->Triangles		= MeshInfo.Triangles;
-	MeshMapInfo->Vertex			= MeshInfo.Vertex;
-	MeshMapInfo->VertLinkIndex  = MeshInfo.VertLinkIndex;
-	MeshMapInfo->VertLinks      = MeshInfo.VertLinks;
-	MeshMapInfo->Bound          = MeshInfo.Bound;
-	MeshMapInfo->AnimSeqs		= MeshInfo.AnimSeqs;
-	MeshMapInfo->Textures		= (UTexture **)GetData();
-
-	MeshMapInfo->Origin			= Mesh->Origin;
-	MeshMapInfo->RotOrigin      = Mesh->RotOrigin;
-	MeshMapInfo->Scale			= Scale;
-
-	unguard;
-}
-
-//
-// Unlock a mesh map.
-//
-void UMeshMap::Unlock(IMeshMap *MeshMapInfo)
-{
-	guard(UMeshMap::Unlock);
-	unguard;
-}
-
-void UMesh::SetSequence(const char *SeqName, int StartFrame, int NumFrames)
-{
-	guard(UMesh::SetSequence);
-
-	FMeshAnimSeq 	*AnimSeq;
-	IMesh			MeshInfo;
-
-	if( (NumAnimSeqs+1) >= MaxAnimSeqs )
+	// Get frame indices.
+	INDEX iFrame1 = 0, iFrame2 = 0;
+	FMeshAnimSeq *Seq = GetAnimSeq( Owner->AnimSequence );
+	if( Seq && Owner->AnimFrame >= 0.0 )
 	{
-		debugf (LOG_Info,"Animation sequence table full");
+		// Animating, so use bound enclosing two frames' bounds.
+		INT iFrame = floor((Owner->AnimFrame+1.0) * Seq->NumFrames);
+		iFrame1    = Seq->StartFrame + ((iFrame + 0) % Seq->NumFrames);
+		iFrame2    = Seq->StartFrame + ((iFrame + 1) % Seq->NumFrames);
+		Bound      = Bounds(iFrame1) + Bounds(iFrame2);
 	}
 	else
 	{
-		GetInfo (&MeshInfo);
-
-		AnimSeq = &MeshInfo.AnimSeqs [NumAnimSeqs++];
-
-		AnimSeq->SeqName.Add(SeqName);			// Sequence's name.
-		AnimSeq->SeqStartFrame 	= StartFrame;	// Starting animation frame.
-		AnimSeq->SeqNumFrames  	= NumFrames;	// Number of frames in sequence.
-		AnimSeq->Rate          	= 0;			// Playback rate (scale still undefined).
+		// Interpolating, so use pessimistic mesh bound.
+		Bound = LocalBound;
 	}
+
+	// Transform Bound by owner's scale and origin.
+	Bound.Min = FVector(-1,-1,-1) + Owner->Location + Scale * (Bound.Min - Origin) * Owner->DrawScale;
+	Bound.Max = FVector(+1,+1,+1) + Owner->Location + Scale * (Bound.Max - Origin) * Owner->DrawScale;
+
+	return Bound;
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	UMesh animation interface.
+-----------------------------------------------------------------------------*/
+
+//
+// Get the transformed point set corresponding to the animation frame 
+// of this primitive owned by Owner. Returns the total outcode of the points.
+//
+BYTE UMesh::GetFrame
+(
+	FTransSample*	ResultVerts,
+	UCamera*		Camera,
+	AActor*			Owner
+)
+{
+	guard(UMesh::GetFrame);
+
+	// Create or get cache memory.
+	FCacheItem *Item;
+	BOOL  WasCached = 1;
+	DWORD CacheID   = MakeCacheID( CID_TweenAnim, Owner->GetIndex() );
+	BYTE  *Mem      = GCache.Get( CacheID, Item );
+	if( Mem==NULL || *(UMesh**)Mem!=this )
+	{
+		if( Mem != NULL )
+		{
+			// Actor's mesh changed.
+			Item->Unlock();
+			GCache.Flush( CacheID );
+		}
+		Mem       = GCache.Create( CacheID, Item, sizeof(UMesh*) + sizeof(FLOAT) + sizeof(FName) + FrameVerts * sizeof(FVector) );
+		WasCached = 0;
+	}
+	UMesh *&CachedMesh = *(UMesh**)Mem; Mem += sizeof(UMesh*);
+	FLOAT &CachedFrame = *(FLOAT *)Mem; Mem += sizeof(FLOAT );
+	FName &CachedSeq   = *(FName *)Mem; Mem += sizeof(FName );
+	if( !WasCached )
+	{
+		CachedMesh  = this;
+		CachedSeq   = NAME_None;
+		CachedFrame = 0.0;
+	}
+
+	// Get vertices pointer and count.
+	FVector *CachedVerts = (FVector*)Mem;
+
+	// Setup coordinate system.
+	FCoords Coords;
+	FVector TempVector;
+	if( Camera->IsWire() || Camera->IsOrtho() )
+	{
+		Coords		= GMath.UnitCoords * Owner->Rotation * RotOrigin;
+		TempVector  = Owner->Location;
+	}
+	else
+	{
+		Coords		= Camera->Coords * Owner->Rotation * RotOrigin;
+		TempVector	= (Owner->Location - Camera->Coords.Origin).TransformVectorBy( Camera->Coords );
+	}
+	FVector NewScale  = Scale * Owner->DrawScale;
+	Coords.XAxis     *= NewScale;
+	Coords.YAxis     *= NewScale;
+	Coords.ZAxis     *= NewScale;
+
+	// Get animation sequence.
+	FMeshAnimSeq *Seq=GetAnimSeq( Owner->AnimSequence );
+
+	// Transform all points into screenspace.
+	BYTE Outcode = FVF_OutReject;
+	if( Owner->AnimFrame>=0.0 || !WasCached )
+	{
+		// Compute interpolation numbers.
+		FLOAT Alpha=0.0;
+		INT iFrameOffset1=0, iFrameOffset2=0;
+		if( Seq )
+		{
+			FLOAT Frame   = Max(Owner->AnimFrame,0.f) * Seq->NumFrames;
+			INT iFrame    = floor(Frame);
+			Alpha         = Frame - iFrame;
+			iFrameOffset1 = (Seq->StartFrame + ((iFrame + 0) % Seq->NumFrames)) * FrameVerts;
+			iFrameOffset2 = (Seq->StartFrame + ((iFrame + 1) % Seq->NumFrames)) * FrameVerts;
+		}
+
+		// Interpolate two frames.
+		FMeshVert *MeshVertex1 = &Verts( iFrameOffset1 );
+		FMeshVert *MeshVertex2 = &Verts( iFrameOffset2 );
+		for( int i=0; i<FrameVerts; i++ )
+		{
+			// Convert packed vectors to float.
+			FVector V1( MeshVertex1[i].X, MeshVertex1[i].Y, MeshVertex1[i].Z );
+			FVector V2( MeshVertex2[i].X, MeshVertex2[i].Y, MeshVertex2[i].Z );
+
+			// Interpolate vertices.
+			CachedVerts[i] = V1 + (V2-V1)*Alpha;
+
+			// Transform it.
+			(FVector&)ResultVerts[i] = (CachedVerts[i] - Origin).TransformVectorBy(Coords) + TempVector;
+			ResultVerts[i].Color.R   = -1;
+			ResultVerts[i].ComputeOutcode( Camera );
+			Outcode &= ResultVerts[i].Flags;
+		}
+	}
+	else
+	{
+		// Compute tweening numbers.
+		FLOAT StartFrame = Seq ? (-1.0 / Seq->NumFrames) : 0.0;
+		INT iFrameOffset = Seq ? Seq->StartFrame * FrameVerts : 0;
+		FLOAT Alpha = 1.0 - Owner->AnimFrame / CachedFrame;
+		if( CachedSeq!=Owner->AnimSequence || Alpha<0.0 || Alpha>1.0)
+		{
+			CachedSeq   = Owner->AnimSequence;
+			CachedFrame = StartFrame;
+			Alpha       = 0.0;
+		}
+
+		// Tween all points.
+		FMeshVert *MeshVertex = &Verts( iFrameOffset );
+		for( int i=0; i<FrameVerts; i++ )
+		{
+			// Convert packed vector to float.
+			FVector V2( MeshVertex[i].X, MeshVertex[i].Y, MeshVertex[i].Z );
+
+			// Interpolate vertices.
+			CachedVerts[i] += (V2 - CachedVerts[i])*Alpha;
+
+			// Transform it.
+			(FVector&)ResultVerts[i] = (CachedVerts[i] - Origin).TransformVectorBy(Coords) + TempVector;
+			ResultVerts[i].Color.R   = -1;
+			ResultVerts[i].ComputeOutcode( Camera );
+			Outcode &= ResultVerts[i].Flags;
+		}
+
+		// Update cached frame.
+		CachedFrame = Owner->AnimFrame;
+	}
+	Item->Unlock();
+	return Outcode;
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	UMesh constructor.
+-----------------------------------------------------------------------------*/
+
+//
+// UMesh constructor.
+//
+UMesh::UMesh( int NumPolys, int NumVerts, int NumFrames, int NumTex )
+{
+	guard(UMesh::UMesh);
+
+	// Set counts.
+	FrameVerts	= NumVerts;
+	AnimFrames	= NumFrames;
+
+	// Allocate all stuff.
+	Tris		= new(GetName(),CREATE_Replace)UMeshTris(NumPolys,1);
+	AnimSeqs	= new(GetName(),CREATE_Replace)UMeshAnimSeqs(0);
+	Verts		= new(GetName(),CREATE_Replace)UMeshVerts(NumVerts * NumFrames,1);
+	Connects	= new(GetName(),CREATE_Replace)UMeshVertConnects(NumVerts,1);
+	Bounds		= new(GetName(),CREATE_Replace)UBounds(NumFrames,1);
+	VertLinks	= new(GetName(),CREATE_Replace)UWords(0);
+	Textures	= new(GetName(),CREATE_Replace)TArray<UTexture*>(NumTex,1);
+	Notifys     = new(GetName(),CREATE_Replace)UMeshAnimNotifys(0);
+
+	// Init textures.
+	for( int i=0; i<Textures->Num; i++ )
+		Textures(i) = NULL;
+
 	unguard;
 }
 
@@ -294,40 +304,45 @@ void UMesh::SetSequence(const char *SeqName, int StartFrame, int NumFrames)
 -----------------------------------------------------------------------------*/
 
 AUTOREGISTER_TOPIC("Mesh",MeshTopicHandler);
-void MeshTopicHandler::Get(ULevel *Level, const char *Topic, const char *Item, char *Data)
+void MeshTopicHandler::Get(ULevel *Level, const char *Item, FOutputDevice &Out)
 {
 	guard(MeshTopicHandler::Get);
 
-	UMeshMap		*MeshMap;
-	IMesh			MeshInfo;
-	FMeshAnimSeq 	*AnimSeq;
-	WORD			SeqNum;
-
 	if( !_strnicmp(Item,"NUMANIMSEQS",11) )
 	{
-		if( GetUMeshMap(Item,"NAME=",&MeshMap) )
+		UMesh *Mesh;
+		if( GetUMesh(Item,"NAME=",Mesh) )
 		{
-			itoa(MeshMap->Mesh->NumAnimSeqs,Data,10);
+			Mesh->Lock(LOCK_Read);
+			Out.Logf( "%i",Mesh->AnimSeqs->Num );
+			Mesh->Unlock(LOCK_Read);
 		}
 	}
 	else if( !_strnicmp(Item,"ANIMSEQ",7) )
 	{
-		if( GetUMeshMap(Item,"NAME=",&MeshMap) &&
-			(GetWORD(Item,"NUM=",&SeqNum)) )
+		UMesh *Mesh;
+		INT   SeqNum;
+		if( GetUMesh(Item,"NAME=",Mesh) &&
+			(GetINT(Item,"NUM=",&SeqNum)) )
 		{
-			MeshMap->Mesh->GetInfo(&MeshInfo);
-			AnimSeq = &MeshInfo.AnimSeqs [SeqNum];
-
-			if( !AnimSeq->SeqName.IsNone() )
+			Mesh->Lock(LOCK_Read);
+			FMeshAnimSeq &Seq = Mesh->AnimSeqs(SeqNum);
+			if( Seq.Name!=NAME_None )
 			{
-				sprintf(Data,"%s                                        %03i %03i",
-					AnimSeq->SeqName.Name(),SeqNum,AnimSeq->SeqNumFrames);
+				Out.Logf
+				(
+					"%s                                        %03i %03i",
+					Seq.Name(),
+					SeqNum,
+					Seq.NumFrames
+ 				);
 			}
+			Mesh->Unlock(LOCK_Read);
 		}
 	}
 	unguard;
 }
-void MeshTopicHandler::Set(ULevel *Level, const char *Topic, const char *Item, const char *Data)
+void MeshTopicHandler::Set(ULevel *Level, const char *Item, const char *Data)
 {
 	guard(MeshTopicHandler::Set);
 	unguard;

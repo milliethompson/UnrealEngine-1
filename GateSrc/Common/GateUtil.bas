@@ -591,7 +591,7 @@ Global Const GKACCESS_None = 32768 ' Flag that should never be set.
 '     be in a level when he uses this command, and the
 '     password must match (if the level has a password).
 '
-' BeginLevel <app_string> <appversion_num> [<packages_string>]
+' BeginLevel <levelport_num> <app_string> <appversion_num>
 '     [Access: Level privelages required, Version: 0.10]
 '     This command, usable only by a level server, tells
 '     the Gatekeeper that the level server's level is up.

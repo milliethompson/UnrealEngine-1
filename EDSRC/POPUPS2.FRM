@@ -1,19 +1,18 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmPopups2 
+   BorderStyle     =   1  'Fixed Single
    Caption         =   "frmMorePopups"
    ClientHeight    =   3975
    ClientLeft      =   5460
    ClientTop       =   3390
    ClientWidth     =   6690
-   Height          =   4575
    Icon            =   "Popups2.frx":0000
-   Left            =   5400
    LinkTopic       =   "Form1"
+   MaxButton       =   0   'False
+   MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   3975
    ScaleWidth      =   6690
-   ShowInTaskbar   =   0   'False
-   Top             =   2850
-   Width           =   6810
    Begin VB.Menu ClassBrowser 
       Caption         =   "ClassBrowser"
       Begin VB.Menu ClassEditScript 
@@ -58,6 +57,15 @@ Begin VB.Form frmPopups2
             Caption         =   "Key &3"
          End
       End
+      Begin VB.Menu arScriptMenu 
+         Caption         =   "S&cript"
+         Begin VB.Menu arScriptEdit 
+            Caption         =   "&Edit script..."
+         End
+         Begin VB.Menu arScriptSubclass 
+            Caption         =   "&Subclass and edit new script..."
+         End
+      End
       Begin VB.Menu ZACTA 
          Caption         =   "-"
       End
@@ -77,7 +85,7 @@ Begin VB.Form frmPopups2
          Caption         =   "Place on &Floor"
       End
       Begin VB.Menu arCeiling 
-         Caption         =   "&Place on &Ceiling"
+         Caption         =   "&Place on Ceiling"
       End
       Begin VB.Menu arFloorAbove 
          Caption         =   "Floor &Above"
@@ -199,37 +207,11 @@ Begin VB.Form frmPopups2
    End
 End
 Attribute VB_Name = "frmPopups2"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
-
-Private Sub arKey0_Click()
-    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=0")
-    Call Ed.Server.Exec("LEVEL REDRAW")
-    frmActorProperties.NoteClassChange
-End Sub
-
-Private Sub arKey1_Click()
-    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=1")
-    Call Ed.Server.Exec("LEVEL REDRAW")
-    frmActorProperties.NoteClassChange
-End Sub
-
-Private Sub arKey2_Click()
-    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=2")
-    Call Ed.Server.Exec("LEVEL REDRAW")
-    frmActorProperties.NoteClassChange
-End Sub
-
-Private Sub arKey3_Click()
-    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=3")
-    Call Ed.Server.Exec("LEVEL REDRAW")
-    frmActorProperties.NoteClassChange
-End Sub
-
-Private Sub cbDelete_Click()
-    frmClassBrowser.Delete_Click
-End Sub
 
 '
 ' ClassBrowser
@@ -253,6 +235,10 @@ End Sub
 
 Private Sub ClassSave_Click()
     frmClassBrowser.SaveClass_Click
+End Sub
+
+Private Sub cbDelete_Click()
+    frmClassBrowser.Delete_Click
 End Sub
 
 '
@@ -300,6 +286,41 @@ Private Sub arRememberClass_Click()
         Ed.Server.Exec "ACTOR SET ADDCLASS=" & GPopupActorClass
         frmMain.ActorCombo.List(0) = GPopupActorClass
         frmMain.ActorCombo.ListIndex = 0
+    End If
+End Sub
+
+Private Sub arKey0_Click()
+    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=0")
+    Call Ed.Server.Exec("LEVEL REDRAW")
+    frmActorProperties.NoteClassChange
+End Sub
+
+Private Sub arKey1_Click()
+    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=1")
+    Call Ed.Server.Exec("LEVEL REDRAW")
+    frmActorProperties.NoteClassChange
+End Sub
+
+Private Sub arKey2_Click()
+    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=2")
+    Call Ed.Server.Exec("LEVEL REDRAW")
+    frmActorProperties.NoteClassChange
+End Sub
+
+Private Sub arKey3_Click()
+    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=3")
+    Call Ed.Server.Exec("LEVEL REDRAW")
+    frmActorProperties.NoteClassChange
+End Sub
+
+Private Sub arScriptEdit_Click()
+    Call frmClassBrowser.LaunchScriptEd(GPopupActorClass, "", 0, 0)
+End Sub
+
+Private Sub arScriptSubclass_Click()
+    Call frmClassBrowser.MakeSubclass(GPopupActorClass, False)
+    If GResult = 1 Then
+        Ed.Server.Exec "ACTOR SUBCLASS NEWCLASS=" & Quotes(GString)
     End If
 End Sub
 

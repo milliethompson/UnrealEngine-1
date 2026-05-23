@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnSprite.cpp: Unreal sprite rendering functions.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -11,23 +11,16 @@
 #include "Unreal.h"
 #include "UnRender.h"
 #include "UnRaster.h"
+#include "UnRenDev.h"
 
-//
-// Parameters
-//
+// Parameters.
 #define SPRITE_PROJECTION_FORWARD	32.00 /* Move sprite projection planes forward */
-#define NOSORT_SIZE					30.0  /* Don't bother sorting meshmaps smaller than this in either axis*/
-
-//
-// Addings sprites to per-node list:
-//
 #define ADD_START 100000.0
 #define ADD_END   0.0
 
-//
 // Temporary globals.
-//
 FSprite *GFirstSprite;
+INT GNumSprites;
 
 /*------------------------------------------------------------------------------
 	Dynamic node contents.
@@ -36,95 +29,105 @@ FSprite *GFirstSprite;
 //
 // Init buffer holding all dynamic contents.
 //
-void dynamicsLock(IModel *ModelInfo)
-	{
-	GUARD;
-	if (GRender.DynamicsLocked) appError ("dynamicsLock: Already locked");
-	//
+void dynamicsLock( UModel *Model )
+{
+	guard(dynamicsLock);
+	checkState(!GRender.DynamicsLocked);
+
 	GRender.NumDynamics 	= 0;
 	GRender.NumPostDynamics	= 0;
 	GRender.DynamicsLocked	= 1;
 	GFirstSprite            = NULL;
-	GDynMem.InitPool();
-	//
-	UNGUARD("dynamicsLock");
-	};
+	GNumSprites             = 0;
+
+	unguard;
+}
 
 //
 // Cleanup buffer holding all dynamic contents (call after rendering)
 //
-void dynamicsUnlock (IModel *ModelInfo)
-	{
-	GUARD;
+void dynamicsUnlock( UModel *Model )
+{
+	guard(dynamicsUnlock)
+	checkState(GRender.DynamicsLocked);
+
 	FDynamicsIndex	*DynamicsIndex;
 	FBspNode		*Node;
-	//
-	if (!GRender.DynamicsLocked) appError ("dynamicsUnlocked: Not locked");
-	//
+
 	DynamicsIndex = GRender.DynamicsIndex;
-	for (INDEX i=0; i<GRender.NumDynamics; i++)
-		{
-		Node 				= &ModelInfo->BspNodes [DynamicsIndex->iNode];
+	for( INDEX i=0; i<GRender.NumDynamics; i++ )
+	{
+		Node 				= &Model->Nodes(DynamicsIndex->iNode);
 		Node->iDynamic[0]	= INDEX_NONE;
 		Node->iDynamic[1]	= INDEX_NONE;
 		DynamicsIndex++;
-		};
+	}
 	GRender.NumDynamics 	= 0;
 	GRender.NumPostDynamics = 0;
-	//
+
 	GRender.DynamicsLocked  = 0;
-	UNGUARD("dynamicsUnlock");
-	};
+	unguard;
+}
 
 //
 // Add an empty entry to dynamic contents and link it up.
 // Returns NULL if the dynamics structure is full.
 // In this case, the rendering engine must recover gracefully.
 //
-FDynamicsIndex inline *dynamicsAdd (IModel *ModelInfo, INDEX iNode, INT Type,
-	FSprite *Sprite, FRasterPoly *Raster, FLOAT Z,INT IsBack)
+inline FDynamicsIndex* dynamicsAdd
+(
+	UModel			*Model,
+	INDEX			iNode,
+	INT				Type,
+	FSprite			*Sprite,
+	FRasterPoly		*Raster,
+	FLOAT			Z,
+	INT				IsBack
+)
 {
-	GUARD;
-	FBspNode		*Node = &ModelInfo->BspNodes [iNode];
+	guard(dynamicsAdd);
+	
+	FBspNode		*Node = &Model->Nodes(iNode);
 	FDynamicsIndex	*Index, *TempIndex,*PrevIndex;
 	INT 			iDynamic;
 
-	if (GRender.NumDynamics >= GRender.MaxDynamics) return NULL;
+	if( GRender.NumDynamics>=GRender.MaxDynamics )
+		return NULL;
 
 	iDynamic	= GRender.NumDynamics++;
 	Index    	= &GRender.DynamicsIndex[iDynamic];
 
 	// Link into dynamics chain.
-	if ((Z==ADD_START) || (Node->iDynamic[IsBack] == INDEX_NONE))
+	if( Z==ADD_START || Node->iDynamic[IsBack]==INDEX_NONE )
 	{
 		// Add at start of list.
 		Index->iNext			= Node->iDynamic[IsBack];
 		Node->iDynamic[IsBack]	= iDynamic;
 	}
-	else if (Z == ADD_END)
+	else if( Z == ADD_END )
 	{
 		// Add at end of list.
-		TempIndex = &GRender.DynamicsIndex [Node->iDynamic[IsBack]];
-		while (TempIndex->iNext != INDEX_NONE) 
+		TempIndex = &GRender.DynamicsIndex[Node->iDynamic[IsBack]];
+		while( TempIndex->iNext != INDEX_NONE )
 		{
 			TempIndex = &GRender.DynamicsIndex [TempIndex->iNext];
 		}
-		Index->iNext     = INDEX_NONE;
-		TempIndex->iNext = iDynamic;
+		Index->iNext			= INDEX_NONE;
+		TempIndex->iNext		= iDynamic;
 	}
 	else
 	{
-		// Z sort them it.  Things that must remain on top, such as sprites (not chunks) are
+		// Z sort them in.  Things that must remain on top, such as sprites (not chunks) are
 		// assigned a Z value of zero.
-		TempIndex = &GRender.DynamicsIndex [Node->iDynamic[IsBack]];
+		TempIndex = &GRender.DynamicsIndex[Node->iDynamic[IsBack]];
 		PrevIndex = NULL;
 
-		while ((TempIndex->iNext != INDEX_NONE) && (TempIndex->Z >= Z))
+		while( TempIndex->iNext!=INDEX_NONE && TempIndex->Z<=Z )
 		{
 			PrevIndex = TempIndex;
 			TempIndex = &GRender.DynamicsIndex[TempIndex->iNext];
 		}
-		if (PrevIndex == NULL)
+		if( PrevIndex == NULL )
 		{
 			Index->iNext			= Node->iDynamic[IsBack];
 			Node->iDynamic[IsBack]  = iDynamic;
@@ -143,53 +146,50 @@ FDynamicsIndex inline *dynamicsAdd (IModel *ModelInfo, INDEX iNode, INT Type,
 
 #if STATS
 	switch (Type)
-		{
+	{
 		case DY_SPRITE:		GStat.NumSprites++;			break;
 		case DY_CHUNK:		GStat.NumChunks++;			break;
 		case DY_FINALCHUNK:	GStat.NumFinalChunks++; 	break;
-		};
+	}
 #endif
 	return Index;
-	UNGUARD("dynamicsAdd");
-};
+	unguard;
+}
 
 //
 // Add all actors to dynamic contents, optionally excluding the player actor.
 // Pass INDEX_NONE to exclude nothing.
 //
-void dynamicsSetup (ICamera *Camera, INDEX iExclude)
+void dynamicsSetup( UCamera *Camera, AActor *Exclude )
 {
-	GUARD;
-	UActorList 		*Actors    = Camera->Level.Actors; 
-	IModel 			*ModelInfo = &Camera->Level.ModelInfo;
+	guard(dynamicsSetup);
+	ULevel::Ptr 	Actors  = Camera->Level;
 	FSprite			*Sprite;
 
 	// Skip if we shouldn't be rendering actors.
-	if ((Camera->ShowFlags & SHOW_Actors) && ModelInfo->NumBspNodes)
-	{
-		// Traverse entire actor list.
-		AActor **ActorPtr = &Actors->ActiveActors->First();
-		AActor **LastPtr  = &Actors->ActiveActors->Last();
-		while( ActorPtr <= LastPtr )
-		{
-			// Add this actor to dynamics if it's renderable.
-			AActor *Actor = *ActorPtr++;
-			if 
-			(		(Actor->Class != NULL)
-				&&	(Actor->iMe   != iExclude)
-				&&	((Camera->Level.State==LEVEL_UpPlay)?!Actor->bHidden:!Actor->bHiddenEd) 
-			)
-			{
-				// Allocate a sprite.
-				Sprite  		= (FSprite *)GDynMem.GetFast(sizeof(FSprite));
-				Sprite->Actor	= Actor;
+	if( !(Camera->Actor->ShowFlags & SHOW_Actors) || !Camera->Level->Model->Nodes->Num )
+		return;
 
-				// Add the sprite.
-				dynamicsAdd( ModelInfo,0,DY_SPRITE,Sprite,NULL,ADD_END,0 );
-			}
+	// Traverse entire actor list.
+	for( INDEX iActor=0; iActor<Actors->Num; iActor++ )
+	{
+		// Add this actor to dynamics if it's renderable.
+		AActor *Actor = Actors(iActor);
+		if 
+		(	(Actor)
+		&&	(Actor != Exclude)
+		&&	((Camera->Level->GetState()==LEVEL_UpPlay)?!Actor->bHidden:!Actor->bHiddenEd)
+		&&	(!Actor->bOnlyOwnerSee || Actor->IsOwnedBy(Camera->Actor)) )
+		{
+			// Allocate a sprite.
+			Sprite  		= new(GDynMem)FSprite;
+			Sprite->Actor	= Actor;
+
+			// Add the sprite.
+			dynamicsAdd( Camera->Level->Model, 0, DY_SPRITE, Sprite, NULL, ADD_END, 0 );
 		}
 	}
-	UNGUARD("dynamicsSetup");
+	unguard;
 }
 
 /*------------------------------------------------------------------------------
@@ -202,13 +202,13 @@ void dynamicsSetup (ICamera *Camera, INDEX iExclude)
 //
 void inline MakeSpriteChunk
 (
-	IModel *ModelInfo, 
-	ICamera *Camera, 
-	INDEX iNode,
-	FDynamicsIndex *Index
+	UModel			*Model, 
+	UCamera			*Camera, 
+	INDEX			iNode,
+	FDynamicsIndex	*Index
 )
 {
-	GUARD;
+	guard(MakeSpriteChunk);
 	FSprite			*Sprite = Index->Sprite;
 	FTransform		*Verts  = Sprite->Verts;
 
@@ -222,10 +222,10 @@ void inline MakeSpriteChunk
 	FLOAT PlaneZ	= Sprite->Z - SPRITE_PROJECTION_FORWARD;
 	FLOAT PlaneZRD	= PlaneZ * Camera->RProjZ;
 
-	FLOAT PlaneX1   = PlaneZRD * (FloatX1 - Camera->FSXR2);
-	FLOAT PlaneX2   = PlaneZRD * (FloatX2 - Camera->FSXR2);
-	FLOAT PlaneY1   = PlaneZRD * (FloatY1 - Camera->FSYR2);
-	FLOAT PlaneY2   = PlaneZRD * (FloatY2 - Camera->FSYR2);
+	FLOAT PlaneX1   = PlaneZRD * (FloatX1 - Camera->FX2);
+	FLOAT PlaneX2   = PlaneZRD * (FloatX2 - Camera->FX2);
+	FLOAT PlaneY1   = PlaneZRD * (FloatY1 - Camera->FY2);
+	FLOAT PlaneY2   = PlaneZRD * (FloatY2 - Camera->FY2);
 
 	// Generate four screen-aligned box vertices.
 	Verts[0].X = PlaneX1; Verts[0].Y = PlaneY1; Verts[0].Z = PlaneZ; Verts[0].ScreenX = FloatX1; Verts[0].ScreenY = FloatY1;
@@ -234,17 +234,17 @@ void inline MakeSpriteChunk
 	Verts[3].X = PlaneX1; Verts[3].Y = PlaneY2; Verts[3].Z = PlaneZ; Verts[3].ScreenX = FloatX1; Verts[3].ScreenY = FloatY2;
 
 	// Transform box into worldspace.
-	for (INT i=0; i<4; i++) 
-		Verts[i].TransformPoint(Camera->Uncoords);
+	for( INT i=0; i<4; i++ )
+		*(FVector*)&Verts[i] = Verts[i].TransformPointBy(Camera->Uncoords);
 
 	// Generate a full rasterization for this box, which we'll filter down the Bsp.
 	FRasterPoly *Raster;
-	Raster			= (FRasterPoly *)GDynMem.Get(sizeof(FRasterPoly) + (Sprite->Y2 - Sprite->Y1)*sizeof(FRasterLine));
+	Raster			= (FRasterPoly *)new(GDynMem,sizeof(FRasterPoly) + (Sprite->Y2 - Sprite->Y1)*sizeof(FRasterLine))BYTE;
 	Raster->StartY	= Sprite->Y1;
 	Raster->EndY	= Sprite->Y2;
 
 	FRasterLine	*Line = &Raster->Lines[0];
-	for ( i=Raster->StartY; i<Raster->EndY; i++ )
+	for( i=Raster->StartY; i<Raster->EndY; i++ )
 	{
 		Line->Start.X = Sprite->X1;
 		Line->End.X   = Sprite->X2;
@@ -254,24 +254,24 @@ void inline MakeSpriteChunk
 	// Add first sprite chunk at end of dynamics list so it will be processed in
 	// the current node's linked rendering list (which we can assume is being
 	// walked when this is called).
-	dynamicsAdd (ModelInfo,iNode,DY_CHUNK,Sprite,Raster,ADD_END,0);
+	dynamicsAdd( Model, iNode, DY_CHUNK, Sprite, Raster, ADD_END, 0 );
 
-	UNGUARD("MakeSpriteChunk");
+	unguard;
 }
 
 //
 // Filter a chunk from the current Bsp node down to its children.  If this is a leaf,
 // leave the chunk here.
 //
-void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynamicsIndex *Index,INT Outside)
+void inline FilterChunk( UModel *Model, UCamera *Camera, INDEX iNode, FDynamicsIndex *Index, INT Outside )
 {
 	FSprite			*Sprite 	= Index->Sprite;
 	FRasterPoly		*Raster 	= Index->Raster;
 	FTransform		*Verts  	= Sprite->Verts;
-	FBspNode		*Node		= &ModelInfo->BspNodes [iNode];
-	FBspSurf		*Surf		= &ModelInfo->BspSurfs [Node->iSurf];
-	FVector			*Normal		= &ModelInfo->FVectors [Surf->vNormal];
-	FVector			*Base		= &ModelInfo->FPoints  [Surf->pBase];
+	FBspNode		&Node		= Model->Nodes  (iNode);
+	FBspSurf		&Surf		= Model->Surfs  (Node.iSurf);
+	FVector			&Normal		= Model->Vectors(Surf.vNormal);
+	FVector			&Base		= Model->Points (Surf.pBase);
 
 	// Setup.
 	FRasterPoly *FrontRaster, *BackRaster;
@@ -282,13 +282,13 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 	{
 		for ( INT i=0; i<4; i++ )
 		{
-			Dist[i] = FPointPlaneDist (Verts[i],*Base,*Normal);
+			Dist[i] = FPointPlaneDist (Verts[i],Base,Normal);
 			Front  += Dist[i] > +0.01;
 			Back   += Dist[i] < -0.01;
 		}
 		// Note: Both Front and Back can be zero
 	}
-	if (Front && Back)
+	if( Front && Back )
 	{	
 		//
 		// We must split the rasterization and filter it down both sides of this node.
@@ -303,9 +303,9 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 		FLOAT		*D2	= &Dist			[0];
 		INT			NumInt = 0;
 
-		for ( INT i=0; i<4; i++ )
+		for( INT i=0; i<4; i++ )
 		{
-			if (((*D1) * (*D2)) < 0.0)
+			if( (*D1)*(*D2) < 0.0 )
 			{	
 				// At intersection point.
 				FLOAT Alpha = *D1 / (*D1 - *D2);
@@ -319,15 +319,16 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 			V1 = V2++;
 			D1 = D2++;
 		}
-		if (NumInt<2) goto NoSplit;
+		if( NumInt < 2 )
+			goto NoSplit;
 
 		// Allocate front and back rasters.
 		INT	Size	= sizeof (FRasterPoly) + (Raster->EndY - Raster->StartY) * sizeof (FRasterLine);
-		FrontRaster	= (FRasterPoly *)GDynMem.Get(Size);
-		BackRaster	= (FRasterPoly *)GDynMem.Get(Size);
+		FrontRaster	= (FRasterPoly *)new(GDynMem,Size)BYTE;
+		BackRaster	= (FRasterPoly *)new(GDynMem,Size)BYTE;
 
 		// Make sure that first intersection point is on top.
-		if (Intersect[0].ScreenY > Intersect[1].ScreenY)
+		if( Intersect[0].ScreenY > Intersect[1].ScreenY )
 		{
 			Intersect[2] = Intersect[0];
 			Intersect[0] = Intersect[1];
@@ -343,7 +344,7 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 
 		// Find TopRaster.
 		FRasterPoly *TopRaster = NULL;
-		if (Y0 > Raster->StartY)
+		if( Y0 > Raster->StartY )
 		{
 			if (Dist[0] >= 0) TopRaster = FrontRaster;
 			else              TopRaster = BackRaster;
@@ -351,7 +352,7 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 
 		// Find BottomRaster.
 		FRasterPoly *BottomRaster = NULL;
-		if (Y1 < Raster->EndY)
+		if( Y1 < Raster->EndY )
 		{
 			if (Dist[2] >= 0) BottomRaster = FrontRaster;
 			else              BottomRaster = BackRaster;
@@ -359,7 +360,7 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 
 		// Find LeftRaster and RightRaster.
 		FRasterPoly *LeftRaster, *RightRaster;
-		if (Intersect[1].ScreenX >= Intersect[0].ScreenX)
+		if( Intersect[1].ScreenX >= Intersect[0].ScreenX )
 		{
 			if (Dist[1] >= 0.0) {LeftRaster = BackRaster;  RightRaster = FrontRaster;}
 			else	   			{LeftRaster = FrontRaster; RightRaster = BackRaster; };
@@ -379,7 +380,7 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 		LeftRaster->EndY   = ClippedY1; RightRaster->EndY   = ClippedY1;
 
 		// Copy TopRaster section.
-		if (TopRaster)
+		if( TopRaster )
 		{
 			TopRaster->StartY = Raster->StartY;
 
@@ -391,7 +392,7 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 		}
 
 		// Copy BottomRaster section.
-		if (BottomRaster)
+		if( BottomRaster )
 		{
 			BottomRaster->EndY = Raster->EndY;
 
@@ -403,7 +404,7 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 		}
 
 		// Split middle raster section.
-		if (Y1 != Y0)
+		if( Y1 != Y0 )
 		{
 			FLOAT	FloatYAdjust	= (FLOAT)Y0 + 1.0 - Intersect[0].ScreenY;
 			FLOAT	FloatFixDX 		= 65536.0 * (Intersect[1].ScreenX - Intersect[0].ScreenX) / (Intersect[1].ScreenY - Intersect[0].ScreenY);
@@ -439,10 +440,11 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 				RightLine  ++;
 			}
 		}
+
 		// Discard any rasters that are completely empty.
-		if (BackRaster ->EndY <= BackRaster ->StartY)
+		if( BackRaster ->EndY <= BackRaster ->StartY )
 			BackRaster  = NULL;
-		if (FrontRaster->EndY <= FrontRaster->StartY) 
+		if( FrontRaster->EndY <= FrontRaster->StartY )
 			FrontRaster = NULL;
 	}
 	else
@@ -453,16 +455,18 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 	}
 
 	// Filter it down.
-	INT CSG = Node->IsCsg();
-	if (Front && FrontRaster)
+	INT CSG = Node.IsCsg();
+	if( Front && FrontRaster )
 	{
-		if (Node->iFront != INDEX_NONE)	dynamicsAdd (ModelInfo,Node->iFront,DY_CHUNK,Sprite,FrontRaster,ADD_START,0);
-		else if (Outside || CSG)		dynamicsAdd (ModelInfo,iNode,DY_FINALCHUNK,Sprite,FrontRaster,Sprite->Z,0);
+		// Only add if not solid space.
+		if     ( Node.iFront != INDEX_NONE ) dynamicsAdd( Model, Node.iFront, DY_CHUNK, Sprite, FrontRaster, ADD_START, 0 );
+		else if( Outside || CSG            ) dynamicsAdd( Model, iNode, DY_FINALCHUNK, Sprite, FrontRaster, Sprite->Z, 0 );
 	}
-	if (Back && BackRaster) // Only add if this isn't a back leaf
+	if( Back && BackRaster )
 	{
-		if (Node->iBack != INDEX_NONE)	dynamicsAdd (ModelInfo,Node->iBack,DY_CHUNK,Sprite,BackRaster,ADD_START,0);
-		else if (Outside && !CSG)		dynamicsAdd (ModelInfo,iNode,DY_FINALCHUNK,Sprite,BackRaster,Sprite->Z,1);
+		// Only add if not solid space.
+		if     ( Node.iBack != INDEX_NONE  ) dynamicsAdd( Model, Node.iBack, DY_CHUNK, Sprite, BackRaster, ADD_START, 0 );
+		else if( Outside && !CSG           ) dynamicsAdd( Model, iNode, DY_FINALCHUNK, Sprite, BackRaster, Sprite->Z, 1 );
 	}
 }
 
@@ -480,32 +484,32 @@ void inline FilterChunk (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FDynam
 // Bound rejected and thus they can't possibly affect the visible results of drawing the actors.
 // This saves lots of tree-walking time.
 //
-void dynamicsFilter (ICamera *Camera, INDEX iNode,INT FilterDown,INT Outside)
+void dynamicsFilter( UCamera *Camera, INDEX iNode,INT FilterDown,INT Outside )
 {
-	GUARD;
-	FDynamicsIndex 			*Index;
-	IModel 					*ModelInfo	= &Camera->Level.ModelInfo;
-	FBspNode				*Node		= &ModelInfo->BspNodes[iNode];
-	INDEX					iDynamic	= Node->iDynamic[0];
+	guard(dynamicsFilter);
+	UModel		*Model		= Camera->Level->Model;
+	FBspNode	*Node		= &Model->Nodes(iNode);
+	INDEX		iDynamic	= Node->iDynamic[0];
 
-	while (iDynamic != INDEX_NONE)
+	while( iDynamic != INDEX_NONE )
 	{
-		Index = &GRender.DynamicsIndex [iDynamic];
-		switch (Index->Type)
+		FDynamicsIndex *Index = &GRender.DynamicsIndex[iDynamic];
+		switch( Index->Type )
 		{
 			case DY_SPRITE:
 			{
 				FSprite *Sprite = Index->Sprite;
-				if ( GRender.SetupSprite( Camera,Sprite ) )
+				if( GRender.SetupSprite( Camera, Sprite ) )
 				{
-					MakeSpriteChunk (ModelInfo,Camera,iNode,Index); // May set Index->iNext
+					// Note: May set Index->iNext.
+					MakeSpriteChunk( Model, Camera, iNode, Index );
 				}
 				break;
 			}
 			case DY_CHUNK:
 			{
-				if (FilterDown) FilterChunk (ModelInfo,Camera,iNode,Index,Outside);
-				else            Index->Type = DY_FINALCHUNK;
+				if( FilterDown ) FilterChunk( Model, Camera, iNode, Index, Outside );
+				else             Index->Type = DY_FINALCHUNK;
 				break;
 			}
 			case DY_FINALCHUNK:
@@ -515,7 +519,7 @@ void dynamicsFilter (ICamera *Camera, INDEX iNode,INT FilterDown,INT Outside)
 		}
 		iDynamic = Index->iNext;
 	}
-	UNGUARD("dynamicsFilter");
+	unguard;
 }
 
 /*------------------------------------------------------------------------------
@@ -535,23 +539,23 @@ void dynamicsFilter (ICamera *Camera, INDEX iNode,INT FilterDown,INT Outside)
 //
 void dynamicsPreRender
 (
-	ICamera *Camera, 
+	UCamera		*Camera, 
 	FSpanBuffer *SpanBuffer,
-	INDEX iNode, 
-	INT IsBack
+	INDEX		iNode, 
+	INT			IsBack
 )
 {
-	GUARD;
-	IModel 			*ModelInfo	= &Camera->Level.ModelInfo;
-	FBspNode		*Node 		= &ModelInfo->BspNodes[iNode];
+	guard(dynamicsPreRender);
+	UModel 			*Model		= Camera->Level->Model;
+	FBspNode		*Node 		= &Model->Nodes(iNode);
 	INDEX			iDynamic	= Node->iDynamic[IsBack];
 
-	if (iDynamic != INDEX_NONE)
+	if( iDynamic != INDEX_NONE )
 	{
 		if (GRender.NumPostDynamics < GRender.MaxPostDynamics)
 			GRender.PostDynamics[GRender.NumPostDynamics++] = iNode;
 	}
-	while (iDynamic != INDEX_NONE)
+	while( iDynamic != INDEX_NONE )
 	{
 		FDynamicsIndex	*Index	= &GRender.DynamicsIndex [iDynamic];
 		FSprite			*Sprite = Index->Sprite;
@@ -562,15 +566,16 @@ void dynamicsPreRender
 				if( !Index->Sprite->SpanBuffer )
 				{
 					// Creating a new span buffer for this sprite.
-					Sprite->SpanBuffer = (FSpanBuffer *)GDynMem.Get(sizeof(FSpanBuffer));
+					Sprite->SpanBuffer = new(GDynMem)FSpanBuffer;
 					Sprite->SpanBuffer->AllocIndex(Index->Raster->StartY,Index->Raster->EndY,&GDynMem);
 
-					if (Sprite->SpanBuffer->CopyFromRaster(*SpanBuffer,*Index->Raster))
+					if( Sprite->SpanBuffer->CopyFromRaster(*SpanBuffer,*Index->Raster) )
 					{
 						// Span buffer is non-empty, so keep it and put it on the to-draw list.
 						STAT(GStat.ChunksDrawn++);
 						Sprite->Next	= GFirstSprite;
 						GFirstSprite	= Sprite;
+						GNumSprites++;
 					}
 					else
 					{
@@ -583,7 +588,8 @@ void dynamicsPreRender
 				{
 					// Merging with the sprite's existing span buffer.
 					// Creating a temporary span buffer.
-					FSpanBuffer *Span = (FSpanBuffer *)GMem.Get(sizeof(FSpanBuffer));
+					FMemMark Mark(GMem);
+					FSpanBuffer *Span = new(GMem)FSpanBuffer;
 					Span->AllocIndex(Index->Raster->StartY,Index->Raster->EndY,&GMem);
 
 					if (Span->CopyFromRaster(*SpanBuffer,*Index->Raster))
@@ -592,8 +598,9 @@ void dynamicsPreRender
 						Sprite->SpanBuffer->MergeWith(*Span);
 						STAT(GStat.ChunksDrawn++);
 					}
+
 					// Release the temporary memory.
-					GMem.Release(Span);
+					Mark.Pop();
 				}
 				break;
 			case DY_CHUNK:
@@ -603,33 +610,28 @@ void dynamicsPreRender
 		}
 		iDynamic = Index->iNext;
 	}
-	UNGUARD("dynamicsPreRender");
+	unguard;
 }
 
 /*------------------------------------------------------------------------------
 	Dynamics postrendering.
 ------------------------------------------------------------------------------*/
 
-void dynamicsFinalize (ICamera *Camera, INT SpanRender)
+void dynamicsFinalize( UCamera *Camera, INT SpanRender )
 {
-	GUARD;
-
-	if (Camera->Level.ModelInfo.NumBspNodes==0)
+	guard(dynamicsFinalize);
+	if( Camera->Level->Model->Nodes->Num == 0 )
 	{
 		// Can't manage dynamic contents if no nodes.
-		GRender.DrawLevelActors (Camera,INDEX_NONE);
+		GRender.DrawLevelActors( Camera, NULL );
 	}
 	else
 	{
 		// Draw all presaved sprites.
-		FSprite *Sprite = GFirstSprite;
-		while( Sprite != NULL )
-		{
-			GRender.DrawActorChunk (Camera,Sprite);
-			Sprite = Sprite->Next;
-		}
+		for( FSprite *Sprite = GFirstSprite; Sprite; Sprite=Sprite->Next )
+			GRender.DrawActorChunk( Camera, Sprite );
 	}
-	UNGUARD("dynamicsFinalize");
+	unguard;
 }
 
 /*-----------------------------------------------------------------------------
@@ -641,40 +643,52 @@ void dynamicsFinalize (ICamera *Camera, INT SpanRender)
 //
 void inline CalcScaledSpriteExtent
 (
-	ICamera *Camera,
-	FLOAT ScreenX, FLOAT ScreenY,
-	FLOAT XSize, FLOAT YSize,
-	INT *X1, INT *Y1, INT *X2, INT *Y2
+	UCamera	*Camera,
+	FLOAT	ScreenX,
+	FLOAT	ScreenY,
+	FLOAT	XSize,
+	FLOAT	YSize,
+	INT		*X1,
+	INT		*Y1,
+	INT		*X2,
+	INT		*Y2
 ) 
 {
+	checkInput(XSize>=0.0);
+	checkInput(YSize>=0.0);
+
 	ScreenX -= XSize * 0.5;
 	ScreenY -= YSize * 0.5;
 
 	// Find correctly rounded X and Y.
 	*X1 = ftoi(ceil(ScreenX));
 	*X2 = ftoi(ceil(ScreenX+XSize));
-	if ( *X1 < 0 )
+	if( *X1 < 0 )
 	{
 		*X1 = 0;
-		if (*X2 < 0) *X2 = 0;
+		if( *X2 < 0 )
+			*X2 = 0;
 	}
-	if ( *X2 > Camera->SXR )
+	if( *X2 > Camera->X )
 	{
-		*X2 = Camera->SXR;
-		if (*X1 > Camera->SXR) *X1 = Camera->SXR;
+		*X2 = Camera->X;
+		if( *X1 > Camera->X )
+			*X1 = Camera->X;
 	}
 
 	*Y1 = ftoi(ceil(ScreenY));
 	*Y2 = ftoi(ceil(ScreenY+YSize));
-	if ( *Y1 < 0 )
+	if( *Y1 < 0 )
 	{
 		*Y1 = 0;
-		if (*Y2 < 0) *Y2 = 0;
+		if( *Y2 < 0 )
+			*Y2 = 0;
 	}
-	if ( *Y2 > Camera->SYR )
+	if( *Y2 > Camera->Y )
 	{
-		*Y2 = Camera->SYR;
-		if (*Y1 > Camera->SYR) *Y1 = Camera->SYR;
+		*Y2 = Camera->Y;
+		if( *Y1 > Camera->Y )
+			*Y1 = Camera->Y;
 	}
 }
 
@@ -682,9 +696,9 @@ void inline CalcScaledSpriteExtent
 // Draw a scaled sprite.  Takes care of clipping.
 // XSize and YSize are in pixels.
 //
-void FGlobalRender::DrawScaledSprite
+void FRender::DrawScaledSprite
 (
-	ICamera		*Camera, 
+	UCamera		*Camera, 
 	UTexture	*Texture,
 	FLOAT		ScreenX, 
 	FLOAT		ScreenY, 
@@ -696,10 +710,9 @@ void FGlobalRender::DrawScaledSprite
 	INT			Highlight
 )
 {
-	FLOAT X1,X2,Y1,Y2;
-
-	GUARD;
-	if (!Texture) appError("Null texture");
+	checkInput( Texture != NULL );
+	FLOAT X1=0, X2=0, Y1=0, Y2=0;
+	guard( FRender::DrawScaledSprite );
 
 	if (Center)
 	{
@@ -710,9 +723,9 @@ void FGlobalRender::DrawScaledSprite
 	Y1 = ScreenY; Y2 = ScreenY + YSize;	
 
 	// Clip.
-	if ( X1 < 0.0 ) 			X1 = 0.0;
-	if ( X2 > Camera->FSXR ) 	X2 = Camera->FSXR;
-	if ( X2 <= X1 )				return;
+	if ( X1 < 0.0 ) 		X1 = 0.0;
+	if ( X2 > Camera->FX ) 	X2 = Camera->FX;
+	if ( X2 <= X1 )			return;
 
 	if (SpanBuffer)
 	{
@@ -721,8 +734,8 @@ void FGlobalRender::DrawScaledSprite
 	}
 	else
 	{
-		if ( Y1 < 0.0 ) 				Y1 = 0.0;
-		if ( Y2 > Camera->FSYR ) 		Y2 = Camera->FSYR;
+		if ( Y1 < 0.0 ) 			Y1 = 0.0;
+		if ( Y2 > Camera->FY ) 		Y2 = Camera->FY;
 	}
 	if ( Y2<=Y1 ) 
 		return;
@@ -739,38 +752,46 @@ void FGlobalRender::DrawScaledSprite
 
 	FLOAT G = Highlight ? (56.0 * 256.0) : (26.0 * 256.0);
 
-	// Build and draw poly.
-	FRasterTexPoly *RasterTexPoly = (FRasterTexPoly	*)GMem.Get
-	(
-		sizeof(FRasterTexPoly)+FGlobalRaster::MAX_RASTER_LINES*sizeof(FRasterTexLine)
-	);
-	FTransTex P[4];
-	P[0].ScreenX = X1; P[0].ScreenY = Y2; P[0].U = U1; P[0].V = V2; P[0].G = G; ftoi(P[0].IntX,P[0].ScreenX-0.5); ftoi(P[0].IntY,P[0].ScreenY-0.5);
-	P[1].ScreenX = X1; P[1].ScreenY = Y1; P[1].U = U1; P[1].V = V1; P[1].G = G; ftoi(P[1].IntX,P[1].ScreenX-0.5); ftoi(P[1].IntY,P[1].ScreenY-0.5);
-	P[2].ScreenX = X2; P[2].ScreenY = Y1; P[2].U = U2; P[2].V = V1; P[2].G = G; ftoi(P[2].IntX,P[2].ScreenX-0.5); ftoi(P[2].IntY,P[2].ScreenY-0.5);
-	P[3].ScreenX = X2; P[3].ScreenY = Y2; P[3].U = U2; P[3].V = V2; P[3].G = G; ftoi(P[3].IntX,P[3].ScreenX-0.5); ftoi(P[3].IntY,P[2].ScreenY-0.5);
+	// Build poly.
+	FTransTexture P[4];
+	P[0].ScreenX = X1; P[0].ScreenY = Y2; P[0].U = U1; P[0].V = V2; P[0].Color = FVector(G,G,G); P[0].Z=1000.0;
+	P[1].ScreenX = X1; P[1].ScreenY = Y1; P[1].U = U1; P[1].V = V1; P[1].Color = FVector(G,G,G); P[1].Z=1000.0;
+	P[2].ScreenX = X2; P[2].ScreenY = Y1; P[2].U = U2; P[2].V = V1; P[2].Color = FVector(G,G,G); P[2].Z=1000.0;
+	P[3].ScreenX = X2; P[3].ScreenY = Y2; P[3].U = U2; P[3].V = V2; P[3].Color = FVector(G,G,G); P[3].Z=1000.0;
 
-	FRasterTexSetup RasterTexSetup;
-	RasterTexSetup.Setup	(*Camera,P,4,&GMem);
-	RasterTexSetup.Generate	(RasterTexPoly);
-
+	// Set flags.
 	DWORD TheseFlags=0;
-	switch (BlitType)
+	switch( BlitType )
 	{
 		case BT_None:			TheseFlags = PF_Masked | PF_NoSmooth;		break;
 		case BT_Normal:			TheseFlags = PF_Masked | 0;					break;
 		case BT_Transparent:	TheseFlags = PF_Masked | PF_Transparent;	break;
 	}
-	FPolySpanTextureInfoBase *Info
-		=	GSpanTextureMapper->SetupForPoly(*Camera,Texture,NULL,TheseFlags,0);
-	RasterTexPoly->Draw(*Camera,*Info,SpanBuffer);
-	GSpanTextureMapper->FinishPoly(Info);
 
-	GMem.Release(RasterTexPoly);
+	// Draw it.
+	if( GCameraManager->RenDev )
+	{
+		// Hardware render it.
+		GCameraManager->RenDev->DrawPolyC( Camera, Texture, P, 4, TheseFlags );
+	}
+	else
+	{
+		//!! This makes a VC++ 5.0 code generator bug go away.
+		__asm{}
 
-	UNGUARD_BEGIN;
-	UNGUARD_MSGF("FGlobalRender::DrawScaledSprite (Y1=%f Y2=%f)",Y1,Y2);
-	UNGUARD_END;
+		// Software render it.
+		FMemMark Mark(GMem);
+		FRasterTexPoly *RasterTexPoly = (FRasterTexPoly	*)new(GMem,
+			sizeof(FRasterTexPoly)+FGlobalRaster::MAX_RASTER_LINES*sizeof(FRasterTexLine))BYTE;
+		FRasterTexSetup RasterTexSetup;
+		RasterTexSetup.Setup( Camera, P, 4, &GMem );
+		RasterTexSetup.Generate( RasterTexPoly );
+		FPolySpanTextureInfoBase *Info = GSpanTextureMapper->SetupForPoly( Camera, Texture, NULL, TheseFlags, 0 );
+		RasterTexPoly->Draw( Camera, *Info, SpanBuffer );
+		GSpanTextureMapper->FinishPoly(Info);
+		Mark.Pop();
+	}
+	unguardf(("(Y1=%f Y2=%f)",Y1,Y2));
 }
 
 /*-----------------------------------------------------------------------------
@@ -780,70 +801,87 @@ void FGlobalRender::DrawScaledSprite
 //
 // Draw a block of texture on the screen.
 //
-void FGlobalRender::DrawTiledTextureBlock(ICamera *Camera,UTexture *Texture,
-	INT X, INT XL, INT Y, INT YL,INT U,INT V)
+void FRender::DrawTiledTextureBlock
+(
+	UCamera		*Camera,
+	UTexture	*Texture,
+	INT			X, 
+	INT			XL, 
+	INT			Y, 
+	INT			YL,
+	INT			U,
+	INT			V
+)
 {
-	guard(FGlobalRender::DrawTiledTextureBlock);
+	guard(FRender::DrawTiledTextureBlock);
 
-	// Get texture data.
-	ITexture TextureInfo;
-	INT 	MipLevel=0,USize,VSize;
-	BYTE	*Data	= Texture->GetData(TextureInfo,&MipLevel,Camera->ColorBytes,&USize,&VSize);
-	FCacheItem *Item = NULL;
+	if( GCameraManager->RenDev )
+	{
+		// Build poly.
+		FTransTexture P[4];
+		FLOAT G = 63*256;
+		P[0].ScreenX = X;    P[0].ScreenY = Y+YL; P[0].U = (U   )*65536.0; P[0].V = (V+YL)*65536.0; P[0].Color = FVector(G,G,G); P[0].Z=1000.0;
+		P[1].ScreenX = X;    P[1].ScreenY = Y;    P[1].U = (U   )*65536.0; P[1].V = (V   )*65536.0; P[1].Color = FVector(G,G,G); P[1].Z=1000.0;
+		P[2].ScreenX = X+XL; P[2].ScreenY = Y;    P[2].U = (U+XL)*65536.0; P[2].V = (V   )*65536.0; P[2].Color = FVector(G,G,G); P[2].Z=1000.0;
+		P[3].ScreenX = X+XL; P[3].ScreenY = Y+YL; P[3].U = (U+XL)*65536.0; P[3].V = (V+YL)*65536.0; P[3].Color = FVector(G,G,G); P[3].Z=1000.0;
 
-	// Setup.
-	INT UAnd		= USize-1;
-	INT VAnd		= VSize-1;
-	BYTE VShift		= Texture->UBits;
-	BYTE *Dest1		= &Camera->Screen[(X + Y*Camera->Stride)*Camera->ColorBytes];
-	INT XE			= X+XL+U;
-	INT YE			= Y+YL+V;
-	
-	X += U; 
-	Y += V;
-
-	if( Camera->ColorBytes==1 )
-	{
-		FColor *Colors = &Texture->Palette->Element(0);
-		for (V=Y; V<YE; V++)
-		{
-			BYTE *Src  = &Data[(V & VAnd) << VShift];
-			BYTE *Dest = Dest1;
-			for (INT U=X; U<XE; U++) *Dest++ = Src[U&UAnd];
-			Dest1 += Camera->Stride;
-		}
-	}
-	else if( Camera->ColorBytes==2 )
-	{
-		WORD *HiColors = Texture->Palette->GetColorDepthPalette(Item,Camera->Texture).PtrWORD;
-		for (V=Y; V<YE; V++)
-		{
-			BYTE *Src  = &Data[(V & VAnd) << VShift];
-			WORD *Dest = (WORD *)Dest1;
-			for (INT U=X; U<XE; U++) *Dest++ = HiColors[Src[U&UAnd]];
-			Dest1 += Camera->Stride*2;
-		}
-	}
-	else if( Camera->ColorBytes==4 )
-	{
-		DWORD *TrueColors = Texture->Palette->GetColorDepthPalette(Item,Camera->Texture).PtrDWORD;
-		for( V=Y; V<YE; V++ )
-		{
-			BYTE  *Src  = &Data[(V & VAnd) << VShift];
-			DWORD *Dest = (DWORD *)Dest1;
-			for (U=X; U<XE; U++) *Dest++ = TrueColors[Src[U&UAnd]];
-			Dest1 += Camera->Stride*4;
-		}
+		// Draw it.
+		GCameraManager->RenDev->DrawPolyC( Camera, Texture, P, 4, 0 );
 	}
 	else
 	{
-		appErrorf("Invalid color depth %i",Camera->ColorBytes);
-	}
+		// Software render it.
+		FTextureInfo TextureInfo;
+		Texture->Lock(TextureInfo,Camera->Texture,TL_RenderPalette);
+		RAINBOW_PTR Colors = TextureInfo.Colors;
 
-	// Unlock the texture.
-	Texture->Unlock(TextureInfo);
-	if( Item ) Item->Unlock();
-	
+		// Setup.
+		BYTE *Data		= TextureInfo.Mips[0]->Data;
+		INT UAnd		= TextureInfo.Mips[0]->USize-1;
+		INT VAnd		= TextureInfo.Mips[0]->VSize-1;
+		BYTE VShift		= Texture->UBits;
+		BYTE *Dest1		= &Camera->Screen[(X + Y*Camera->Stride)*Camera->ColorBytes];
+		INT XE			= X+XL+U;
+		INT YE			= Y+YL+V;
+
+		X += U; 
+		Y += V;
+
+		if( Camera->ColorBytes==1 )
+		{
+			for (V=Y; V<YE; V++)
+			{
+				BYTE *Src  = &Data[(V & VAnd) << VShift];
+				BYTE *Dest = Dest1;
+				for (INT U=X; U<XE; U++) *Dest++ = Colors.PtrBYTE[Src[U&UAnd]];
+				Dest1 += Camera->Stride;
+			}
+		}
+		else if( Camera->ColorBytes==2 )
+		{
+			for (V=Y; V<YE; V++)
+			{
+				BYTE *Src  = &Data[(V & VAnd) << VShift];
+				WORD *Dest = (WORD *)Dest1;
+				for (INT U=X; U<XE; U++) *Dest++ = Colors.PtrWORD[Src[U&UAnd]];
+				Dest1 += Camera->Stride*2;
+			}
+		}
+		else if( Camera->ColorBytes==4 )
+		{
+			for( V=Y; V<YE; V++ )
+			{
+				BYTE  *Src  = &Data[(V & VAnd) << VShift];
+				DWORD *Dest = (DWORD *)Dest1;
+				for (U=X; U<XE; U++) *Dest++ = Colors.PtrDWORD[Src[U&UAnd]];
+				Dest1 += Camera->Stride*4;
+			}
+		}
+		else appErrorf("Invalid color depth %i",Camera->ColorBytes);
+
+		// Unlock the texture.
+		Texture->Unlock(TextureInfo);
+	}
 	unguard;
 }
 
@@ -852,85 +890,98 @@ void FGlobalRender::DrawTiledTextureBlock(ICamera *Camera,UTexture *Texture,
 -----------------------------------------------------------------------------*/
 
 //
-// Draw a Sprite (sprite or scaled sprite) with no span clipping
+// Draw an actor with no span clipping.
 //
-void FGlobalRender::DrawActorSprite( ICamera *Camera,FSprite *Sprite )
+void FRender::DrawActorSprite( UCamera *Camera,FSprite *Sprite )
 {
-	GUARD;
+	guard(FRender::DrawActorSprite);
+	
 	AActor *Actor = Sprite->Actor;
 	INT ModeClass = GEditor ? GEditor->edcamModeClass(GEditor->Mode) : EMC_None;
 
-	if (GEditor && GEditor->Scan.Active) 
+	if( GEditor && GEditor->Scan.Active )
 		GEditor->Scan.PreScan();
 
+	// Draw the actor.
 	if
-	(
-			(Actor->DrawType==DT_Sprite) 
-		||	(Actor->DrawType==DT_Brush) 
-		||	(Camera->ShowFlags & SHOW_ActorIcons)
-	)
+	(	(Actor->DrawType==DT_Sprite) 
+	||	(Actor->DrawType==DT_Brush) 
+	||	(Camera->Actor->ShowFlags & SHOW_ActorIcons) )
 	{
-		if ( Actor->Texture )
-		{
-			DrawScaledSprite
-			(
-				Camera,Actor->Texture,
-				Sprite->ScreenX,Sprite->ScreenY,
-				Sprite->Scale * Actor->Texture->USize, Sprite->Scale * Actor->Texture->VSize,
-				Actor->BlitType,0,1,Actor->bSelected
-			);
-			if ( Camera->Camera->IsOrtho() )
-			{
-				if ( Camera->ShowFlags & SHOW_ActorRadii )
-				{
-					if (Actor->bCollideActors)
-					{
-						DrawCircle(Camera,Actor->Location,Actor->CollisionRadius,ActorArrowColor,1);
-					}
-					if ( (Actor->LightType!=LT_None) && Actor->bSelected )
-					{
-						DrawCircle(Camera,Actor->Location,Actor->WorldLightRadius(),ActorArrowColor,1);
-					}
-				}
-				if ( Actor->bDirectional
-					&& (ModeClass==EMC_Actor || Actor->IsKindOf("Camera")))
-				{
-					GGfx.ArrowBrush->Location = Actor->Location;
-					GGfx.ArrowBrush->Rotation = Actor->DrawRot;
-					GGfx.ArrowBrush->Bound[1].Init(); // Don't bound-reject.
-					GRender.DrawBrushPolys (Camera,GGfx.ArrowBrush,ActorArrowColor,0,NULL,1,0,Actor->bSelected,0);
-				}
-			}
-		}
-	}
-	else if ( (Actor->DrawType==DT_MeshMap) && (Actor->MeshMap) )
-	{
-		DrawMeshMap
+		if( Actor->Texture ) DrawScaledSprite
 		(
-			*Camera,
-			*Actor->MeshMap,
-			NULL,
-			Actor->Location,
-			Actor->DrawRot,
-			Actor->bSelected,
-			Sprite,
-			!Actor->bUnlit,
-			!Actor->bNoSmooth
+			Camera,Actor->Texture,
+			Sprite->ScreenX,
+			Sprite->ScreenY,
+			Actor->DrawScale * Actor->Texture->USize,
+			Actor->DrawScale * Actor->Texture->VSize,
+			Actor->BlitType,
+			0,
+			1,
+			Actor->bSelected && Camera->Level->GetState()!=LEVEL_UpPlay
 		);
 	}
-	if (GEditor && GEditor->Scan.Active) 
-		GEditor->Scan.PostScan(EDSCAN_Actor,Sprite->Actor->iMe,0,0,NULL);
+	else if( Actor->DrawType==DT_Mesh )
+	{
+		if( Actor->Mesh ) DrawMesh ( Camera, Actor, NULL, Sprite );
+	}
 
-	UNGUARD("FGlobalRender::DrawActorSprite");
+	// Draw frills.
+	if( Camera->IsOrtho() )
+	{
+		// Radii.
+		if( Camera->Actor->ShowFlags & SHOW_ActorRadii )
+		{
+			if( !Actor->Brush || !Actor->Brush->bCheckCollision )
+			{
+				// Show collision radius
+				if( Actor->bCollideActors && Camera->Actor->RendMap==REN_OrthXY )
+					DrawCircle( Camera, Actor->Location, Actor->CollisionRadius, ActorArrowColor, 1 );
+
+				// Show collision height.
+				FVector Ext(Actor->CollisionRadius,Actor->CollisionRadius,Actor->CollisionHeight);
+				FVector Min(Actor->Location - Ext);
+				FVector Max(Actor->Location + Ext);
+				if( Actor->bCollideActors && Camera->Actor->RendMap!=REN_OrthXY )
+					DrawBox( Camera, Min, Max, ActorArrowColor, 1 );
+			}
+			else
+			{
+				FVector Min,Max;
+				Actor->GetCollisionExtent( Min, Max );
+				DrawBox( Camera, Min, Max, ActorArrowColor, 1 );
+			}
+
+			// Show light radius.
+			if( (Actor->LightType!=LT_None) && Actor->bSelected  && Camera->Level->GetState()!=LEVEL_UpPlay )
+				DrawCircle( Camera, Actor->Location, Actor->WorldLightRadius(), ActorArrowColor, 1 );
+		}
+
+		// Direction arrow.
+		if
+		(	(Actor->bDirectional)
+		&&	(ModeClass==EMC_Actor || Actor->IsA("View")))
+		{
+			GGfx.ArrowBrush->Location = Actor->Location;
+			GGfx.ArrowBrush->Rotation = Actor->Rotation;
+			GGfx.ArrowBrush->TransformedBound.Init(); // Don't bound-reject.
+			GRender.DrawBrushPolys(Camera,GGfx.ArrowBrush,ActorArrowColor,0,NULL,1,0,Actor->bSelected,0);
+		}
+	}
+
+	if( GEditor && GEditor->Scan.Active )
+		GEditor->Scan.PostScan( EDSCAN_Actor, (INDEX)Sprite->Actor, 0, 0, NULL );
+
+	unguard;
 }
 
 //
 // Draw an actor clipped to a span buffer representing the portion of
 // the actor that falls into a particular Bsp leaf.
 //
-void FGlobalRender::DrawActorChunk (ICamera *Camera,FSprite *Sprite)
+void FRender::DrawActorChunk( UCamera *Camera,FSprite *Sprite )
 {
-	GUARD;
+	guard(FRender::DrawActorChunk);
 	if (GEditor && GEditor->Scan.Active)
 		GEditor->Scan.PreScan();
 
@@ -939,35 +990,30 @@ void FGlobalRender::DrawActorChunk (ICamera *Camera,FSprite *Sprite)
 	(
 			(Actor->DrawType==DT_Sprite) 
 		||	(Actor->DrawType==DT_Brush) 
-		||	(Camera->ShowFlags & SHOW_ActorIcons)
+		||	(Camera->Actor->ShowFlags & SHOW_ActorIcons)
 	)
 	{
 		if (Actor->Texture) DrawScaledSprite
 		(
 			Camera,Actor->Texture,
-			Sprite->ScreenX,Sprite->ScreenY,
-			Sprite->Scale * Actor->Texture->USize, Sprite->Scale * Actor->Texture->VSize,
-			Actor->BlitType,Sprite->SpanBuffer,1,Actor->bSelected
-		);
-	}
-	else if ((Actor->DrawType==DT_MeshMap) && (Actor->BlitType!=BT_None) && (Actor->MeshMap!=NULL))
-	{
-		DrawMeshMap
-		(
-			*Camera,
-			*Actor->MeshMap,
+			Sprite->ScreenX,
+			Sprite->ScreenY,
+			Actor->DrawScale * Actor->Texture->USize,
+			Actor->DrawScale * Actor->Texture->VSize,
+			Actor->BlitType,
 			Sprite->SpanBuffer,
-			Actor->Location,
-			Actor->DrawRot,
-			Actor->bSelected,
-			Sprite,
-			!Actor->bUnlit,
-			!Actor->bNoSmooth
+			1,
+			Actor->bSelected && Camera->Level->GetState()!=LEVEL_UpPlay
 		);
 	}
-	if (GEditor && GEditor->Scan.Active)
-		GEditor->Scan.PostScan(EDSCAN_Actor,Sprite->Actor->iMe,0,0,NULL);
-	UNGUARD("FGlobalRender::DrawActorChunk");
+	else if( Actor->DrawType==DT_Mesh && Actor->BlitType!=BT_None && Actor->Mesh!=NULL )
+	{
+		DrawMesh( Camera, Actor, Sprite->SpanBuffer, Sprite );
+	}
+	if( GEditor && GEditor->Scan.Active )
+		GEditor->Scan.PostScan( EDSCAN_Actor, (INDEX)Sprite->Actor, 0, 0, NULL );
+
+	unguard;
 }
 
 /*-----------------------------------------------------------------------------
@@ -979,13 +1025,13 @@ void FGlobalRender::DrawActorChunk (ICamera *Camera,FSprite *Sprite)
 // is visible, or 0 if the actor is occluded.  If occluded, the Sprite isn't
 // visible and should be ignored.
 //
-INT FGlobalRender::SetupSprite( ICamera *Camera, FSprite *Sprite )
+INT FRender::SetupSprite( UCamera *Camera, FSprite *Sprite )
 {
-	GUARD;
+	guard(FRender::SetupSprite);
 
 	// Setup.
 	AActor	*Actor		= Sprite->Actor;
-	UClass	*Class		= Actor->Class;
+	UClass	*Class		= Actor->GetClass();
 	FVector Location	= Actor->Location - Camera->Coords.Origin;
 
 	// Init sprite info.
@@ -993,127 +1039,112 @@ INT FGlobalRender::SetupSprite( ICamera *Camera, FSprite *Sprite )
 	Sprite->SpanBuffer	= NULL;
 
 	// Figure out what to do with this.
-	if ((Sprite->Z < -SPRITE_PROJECTION_FORWARD) && !Camera->Camera->IsWire())
+	if( Sprite->Z<-SPRITE_PROJECTION_FORWARD && !Camera->IsWire() )
 	{
 		// This is not possibly visible.
 		return 0;
 	}
 
-	// Get the zone descriptor.
-	Sprite->ZoneDescriptor = Camera->Level.GetZoneDescriptor(Actor->Zone);
+	// Get the zone info.
+	Sprite->Zone = Actor->Zone;
 
 	// Handle the actor based on its type.
-	if ( (Actor->DrawType==DT_Sprite) 
-		||	(Actor->DrawType==DT_Brush) 
-		||	(Camera->ShowFlags & SHOW_ActorIcons) )
+	if
+	(	(Actor->DrawType==DT_Sprite) 
+	||	(Actor->DrawType==DT_Brush) 
+	||	(Camera->Actor->ShowFlags & SHOW_ActorIcons) )
 	{
 		// This is a sprite.
-		if ((Actor->DrawType!=DT_Brush) || (GEditor!=NULL))
+		if( Actor->DrawType!=DT_Brush || GEditor!=NULL )
 		{
 			// Make sure we have something to draw.
-			if (!Actor->Texture) 
+			if( !Actor->Texture )
 				return 0;
 
 			// See if this is occluded.
-			if (!GRender.Project (Camera,&Actor->Location,&Sprite->ScreenX,&Sprite->ScreenY,&Sprite->Scale)) 
+			if( !GRender.Project( Camera, &Actor->Location, &Sprite->ScreenX, &Sprite->ScreenY, &Actor->DrawScale ))  
 				return 0;
 
 			// Compute sprite extent.
-			Sprite->Scale *= Actor->DrawScale;
 			CalcScaledSpriteExtent
 			(
 				Camera,
 				Sprite->ScreenX,Sprite->ScreenY,
-				Sprite->Scale * Actor->Texture->USize,Sprite->Scale * Actor->Texture->VSize,
-				&Sprite->X1,&Sprite->Y1,&Sprite->X2,&Sprite->Y2
+				Actor->DrawScale * Actor->Texture->USize,
+				Actor->DrawScale * Actor->Texture->VSize,
+				&Sprite->X1,
+				&Sprite->Y1,
+				&Sprite->X2,
+				&Sprite->Y2
 			);
 		}
-		// Return whether the sprite is visible.
-		return ((Sprite->Y1 < Camera->SYR) && (Sprite->Y2 > 0));
-	}
-	else if ((Actor->DrawType==DT_MeshMap) && Actor->MeshMap)
-	{
-		// This is a meshmap.
-		UMeshMap *MeshMap	= Actor->MeshMap;
-		UMesh *Mesh			= MeshMap->Mesh;
-		Location			= Actor->Location;
-
-		// Get information about the meshmap.
-		IMesh MeshInfo;
-		Mesh->GetInfo(&MeshInfo);
-
-		// Set and validate the meshmap's frame.
-		if (Actor->AnimSeq>=Mesh->NumAnimSeqs)
-		{
-			Sprite->iFrame=0;
-		}
 		else
 		{
-			Sprite->iFrame = 
-				MeshInfo.AnimSeqs[Actor->AnimSeq].SeqStartFrame
-			+	((int)Actor->AnimBase%(MeshInfo.AnimSeqs[Actor->AnimSeq].SeqNumFrames));
+			Sprite->X1	  = Sprite->ScreenX;
+			Sprite->X2	  = Sprite->ScreenX;
+			Sprite->Y1	  = Sprite->ScreenY;
+			Sprite->Y2    = Sprite->ScreenY;
 		}
-		if (Sprite->iFrame>=Mesh->NumAnimFrames) 
-			Sprite->iFrame=0;
 
-		// Setup rendering info for the meshmap.
-		if (Camera->Camera->IsWire())
+		// Return whether the sprite is visible.
+		debugOutput(Sprite->X1<=Sprite->X2);
+		debugOutput(Sprite->Y1<=Sprite->Y2);
+		return Sprite->Y1<Camera->Y && Sprite->Y2>0;
+	}
+	else if( Actor->DrawType==DT_Mesh && Actor->Mesh )
+	{
+		// Setup rendering info for the mesh.
+		if( Camera->IsWire() )
 		{
 			// Setup wireframe rendering.
-			if (!GRender.Project (Camera,&Location,&Sprite->ScreenX,&Sprite->ScreenY,NULL)) 
+			if( !GRender.Project (Camera,&Location,&Sprite->ScreenX,&Sprite->ScreenY,NULL) )
 				return 0;
 
-			Sprite->Scale = Actor->DrawScale;
-			Sprite->X1	  = Sprite->ScreenX; Sprite->X2 = Sprite->ScreenX;
-			Sprite->Y1	  = Sprite->ScreenY; Sprite->Y2 = Sprite->ScreenY;
+			Sprite->X1	  = Sprite->ScreenX;
+			Sprite->X2	  = Sprite->ScreenX;
+			Sprite->Y1	  = Sprite->ScreenY;
+			Sprite->Y2    = Sprite->ScreenY;
 		}
 		else
 		{
-			// Setup 3D rendering.
-			Sprite->Scale = Actor->DrawScale;
-
-			// Get pointer to mesh's per-frame bounding Bound.
-			FBoundingRect Bounds = MeshInfo.Bound[Sprite->iFrame];
-
-			// Transform Bound by scale and origin.
-			Bounds.Min.X = -1.0 + Location.X + MeshMap->Scale.X * (Bounds.Min.X - Mesh->Origin.X) * Actor->DrawScale;
-			Bounds.Min.Y = -1.0 + Location.Y + MeshMap->Scale.Y * (Bounds.Min.Y - Mesh->Origin.Y) * Actor->DrawScale;
-			Bounds.Min.Z = -1.0 + Location.Z + MeshMap->Scale.Z * (Bounds.Min.Z - Mesh->Origin.Z) * Actor->DrawScale;
-
-			Bounds.Max.X = +1.0 + Location.X + MeshMap->Scale.X * (Bounds.Max.X - Mesh->Origin.X) * Actor->DrawScale;
-			Bounds.Max.Y = +1.0 + Location.Y + MeshMap->Scale.Y * (Bounds.Max.Y - Mesh->Origin.Y) * Actor->DrawScale;
-			Bounds.Max.Z = +1.0 + Location.Z + MeshMap->Scale.Z * (Bounds.Max.Z - Mesh->Origin.Z) * Actor->DrawScale;
-
-			FCoords BoxCoords = GMath.UnitCoords;
-			BoxCoords.DeTransformByRotation(Actor->DrawRot);
-			BoxCoords.DeTransformByRotation(Mesh->RotOrigin);
-			BoxCoords.Origin = Location;
+			// Get mesh's per-frame bounding Bound.
+			FBoundingRect Bounds    = Actor->Mesh->GetBoundingRect( Actor );
+			FCoords       BoxCoords = GMath.UnitCoords / Actor->Rotation / Actor->Mesh->RotOrigin;
+			BoxCoords.Origin        = Actor->Location;
 
 			// Try to view pyramid and span reject it.
 			FScreenBounds ScreenBounds;
-			if (!GRender.BoundVisible (Camera,&Bounds,NULL,&ScreenBounds,&BoxCoords)) 
+			if( !GRender.BoundVisible( Camera, &Bounds, NULL, &ScreenBounds, &BoxCoords ) )
 				return 0;
 
 			// Set extent.
-			if (ScreenBounds.Valid)
+			if( ScreenBounds.Valid )
 			{
 				// Screen bounds are valid, so set the extent.
-				Sprite->X1 = Max ((INT)0,ScreenBounds.MinX); Sprite->X2 = Min (Camera->SXR,ScreenBounds.MaxX);
-				Sprite->Y1 = Max ((INT)0,ScreenBounds.MinY); Sprite->Y2 = Min (Camera->SYR,ScreenBounds.MaxY);
+				Sprite->X1 = Max( 0.f,        ScreenBounds.MinX );
+				Sprite->X2 = Min( Camera->FX, ScreenBounds.MaxX );
+				Sprite->Y1 = Max( 0.f,        ScreenBounds.MinY );
+				Sprite->Y2 = Min( Camera->FY, ScreenBounds.MaxY );
 			}
 			else
 			{
 				// Screen bounds aren't valid, so the extent is potentially the whole screen.
-				Sprite->X1 = 0; Sprite->X2 = Camera->SXR;
-				Sprite->Y1 = 0; Sprite->Y2 = Camera->SYR;
+				Sprite->X1 = 0;
+				Sprite->Y1 = 0;
+				Sprite->X2 = Camera->X;
+				Sprite->Y2 = Camera->Y;
 			}
 		}
+
 		// This is potential visible.
+		debugOutput(Sprite->X1<=Sprite->X2);
+		debugOutput(Sprite->Y1<=Sprite->Y2);
 		return 1;
 	}
+
 	// Not potentially visible.
 	return 0;
-	UNGUARD("FGlobalRender::SetupSprite");
+	unguard;
 }
 
 /*-----------------------------------------------------------------------------
@@ -1123,29 +1154,25 @@ INT FGlobalRender::SetupSprite( ICamera *Camera, FSprite *Sprite )
 //
 // Draw all moving brushes in the level as wireframes.
 //
-void FGlobalRender::DrawMovingBrushWires( ICamera *Camera )
+void FRender::DrawMovingBrushWires( UCamera *Camera )
 {
-	guard(FGlobalRender::DrawMovingBrushWires);
+	guard(FRender::DrawMovingBrushWires);
 
-	UActorList *Actors = Camera->Level.Actors;
-	AActor **ActorPtr  = &Actors->ActiveActors->First();
-	AActor **LastPtr   = &Actors->ActiveActors->Last();
-	while( ActorPtr <= LastPtr )
+	for( INDEX iActor=0; iActor<Camera->Level->Num; iActor++ )
 	{
-		AActor *Actor = *ActorPtr++;
-
-		if (Actor->Class && Actor->IsMovingBrush())
+		AActor *Actor = Camera->Level->Element(iActor);
+		if( Actor && Actor->IsMovingBrush() )
 		{
 			if (GEditor && GEditor->Scan.Active)
 				GEditor->Scan.PreScan();
 
 			if (!GEditor)
-				Actor->UpdateBrushPosition(&Camera->Level,Actor->iMe,0);
+				Actor->UpdateBrushPosition(Camera->Level,0);
 
 			DrawBrushPolys(Camera,Actor->Brush,MoverColor,0,NULL,Actor->bSelected,Actor->bSelected,Actor->bSelected,0);
 
 			if (GEditor && GEditor->Scan.Active) 
-				GEditor->Scan.PostScan(EDSCAN_Actor,Actor->iMe,0,0,NULL);
+				GEditor->Scan.PostScan( EDSCAN_Actor, (INDEX)Actor, 0, 0, NULL );
 		}
 	}
 	unguard;
@@ -1154,61 +1181,56 @@ void FGlobalRender::DrawMovingBrushWires( ICamera *Camera )
 //
 // Just draw an actor, no span occlusion
 //
-void FGlobalRender::DrawActor( ICamera *Camera,INDEX iActor )
+void FRender::DrawActor( UCamera *Camera, AActor *Actor)
 {
-	GUARD;
+	guard(FRender::DrawActor);
+
 	FSprite	Sprite;
-	Sprite.Actor = &Camera->Level.Actors->Element(iActor);
-	if ( SetupSprite( Camera, &Sprite) )
+	Sprite.Actor = Actor;
+	if( SetupSprite( Camera, &Sprite) )
 	{
 		DrawActorSprite( Camera, &Sprite );
 	}
-	UNGUARD("FGlobalRender::DrawActor");
+	unguard;
 }
 
 //
 // Draw all actors in a level without doing any occlusion checking or sorting.
 // For wireframe views.
 //
-void FGlobalRender::DrawLevelActors(ICamera *Camera, INDEX iExclude)
+void FRender::DrawLevelActors( UCamera *Camera, AActor *Exclude )
 {
-	GUARD;
-	UActorList *Actors = Camera->Level.Actors;
+	guard(FRender::DrawLevelActors);
+	ULevel::Ptr Actors = Camera->Level;
 
-	AActor **ActorPtr = &Actors->ActiveActors->First();
-	AActor **LastPtr  = &Actors->ActiveActors->Last();
-	while( ActorPtr <= LastPtr )
+	for( INDEX iActor=0; iActor<Actors->Num; iActor++ )
 	{
-		AActor *Actor = *ActorPtr++;
+		AActor *Actor = Actors(iActor);
 		if
-		(
-				Actor->Class 
-			&&	(Actor->iMe != iExclude) 
-			&&	((Camera->Level.State==LEVEL_UpPlay)?!Actor->bHidden:!Actor->bHiddenEd)
-		)
+		(	(Actor)
+		&&	(Actor != Exclude) 
+		&&	((Camera->Level->GetState()==LEVEL_UpPlay)?!Actor->bHidden:!Actor->bHiddenEd)
+		&&	(!Actor->bOnlyOwnerSee || Actor->IsOwnedBy(Camera->Actor)) )
 		{
-
 			// If this actor is an event source, draw event lines connecting it to
 			// all corresponding event sinks.
-			if ((Actor->Event!=NAME_NONE) && GEditor && 
-				(GEditor->edcamModeClass(GEditor->Mode)==EMC_Actor))
+			if( Actor->Event!=NAME_None && GEditor && 
+				GEditor->edcamModeClass(GEditor->Mode)==EMC_Actor)
 			{
-				AActor **OtherActorPtr = &Actors->ActiveActors->First();
-				AActor **OtherLastPtr  = &Actors->ActiveActors->Last();
-				while( OtherActorPtr <= OtherLastPtr )
+				for( INDEX iOther=0; iOther<Actors->Num; iOther++ )
 				{
-					AActor *OtherActor = *OtherActorPtr++;
+					AActor *OtherActor = Actors(iOther);
 					if
-					(
-							OtherActor->Class 
-						&&	(OtherActor->Name == Actor->Event) 
-						&&	((Camera->Level.State==LEVEL_UpPlay)?!Actor->bHidden:!Actor->bHiddenEd))
+					(	(OtherActor)
+					&&	(OtherActor->GetFName() == Actor->Event) 
+					&&	((Camera->Level->GetState()==LEVEL_UpPlay)?!Actor->bHidden:!Actor->bHiddenEd)
+					&&  (!Actor->bOnlyOwnerSee || Actor->IsOwnedBy(Camera->Actor)) )
 					{
 						GRender.Draw3DLine
 						(
 							Camera,
-							&Actor->Location, 
-							&OtherActor->Location,
+							Actor->Location, 
+							OtherActor->Location,
 							1,ActorArrowColor,0,1
 						);
 					}
@@ -1225,375 +1247,7 @@ void FGlobalRender::DrawLevelActors(ICamera *Camera, INDEX iExclude)
 			}
 		}
 	}
-	UNGUARD("FGlobalRender::DrawLevelActors");
-}
-
-/*------------------------------------------------------------------------------
-	Mesh sprites.
-------------------------------------------------------------------------------*/
-
-//
-// Structure used by DrawMeshMap for sorting triangles.
-//
-struct FMeshTriSort
-{
-	FTransTex*	FirstPoint;	// First point of clipped triangle point list.
-	FLOAT		MinZ;		// Z minima on clipped triangle.
-	INT 		Index;		// Index of triangle in triangle table.
-	INT 		NumPts;		// Number of points in clipped triangle, >= 3.
-	friend inline INT Compare(const FMeshTriSort &A, const FMeshTriSort &B)
-	{
-		return 1 - 2*(A.MinZ > B.MinZ);
-	}
-};
-
-//
-// Draw a mesh map.
-//
-void FGlobalRender::DrawMeshMap
-(
-	ICamera &Camera, UMeshMap &MeshMap,FSpanBuffer *SpanBuffer,
-	FVector &Location, FRotation &Rotation, INT Highlight, FSprite *Sprite,
-	INT DrawLit, INT DrawSmooth
-)
-{
-	guard(FGlobalRender::DrawMeshMap);
-
-	FVector				VertexNormal,Side1,Side2,*FVectPool;
-	FPoly				EdPoly;
-	FCoords				Coords;
-	FTransTex			*Pts,*PtsPool,*P;
-	FTransform			*Verts,*Vert,*V1,*V2,*V3;
-	FMeshTriSort 		*TriPool,*TriPtr,*TriTop;
-	FMeshVertLinkIndex	*VertLinkIndex;
-	FRasterTexPoly		*RasterTexPoly;
-	FRasterTexSetup		RasterTexSetup;
-	INT 				*VertexShade;
-	WORD				Color,*VertLink;
-	BYTE				Outcode = FVF_OutReject;
-	INT 				i,j,k,n,FrameOffset,NumPts,VisibleTriangles;
-	INT 				Temp=0,TotalPts,iVertex;
-
-	// Process special poly flags.
-	DWORD ExtraFlags = DrawSmooth ? 0 : PF_NoSmooth;
-
-	// Lock the mesh map.
-	IMeshMap MeshMapInfo;
-	MeshMap.Lock(&MeshMapInfo);
-
-	// Grab all memory needed for drawing the meshmap.
-	Verts 		  = (FTransform		*)GMem.Get(MeshMapInfo.NumVertices * sizeof  (FTransform));
-	VertexShade	  = (INT			*)GMem.Get(MeshMapInfo.NumVertices * sizeof  (INT));
-	TriPool		  = (FMeshTriSort	*)GMem.Get(64 * MeshMapInfo.NumTriangles * sizeof (FMeshTriSort)); // Way overestimate
-	Pts 		  = (FTransTex		*)GMem.Get(32 * sizeof (FTransTex));
-	RasterTexPoly = (FRasterTexPoly	*)GMem.Get(sizeof(FRasterTexPoly)+FGlobalRaster::MAX_RASTER_LINES*sizeof(FRasterTexLine));
-	PtsPool		  = (FTransTex		*)GMem.Get(0); // Will be expanded	
-
-	// Compute the scale.
-	FVector Scale = MeshMapInfo.Scale * Sprite->Scale;
-
-	// Figure out what frame we're drawing.
-	FrameOffset	= Sprite->iFrame * MeshMapInfo.NumVertices;
-
-	// Render a wireframe view or textured view.
-	if (Camera.Camera->IsWire() || Camera.Camera->IsOrtho())
-	{
-		//
-		// Render a wireframe view.
-		//
-
-		// Setup coordinate system.
-		Coords      = GMath.UnitCoords;
-		Coords.TransformByRotation (Rotation);
-		Coords.TransformByRotation (MeshMapInfo.RotOrigin);
-
-		// Set up color.
-		if (Highlight)	Color = ActorHiWireColor;
-		else			Color = ActorWireColor;
-
-		// Transform all points.
-		FVectPool = (FVector *)GMem.Get(MeshMapInfo.NumVertices*sizeof(FVector));
-		for (i=0; i<MeshMapInfo.NumVertices; i++) // Transform all points
-		{
-			FMeshVertex &MeshVertex = MeshMapInfo.Vertex[FrameOffset + i];
-
-			FVectPool[i].X	= Scale.X * (MeshVertex.X - MeshMapInfo.Origin.X);
-			FVectPool[i].Y	= Scale.Y * (MeshVertex.Y - MeshMapInfo.Origin.Y);
-			FVectPool[i].Z	= Scale.Z * (MeshVertex.Z - MeshMapInfo.Origin.Z);
-
-			FVectPool[i].TransformVector(Coords);	 
-			FVectPool[i] += Location;
-		}
-
-		// Render each triangle.
-		FMeshTriangle *Triangle = &MeshMapInfo.Triangles[0]; 
-		for (i=0; i<MeshMapInfo.NumTriangles; i++)
-			{
-			// Build an FPoly from this triangle.
-			EdPoly.Init();
-			EdPoly.NumVertices = 3;
-			for (j=0; j<3; j++) EdPoly.Vertex[j] = FVectPool[Triangle->iVertex[j]];
-			
-			// Validate the FPoly.
-			if (EdPoly.Finalize(1)==0)
-			{
-				// Set FPoly's flags.
-				if (Triangle->Type==MT_Masked) EdPoly.PolyFlags |= PF_Masked | PF_NotSolid;
-				else if (Triangle->Type==MT_Transparent) EdPoly.PolyFlags |= PF_Transparent | PF_NotSolid;
-				EdPoly.PolyFlags |= PF_NotSolid;
-
-				// Render it.
-				GRender.DrawFPoly(&Camera,&EdPoly,Color,1,0);
-			}
-			Triangle++;
-		}
-	}
-	else
-	{
-		//
-		// 3D textured view: Build coordinate system to get creature into screenspace.
-		//
-
-		// Setup coordinate system.
-		Coords = Camera.Coords;
-		Coords.TransformByRotation	(Rotation);
-		Coords.TransformByRotation	(MeshMapInfo.RotOrigin);
-		FVector TempVector = Location - Camera.Coords.Origin;
-		TempVector.TransformVector (Camera.Coords);
-
-		// Transform all points into screenspace and compute outcodes.
-		FrameOffset				= Sprite->iFrame * MeshMapInfo.NumVertices;
-		FMeshVertex *MeshVertex = &MeshMapInfo.Vertex	[FrameOffset];
-		Vert					= &Verts 				[0];
-
-		for (i=0; i<MeshMapInfo.NumVertices; i++)
-		{
-			Vert->X = Scale.X * (MeshVertex->X - MeshMapInfo.Origin.X);
-			Vert->Y = Scale.Y * (MeshVertex->Y - MeshMapInfo.Origin.Y);
-			Vert->Z = Scale.Z * (MeshVertex->Z - MeshMapInfo.Origin.Z);
-
-			Vert->TransformVector(Coords);
-			*Vert += TempVector;
-
-			Vert->ComputeOutcode(Camera);
-			Outcode &= Vert->Flags;
-
-			MeshVertex++;
-			Vert++;
-		}
-		if( !Outcode )
-		{
-			// Some of the vertices are in the view frustrum.
-
-			// Set up list for triangle sorting, adding all non-backfaced triangles.
-			FMeshTriangle	*Triangle	= &MeshMapInfo.Triangles [0]; 		
-			TriTop   			= &TriPool               [0];
-			VisibleTriangles	= 0;
-
-			for (i=0; i<MeshMapInfo.NumTriangles; i++)
-			{
-				V1 = &Verts [Triangle->iVertex[0]];
-				V2 = &Verts [Triangle->iVertex[1]];
-				V3 = &Verts [Triangle->iVertex[2]];
-
-				// Try to outcode-reject the triangle.
-				if (!(V1->Flags & V2->Flags & V3->Flags))
-				{
-					//
-					// See if this triangle is either two-sided or front-faced:
-					//
-					if (	(Triangle->Type==MT_Masked)
-						||	(Triangle->Type==MT_Transparent)
-						||	((*V1 | (*V2 ^ *V3))>0.0))
-					{
-						TriTop->Index = i;
-						TriTop->MinZ =
-							Verts [Triangle->iVertex[0]].Z +
-							Verts [Triangle->iVertex[1]].Z +
-							Verts [Triangle->iVertex[2]].Z;
-						VisibleTriangles++;
-						TriTop++;
-					}
-				}
-				Triangle++;
-			}
-			if (VisibleTriangles>0)
-			{
-				//
-				// One or more triangles is visible.
-				//
-
-				// If creature is large on screen, sort it.
-				if (((Sprite->X2-Sprite->X1)>=NOSORT_SIZE) && ((Sprite->Y2-Sprite->Y1)>=NOSORT_SIZE))
-				{
-					QSort(TriPool,VisibleTriangles);
-				}
-
-				// Build list of all incident lights on the creature.
-				// Considers only the entire creature and does not
-				// differentiate between individual creature polys.
-				GLightManager->SetupForActor(&Camera,Sprite->Actor->iMe);
-
-				for (i=0; i<MeshMapInfo.NumVertices; i++)
-				{
-					// Tag as uncomputed.
-					VertexShade[i] = 0;
-				}
-
-				// Perform all vertex lighting.
-				TriPtr = &TriPool[0];
-				for (i=0; i<VisibleTriangles; i++)
-				{
-					FMeshTriangle &Triangle = MeshMapInfo.Triangles[TriPtr->Index];
-
-					for (j=0; j<3; j++)
-					{
-						iVertex = Triangle.iVertex[j];
-						if (VertexShade[iVertex]==0)
-						{
-							FTransform *P = &Verts[iVertex];
-							if (!P->Flags)
-							{
-								// Transformation is done, don't generate again.
-								P->iTransform = 0;
-								FLOAT Factor  = Camera.ProjZ / P->Z;
-								P->ScreenX    = P->X * Factor + Camera.FSXR15;
-								P->ScreenY    = P->Y * Factor + Camera.FSYR15;
-							}
-							else
-							{
-								// Must transform after clipping.
-								P->iTransform = MAXWORD;
-							}
-
-							VertexNormal 	= GMath.ZeroVector;
-
-							VertLinkIndex	= &MeshMapInfo.VertLinkIndex [iVertex];
-							VertLink     	= &MeshMapInfo.VertLinks     [VertLinkIndex->TriangleListOffset];
-							n            	= VertLinkIndex->NumVertTriangles;
-
-							for (k=0; k<n; k++)
-							{
-								FMeshTriangle &OtherTriangle = MeshMapInfo.Triangles[*VertLink++];
-
-								Side1      = Verts[OtherTriangle.iVertex[1]] - Verts[OtherTriangle.iVertex[0]];
-								Side2      = Verts[OtherTriangle.iVertex[2]] - Verts[OtherTriangle.iVertex[0]];
-
-								VertexNormal += (Side2 ^ Side1).Normal();
-							}
-							VertexNormal.Normalize();
-
-							// Compute effect of each lightsource on this vertex.
-							FTexLattice Lattice;
-							if( DrawLit )
-							{
-								// Temporarily disabled:
-								//GRender.LightList.CalcRectSample(1,0,*P,VertexNormal,Lattice,(Camera->RendMap==REN_DynLight)?2:0);				
-								Lattice.FloatG = 0.5 - Min(0.5,0.00035*P->Z);
-							}
-							else
-							{
-								Lattice.FloatG = 0.5 - Min(0.5,0.00035*P->Z);
-							}
-							if( Highlight ) Lattice.FloatG = 0.6 + (0.4 * Lattice.FloatG);
-							VertexShade[iVertex] = Min(256*61,256.0 + 
-								60.0 * 256.0 * Lattice.FloatG + (Sprite->Actor->InherentGlow<<6));
-						}
-					}
-					TriPtr++;
-				}
-
-				// Clip the triangles.
-				TriPtr   = &TriPool[0];
-				TotalPts = 0;
-
-				for( i=0; i<VisibleTriangles; i++ )
-				{
-					FMeshTriangle &Triangle = MeshMapInfo.Triangles[TriPtr->Index];
-
-					P = &Pts [0];
-					for (j=0; j<3; j++)
-					{
-						*(FTransform *)P = Verts[Triangle.iVertex[j]];
-
-						P->U = Triangle.Tex[j].U * 65536.0;
-						P->V = Triangle.Tex[j].V * 65536.0;
-						P->G = VertexShade [Triangle.iVertex[j]];
-
-						P++;
-					}
-					NumPts = GRender.ClipTexPoints(&Camera,Pts,&PtsPool[TotalPts],3);
-
-					TriPtr->FirstPoint   = &PtsPool [TotalPts];
-					TriPtr->NumPts       = NumPts;
-
-					TotalPts             += NumPts;
-					TriPtr				 ++;
-				}
-				GMem.Get(TotalPts * sizeof(FTransTex)); // Reserve memory for PtsPool.
-
-				// Draw all visible triangles.
-				TriPtr = &TriPool[0];
-				for (i=0; i<VisibleTriangles; i++)
-				{
-					FMeshTriangle &Triangle = MeshMapInfo.Triangles[TriPtr->Index];
-					NumPts   = TriPtr->NumPts;
-
-					if (NumPts>0)
-					{
-						P = TriPtr->FirstPoint;
-
-						RasterTexSetup.Setup	(Camera,P,NumPts,&GMem);
-						RasterTexSetup.Generate	(RasterTexPoly);
-						if ( Triangle.Type==MT_Masked || Triangle.Type==MT_Transparent )
-						{
-							RasterTexPoly->ForceForwardFace();
-						}
-						if ((Camera.RendMap!=REN_Polys)&&(Camera.RendMap!=REN_PolyCuts)&&
-							(Camera.RendMap!=REN_Zones)&&(Triangle.Type!=MT_Flat)&&(Camera.RendMap!=REN_Wire))
-						{
-							FPolySpanTextureInfoBase *Info
-							= GSpanTextureMapper->SetupForPoly
-							(
-								Camera,
-								MeshMapInfo.Textures[Triangle.TextureNum],
-								Sprite->ZoneDescriptor,
-								ExtraFlags | ((Triangle.Type==MT_Masked) ? PF_Masked : 0),
-								PF_Masked
-							);
-							RasterTexPoly->Draw(Camera,*Info,SpanBuffer);
-							GSpanTextureMapper->FinishPoly(Info);
-						}
-						else if (Triangle.Type==MT_Flat)
-						{
-							RasterTexPoly->DrawFlat
-							(
-								Camera,
-								BlackColor,
-								SpanBuffer
-							);
-						}
-						else 
-						{
-							RasterTexPoly->DrawFlat
-							(
-								Camera,
-								COLOR(P_BROWN,4+(TriPtr->Index)&15),
-								SpanBuffer
-							);
-						}
-						RasterTexSetup.Release();
-					}
-					TriPtr++;
-				}
-			}
-		}
-	}
-	GMem.Release(Verts);
-	STAT(GStat.MeshMapsDrawn++);
-	MeshMap.Unlock	(&MeshMapInfo);
-
-	unguardf(("(%s)",MeshMap.Name));
+	unguard;
 }
 
 /*------------------------------------------------------------------------------

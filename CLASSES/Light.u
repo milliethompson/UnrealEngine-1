@@ -1,0 +1,237 @@
+'
+' Actor classes exported from UnrealEd
+'
+DeclareClass Name=Light
+DeclareClass Name=Satellite
+DeclareClass Name=TorchFlame
+
+Begin Class Name=Light
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// The light class.
+//=============================================================================
+class Light expands Actor
+	package(UnEngine);
+
+#exec Texture Import File=..\Graphics\S_Light.pcx  Name=S_Light Palette=Palette Mips=Off Flags=2
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Light
+      Location=(+00000.000000,+00000.000000,+00000.000000)
+      Velocity=(+00000.000000,+00000.000000,+00000.000000)
+      DrawRot=(0,0,0)
+      ViewRot=(0,0,0)
+      Owner=None
+      Weapon=None
+      Texture=s_light
+      Mesh=None
+      Brush=None
+      AmbientSound=None
+      DrawScale=+00001.000000
+      AnimSeq=0
+      AnimRate=+00000.000000
+      AnimBase=+00000.000000
+      AnimCount=0
+      AnimFirst=0
+      AnimLast=0
+      AnimMessage=0
+      CollisionRadius=+00024.000000
+      CollisionHeight=+00024.000000
+      DrawType=1
+      BlitType=1
+      ParticleType=0
+      ParticleCount=0
+      ParticleRate=0
+      SoundRadius=32
+      LightType=1
+      LightEffect=0
+      LightBrightness=64
+      LightHue=0
+      LightSaturation=255
+      LightRadius=64
+      LightPeriod=32
+      LightPhase=0
+	  LightCone=128
+	  VolumeBrightness=128
+	  VolumeRadius=16
+      InherentBrightness=0
+      bAnimate=False
+      bMeshWet=False
+      bMeshShadowCast=False
+      bMeshEnviroMap=False
+      bSpriteRotates=False
+      bUnused0=False
+      bActorShadows=False
+      bShinyReflect=False
+      bSpecialLight=False
+      bStatic=True
+      bHidden=True
+      bHiddenEd=False
+      bDirectional=False
+      bCollideActors=False
+      bCollideWorld=False
+      bBlockActors=False
+      bBehindView=False
+      bSelected=False
+      bTempDynamicLight=False
+      bDrawOnHorizon=False
+      bTempLightChanged=False
+      bUnlit=False
+      bNoSmooth=False
+      bUnused4=False
+      bUnused5=False
+      bUnused6=False
+      bUnused7=False
+      bUnused8=False
+      User=None
+      Name=None
+      EventName=None
+      Target=None
+      Inventory=None
+      Floor=None
+      Mass=+00100.000000
+      bInactive=False
+      bPegged=False
+      bGravity=False
+      bMomentum=False
+      bProjTarget=False
+      bCanPossess=False
+      bDifficulty1=True
+      bDifficulty2=True
+      bDifficulty3=True
+      bDifficulty4=True
+      bNetCooperative=True
+      bNetDeathMatch=True
+      bNetPersistent=True
+      bNetNoMonsters=True
+      bTempEditor=False
+      bJustDeleted=False
+      bCanBeTeleported=False
+      bUnused12=False
+      bUnused13=False
+      bUnused14=False
+      bUnused15=False
+      Me=None
+      ChanceOfExistence=0
+      LifeSpan=0
+      Age=0
+      Era=0
+      WhichTriggers=0
+      TextureList=0
+      TextureCount=0
+      ScriptCountdown=0
+      TimerCountdown=0
+      TimerMessage=0
+      WaterSinkRate=+00000.500000
+      AITask=0
+      PendingTeleporter=None
+      TeleportDelay=0
+      DefaultEdCategory=Lighting
+	  Physics=PHYS_None
+   End DefaultProperties
+End Class
+
+Begin Class Name=Satellite
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Satellite, a special kind of light which appears in the backdrops
+// and rises/falls according to the level's day/night cycle.
+//=============================================================================
+class Satellite expands Light
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// Variables.
+
+// Amount that level's day cycle is scaled by, normally 1.0.
+var() float Period;
+
+// Phase offset from start of level time, 0.0 to 1.0.
+var() float Phase;
+
+var vector SatX,SatY,SatZ;
+
+//-----------------------------------------------------------------------------
+// Functions.
+
+//
+// Remember our coordinate system.
+//
+function BeginPlay()
+{
+	GetUnAxes(Rotation,SatX,SatY,SatZ);
+}
+
+function Tick( float DeltaTime )
+{
+	SetLocation
+	(	sin(Level.TimeSeconds) * SatZ
+	+	cos(Level.TimeSeconds) * SatX);
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Sattelite
+	  LightType=1
+	  LightEffect=15
+	  LightBrightness=128
+	  Period=1.0
+	  Phase=0.0
+	  bStatic=0
+	  bDirectional=1
+	  bOnHorizon=1
+   End DefaultProperties
+End Class
+
+Begin Class Name=TorchFlame
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Torchflame.
+//=============================================================================
+class TorchFlame expands Light
+	package(UnGame);
+
+#call ..\Models\Flame.mac
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=TorchFlame
+      bStatic=False
+      bHidden=False
+      Mesh=Flame
+      DrawType=2
+      DrawScale=1.0
+      AnimRate=1.0
+      AnimCount=0
+      AnimSeq=1
+      bAnimate=True
+      LightType=1
+	  LightEffect=2
+      LightBrightness=40
+      LightRadius=32
+   End DefaultProperties
+End Class
+
+Begin Class Name=Spotlight
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// A directional spotlight.
+//=============================================================================
+class Spotlight expands Light
+	package(UnEngine);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Spotlight
+	  LightType=1
+	  LightEffect=12
+	  LightCone=128
+	  bDirectional=1
+	  bStaticActor=0
+   End DefaultProperties
+End Class

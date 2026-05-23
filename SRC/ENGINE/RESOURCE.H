@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Developer Studio generated include file.
-// Used by UnEngine.rc
+// Used by Engine.rc
 //
 #define IDS_STRING1                     1
 #define IDS_DESCRIPTION                 1
@@ -27,6 +27,7 @@
 #define IDC_BRUSHWARP                   122
 #define IDC_BRUSHSNAP                   123
 #define IDD_DIALOG1                     124
+#define IDC_CURSOR2                     127
 #define IDM_MAP_TEX                     200
 #define IDM_MAP_DYNLIGHT                200
 #define IDM_MAP_ILLUM                   201
@@ -119,7 +120,7 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
-#define _APS_NEXT_RESOURCE_VALUE        127
+#define _APS_NEXT_RESOURCE_VALUE        128
 #define _APS_NEXT_COMMAND_VALUE         40033
 #define _APS_NEXT_CONTROL_VALUE         1008
 #define _APS_NEXT_SYMED_VALUE           101

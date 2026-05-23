@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnEngine.h: Unreal engine definition
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -15,33 +15,47 @@
 	Unreal engine.
 -----------------------------------------------------------------------------*/
 
-class UNREAL_API FUnrealEngine
+class UNENGINE_API FGlobalUnrealEngine
 {
 public:
-
+	// FGlobalUnrealEngine Startup/shutdown.
 	int Init
 	(
-		class FGlobalPlatform	*Platform, 
-		class FTaskManager		*TaskManager,
-		class FCameraManager	*CameraManager, 
-		class FGlobalRender		*Rend, 
-		class FGameBase			*Game,
-		class NManager			*NetManager,
-		class FGlobalEditor		*Editor
+		class FGlobalPlatform		*Platform, 
+		class FCameraManagerBase	*CameraManager, 
+		class FRenderBase			*Rend, 
+		class FGameBase				*Game,
+		class NManager				*NetManager,
+		class FGlobalEditor			*Editor,
+		class FEditorRenderBase		*EdRend
 	);
 	void Exit();
 	void ErrorExit();
 
+	// Camera functions.
 	UCamera *OpenCamera();
 	void Draw (UCamera *Camera, int Scan);
 
-	void EnterWorld(const char *WorldURL);
-	void GetWorldInfo(char *WorldURL, char *WorldTitle);
+	// World functions.
+	void EnterWorld(const char *WorldURL, BOOL LoadSaveGame);
 
+	// Game functions.
 	void InitGame();
 	void ExitGame();
 
+	// Command line.
 	int Exec(const char *Cmd,FOutputDevice *Out=GApp);
+
+	// Accessors.
+	int IsClient() {return EngineIsClient;}
+	int IsServer() {return EngineIsServer;}
+	int IsEditor() {return EngineIsEditor;}
+
+private:
+	// Implementation variables.
+	int EngineIsClient;
+	int EngineIsServer;
+	int EngineIsEditor;
 };
 
 /*-----------------------------------------------------------------------------

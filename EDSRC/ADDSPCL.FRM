@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmAddSpecial 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Add Special Brush"
@@ -6,18 +6,16 @@ Begin VB.Form frmAddSpecial
    ClientLeft      =   4110
    ClientTop       =   4950
    ClientWidth     =   3210
-   Height          =   3645
    HelpContextID   =   316
    Icon            =   "AddSpcl.frx":0000
-   Left            =   4050
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   3285
    ScaleWidth      =   3210
    ShowInTaskbar   =   0   'False
-   Top             =   4650
-   Width           =   3330
    Begin VB.ComboBox Settings 
       Height          =   315
       Left            =   1200
@@ -189,7 +187,9 @@ Begin VB.Form frmAddSpecial
    End
 End
 Attribute VB_Name = "frmAddSpecial"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 

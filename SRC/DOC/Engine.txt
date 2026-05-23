@@ -1,0 +1,438 @@
+/*=============================================================================
+	UnEngine.txt: Unreal architectural notes.
+
+	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
+
+	Revision history:
+		* Created by Tim Sweeney
+=============================================================================*/
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Resource overview.
+///////////////////////////////////////////////////////////////////////////////
+
+A resource in Unreal is an instance of any class which is derived from 
+UResource or its child class, UDatabase.  Resources provide functions 
+which the Unreal resource manager uses perform loading, saving, 
+garbage collection, tracking, and scripting.  The reasons Unreal uses 
+resources, rather than hardcoded loading/saving routines for all
+datatypes are:
+
+	- Resources allow Unreal to handle a wide range of datatypes with
+	  a rich set of relationships, without resorting to hand coding
+	  all of their possible interdependencies.
+
+	- UnrealScript and UnrealEd can access all of Unreal's resource 
+	  types in a general, versatile manner.
+
+	- UnrealServers can send level resources to clients dynamically,
+	  using a Netscape-style hard disk cache to prevent downloading
+	  the same data over and over.
+
+	- Loading/saving is a breeze - there is no need to write explicit
+	  loading/saving routines and all their error handling logic
+	  for your resource classes.
+
+	- Garbage collection becomes possible, a necessity in an environment
+	  rich with interrelated objects whose structure isn't known in
+	  advance.
+
+Resource class names begin with U, such as UResource, ULevel, UModel, USound.
+
+A resource in memory is uniquely identified by a pair of data:
+	- The resource's name (up to 32 characters, case insensitive).
+	- The resource's type.
+
+Therefore, it is ok to have (for example) a UTexture named "Bob" and a
+USound named "Bob". However, you can't have two different UTexture's named
+"Bob" - when loading the later Bob from disk, it will replace the former Bob.
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Names.
+///////////////////////////////////////////////////////////////////////////////
+
+Names (variables of the FName class) contain globally accessible name strings.
+These names may contain up to 32 characters and are case-insensitive.
+The FName class contains only a single member, a 16-bit index into the
+global name table.  The reasons Unreal uses FNames instead of simply
+using char[32]'s are:
+
+	- Most names are used many times, so there is significant
+	  space savings by only storing the string once, and storing
+	  16-bit indices to the string elsewhere.
+
+	- Searching for names is faster this way, which helps with
+	  UnrealScript speed.
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Serialization.
+///////////////////////////////////////////////////////////////////////////////
+
+The FArchive class (residing in UnArc.h) is used throughout the Unreal
+resource manager for many purposes, including:
+	- Loading Unrealfiles, with automatic pointer linking.
+	- Saving Unrealfiles, with automatic pointer delinking.
+	- Figuring out which resources are active, for garbage collection.
+
+Each UResource-derived class has two serialization functions which make
+use of FArchives:
+
+	- SerializeHeader: Calls the archive with a reference to each of the
+	  variables in the header part of the resource (this is the part of the
+	  resource which goes directly into the UResource-derived class and
+	  is always in memory).
+
+	- SerializeData: Calls the archive with a reference to each variable in
+	  its data porttion (this is the part of the resource which is not always
+	  in memory, and can be accessed via GetData() for UResources, and via
+	  Element(i) for UDatabases).
+
+By creating these serialize functions for each resource class, the resource
+manager knows how to load, save, and manage the contents of the resource in
+a generic way, without knowing the implementation details of each resource 
+class.  The resource manager performs all loading and saving by calling the
+serialize functions and doing something with each variable you pass to its
+archive -- loading it from disk, saving it to disk, or whatever.
+
+In addition, each non-resource class which can be referenced by resources
+needs to implement FArchive& operator<<, the serialization operator (familiar
+to those who use C++ iostream operators).  This operator performs all of the
+magic required for loading, saving, garbage collection of resources, etc.
+Note that non-resource classes are not garbage-collected since the resource
+manager is not responsible for allocating or deallocating them, but they are
+properly traversed in order to determine which resources need to be garbage
+collected.
+
+The mechanisms behind FArchive and serialization are similar in many ways
+to the CArchive class and serialization in Microsoft Foundation Classes.
+A general knowledge of MFC will help to understand Unreal. However, the
+similarities are generally just skin-deep.
+
+Here is how the resource manager uses serialization for the following
+specific tasks:
+
+	- Saving a resource: When you call the resource manager's save function,
+	  it first calls your resource's serialize function to find all of the
+	  resources and names it relies on (it detects that by using a special 
+	  FArchive-derived class which recursively builds a list of serialized 
+	  UResources. Once it has recursively collected a full list of dependent
+	  resources, it writes serializes all of them to a file. However,
+	  since the resource may contain pointers to other resources, Unreal
+	  automatically generates a symbol table and delinks the pointers
+	  according to the symbol table, so that the pointers can be properly
+	  linked at load time.
+
+	- Loading a resource: When you call the AddFile function, it loads all
+	  of the resource headers and data from disk, allocates new UResource
+	  objects for them, serializes their data, and the links their pointers.
+
+	- Garbage collection: See the below section on garbage collection.
+
+	- Determining whether the client has a copy of a server-side
+	  resource: Both the client and server serialize the resource and
+	  determine its CRC32 and its size. The resources are assumed to be
+	  identical if both numbers match exactly.
+
+Unrealfiles on disk are complicated things.  See the source for UnrInfo.exe
+for documentation on the file format, and very simple (external to the engine)
+example code for accessing them.
+
+Serialization gotchas:
+
+	- Serializers must only serialize (1) information which they want to be
+	  stored in Unrealfiles and (2) other resources they reference.
+	  They must not serialize temporary variables which are relevent only in
+	  memory (for example, UClass has a pointer to the class's processing
+	  function). If internal temporary variables are serialized, then a CRC32 
+	  check will yield the false impression that two resources are not identical 
+	  when, for client/server purposes, they are.
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Garbage collection.
+///////////////////////////////////////////////////////////////////////////////
+
+All Unreal resources are garbage collected, meaning that they only remain in
+memory for as long as the Unreal engine thinks they are active.
+
+What do I mean by "active"? 
+
+All resources in the world form a tree.  In UnrealEd, turn on God Mode and go into 
+Window/Resource Browser to see the actual tree.  At the top of the tree is the global 
+UArray resource named "Root" which resides in the FGlobalResourceManager class GRes.Root. 
+Resources can be added to the Root array via GRes.AddToRoot and GRes.RemoveFromRoot.
+
+When garbage collection is performed, the resource manager starts at GRes.Root
+and recursively serializes its way through the entire resource tree, chasing 
+down all UResource and FName references, and marking them as active.  Any resources
+which it doesn't reach, it considers "garbage" and it kills.
+
+For a real world example, consider the player's weapon model, a UModel resource.
+Why is it not destroyed during garbage collection? You can follow the tree to
+find the answer: Root references the ServerArray UArray which is allocated in 
+GServer.Init(), which references the current level. The level references an actor 
+list, which contains the player's weapon actor, which references the player's 
+weapon UModel.
+
+The bottom line is that, if you want a resource to stay around, you must make
+sure that it's referenced somewhere in the resource tree.  It is quite easy to 
+allocate a resource, keep a pointer to it in your C++ code, and later find that 
+the gc has toasted it because you didn't make it known to the global tree.
+
+Garbage collection is performed only when GRes.Purge() is called. This 
+typically happens after loading a level. In general, it's only beneficial to
+call Purge() after a Big Event, such as loading a new Unrealfile. While some
+resources do become inactive during play, the memory savings isn't significant, and
+Purge() is slow and is not meant to be a realtime function.
+
+Your stuff won't be discarded by the garbage collecter if:
+
+	- It is referenced by another resource that is active.  GRes.Root is always
+	  active, as is everything recursively referenced by it.
+
+	- It's referenced by the current level (because the level is always stuck into
+	  the resource tree by the FGlobalServer code).
+
+	- It resides in an actor in the level's actor list. There is automatic logic built
+	  into the actor list code which properly serializes all resources referenced
+	  by actors. This is possible because the UnrealScript compiler has a list of
+	  all variables in all actor classes, and it knows which ones are resources and
+	  names. (This is just a clarification of how the UActors resource class works;
+	  it isn't an exception to the above rule).
+
+Your stuff also won't be garbage collected while a level is locked (because GRes.Purge()
+will never be called in such a case), which means that it's ok to take stuff out of 
+the tree very temporarily (i.e. not across a tick), while you're manipulating the tree.
+
+At the moment, the engine only calls GRes.Purge() after a level has been loaded,
+but that could change: I reserve the right to perform a purge anytime when the level
+is not locked.
+
+Why Unreal uses garbage collection:
+	- It doesn't take up any CPU time during gameplay.
+	- It's less error-prone than reference counting.
+	- Is done using the existing serialize functions, so it requires no
+	  custom programming work.
+	- Fits in Really Well with the UnrealScript architecture.
+
+For comparison, UnrealScript's garbage collection mechanism is almost exactly
+the same as Sun's Java runtime gc method - a latent tree-following algorithm.
+Visual Basic seems to perform reference counting, and low level languages 
+like C/C++ perform no garbage collection.
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Archives.
+///////////////////////////////////////////////////////////////////////////////
+
+Resources use the FArchive class as a transparent means of saving, loading,
+and tracking resources. Each resource class contains two functions for
+serialization:
+
+	SerializeHeader(FArchive& Ar); // For serializing the header portion.
+	SerializeData(FArchive& Ar);   // For sertializing the data portion.
+
+All non-resource classes which can be loaded/saved contain only one 
+serialization function, operator<<:
+
+	FArchive& operator<< (FArchive& Ar, MyClass& C);
+
+I use these two separate mechanisms because there is a fundamental difference
+between how resources and non-resource classes are serialized: resources only
+reference other resource classes via pointers, while resources only use
+non-resource classes as member variables.
+
+Sample code:
+
+class FThing // Some non-resource class I made up.
+{
+	UTexture  *ThingTexture; // A resource this class references.
+	FName     Name;          // A name this class references.
+	int       Count;         // A persistent variable.
+	int       Temp;          // A temporary variable which we don't serialize.
+	
+	// Serializer.
+	FArchive& operator<< (FArchive& Ar, FThing& Thing)
+		{return Ar << ThingTexture << Name << Count;}
+};
+
+Unreal's resource manager can use the above serialization routine to 
+perform any of the following actions, depending on the implementation 
+of the FArchive-derived class passed to it:
+
+ - Load the FThing (by writing out binary versions of each of the 
+   member variables to the archive).
+   
+ - Save the thing (by reading them in -- note that this is 
+   possible since the FArchive operator<< accepts its parameters 
+   by reference).
+
+ - Determine which resources are referenced by the FThing, for
+   garbage collection.
+
+Finally, byte order conversion (i.e. for Macintosh or N64 loading)
+is thrown in for free, as is the ability to easily support backwards
+compatibility. Quite a powerful operator, that <<.
+
+Preloading:
+
+Serialization becomes tricky when the data in one resource is required in
+order to serialize another resource. Such is the case with actor lists, where
+the data in an actor list (each actor) can only be loaded once the actor's
+class has been serialized. This is because the actor class contains a list of
+actor properties; without that, the actor serializer can't tell what properties
+it needs to serialize.  The FArchive class provides two functions, PreloadHeader
+and PreloadData which enable classes (such as UActors) to make sure that
+the classes they rely on (such as UClass) are present.
+
+As a result, serialization does not always occur linearly. More specifically,
+there is no guarantee as to which overall order resources will be serialized 
+during loading and saving.
+
+Versioning:
+
+The FArchive class contains some basic support for versioning, the ability
+to load older files into the current version of the engine.  The FArchive
+class exposes the following methods:
+
+	Ver()
+		The version number of the Unrealfile we're loading.  If IsLoading is 
+		false, this is always set to the current version.  If you want to 
+		support backwards compatibility, you can only support backwards-
+		compatible file loading.  There is no support for backwards-
+		compatible file saving.
+
+If you create new resource classes or modify existing ones, it's your job 
+to perform version checking and selectively loading the proper resource variables
+based on the version. Resource code should absolutely always either handle previous
+version resources, or gracefully detect old versions and fail with an appropriate
+diagnostic message. Reading invalid data and exploding is Very Bad.
+
+Selective loading:
+
+Often, Unrealfiles contain more stuff than one wants to load. For example,
+a level file contains a lot of brush data that is only relevant while editing 
+the level in UnrealEd.  In a serialization routine, you can detect all of these
+conditions and act accordingly.
+
+The following FArchive member variables are set according to the archiving
+context. These flags answer the question, "Why is this resource being
+serialized and what will be done with the results?"
+
+	ForEdit
+	ForClient
+	ForServer
+		Flags which are either 0 or 1, which describe the context the resource
+		is being used in. These may be used in order to selectively serialize
+		the appropriate parts of the resource.
+
+	IsLoading
+		Set to 1 when loading, 0 when not loading.
+		When IsLoading=1, the other flags are set in one of the following combinations.
+
+			Case                      ForEdit ForClient ForServer
+			----                      ------- --------- ---------
+			UnrealEd                  1       1         1
+			Local game                0       1         1
+			Network game client       0       1         0
+			Dedicated server          0       0         1
+
+	IsSaving
+		Set to 1 when saving, 0 when not saving.  Note that resources
+		are often serialized with IsLoading and IsSaving both set to
+		zero.  This occurs during garbage collection, for example, when
+		the resource manager is just traversing the resource tree.
+
+		When IsSaving=1, the flags are set in one of the following configurations:
+
+			Case                      ForEdit ForClient ForServer
+			----                      ------- --------- ---------
+			UnrealEd                  1       1         1
+			Saving the local game     0       1         1
+
+PostLoading:
+
+PostLoadHeader is called after all headers in a Unrealfiles have
+been successfully loaded from disk and serialized.  This gives each
+loaded resource a chance to initialize any in-memory tables that it
+uses, or clean up data which it didn't load by serialization. This
+function is highly predictable: when it's called, all resources are
+guaranteed to have been loaded. However, there is no guarantee that 
+resources will be postloaded in any particular order.
+
+PostLoadData (for UResource classes) and PostLoadItem (for UDatabase
+elements) are called after a resource's data has been loaded from an
+Unrealfile.  When they are called it is guaranteed that all resource
+headers have been successfully serialized and postloaded.  There is no
+guarantee about what order the data postloaders will be called.
+Also note that, if resource swapping is enabled, PostLoadData
+could be called during a call to a resource's Lock function, when the
+resource data has to be loaded from disk.
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Status bar.
+///////////////////////////////////////////////////////////////////////////////
+
+todo: Write me!
+
+The status bar code in 0.84 is outdated and will be totally replaced.
+The status bar code in 0.85 has been ripped out.
+
+The final Unreal status bar code will make use of a custom actor class,
+StatusDescriptor, which contains all of the textures and custom text that
+should be rendered in the status bar. This will be extremely powerful because
+it lets status bars be scripted in UnrealScript, enables multiple status
+bars on the screen, and enables status bars to be completely changed on the
+server side. But, it's not implemented yet!
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Player controls.
+///////////////////////////////////////////////////////////////////////////////
+
+todo: Write me!
+
+The player controls in 0.84 have been completely tossed out.
+The player controls are currently being rewritten in UnrealScript.
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Inventory.
+///////////////////////////////////////////////////////////////////////////////
+
+todo: Write me!
+
+The inventory system in 0.84 has been completely tossed out.
+The inventory system is currently being rewritten in UnrealScript.
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Physics system.
+///////////////////////////////////////////////////////////////////////////////
+
+todo: Write me!
+
+No movement system yet exists. Coming soon.
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Script-callable functions in C++.
+///////////////////////////////////////////////////////////////////////////////
+
+todo: Write me!
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Menus.
+///////////////////////////////////////////////////////////////////////////////
+
+todo: Write me!
+
+In short, the menu system will be entirely rewritten in UnrealScript,
+using actor classes. This will enable menus to be handled on both the
+client and server sides.  The resulting system will be much, much easier
+to write code for, but it's not yet in.
+
+///////////////////////////////////////////////////////////////////////////////
+	>>Network play actor logistics.
+///////////////////////////////////////////////////////////////////////////////
+
+todo: Write me!
+
+///////////////////////////////////////////////////////////////////////////////
+	>>The End.
+///////////////////////////////////////////////////////////////////////////////

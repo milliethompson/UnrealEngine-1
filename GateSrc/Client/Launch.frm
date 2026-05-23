@@ -1,4 +1,5 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "comctl32.ocx"
 Begin VB.Form Launch 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Unreal GateKeeper Launcher"
@@ -7,16 +8,13 @@ Begin VB.Form Launch
    ClientTop       =   8205
    ClientWidth     =   4890
    ControlBox      =   0   'False
-   Height          =   4110
    Icon            =   "Launch.frx":0000
-   Left            =   1170
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   3750
    ScaleWidth      =   4890
-   Top             =   7905
-   Width           =   5010
    Begin VB.CommandButton LaunchCancel 
       Cancel          =   -1  'True
       Caption         =   "&Cancel"
@@ -47,11 +45,11 @@ Begin VB.Form Launch
          TabIndex        =   13
          Top             =   480
          Width           =   4575
-         _Version        =   65536
          _ExtentX        =   8070
          _ExtentY        =   344
-         _StockProps     =   192
+         _Version        =   327680
          Appearance      =   1
+         MouseIcon       =   "Launch.frx":030A
       End
       Begin VB.Label ConnectStatus 
          Alignment       =   2  'Center
@@ -81,13 +79,13 @@ Begin VB.Form Launch
    Begin VB.Frame Frame1 
       Caption         =   "Startup Options"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   3195
       Left            =   120
@@ -135,7 +133,7 @@ Begin VB.Form Launch
          Width           =   2955
       End
       Begin VB.OptionButton LaunchRemote 
-         Caption         =   "Administer a remote UnrealServer on the Internet:"
+         Caption         =   "Administer a remote Gatekeeper on the Internet:"
          Height          =   255
          Left            =   240
          TabIndex        =   5
@@ -143,7 +141,7 @@ Begin VB.Form Launch
          Width           =   4335
       End
       Begin VB.OptionButton LaunchLocal 
-         Caption         =   "Launch a dedicated UnrealServer on this machine now."
+         Caption         =   "Launch a dedicated Gatekeeper on this machine now."
          Height          =   255
          Left            =   240
          TabIndex        =   3
@@ -162,7 +160,9 @@ Begin VB.Form Launch
    End
 End
 Attribute VB_Name = "Launch"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' Launch.frm: GateClient initial launch screen.
@@ -499,7 +499,7 @@ Private Sub LaunchOk_Click()
             
             ' Go into the main client form.
             Main.Startup
-            Unload Me
+            Hide
         End If
     Else
         
@@ -524,7 +524,7 @@ Private Sub LaunchOk_Click()
             
             ' Go into the main client form.
             Main.Startup
-            Unload Me
+            Hide
         End If
     End If
 End Sub

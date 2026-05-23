@@ -26,7 +26,7 @@ public:
 
 	// Dialog Data.
 	//{{AFX_DATA(CUnrealWnDlg)
-	enum { IDD = IDD_UNWN_DIALOG };
+	enum { IDD = IDD_LOG };
 	CEdit	m_CmdLine;
 	CEdit	m_CmdLog;
 	//}}AFX_DATA
@@ -46,7 +46,6 @@ protected:
 	HICON m_hIcon;
 
 	// Handmade message map functions.
-	afx_msg LONG OnUnrealTimer(UINT,LONG);
 	//
 	// Generated message map functions.
 	//{{AFX_MSG(CUnrealWnDlg)

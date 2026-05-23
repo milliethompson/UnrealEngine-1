@@ -1,68 +1,149 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{F9043C88-F6F2-101A-A3C9-08002B2F49FB}#1.1#0"; "comdlg32.ocx"
 Begin VB.Form frmDialogs 
    AutoRedraw      =   -1  'True
    BorderStyle     =   0  'None
    Caption         =   "Common dialogs used throughout"
-   ClientHeight    =   4095
-   ClientLeft      =   525
-   ClientTop       =   1185
+   ClientHeight    =   6855
+   ClientLeft      =   2340
+   ClientTop       =   7830
    ClientWidth     =   10275
    Enabled         =   0   'False
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   4500
    Icon            =   "Dialogs.frx":0000
-   Left            =   465
    LinkTopic       =   "Form1"
-   ScaleHeight     =   4095
+   PaletteMode     =   1  'UseZOrder
+   ScaleHeight     =   6855
    ScaleWidth      =   10275
    ShowInTaskbar   =   0   'False
-   Top             =   840
-   Width           =   10395
+   Begin MSComDlg.CommonDialog MusicLoadDlg 
+      Left            =   5340
+      Top             =   4320
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "uax"
+      DialogTitle     =   "Load Music"
+      Filter          =   "Music resources (*.umx)|*.umx|All Files (*.*)|*.*"
+      Flags           =   524800
+      MaxFileSize     =   5000
+   End
+   Begin MSComDlg.CommonDialog MusicSaveDlg 
+      Left            =   360
+      Top             =   3360
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "uax"
+      DialogTitle     =   "Save Music"
+      Filter          =   "Music resources (*.umx)|*.umx|All Files (*.*)|*.*"
+      Flags           =   33280
+      MaxFileSize     =   5000
+   End
+   Begin MSComDlg.CommonDialog MusicExportDlg 
+      Left            =   8160
+      Top             =   4500
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "ufx"
+      DialogTitle     =   "Export A Song"
+      Filter          =   "Song (*.s3m)|*.s3m"
+      Flags           =   2097152
+   End
+   Begin MSComDlg.CommonDialog MusicImportDlg 
+      Left            =   360
+      Top             =   4320
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "ufx"
+      DialogTitle     =   "Import music"
+      Filter          =   "Songs (*.s3m)|*.s3m|All Files (*.*)|*.*"
+      Flags           =   2097664
+      MaxFileSize     =   5000
+   End
+   Begin MSComDlg.CommonDialog SoundLoadFamilyDlg 
+      Left            =   6000
+      Top             =   3300
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "uax"
+      DialogTitle     =   "Load Sound Family"
+      Filter          =   "Unreal Sounds (*.uax)|*.uax|All Files (*.*)|*.*"
+      Flags           =   524800
+      MaxFileSize     =   5000
+   End
+   Begin MSComDlg.CommonDialog SoundSaveFamilyDlg 
+      Left            =   4140
+      Top             =   3300
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "uax"
+      DialogTitle     =   "Save Sound Family"
+      Filter          =   "Unreal Sounds (*.uax)|*.uax|All Files (*.*)|*.*"
+      Flags           =   33280
+      MaxFileSize     =   5000
+   End
+   Begin MSComDlg.CommonDialog SoundExportDlg 
+      Left            =   1560
+      Top             =   3360
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "ufx"
+      DialogTitle     =   "Export A Sound"
+      Filter          =   "Unreal sound effect (*.ufx)|*.ufx"
+      Flags           =   2097152
+   End
+   Begin MSComDlg.CommonDialog SoundImportDlg 
+      Left            =   1560
+      Top             =   4320
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "ufx"
+      DialogTitle     =   "Import sound"
+      Filter          =   "Unreal sound effect (*.ufx)|*.ufx|All Files (*.*)|*.*"
+      Flags           =   2097664
+      MaxFileSize     =   5000
+   End
    Begin MSComDlg.CommonDialog TwoDeeTexture 
       Left            =   2820
       Top             =   2100
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "bmp"
       DialogTitle     =   "Load Texture in Background"
       Filter          =   "BMP files (*.bmp)|*.bmp|All Files (*.*)|*.*"
    End
-   Begin VB.Label Label2 
-      Caption         =   "TwoDeeTexture"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   2580
-      TabIndex        =   28
-      Top             =   2640
-      Width           =   1335
-   End
    Begin MSComDlg.CommonDialog TwoDeeOpen 
       Left            =   420
       Top             =   2100
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "u2d"
       DialogTitle     =   "Open 2D Shape"
@@ -72,313 +153,69 @@ Begin VB.Form frmDialogs
    Begin MSComDlg.CommonDialog TwoDeeSave 
       Left            =   1620
       Top             =   2040
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "u2d"
       DialogTitle     =   "Save 2D Shape"
       Filter          =   "2D Shapes (*.u2d)|*.u2d|All Files (*.*)|*.*"
       Flags           =   2097154
    End
-   Begin VB.Label Label30 
-      Caption         =   "SoundLoadFamilyDlg"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   315
-      Left            =   4740
-      TabIndex        =   27
-      Top             =   3540
-      Width           =   1755
-   End
-   Begin MSComDlg.CommonDialog SoundLoadFamilyDlg 
-      Left            =   5340
-      Top             =   3000
-      _Version        =   65536
-      _ExtentX        =   847
-      _ExtentY        =   847
-      _StockProps     =   0
-      CancelError     =   -1  'True
-      DefaultExt      =   "uax"
-      DialogTitle     =   "Load Sound Family"
-      Filter          =   "Unreal Sounds (*.uax)|*.uax|All Files (*.*)|*.*"
-      Flags           =   33280
-      MaxFileSize     =   5000
-   End
-   Begin VB.Label Label29 
-      Caption         =   "SoundSaveFamilyDlg"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   315
-      Left            =   3000
-      TabIndex        =   26
-      Top             =   3540
-      Width           =   1575
-   End
-   Begin MSComDlg.CommonDialog SoundSaveFamilyDlg 
-      Left            =   3480
-      Top             =   3000
-      _Version        =   65536
-      _ExtentX        =   847
-      _ExtentY        =   847
-      _StockProps     =   0
-      CancelError     =   -1  'True
-      DefaultExt      =   "uax"
-      DialogTitle     =   "Load Sound Family"
-      Filter          =   "Unreal Sounds (*.uax)|*.uax|All Files (*.*)|*.*"
-      Flags           =   33280
-      MaxFileSize     =   5000
-   End
-   Begin VB.Label Label9 
-      Caption         =   "SoundExportDlg"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   375
-      Left            =   1560
-      TabIndex        =   25
-      Top             =   3540
-      Width           =   1335
-   End
-   Begin MSComDlg.CommonDialog SoundExportDlg 
-      Left            =   1860
-      Top             =   3000
-      _Version        =   65536
-      _ExtentX        =   847
-      _ExtentY        =   847
-      _StockProps     =   0
-      CancelError     =   -1  'True
-      DefaultExt      =   "ufx"
-      DialogTitle     =   "Export A Sound"
-      Filter          =   "Unreal sound effect (*.ufx)|*.ufx"
-      Flags           =   2097152
-   End
-   Begin VB.Label Label8 
-      Caption         =   "SoundImportDlg"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   315
-      Left            =   120
-      TabIndex        =   24
-      Top             =   3600
-      Width           =   1275
-   End
-   Begin MSComDlg.CommonDialog SoundImportDlg 
-      Left            =   420
-      Top             =   3060
-      _Version        =   65536
-      _ExtentX        =   847
-      _ExtentY        =   847
-      _StockProps     =   0
-      CancelError     =   -1  'True
-      DefaultExt      =   "ufx"
-      DialogTitle     =   "Import sound"
-      Filter          =   "Unreal sound effect (*.ufx)|*.ufx|All Files (*.*)|*.*"
-      Flags           =   2097664
-      MaxFileSize     =   5000
-   End
-   Begin VB.Label Label28 
-      Caption         =   "ClassLoad"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   3360
-      TabIndex        =   23
-      Top             =   720
-      Width           =   855
-   End
-   Begin VB.Label Label27 
-      Caption         =   "ClassSave"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   4320
-      TabIndex        =   22
-      Top             =   720
-      Width           =   855
-   End
    Begin MSComDlg.CommonDialog ClassLoad 
       Left            =   3600
       Top             =   120
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "ucx"
       DialogTitle     =   "Load Actor Class File"
-      Filter          =   "Unreal Actor Class (*.ucx)|*.ucx|Actor class text files (*.tcx)|*.tcx|All Files (*.*)|*.*"
-      Flags           =   33280
+      Filter          =   "Unreal Actor Class (*.ucx)|*.ucx|Actor class text files (*.u)|*.u|All Files (*.*)|*.*"
+      Flags           =   524800
    End
    Begin MSComDlg.CommonDialog ClassSave 
       Left            =   4560
       Top             =   120
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "ucx"
       DialogTitle     =   "Save Actor Class File"
-      Filter          =   "Unreal Actor Class (*.ucx)|*.ucx|Actor class text file (*.tcx)|*.tcx|C++ header (*.h)|*.h"
+      Filter          =   "Unreal Actor Class (*.ucx)|*.ucx|Actor class text file (*.u)|*.u|C++ header (*.h)|*.h"
       Flags           =   2097154
    End
    Begin MSComDlg.CommonDialog ExportTex 
       Left            =   8820
       Top             =   120
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "pcx"
       DialogTitle     =   "Export A Texture"
       Filter          =   "Standard PCX file (*.pcx)|*.pcx"
       Flags           =   2097154
    End
-   Begin VB.Label Label26 
-      Caption         =   "ExportTex"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   8700
-      TabIndex        =   21
-      Top             =   720
-      Width           =   1095
-   End
-   Begin VB.Label Label24 
-      Caption         =   "AddFile"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   4440
-      TabIndex        =   20
-      Top             =   2640
-      Width           =   735
-   End
    Begin MSComDlg.CommonDialog AddFile 
       Left            =   4440
       Top             =   2100
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "unr"
       DialogTitle     =   "Load an UnrealEd file at startup"
       Filter          =   $"Dialogs.frx":030A
       Flags           =   2129920
    End
-   Begin VB.Label Label23 
-      Caption         =   "MacroPick"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   2400
-      TabIndex        =   19
-      Top             =   720
-      Width           =   855
-   End
-   Begin MSComDlg.CommonDialog MacroPick 
-      Left            =   2400
-      Top             =   180
-      _Version        =   65536
-      _ExtentX        =   847
-      _ExtentY        =   847
-      _StockProps     =   0
-      CancelError     =   -1  'True
-      DefaultExt      =   "mac"
-      DialogTitle     =   "Set Initial UnrealEd Macro"
-      Filter          =   "Unreal Macros (*.mac)|*.mac|All Files (*.*)|*.*"
-      Flags           =   2097152
-   End
-   Begin VB.Label Label22 
-      Caption         =   "ToolHelp"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   9240
-      TabIndex        =   18
-      Top             =   2700
-      Width           =   855
-   End
    Begin MSComDlg.CommonDialog ToolHelp 
       Left            =   9360
       Top             =   2100
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       HelpCommand     =   1
       HelpContext     =   105
       HelpFile        =   "help\unrealed.hlp"
@@ -386,119 +223,38 @@ Begin VB.Form frmDialogs
    Begin MSComDlg.CommonDialog RelNotes 
       Left            =   6300
       Top             =   2100
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       HelpCommand     =   1
       HelpContext     =   105
       HelpFile        =   "help\unrealed.hlp"
    End
-   Begin VB.Label Label21 
-      Caption         =   "RelNotes"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   6300
-      TabIndex        =   17
-      Top             =   2700
-      Width           =   855
-   End
-   Begin VB.Label Label20 
-      Caption         =   "About"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   8460
-      TabIndex        =   16
-      Top             =   2700
-      Width           =   615
-   End
    Begin MSComDlg.CommonDialog About 
       Left            =   8460
       Top             =   2100
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       HelpCommand     =   1
       HelpContext     =   104
       HelpFile        =   "help\unrealed.hlp"
    End
-   Begin VB.Label Label19 
-      Caption         =   "HelpContents"
-      BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   7260
-      TabIndex        =   15
-      Top             =   2700
-      Width           =   1095
-   End
    Begin MSComDlg.CommonDialog HelpContents 
       Left            =   7500
       Top             =   2100
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       HelpCommand     =   11
       HelpFile        =   "help\unrealed.hlp"
-   End
-   Begin MSComDlg.CommonDialog MacroLoad 
-      Left            =   3600
-      Top             =   1140
-      _Version        =   65536
-      _ExtentX        =   847
-      _ExtentY        =   847
-      _StockProps     =   0
-      CancelError     =   -1  'True
-      DefaultExt      =   "mac"
-      DialogTitle     =   "Load Macro"
-      Filter          =   "Unreal Macros (*.mac)|*.mac|All Files (*.*)|*.*"
-      Flags           =   2097152
-   End
-   Begin MSComDlg.CommonDialog MacroSaveAs 
-      Left            =   4860
-      Top             =   1140
-      _Version        =   65536
-      _ExtentX        =   847
-      _ExtentY        =   847
-      _StockProps     =   0
-      CancelError     =   -1  'True
-      DefaultExt      =   "mac"
-      DialogTitle     =   "Save Macro As"
-      Filter          =   "Unreal Macros (*.mac)|*mac|All Files (*.*)|*.*"
-      Flags           =   2097154
    End
    Begin MSComDlg.CommonDialog ImportMap 
       Left            =   2400
       Top             =   1140
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "t3d"
       DialogTitle     =   "Import Map"
@@ -508,10 +264,9 @@ Begin VB.Form frmDialogs
    Begin MSComDlg.CommonDialog ExportMap 
       Left            =   1440
       Top             =   1140
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "t3d"
       DialogTitle     =   "Export Map"
@@ -521,51 +276,47 @@ Begin VB.Form frmDialogs
    Begin MSComDlg.CommonDialog TexFamLoad 
       Left            =   5520
       Top             =   120
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "utx"
-      DialogTitle     =   "Load Texture Family"
+      DialogTitle     =   "Load Texture Set"
       Filter          =   "Unreal Textures (*.utx)|*.utx|All Files (*.*)|*.*"
-      Flags           =   33280
+      Flags           =   524800
       MaxFileSize     =   5000
    End
    Begin MSComDlg.CommonDialog TexFamSave 
       Left            =   6600
       Top             =   120
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "utx"
-      DialogTitle     =   "Save Texture Family"
+      DialogTitle     =   "Save Texture Set"
       Filter          =   "Unreal Textures (*.utx)|*.utx|All Files (*.*)|*.*"
       Flags           =   2097154
    End
    Begin MSComDlg.CommonDialog TexImport 
       Left            =   7740
       Top             =   120
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "pcx"
-      DialogTitle     =   "Import texture map"
-      Filter          =   "PCX files (*.pcx)|*.pcx|All Files (*.*)|*.*"
+      DialogTitle     =   "Import A Texture"
+      Filter          =   "All graphics files (*.pcx,*.bmp)|*.pcx;*.bmp|PCX files (*.pcx)|*.pcx|BMP files (*.bmp)|*.bmp|All files (*.*)|*.*"
       Flags           =   2097664
       MaxFileSize     =   5000
    End
    Begin MSComDlg.CommonDialog BrushSave 
       Left            =   8220
       Top             =   1200
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "u3d"
       DialogTitle     =   "Save Brush"
@@ -575,23 +326,21 @@ Begin VB.Form frmDialogs
    Begin MSComDlg.CommonDialog BrushOpen 
       Left            =   120
       Top             =   1200
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "u3d"
       DialogTitle     =   "Open Brush"
       Filter          =   "3D Solids (*.u3d)|*.u3d|All Files (*.*)|*.*"
-      Flags           =   2097152
+      Flags           =   655360
    End
    Begin MSComDlg.CommonDialog ExportBrush 
-      Left            =   120
+      Left            =   240
       Top             =   180
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "t3d"
       DialogTitle     =   "Export A Brush"
@@ -599,12 +348,11 @@ Begin VB.Form frmDialogs
       Flags           =   2097154
    End
    Begin MSComDlg.CommonDialog ImportBrush 
-      Left            =   1320
-      Top             =   180
-      _Version        =   65536
+      Left            =   1440
+      Top             =   120
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "t3d"
       DialogTitle     =   "Import A Brush"
@@ -612,12 +360,11 @@ Begin VB.Form frmDialogs
       Flags           =   2097152
    End
    Begin MSComDlg.CommonDialog MapSaveAs 
-      Left            =   6900
+      Left            =   7020
       Top             =   1200
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "unr"
       DialogTitle     =   "Save Map As"
@@ -625,62 +372,405 @@ Begin VB.Form frmDialogs
       Flags           =   2097154
    End
    Begin MSComDlg.CommonDialog MapOpen 
-      Left            =   5700
+      Left            =   5880
       Top             =   1200
-      _Version        =   65536
       _ExtentX        =   847
       _ExtentY        =   847
-      _StockProps     =   0
+      _Version        =   327680
       CancelError     =   -1  'True
       DefaultExt      =   "unr"
       DialogTitle     =   "Open Map File"
       Filter          =   "Unreal Maps (*.unr)|*.unr|All Files (*.*)|*.*"
       Flags           =   2129920
    End
-   Begin VB.Label Label18 
-      Caption         =   "MacroLoad"
+   Begin MSComDlg.CommonDialog FHmapOpen 
+      Left            =   2640
+      Top             =   5640
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "pcx"
+      DialogTitle     =   "Open Terra Height Map"
+      Filter          =   "PCX Files (*.pcx)|*.pcx|All Files (*.*)|*.*"
+      Flags           =   2097152
+   End
+   Begin MSComDlg.CommonDialog FloorSave 
+      Left            =   1560
+      Top             =   5640
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "tra"
+      DialogTitle     =   "Open Terra File"
+      Filter          =   "Terra Files (*.tra)|*.tra|All Files (*.*)|*.*"
+      Flags           =   2097154
+   End
+   Begin MSComDlg.CommonDialog FloorOpen 
+      Left            =   360
+      Top             =   5640
+      _ExtentX        =   847
+      _ExtentY        =   847
+      _Version        =   327680
+      CancelError     =   -1  'True
+      DefaultExt      =   "tra"
+      DialogTitle     =   "Open Terra File"
+      Filter          =   "Terra Files (*.tra)|*.tra|All Files (*.*)|*.*"
+      Flags           =   2097152
+   End
+   Begin VB.Label Label23 
+      Alignment       =   2  'Center
+      Caption         =   "FloorOpen"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   120
+      TabIndex        =   32
+      Top             =   6240
+      Width           =   1095
+   End
+   Begin VB.Label Label18 
+      Alignment       =   2  'Center
+      Caption         =   "FloorSave"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   1320
+      TabIndex        =   31
+      Top             =   6240
+      Width           =   1095
+   End
+   Begin VB.Label Label17 
+      Caption         =   "FHmapOpen"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   2400
+      TabIndex        =   30
+      Top             =   6240
+      Width           =   1095
+   End
+   Begin VB.Label Label33 
+      Caption         =   "MusicLoadDlg"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   315
+      Left            =   5040
+      TabIndex        =   29
+      Top             =   4860
+      Width           =   1155
+   End
+   Begin VB.Label Label32 
+      Caption         =   "MusicSaveDlg"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   315
+      Left            =   0
+      TabIndex        =   28
+      Top             =   3840
+      Width           =   1155
+   End
+   Begin VB.Label Label31 
+      Caption         =   "MusicExportDlg"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   375
+      Left            =   7860
+      TabIndex        =   27
+      Top             =   5040
+      Width           =   1335
+   End
+   Begin VB.Label Label25 
+      Caption         =   "MusicImportDlg"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   315
+      Left            =   0
+      TabIndex        =   26
+      Top             =   4920
+      Width           =   1215
+   End
+   Begin VB.Label Label30 
+      Caption         =   "SoundLoadFamilyDlg"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   315
+      Left            =   5400
+      TabIndex        =   25
+      Top             =   3840
+      Width           =   1755
+   End
+   Begin VB.Label Label29 
+      Caption         =   "SoundSaveFamilyDlg"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   315
+      Left            =   3660
+      TabIndex        =   24
+      Top             =   3840
+      Width           =   1575
+   End
+   Begin VB.Label Label9 
+      Caption         =   "SoundExportDlg"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   375
+      Left            =   1200
+      TabIndex        =   23
+      Top             =   3840
+      Width           =   1335
+   End
+   Begin VB.Label Label8 
+      Caption         =   "SoundImportDlg"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   315
+      Left            =   1320
+      TabIndex        =   22
+      Top             =   4920
+      Width           =   1275
+   End
+   Begin VB.Label Label2 
+      Caption         =   "TwoDeeTexture"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   2580
+      TabIndex        =   21
+      Top             =   2640
+      Width           =   1335
+   End
+   Begin VB.Label Label28 
+      Caption         =   "ClassLoad"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   3360
-      TabIndex        =   14
-      Top             =   1740
-      Width           =   975
+      TabIndex        =   20
+      Top             =   720
+      Width           =   855
    End
-   Begin VB.Label Label17 
-      Caption         =   "MacroSaveAs"
+   Begin VB.Label Label27 
+      Caption         =   "ClassSave"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
-      Left            =   4500
+      Left            =   4320
+      TabIndex        =   19
+      Top             =   720
+      Width           =   855
+   End
+   Begin VB.Label Label26 
+      Caption         =   "ExportTex"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   8700
+      TabIndex        =   18
+      Top             =   720
+      Width           =   1095
+   End
+   Begin VB.Label Label24 
+      Caption         =   "AddFile"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   4440
+      TabIndex        =   17
+      Top             =   2640
+      Width           =   735
+   End
+   Begin VB.Label Label22 
+      Caption         =   "ToolHelp"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   9240
+      TabIndex        =   16
+      Top             =   2700
+      Width           =   855
+   End
+   Begin VB.Label Label21 
+      Caption         =   "RelNotes"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   6300
+      TabIndex        =   15
+      Top             =   2700
+      Width           =   855
+   End
+   Begin VB.Label Label20 
+      Caption         =   "About"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   8460
+      TabIndex        =   14
+      Top             =   2700
+      Width           =   615
+   End
+   Begin VB.Label Label19 
+      Caption         =   "HelpContents"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   7260
       TabIndex        =   13
-      Top             =   1740
-      Width           =   1155
+      Top             =   2700
+      Width           =   1095
    End
    Begin VB.Label Label16 
       Caption         =   "ImportMap"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   2280
@@ -691,13 +781,13 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label15 
       Caption         =   "ExportMap"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   1200
@@ -708,13 +798,13 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label14 
       Caption         =   "TexFamLoad"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   5280
@@ -725,13 +815,13 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label13 
       Caption         =   "TexFamSave"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   6420
@@ -742,13 +832,13 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label12 
       Caption         =   "TexImport"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   7620
@@ -759,13 +849,13 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label11 
       Caption         =   "TwoDeeSave"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   1440
@@ -776,13 +866,13 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label10 
       Caption         =   "TwoDeeOpen"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   180
@@ -793,13 +883,13 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label7 
       Caption         =   "BrushSave"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   8220
@@ -810,13 +900,13 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label6 
       Caption         =   "BrushOpen"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   120
@@ -827,30 +917,30 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label5 
       Caption         =   "ExportBrush"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   120
       TabIndex        =   3
-      Top             =   720
+      Top             =   840
       Width           =   975
    End
    Begin VB.Label Label4 
       Caption         =   "ImportBrush"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   1260
@@ -861,13 +951,13 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label3 
       Caption         =   "MapSaveAs"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   6900
@@ -878,13 +968,13 @@ Begin VB.Form frmDialogs
    Begin VB.Label Label1 
       Caption         =   "MapOpen"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   5760
@@ -894,8 +984,61 @@ Begin VB.Form frmDialogs
    End
 End
 Attribute VB_Name = "frmDialogs"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 
+Private Sub Form_Load()
+    Dim SaveFlags As Long, LoadSingleFlags As Long, LoadMultiFlags As Long, HelpFlags As Long
+       
+    ' Flags.
+    SaveFlags = cdlOFNLongNames Or cdlOFNHideReadOnly Or cdlOFNNoReadOnlyReturn Or cdlOFNOverwritePrompt
+    LoadSingleFlags = cdlOFNLongNames Or cdlOFNFileMustExist Or cdlOFNExplorer Or cdlOFNShareAware
+    LoadMultiFlags = cdlOFNLongNames Or cdlOFNFileMustExist Or cdlOFNExplorer Or cdlOFNShareAware Or cdlOFNAllowMultiselect
+    HelpFlags = 0
+    
+    ' Saving single files.
+    ExportBrush.Flags = SaveFlags
+    ClassSave.Flags = SaveFlags
+    TexFamSave.Flags = SaveFlags
+    ExportTex.Flags = SaveFlags
+    BrushOpen.Flags = SaveFlags
+    ExportMap.Flags = SaveFlags
+    MapSaveAs.Flags = SaveFlags
+    BrushSave.Flags = SaveFlags
+    TwoDeeSave.Flags = SaveFlags
+    MusicSaveDlg.Flags = SaveFlags
+    SoundExportDlg.Flags = SaveFlags
+    SoundSaveFamilyDlg.Flags = SaveFlags
+    MusicExportDlg.Flags = SaveFlags
+    FloorSave.Flags = SaveFlags
+    
+    ' Loading single files.
+    ClassLoad.Flags = LoadSingleFlags
+    ImportBrush.Flags = LoadSingleFlags
+    ImportMap.Flags = LoadSingleFlags
+    MapOpen.Flags = LoadSingleFlags
+    TwoDeeOpen.Flags = LoadSingleFlags
+    TwoDeeTexture.Flags = LoadSingleFlags
+    AddFile.Flags = LoadSingleFlags
+    MusicImportDlg.Flags = LoadSingleFlags
+    MusicLoadDlg.Flags = LoadSingleFlags
+    FloorOpen.Flags = LoadSingleFlags
+    FHmapOpen.Flags = LoadSingleFlags
+    
+    ' Loading multiple files.
+    TexFamLoad.Flags = LoadMultiFlags
+    TexImport.Flags = LoadMultiFlags
+    SoundLoadFamilyDlg.Flags = LoadMultiFlags
+    SoundImportDlg.Flags = LoadMultiFlags
+    
+    ' Help.
+    RelNotes.Flags = HelpFlags
+    HelpContents.Flags = HelpFlags
+    About.Flags = HelpFlags
+    ToolHelp.Flags = HelpFlags
+    
+End Sub
 

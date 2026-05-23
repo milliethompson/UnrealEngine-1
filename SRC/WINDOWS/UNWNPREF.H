@@ -2,7 +2,7 @@
 UnWnPref.h: Preferences property page dialog
 Used by: Properties dialog to present preferences
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:

@@ -1,7 +1,7 @@
 /*=============================================================================
-	UnBuild.h: Unreal build settings
+	UnBuild.h: Unreal build settings.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	This file contains all settings and options related to a particular build
@@ -12,7 +12,7 @@
 #define _INC_UNBUILD
 
 /*-----------------------------------------------------------------------------
-	Notes on other defines
+	Notes on other defines.
 
 Any of the following must be defined in each project's standard definitions,
 rather than in this shared header:
@@ -29,84 +29,89 @@ COMPILING_EDITOR	If compiling UnEditor.dll
 -----------------------------------------------------------------------------*/
 
 /*-----------------------------------------------------------------------------
-	Major compile options
+	Major compile options.
 -----------------------------------------------------------------------------*/
 
-//
-// Runtime checks.
-//
-#ifndef PARANOID
-	#define	PARANOID		0	/* Perform slow, expensive validity checks */
+// Runtime checks to perform.
+#ifndef CHECK_ALL
+#define	CHECK_ALL		0	/* Perform pretty slow validity checks? */
+#endif
+
+#ifndef CHECK_ALLOCS
+#define CHECK_ALLOCS	0	/* Check for malloc memory leaks */
 #endif
 
 #ifndef STATS
-	#define STATS			1	/* Support rendering statistics */
+#define STATS			1	/* Support rendering statistics? */
 #endif
 
-#ifndef NO_CLOCK
-	#define NO_CLOCK		0	/* Don't perform simple timing of critical loops */
+// Runtime timing.
+#ifndef DO_CLOCK
+#define DO_CLOCK		1	/* Perform simple timing of critical loops? */
 #endif
 
-#ifndef NO_SLOW_CLOCK
-	#define NO_SLOW_CLOCK	1	/* Don't perform CPU-intense timing of critical loops */
+#ifndef DO_SLOW_CLOCK
+#define DO_SLOW_CLOCK	0	/* Perform CPU-intense timing of critical loops? */
 #endif
 
-#ifndef NO_GUARD
-	#define NO_GUARD		0	/* Don't trap errors */
+// Runtime callstack display.
+#ifndef DO_GUARD
+#define DO_GUARD		1	/* Trap errors? */
 #endif
 
-#ifndef NO_SLOW_GUARD
-	#define NO_SLOW_GUARD	0	/* Don't trap errors where that would slow down the code significantly */
+#ifndef DO_SLOW_GUARD
+#define DO_SLOW_GUARD	0	/* Trap errors where that would slow down the code significantly? */
 #endif
 
-//
 // Modules to compile.
-//
-#define EDITOR				1	/* Include Unreal editor code */
+#define EDITOR			1	/* Include Unreal editor code? */
 
-//
 // Code to generate.
-//
-#define ASM					1	/* Use Intel assembler code */
+#define ASM				1	/* Use Intel assembler code? */
 
 /*-----------------------------------------------------------------------------
-	Defines for all platforms
+	Conditional macros.
 -----------------------------------------------------------------------------*/
 
-//
-// Names and version numbers:
-//
+// Conditional that only takes effect if editor support is enabled.
+#if EDITOR
+#define IFEDITOR(cmds) cmds
+#else
+#define IFEDITOR(cmds)
+#endif
+
+/*-----------------------------------------------------------------------------
+	Defines for all platforms.
+-----------------------------------------------------------------------------*/
+
+// Names and version numbers.
 #define GAME_NAME		"Unreal"
-#define ENGINE_NAME		"Unreal Engine"
+#define ENGINE_NAME		"Unreal Virtual Machine"
 #define CAMERA_NAME		"Unreal Camera"
 
-#define GAME_VERSION	"0.84"
-#define ENGINE_VERSION  "0.84"
+#define GAME_VERSION	"0.86"
+#define ENGINE_VERSION  "0.86"
 
 #define CONSOLE_SPAWN_1	"UnrealServer " ENGINE_VERSION
-#define CONSOLE_SPAWN_2	"Copyright 1996 Epic MegaGames, Inc."
+#define CONSOLE_SPAWN_2	"Copyright 1997 Epic MegaGames, Inc."
 
-//
+// Class name to apply top-level Make-All to.
+#define TOP_CLASS_NAME "Object"
+
 // Gatekeeper information.
-//
 #define GK_VER		    "10"
 #define GK_APP          "Unreal"
-#define GK_APP_VER		"84"
+#define GK_APP_VER		"86"
 
-//
-// Resource file version number.  
-// Prevents outdated resource files from being loaded.
-//
-#define RES_FILE_VERSION (0x000A)
-#define RES_FILE_TAG     "Unreal Resource\x1A"
+// Unrealfile information.
+// Prevents outdated Unrealfiles from being loaded.
+#define UNREALFILE_TAG "Unrealfile\x1A" /* 31 characters or less */
 
-//
 // Hardcoded filenames, paths, and extensions:
-//
-#define DEFAULT_STARTUP_FNAME	"..\\Maps\\Unreal.unr"
-#define DEFAULT_CLASS_FNAME		"..\\Classes\\Unreal.ucx"
+#define DEFAULT_STARTUP_FNAME	"Unreal.unr"
+#define DEFAULT_CLASS_FNAME		"Unreal.ucx"
+#define DEFAULT_BINDINGS_FNAME	"Bind.mac"
 #define DEFAULT_PALETTE_FNAME	"..\\Graphics\\Palette.pcx"
-#define WEB_LINK_FNAME			"http://www.epicgames.com/"
 #define HELP_LINK_FNAME			"..\\Help\\Unreal.hlp"
 #define EDITOR_FNAME			"..\\UnrealEd.exe"
 #define PROFILE_RELATIVE_FNAME	"\\Unreal.ini"
@@ -122,28 +127,25 @@ COMPILING_EDITOR	If compiling UnEditor.dll
 #define ENGINE_PARTIAL			"UnServer.exe"
 #define SYSTEM_PARTIAL			"System"
 
+// Paths to search for UnrealFiles.
+#define FIND_PATHS              {"..\\Cache\\", "..\\System\\", "..\\Classes\\", "..\\Maps\\", "..\\Textures\\", "..\\Audio\\", "..\\Brushes\\"}
+
 #ifndef _DEBUG
-	#define GAME_DLL			"UnGame.dll"
-	#define MFC_HELP_PARTIAL	"UNSERVER.HLP" /* Must be all caps */
+	#define MFC_HELP_PARTIAL	"UNSERVER.HLP" /* Must be all caps. */
 #else
-	#define GAME_DLL			"dGame.dll"
-	#define MFC_HELP_PARTIAL	"DSERVER.HLP" /* Must be all caps */
+	#define MFC_HELP_PARTIAL	"DSERVER.HLP" /* Must be all caps. */
 #endif
 
-//
-// URL's
-//
+// URL's.
 #define URL_WEB					"http://www.epicgames.com/"
 #define URL_GAME				"unreal://unreal.epicgames.com/"
 #define URL_UNAVAILABLE			"..\\Help\\Unreal.htm"
 
 /*-----------------------------------------------------------------------------
-	Windows 95 settings
+	Windows 95 settings.
 -----------------------------------------------------------------------------*/
 
-//
-// For shell, Ole, and file dialogs:
-//
+// For shell, Ole, and file dialogs.
 #define MAP_EXTENSION			".unr"
 #define OLE_APP					"Unreal"
 #define OLE_APP_DESCRIPTION		"Unreal Engine"
@@ -152,18 +154,17 @@ COMPILING_EDITOR	If compiling UnEditor.dll
 #define MIME_MAP_TYPE			"application/unreal"
 #define PLAY_COMMAND			"&Play this Unreal level"
 #define EDIT_COMMAND			"&Edit with UnrealEd"
-#define LOAD_MAP_MASK			"Unreal maps (*.unr) | *.unr| All Files (*.*) | *.* ||"
-#define SAVE_MAP_MASK			"Unreal maps (*.unr) | *.unr| All Files (*.*) | *.* ||"
+#define LOAD_MAP_MASK			"Unreal maps (*.unr)|*.unr|All Files (*.*)|*.*||"
+#define LOAD_MAP_FILTER         "Unreal maps (*.unr)\x00*.unr\x00All Files (*.*)\x00*.*\x00\x00"
+#define SAVE_MAP_MASK			"Unreal maps (*.unr)|*.unr|All Files (*.*)|*.*||"
+#define SAVE_MAP_FILTER         "Unreal maps (*.unr)\x00*.unr\x00All Files (*.*)\x00*.*\x00\x00"
 
-//
-// Registry usage:
-//
+// Registry usage.
 #define REGISTRY_KEY_BASE		"Software"
 #define REGISTRY_KEY_COMPANY	"Epic MegaGames"
 #define REGISTRY_KEY_PRODUCT	"Unreal"
 
 /*-----------------------------------------------------------------------------
-	The End
+	The End.
 -----------------------------------------------------------------------------*/
 #endif // _INC_UNBUILD
-

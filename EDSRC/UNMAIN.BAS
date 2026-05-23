@@ -1,10 +1,6 @@
 Attribute VB_Name = "UNMAIN"
 Option Explicit
 
-'
-' These are initialized here in Sub Main
-' based on App.StartMode.
-'
 Global Ed As UnrealEdApp
 
 '
@@ -136,7 +132,7 @@ Sub UnloadMiscForms()
     If GNumMiscForms <> 0 Then MsgBox ("UnloadMiscForms: Failed RemoveMiscForm")
 End Sub
 
-Sub PreSave()
+Sub PreSaveAll()
     Dim i As Integer
     For i = 0 To GNumMiscForms - 1
         Call GMiscForms(i).PreSave

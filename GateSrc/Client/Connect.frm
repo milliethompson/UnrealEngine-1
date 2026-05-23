@@ -1,4 +1,6 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "comctl32.ocx"
+Object = "{248DD890-BB45-11CF-9ABC-0080C7E7B78D}#1.0#0"; "MSWINSCK.OCX"
 Begin VB.Form Connect 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Connection Progress"
@@ -7,17 +9,20 @@ Begin VB.Form Connect
    ClientTop       =   1455
    ClientWidth     =   4725
    ControlBox      =   0   'False
-   Height          =   1380
    Icon            =   "Connect.frx":0000
-   Left            =   2835
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1020
    ScaleWidth      =   4725
    ShowInTaskbar   =   0   'False
-   Top             =   1155
-   Width           =   4845
+   Begin MSWinsockLib.Winsock TCP 
+      Left            =   4440
+      Top             =   720
+      _ExtentX        =   741
+      _ExtentY        =   741
+   End
    Begin VB.Timer ConnectionTimer 
       Enabled         =   0   'False
       Interval        =   100
@@ -33,14 +38,17 @@ Begin VB.Form Connect
       Top             =   60
       Width           =   915
    End
-   Begin WINSOCKLib.TCP TCP 
-      Left            =   4260
-      Top             =   660
-      _ExtentX        =   635
-      _ExtentY        =   635
-      RemoteHost      =   ""
-      RemotePort      =   0
-      LocalPort       =   0
+   Begin ComctlLib.ProgressBar ConnectProgress 
+      Height          =   255
+      Left            =   60
+      TabIndex        =   0
+      Top             =   480
+      Width           =   4575
+      _ExtentX        =   8070
+      _ExtentY        =   450
+      _Version        =   327680
+      Appearance      =   1
+      MouseIcon       =   "Connect.frx":030A
    End
    Begin VB.Label ConnectHost 
       Caption         =   "Label2"
@@ -68,21 +76,11 @@ Begin VB.Form Connect
       Top             =   780
       Width           =   4035
    End
-   Begin ComctlLib.ProgressBar ConnectProgress 
-      Height          =   255
-      Left            =   60
-      TabIndex        =   0
-      Top             =   480
-      Width           =   4575
-      _Version        =   65536
-      _ExtentX        =   8070
-      _ExtentY        =   450
-      _StockProps     =   192
-      Appearance      =   1
-   End
 End
 Attribute VB_Name = "Connect"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' Connect.frm: GateClient code to manage the connection
@@ -170,7 +168,6 @@ SocketError2:
         End
     
     Else
-        
         ' Form was activated to perform an initial
         ' connection attempt.
         
@@ -213,7 +210,7 @@ Private Sub Form_Unload(Cancel As Integer)
 
     ' Disconnect Tcp socket.
     On Error GoTo TcpError
-    TCP.Disconnect
+    TCP.Close
 TcpError:
 End Sub
 
@@ -328,9 +325,12 @@ Private Sub ProcessIncomingCode(Code As Long, ByVal Extra As String)
     Dim Topic As String, Key As String, Value As String
     Dim i As Integer
 
+    ' For debugging print all incoming messages:
+    'LocalGateClient.Log Code & " " & Extra
+    
     ' State assertion.
     If Not LocalGateClient.IsConnected Then
-        MsgBox "ProcessIncomingCode inconsistency."
+        MsgBox "ProcessIncomingCode inconsistency"
         End
     End If
 
@@ -537,11 +537,11 @@ End Sub
 '
 ' TCP error event.
 '
-Private Sub TCP_Error(Number As Integer, Description As String, Scode As Long, Source As String, HelpFile As String, HelpContext As Long, CancelDisplay As Boolean)
+Private Sub TCP_Error(ByVal Number As Integer, Description As String, ByVal Scode As Long, ByVal Source As String, ByVal HelpFile As String, ByVal HelpContext As Long, CancelDisplay As Boolean)
     
     ' Handle error in its context.
     If LocalGateClient.IsConnected Then
-    
+
         ' We are connected.  Any TCP errors here are unrecoverable.
         MsgBox "Error communicating with server ( " & _
             Number & "): " & Description & "."
@@ -875,7 +875,7 @@ Public Sub MultiSubscriptionNotify(Ctl As Object, _
 
         ' Update listbox.
         If Adding Then
-
+            
             ' Add this to listbox.
             Ctl.AddItem Keyfield & _
                 Chr(9) & Chr(9) & Chr(9) & _
@@ -887,7 +887,7 @@ Public Sub MultiSubscriptionNotify(Ctl As Object, _
                 Ctl.ListIndex = 0
             End If
         Else
-
+            MsgBox "Remove"
             ' Remove this from listbox.
             For i = 0 To Ctl.ListCount - 1
                 If UCase(Left(Ctl.List(i), KeyfieldLen)) _

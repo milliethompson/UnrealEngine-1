@@ -1,109 +1,89 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmPreferences 
    BorderStyle     =   3  'Fixed Dialog
-   Caption         =   "Preferences"
-   ClientHeight    =   6105
+   Caption         =   "Field of view"
+   ClientHeight    =   5160
    ClientLeft      =   2100
    ClientTop       =   2310
-   ClientWidth     =   6000
+   ClientWidth     =   5955
    ForeColor       =   &H80000008&
-   Height          =   6465
    HelpContextID   =   116
    Icon            =   "Prefs.frx":0000
-   Left            =   2040
    LinkTopic       =   "Form5"
    MaxButton       =   0   'False
-   ScaleHeight     =   6105
-   ScaleWidth      =   6000
+   PaletteMode     =   1  'UseZOrder
+   ScaleHeight     =   5160
+   ScaleWidth      =   5955
    ShowInTaskbar   =   0   'False
-   Top             =   2010
-   Width           =   6120
    Begin VB.Frame Frame5 
       Caption         =   "Editing Features"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
-      Height          =   855
-      Left            =   120
-      TabIndex        =   18
-      Top             =   4680
+      Height          =   975
+      Left            =   60
+      TabIndex        =   11
+      Top             =   3660
       Width           =   5775
+      Begin VB.ComboBox FOV 
+         Height          =   315
+         Left            =   180
+         Style           =   2  'Dropdown List
+         TabIndex        =   14
+         Top             =   600
+         Width           =   735
+      End
       Begin VB.CheckBox GodMode 
          Caption         =   "God Mode: Enables you to use options which may be dangerous"
          Height          =   255
          Left            =   180
-         TabIndex        =   19
+         TabIndex        =   12
          Top             =   300
          Width           =   5475
       End
-   End
-   Begin VB.Frame Frame1 
-      Caption         =   "Field of view"
-      BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   735
-      Left            =   4080
-      TabIndex        =   15
-      Top             =   120
-      Width           =   1815
-      Begin VB.ComboBox FOV 
-         Height          =   315
-         Left            =   120
-         Style           =   2  'Dropdown List
-         TabIndex        =   16
-         Top             =   360
-         Width           =   735
-      End
       Begin VB.Label Label4 
-         Caption         =   "Degrees"
+         Caption         =   "Field of view"
          Height          =   255
-         Left            =   960
-         TabIndex        =   17
-         Top             =   360
-         Width           =   735
+         Left            =   1020
+         TabIndex        =   15
+         Top             =   660
+         Width           =   1095
       End
    End
    Begin VB.Frame Frame4 
       Caption         =   "Autosave"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   855
-      Left            =   120
-      TabIndex        =   9
-      Top             =   3720
+      Left            =   60
+      TabIndex        =   7
+      Top             =   2760
       Width           =   5775
       Begin VB.CheckBox AutoUnique 
          Caption         =   "Unique autosave filenames"
          Height          =   255
          Left            =   3120
-         TabIndex        =   20
+         TabIndex        =   13
          Top             =   360
          Width           =   2535
       End
       Begin VB.ComboBox AutoTime 
          Height          =   315
          Left            =   1320
-         TabIndex        =   11
+         TabIndex        =   9
          Text            =   "10"
          Top             =   360
          Width           =   855
@@ -112,7 +92,7 @@ Begin VB.Form frmPreferences
          Caption         =   "minutes."
          Height          =   255
          Left            =   2280
-         TabIndex        =   12
+         TabIndex        =   10
          Top             =   360
          Width           =   855
       End
@@ -120,7 +100,7 @@ Begin VB.Form frmPreferences
          Caption         =   "Autosave every"
          Height          =   255
          Left            =   120
-         TabIndex        =   10
+         TabIndex        =   8
          Top             =   360
          Width           =   1215
       End
@@ -129,76 +109,35 @@ Begin VB.Form frmPreferences
       Cancel          =   -1  'True
       Caption         =   "&Cancel"
       Height          =   375
-      Left            =   5040
-      TabIndex        =   8
-      Top             =   5640
-      Width           =   855
+      Left            =   4860
+      TabIndex        =   6
+      Top             =   4740
+      Width           =   975
    End
    Begin VB.CommandButton Ok 
       Caption         =   "&Ok"
       Default         =   -1  'True
       Height          =   375
-      Left            =   120
-      TabIndex        =   7
-      Top             =   5640
-      Width           =   855
-   End
-   Begin VB.Frame Frame3 
-      Caption         =   "Startup Macro"
-      BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
-      EndProperty
-      Height          =   735
-      Left            =   120
+      Left            =   60
       TabIndex        =   5
-      Top             =   120
-      Width           =   3855
-      Begin VB.CommandButton NoStartupMac 
-         Caption         =   "X"
-         Height          =   255
-         Left            =   3480
-         TabIndex        =   14
-         Top             =   360
-         Width           =   255
-      End
-      Begin VB.CommandButton StartupMacPick 
-         Caption         =   "..."
-         Height          =   255
-         Left            =   3120
-         TabIndex        =   6
-         Top             =   360
-         Width           =   255
-      End
-      Begin VB.Label InitialMacroName 
-         Caption         =   "(none)"
-         Height          =   255
-         Left            =   120
-         TabIndex        =   13
-         Top             =   360
-         Width           =   3015
-      End
+      Top             =   4740
+      Width           =   915
    End
    Begin VB.Frame Frame2 
       Caption         =   "Initial files to load"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   2655
-      Left            =   120
+      Left            =   60
       TabIndex        =   0
-      Top             =   960
+      Top             =   60
       Width           =   5775
       Begin VB.CommandButton RemoveFile 
          Caption         =   "&Remove"
@@ -234,7 +173,9 @@ Begin VB.Form frmPreferences
    End
 End
 Attribute VB_Name = "frmPreferences"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 Dim Starting As Boolean
@@ -266,18 +207,11 @@ Private Sub FOV_Click()
     End If
 End Sub
 
-Private Sub NoStartupMac_Click()
-    InitialMacroName.Caption = "(none)"
-End Sub
-
 Private Sub Ok_Click()
     Dim i As Integer
     '
     Ed.AutoSaveTime = Val(AutoTime.Text) ' May be 0
     Ed.AutoUnique = AutoUnique.Value
-    '
-    Ed.InitialMacro = InitialMacroName.Caption
-    If InitialMacroName.Caption = "(none)" Then Ed.InitialMacro = ""
     '
     Ed.InitialFiles = ""
     For i = 0 To InitialFiles.ListCount - 1
@@ -311,9 +245,6 @@ Private Sub Form_Load()
         End If
         If T <> "" Then InitialFiles.AddItem (T)
     Loop Until T = ""
-    '
-    InitialMacroName.Caption = Ed.InitialMacro
-    If Ed.InitialMacro = "" Then InitialMacroName.Caption = "(none)"
     '
     AutoUnique.Value = Ed.AutoUnique
     '
@@ -350,23 +281,3 @@ Private Sub RemoveFile_Click()
     End If
 End Sub
 
-Private Sub StartupMacPick_Click()
-    '
-    ' Dialog for "Pick Macro":
-    '
-    frmDialogs.MacroPick.filename = InitialMacroName.Caption
-    If InitialMacroName.Caption = "" Then frmDialogs.MacroPick.filename = ""
-    '
-    On Error GoTo Skip
-    Ed.Server.Disable
-    frmDialogs.MacroPick.ShowOpen 'Modal File-Open Box
-    '
-    Call UpdateDialog(frmDialogs.MacroPick)
-    If (frmDialogs.MacroPick.filename <> "") Then
-        InitialMacroName.Caption = frmDialogs.MacroPick.filename
-    Else
-        InitialMacroName.Caption = "(none)"
-    End If
-Skip:
-    Ed.Server.Enable
-End Sub

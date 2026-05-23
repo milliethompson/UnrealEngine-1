@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnPlatfm.cpp: All generic, platform-specific routines-specific routines.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -12,6 +12,7 @@
 #include <float.h>
 #include <new.h>
 #include <direct.h>
+#include <malloc.h>
 
 #include "UnWn.h"
 #include "Unreal.h"
@@ -19,12 +20,11 @@
 #include "UnPswd.h"
 #include "Net.h"
 
-#include "UnInput.h"
-#include "UnAction.h"
-
 /*-----------------------------------------------------------------------------
 	Globals.
 -----------------------------------------------------------------------------*/
+
+#define TRACK_ALLOCS 1
 
 //
 // An entry that tracks one allocated memory block.
@@ -32,8 +32,7 @@
 class FTrackedAllocation
 {
 public:
-	void				*AlignedPtr;
-	void				*BasePtr;
+	void				*Ptr;
 	int					Size;
 	char				Name[NAME_SIZE];
 	FTrackedAllocation	*Next;
@@ -44,6 +43,8 @@ int CDECL UnrealAllocationErrorHandler(size_t);
 int SlowLog=0,SlowClosed=0;
 QWORD FGlobalPlatform_PerformanceFrequency;
 FLOAT FGlobalPlatform_CpuSpeed;
+
+void FGlobalPlatform_MemoryStatus(FOutputDevice &Out);
 
 /*-----------------------------------------------------------------------------
 	FGlobalPlatform Command line.
@@ -64,16 +65,7 @@ int FGlobalPlatform::Exec(const char *Cmd,FOutputDevice *Out)
 		}
 		else return 0;
 	}
-	else if( GetCMD(&Str,"STATUS") )
-	{
-		if( GetCMD(&Str,"APP") || !Str[0] )
-		{
-			Out->Logf("   APP - Alive and well");
-			return Str[0]!=0;
-		}
-		else return 0;
-	}
-	else if( GetCMD(&Str,"EXIT") )
+	if( GetCMD(&Str,"EXIT") )
 	{
 		Out->Log("Closing by request");
 		RequestExit();
@@ -81,11 +73,16 @@ int FGlobalPlatform::Exec(const char *Cmd,FOutputDevice *Out)
 	}
 	else if (GetCMD(&Str,"MEM") )
 	{
+		FGlobalPlatform_MemoryStatus(*Out);
+
+		int All = GetCMD(&Str,"ALL");
 		int Count=0,Size=0;
 		FTrackedAllocation *A = GTrackedAllocations;
 
 		while( A )
 		{
+			if( All )
+				Out->Logf("  %s - %i",A->Name,A->Size);
 			Count++;
 			Size += A->Size;
 			A = A->Next;
@@ -177,28 +174,41 @@ void FGlobalPlatform::GetMemoryInfo(int *MemoryInUse,int *MemoryAvailable)
 //
 // Intel CPUID.
 //
-void FGlobalPlatform_CPUID(int i,DWORD *A,DWORD *B,DWORD *C,DWORD *D)
+void FGlobalPlatform_CPUID( int i, DWORD *A, DWORD *B, DWORD *C, DWORD *D )
 {
-	guard(FGlobalPlatform_CPUID);
- 	__asm
+	try
 	{
-		mov eax,[i]
-		_emit 0x0f
-		_emit 0xa2
+ 		__asm
+		{			
+			mov eax,[i]
+			_emit 0x0f
+			_emit 0xa2
 
-		mov edi,[A]
-		mov [edi],eax
+			mov edi,[A]
+			mov [edi],eax
 
-		mov edi,[B]
-		mov [edi],ebx
+			mov edi,[B]
+			mov [edi],ebx
 
-		mov edi,[C]
-		mov [edi],ecx
+			mov edi,[C]
+			mov [edi],ecx
 
-		mov edi,[D]
-		mov [edi],edx
+			mov edi,[D]
+			mov [edi],edx
+
+			mov eax,0
+			mov ebx,0
+			mov ecx,0
+			mov edx,0
+			mov esi,0
+			mov edi,0
+		}
 	}
-	unguard;
+	catch(...)
+	{
+		debugf( "CPUID failed!" );
+		*A = *B = *C = *D = 0;
+	}
 }
 
 /*-----------------------------------------------------------------------------
@@ -255,16 +265,15 @@ int FGlobalPlatform::PasswordDialog(const char *Title,const char *Prompt,char *N
 //
 // Add a new allocation to the list of tracked allocations.
 //
-void FGlobalPlatform_AddTrackedAllocation(void *AlignedPtr,void *BasePtr,int Size,char *Name)
+void FGlobalPlatform_AddTrackedAllocation(void *Ptr,int Size,char *Name)
 {
 	guard(FGlobalPlatform_AddTrackedAllocation);
 
 	FTrackedAllocation *A = new FTrackedAllocation;
 
-	A->AlignedPtr	= AlignedPtr;
-	A->BasePtr		= BasePtr;
-	A->Size			= Size;
-	A->Next			= GTrackedAllocations;
+	A->Ptr		= Ptr;
+	A->Size		= Size;
+	A->Next		= GTrackedAllocations;
 
 	strncpy(A->Name,Name,NAME_SIZE); A->Name[31]=0;
 
@@ -275,8 +284,9 @@ void FGlobalPlatform_AddTrackedAllocation(void *AlignedPtr,void *BasePtr,int Siz
 
 //
 // Delete an existing allocation from the list.
+// Returns the original (pre-alignment) pointer.
 //
-void *FGlobalPlatform_DeleteTrackedAllocation(void *AlignedPtr)
+void *FGlobalPlatform_DeleteTrackedAllocation(void *Ptr)
 {
 	guard(FGlobalPlatform_DeleteTrackedAllocation);
 
@@ -285,9 +295,9 @@ void *FGlobalPlatform_DeleteTrackedAllocation(void *AlignedPtr)
 
 	while( A )
 	{
-		if( A->AlignedPtr == AlignedPtr )
+		if( A->Ptr == Ptr )
 		{
-			void *Result = A->BasePtr;
+			void *Result = A->Ptr;
 			*PrevLink = A->Next;
 			delete A;
 			return Result;
@@ -333,14 +343,11 @@ void FGlobalPlatform::Init(char *ThisCmdLine, char *BaseDir)
 
 		static char *OurLogEventNames[LOG_MAX] =
 		{
-			"None",		"Info",    "Critical","Win",
-			"Net",      "Ed",      "Rend",    "File",
-			"Audio",    "Res",     "Actor",   "Server",
-			"Bug",      "Init",    "Exit",    "Bsp",
-			"Trans",    "Cmd",     "Play",    "Chat",
-			"Whisper",  "Session", "Client",  "ComeGo",
-			"Console",  "Error",   "Task",    "Debug",
-			"Script"
+			"None",		"Info",		"Critical",	"Actor",
+			"Debug",	"Init",		"Exit",		"Cmd",
+			"Play",		"Chat",		"Whisper",	"Session",
+			"Client",	"ComeGo",	"Console",	"ExecError",
+			"Problem",	"ScriptWarn","ScriptLog"
 		};
 		PlatformVersion	= PLATFORM_VERSION;
 		hWndLog			= 0;
@@ -357,10 +364,7 @@ void FGlobalPlatform::Init(char *ThisCmdLine, char *BaseDir)
 		LogFile			= NULL;
 
 		// Features present.
-		MMX				= 0;
-		PentiumPro		= 0;
-		Extra2			= 0;
-		Extra3			= 0;
+		Features		= 0;
 
 		if (mystrstr(CmdLine,"-DEBUG")) Debugging=1;
 		if (mystrstr(CmdLine,"-debug")) Debugging=1;
@@ -374,6 +378,9 @@ void FGlobalPlatform::Init(char *ThisCmdLine, char *BaseDir)
 		strcpy(StartingPath,	BaseDir);
 		strcpy(DataPath,		BaseDir);
 		strcpy(LogFname,		LOG_PARTIAL);
+
+		// Math.
+		EnableFastMath(0);
 	}
 	catch(...)
 	{
@@ -390,6 +397,9 @@ void FGlobalPlatform::Init(char *ThisCmdLine, char *BaseDir)
 void FGlobalPlatform::Startup()
 {
 	guard(FGlobalPlatform::Startup);
+
+	// Command line.
+	Logf(LOG_Init,"Command line: %s",CmdLine);
 
 	// Check Windows version.
 	OSVERSIONINFO Version; Version.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
@@ -424,8 +434,8 @@ void FGlobalPlatform::Startup()
 	else if ((FPState&_RC_DOWN)==_RC_DOWN)	strcat(StateDescr," Down");
 	else strcat(StateDescr," Near");
 
-	if ((FPState&_PC_24)==_PC_24)			strcat(StateDescr," 24-bit");
-	else if ((FPState&_PC_24)==_PC_53)		strcat(StateDescr," 53-bit");
+	if ((FPState&_MCW_PC)==_PC_24)			strcat(StateDescr," 24-bit");
+	else if ((FPState&_MCW_PC)==_PC_53)		strcat(StateDescr," 53-bit");
 	else									strcat(StateDescr," 64-bit");
 
 	Log(LOG_Init,StateDescr);
@@ -434,7 +444,6 @@ void FGlobalPlatform::Startup()
 	LARGE_INTEGER lFreq;
 	QueryPerformanceFrequency(&lFreq);
 	FGlobalPlatform_PerformanceFrequency = ((QWORD)lFreq.LowPart) + ((QWORD)lFreq.HighPart<<32); 
-	Logf(LOG_Init,"CPU speed is approximately %4.2f mHz",0.60 + (FLOAT)(SQWORD)FGlobalPlatform_PerformanceFrequency/1000000.0);
 
 	INT Cycles=0;
 	DWORD Q1 = MicrosecondTime();
@@ -451,47 +460,48 @@ void FGlobalPlatform::Startup()
 	Logf(LOG_Init,"CPU Page size=%i, Processors=%i",SI.dwPageSize,SI.dwNumberOfProcessors);
 
 	// Check processor version with CPUID.
-	DWORD A,B,C,D;
+	DWORD A=0,B=0,C=0,D=0;
 
 	FGlobalPlatform_CPUID(0,&A,&B,&C,&D);
-	char Brand[13]="",*Model="Unknown Processor Type",Features[256]="";
+	char Brand[13]="", *Model, FeatStr[256]="";
 
-	Brand[ 0]=B;
-	Brand[ 1]=B>>8;
-	Brand[ 2]=B>>16;
-	Brand[ 3]=B>>24;
-	Brand[ 4]=D;
-	Brand[ 5]=D>>8;
-	Brand[ 6]=D>>16;
-	Brand[ 7]=D>>24;
-	Brand[ 8]=C;
-	Brand[ 9]=C>>8;
-	Brand[10]=C>>16;
-	Brand[11]=C>>24;
-	Brand[12]=0;
+	Brand[ 0] = B;
+	Brand[ 1] = B>>8;
+	Brand[ 2] = B>>16;
+	Brand[ 3] = B>>24;
+	Brand[ 4] = D;
+	Brand[ 5] = D>>8;
+	Brand[ 6] = D>>16;
+	Brand[ 7] = D>>24;
+	Brand[ 8] = C;
+	Brand[ 9] = C>>8;
+	Brand[10] = C>>16;
+	Brand[11] = C>>24;
+	Brand[12] = 0;
 	
-	FGlobalPlatform_CPUID(1,&A,&B,&C,&D);
-	switch ((A>>8)&0x000f)
+	FGlobalPlatform_CPUID( 1, &A, &B, &C, &D );
+	switch( (A>>8) & 0x000f )
 	{
-		case 4:  Model="486-class processor"; break;
-		case 5:  Model="Pentium-class processor"; break;
+		case 4:  Model="486-class processor";        break;
+		case 5:  Model="Pentium-class processor";    break;
 		case 6:  Model="PentiumPro-class processor"; break;
-		case 7:  Model="P7-class processor"; break;
+		case 7:  Model="P7-class processor";         break;
+		default: Model="Unknown processor";          break;
 	}
-	if (D&0x00800000)
+	if( D & 0x00800000 )
 	{
-		strcat(Features,"MMX ");
-		MMX     = 1;
+		strcat( FeatStr, "MMX " );
+		Features |= PLAT_MMX;
 	}
-	if (D&0x00008000)
+	if( D & 0x00008000 )
 	{
-		PentiumPro = 1;
-		strcat(Features,"CMov ");
+		Features |= PLAT_PentiumPro;
+		strcat( FeatStr, "CMov " );
 	}
-	if (D&0x00000001) strcat(Features,"FPU ");
-	if (D&0x00000010) strcat(Features,"TimeStamp ");
-	Logf(LOG_Init,"CPU Detected: %s (%s)",Model,Brand);
-	Logf(LOG_Init,"CPU Features: %s",Features);
+	if( D & 0x00000001 ) strcat( FeatStr, "FPU " );
+	if( D & 0x00000010 ) strcat( FeatStr, "TimeStamp " );
+	Logf( LOG_Init, "CPU Detected: %s (%s)", Model, Brand );
+	Logf( LOG_Init, "CPU Features: %s", FeatStr );
 
 	// Handle operator new allocation errors.
 	_set_new_handler(UnrealAllocationErrorHandler);
@@ -507,6 +517,7 @@ void FGlobalPlatform::Startup()
 //
 int FGlobalPlatform::EnableFastMath(int Enable)
 {
+	guard(FGlobalPlatform::EnableFastMath);
 	if( Enable )
 	{
 		// Fast, low precision, round down (for rendering).
@@ -518,6 +529,17 @@ int FGlobalPlatform::EnableFastMath(int Enable)
 		unsigned int FPState = _controlfp (_PC_64, _MCW_PC);
 	}
 	return Enable;
+	unguard;
+}
+
+//
+// See whether a floating point number is a not-a-number.
+//
+int FGlobalPlatform::IsNan( FLOAT f )
+{
+	guard(FGlobalPlatform::IsNan);
+	return _isnan(f);
+	unguard;
 }
 
 //
@@ -549,7 +571,7 @@ void FGlobalPlatform::CheckAllocations()
 //
 // Lookup the address of a DLL function
 //
-void *FGlobalPlatform::GetProcAddress(char *ModuleName, char *ProcName,int Checked)
+void *FGlobalPlatform::GetProcAddress( const char *ModuleName, const char *ProcName,int Checked )
 {
 	guard(FGlobalPlatform::GetProcAddress);
 
@@ -557,29 +579,32 @@ void *FGlobalPlatform::GetProcAddress(char *ModuleName, char *ProcName,int Check
 	void *Result;
 
 	HMODULE			hModule = GetModuleHandle(ModuleName);
-	if (!hModule)	hModule = LoadLibrary(ModuleName);
+	if( !hModule )	hModule = LoadLibrary    (ModuleName);
 
 	if( !hModule)  
 	{
-		if (Checked) Errorf("Couldn't load module %s",ModuleName);
+		if( Checked )
+			Errorf("Couldn't load module %s",ModuleName);
 		return NULL;
 	}
-	Result  = (void *)::GetProcAddress(hModule,ProcName);
-	if( Result ) return Result;
+	Result = (void *)::GetProcAddress(hModule,ProcName);
+	if( Result )
+		return Result;
 
 	// Actor processing function pointer.
-	sprintf(TempName,"?A%sProcess@@3PAXA",ProcName);
+	sprintf(TempName,"?%s@@3VUClass@@A",ProcName);
 	Result = (void *)::GetProcAddress(hModule,TempName);
-	if (Result) return Result;
+	if( Result )
+		return Result;
 
-	if (Checked) Errorf ("Couldn't find address of %s in %s",ProcName,ModuleName);
+	if( Checked )
+		Errorf( "Couldn't find address of %s in %s",ProcName,ModuleName );
 	return NULL;
-
 	unguard;
 }
 
 //
-// Break the debugger
+// Break the debugger.
 //
 void FGlobalPlatform::DebugBreak()
 {
@@ -603,7 +628,7 @@ QWORD FGlobalPlatform::MicrosecondTime()
 
 	LARGE_INTEGER Numerator;
 
-	if (!QueryPerformanceCounter(&Numerator)) 
+	if( !QueryPerformanceCounter(&Numerator) )
 		App.Platform.Error ("FGlobalPlatform::Time: No performance counter exists");
 
 	QWORD N = (QWORD)Numerator.LowPart + (((QWORD)Numerator.HighPart)<<32);
@@ -689,7 +714,7 @@ void FGlobalPlatform::LaunchURL(char *URL, char *Extra)
 
 	Logf("LaunchURL %s",URL);
 
-	if( ShellExecute(App.Dialog->m_hWnd,"open",WEB_LINK_FNAME,"","",SW_SHOWNORMAL)<=(HINSTANCE)32 )
+	if( ShellExecute(App.Dialog->m_hWnd,"open",URL_WEB,"","",SW_SHOWNORMAL)<=(HINSTANCE)32 )
 	{
 		MessageBox
 		(
@@ -707,53 +732,130 @@ void FGlobalPlatform::LaunchURL(char *URL, char *Extra)
 
 //
 // Create a file mapping object, set its address, and return its handle.
+// Call with MaxSize=0 to open a read-only.
+// Returns NULL if file not found.
 //
-DWORD FGlobalPlatform::CreateFileMapping(const char *Name, int MaxSize, BYTE **Address)
+BYTE *FGlobalPlatform::CreateFileMapping( FFileMapping &File, const char *Name, int MaxSize )
 {
 	guard(FGlobalPlatform::CreateFileMapping);
 
-	DWORD Result;
-	Result = (DWORD)::CreateFileMapping((HANDLE)0xFFFFFFFF,NULL,PAGE_READWRITE,0,MaxSize,Name);
-	if (Result==NULL) Error ("CreateFileMapping failed");
+	// Init file mapping struct.
+	strcpy( File.Filename, Name );
+	File.hFile        = NULL;
+	File.hFileMapping = NULL;
+	File.Base         = NULL;
 
-	*Address = (BYTE *)MapViewOfFile((HANDLE)Result,FILE_MAP_ALL_ACCESS,0,0,0);
+	// Create or open the file.
+	// Note: Win32 bug prevents using read-only file mappings.
+	guard(CreateFile);
+	File.hFile = CreateFile
+	(
+		Name,
+		MaxSize ? GENERIC_READ | GENERIC_WRITE   : GENERIC_READ,
+		MaxSize ? 0                              : FILE_SHARE_READ,
+		NULL,
+		MaxSize ? CREATE_ALWAYS                  : OPEN_EXISTING,
+		MaxSize ? FILE_FLAG_SEQUENTIAL_SCAN      : FILE_FLAG_RANDOM_ACCESS,
+		NULL
+	);
+	unguard;
+	if( File.hFile == NULL )
+	{
+		guard(CloseFile);
+		CloseFileMapping( File, MaxSize ? -1 : 0 );
+		return NULL;
+		unguard;
+	}
 
-	if ((int)*Address&15) Error ("CreateFileMapping is unaligned");
-   	return Result;
+	// Make the file into a file mapping.
+	guard(CreateFileMapping);
+	File.hFileMapping = ::CreateFileMapping
+	( 
+		File.hFile,
+		NULL, 
+		MaxSize ? PAGE_READWRITE : PAGE_READONLY,
+		0, 
+		MaxSize, 
+		NULL
+	);
+	unguard;
+	if( File.hFileMapping == NULL  )
+	{
+		guard(CloseFileMapping);
+		CloseFileMapping( File, MaxSize ? -1 : 0 );
+		return NULL;
+		unguard;
+	}
 
+	// Map the file into memory.
+	guard(MapViewOfFile);
+	File.Base = MapViewOfFile
+	(
+		File.hFileMapping,
+		MaxSize ? FILE_MAP_ALL_ACCESS : FILE_MAP_READ,
+		0,
+		0,
+		0
+	);
+	unguard;
+	if( File.Base == NULL )
+	{
+		guard(CloseFileMapping);
+		CloseFileMapping( File, MaxSize ? -1 : 0 );
+		return NULL;
+		unguard;
+	}
+
+	// Success.
+	checkOutput(((int)File.Base&15)==0);
+	return (BYTE*)File.Base;
 	unguard;
 }
 
 //
 // Close a file mapping object.
+// If Trunc > 0, truncate the file.
+// If Trunc = 0, delete the file.
 //
-void FGlobalPlatform::CloseFileMapping(DWORD FileMappingID)
+void FGlobalPlatform::CloseFileMapping( FFileMapping &File, INT Trunc )
 {
 	guard(FGlobalPlatform::CloseFileMapping);
 
-	CloseHandle ((HANDLE)FileMappingID);
+	if( File.Base         ) UnmapViewOfFile( File.Base         ); File.Base         = NULL;
+	if( File.hFileMapping ) CloseHandle    ( File.hFileMapping ); File.hFileMapping = NULL;
+	if( Trunc > 0         ) SetFilePointer ( File.hFile, Trunc, 0, FILE_BEGIN );
+	if( Trunc > 0         ) SetEndOfFile   ( File.hFile        );
+	if( File.hFile        ) CloseHandle    ( File.hFile        ); File.hFile        = NULL;
+	if( Trunc == 0        ) DeleteFile     ( File.Filename     );
 
 	unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	FGlobalPlatform keyboard implementation.
+	FGlobalPlatform file finding.
 -----------------------------------------------------------------------------*/
 
-//
-// Reset the keyboard state.
-//
-void FGlobalPlatform::ResetKeyboard()
+int FGlobalPlatform::FindFile( const char *In, char *Out )
 {
-	guard(FGlobalPlatform::ResetKeyboard);
+	guard(FGlobalPlatform::FindFile);
+	static const char *Paths[] = FIND_PATHS;
 
-	memset (KeyDown,   0,sizeof(KeyDown));
-	memset (KeyPressed,0,sizeof(KeyDown));
+	// Try file as specified.
+	strcpy( Out, In );
+	if( fsize( Out ) >= 0 )
+		return 1;
 
-	GApp->Input->Reset();
+	// Try all of the predefined paths.
+	for( int i=0; i<ARRAY_COUNT(Paths); i++ )
+	{
+		strcpy( Out, Paths[i] );
+		strcat( Out, In       );
+		if( fsize( Out ) >= 0 )
+			return 1;
+	}
 
-	KnownButtons=0;
-
+	// Not found.
+	return 0;
 	unguard;
 }
 
@@ -767,17 +869,16 @@ void FGlobalPlatform::ResetKeyboard()
 // This code is unguarded because trapped errors will just try
 // to log more errors, resulting in a recursive mess.
 //
-void FGlobalPlatform::Log(ELogType Event,const char *String)
+void FGlobalPlatform::Write( const void *Data,int Length, ELogType Event )
 {
 	if (!LogAlive) 
 		return;
 
-	char	C[256];
-	int		Len;
+	char C[256];
 
-	Len = min (255,strlen(String));
-	strncpy (C,String,Len);
-	C [Len]=0;
+	Length = min (255,Length);
+	strncpy (C,(char *)Data,Length);
+	C[Length]=0;
 
 	if (strchr(C,'\r')) *strchr(C,'\r')=0;
 	if (strchr(C,'\n')) *strchr(C,'\n')=0;
@@ -786,7 +887,7 @@ void FGlobalPlatform::Log(ELogType Event,const char *String)
 
 	if( SlowLog && SlowClosed )
 	{
-		LogFile=fopen(LogFname,"a+t");
+		LogFile = fopen(LogFname,"a+t");
 	}
 	if (Debugging) OutputDebugString(S+"\r\n");
 	if (LogAlive && App.Dialog) App.Dialog->Log(S);
@@ -812,7 +913,7 @@ void FGlobalPlatform::CloseLog()
 	{
 		Log(LOG_Info,LPCSTR(S));
 		fclose(LogFile);
-		LogFile=NULL;
+		LogFile = NULL;
 	}
 }
 
@@ -829,9 +930,9 @@ void FGlobalPlatform::OpenLog(const char *Fname)
 	if (Fname!=NULL)	strcpy(LogFname,Fname);
 
 	// Create new text file for read/write.
-	LogFile=fopen(LogFname,"w+t");
+	LogFile = fopen(LogFname,"w+t");
 
-	if( LogFile==NULL )
+	if( LogFile == NULL )
 	{
 		Log(LOG_Info,"Failed to open log");
 	}
@@ -840,7 +941,7 @@ void FGlobalPlatform::OpenLog(const char *Fname)
 		fputs(
 			"\n"
 			"###############################################\n"
-			"# Unreal, Copyright 1996 Epic MegaGames, Inc. #\n"
+			"# Unreal, Copyright 1997 Epic MegaGames, Inc. #\n"
 			"###############################################\n"
 			"\n",
 			LogFile);
@@ -851,6 +952,31 @@ void FGlobalPlatform::OpenLog(const char *Fname)
 /*-----------------------------------------------------------------------------
 	FGlobalPlatform windows specific routines.
 -----------------------------------------------------------------------------*/
+
+//
+// Show memory status.
+//
+void FGlobalPlatform_MemoryStatus(FOutputDevice &Out)
+{
+	MEMORYSTATUS B; B.dwLength = sizeof(B);
+	GlobalMemoryStatus(&B);
+	Out.Log("Memory status:");
+	Out.Logf
+	(
+		"Total: Phys=%iK Pagef=%iK Virt=%iK",
+		B.dwTotalPhys/1024,
+		B.dwTotalPageFile/1024,
+		B.dwTotalVirtual/1024
+	);
+	Out.Logf
+	(
+		"Avail: Phys=%iK Pagef=%iK Virt=%iK",
+		B.dwTotalPhys/1024,
+		B.dwTotalPageFile/1024,
+		B.dwTotalVirtual/1024
+	);
+	Out.Logf("Load = %i%%",B.dwMemoryLoad);
+}
 
 //
 // Set the parent of the main server/log window.
@@ -893,7 +1019,7 @@ int FGlobalPlatform::MessageBox(const char *Text,const char *Title,int YesNo)
 // Put up a message box for debugging.
 // Not guarded.
 //
-int VARARGS FGlobalPlatform::DebugBoxf(char *Fmt,...)
+int VARARGS FGlobalPlatform::DebugBoxf( const char *Fmt, ... )
 {
 	char TempStr[4096];
 	va_list  ArgPtr;
@@ -908,12 +1034,12 @@ int VARARGS FGlobalPlatform::DebugBoxf(char *Fmt,...)
 //
 // Send a callback value to the UnrealEd client.
 //
-void FGlobalPlatform::EdCallback(WORD Code,WORD Param)
+void FGlobalPlatform::EdCallback( WORD Code, WORD Param )
 {
 	guard(FGlobalPlatform::EdCallback);
 
 	if( App.hWndCallback!=NULL )
-		PostMessage(App.hWndCallback,WM_CHAR,32+Code,0);
+		PostMessage( App.hWndCallback, WM_CHAR, 32+Code, 0 );
 	
 	unguard;
 }
@@ -955,11 +1081,10 @@ void FGlobalPlatform::Hide()
 	FGlobalPlatform memory allocation.
 -----------------------------------------------------------------------------*/
 
-//
 // Allocate memory. Tracks all memory allocations.
-//
-void *VARARGS FGlobalPlatform::Malloc( int Size,char *Fmt,... )
+void *VARARGS FGlobalPlatform::Malloc( int Size,const char *Fmt,... )
 {
+#if CHECK_ALLOCS
 	char TempStr[4096];
 	va_list  ArgPtr;
 
@@ -969,54 +1094,33 @@ void *VARARGS FGlobalPlatform::Malloc( int Size,char *Fmt,... )
 
 	// Can't enclose variable arguments in GUARD/UNGUARD block.
 	guard(FGlobalPlatform::Malloc);
+	checkInput(Size>=0);
 
-	if (Size<0)
-		Errorf("Negative size %i: %s",Size,TempStr);
-
-	void *Ptr = malloc(Size);
-	if (!Ptr)
-		Errorf("Out of memory: %s",TempStr);
-
-	FGlobalPlatform_AddTrackedAllocation(Ptr,Ptr,Size,TempStr);
-
-	return Ptr;
+	if( Size == 0 )
+	{
+		return NULL;
+	}
+	else
+	{
+		void *Ptr = malloc(Size);
+		if( !Ptr ) Errorf("Out of memory: %s",TempStr);
+		FGlobalPlatform_AddTrackedAllocation(Ptr,Size,TempStr);
+		return Ptr;
+	}
+	unguardf(("(%i %s)",Size,TempStr));
+#else
+	guard(FGlobalPlatform::Malloc);
+	return malloc(Size);
 	unguard;
-}
-
-//
-// Allocate memory aligned on the specified power-of-two boundary.
-//
-void *VARARGS FGlobalPlatform::MallocAligned(int Size,int Alignment,char *Fmt,...)
-{
-	char TempStr[4096];
-	va_list  ArgPtr;
-
-	va_start (ArgPtr,Fmt);
-	vsprintf (TempStr,Fmt,ArgPtr);
-	va_end   (ArgPtr);
-
-	guard(FGlobalPlatform::MallocAligned);
-
-	if (Size<0)
-		Errorf("Negative size %i: %s",Size,TempStr);
-
-	void *BasePtr		= malloc(Size+65535);
-	void *AlignedPtr	= (void *)(((int)BasePtr+65535) & ~65535);
-	
-	if (!BasePtr) 
-		Errorf("Out of memory: %s",TempStr);
-
-	FGlobalPlatform_AddTrackedAllocation(AlignedPtr,BasePtr,Size,TempStr);
-
-	return AlignedPtr;
-	unguard;
+#endif
 }
 
 //
 // Reallocate memory.
 //
-void *VARARGS FGlobalPlatform::Realloc(void *Ptr,int NewSize,char *Fmt,...)
+void *VARARGS FGlobalPlatform::Realloc( void *Ptr, int NewSize, const char *Fmt,... )
 {
+#if CHECK_ALLOCS
 	char TempStr[4096];
 	va_list  ArgPtr;
 
@@ -1025,31 +1129,64 @@ void *VARARGS FGlobalPlatform::Realloc(void *Ptr,int NewSize,char *Fmt,...)
 	va_end   (ArgPtr);
 
 	guard(FGlobalPlatform::Realloc);
+	checkInput(NewSize>=0);
 
-	if (Ptr) 
-		FGlobalPlatform_DeleteTrackedAllocation(Ptr);
-	
-	void *NewPtr = realloc(Ptr,NewSize);
-	
-	if (NewPtr) 
-		FGlobalPlatform_AddTrackedAllocation(NewPtr,NewPtr,NewSize,TempStr);
-
-	return NewPtr;
-
+	if( Ptr == NULL )
+	{
+		if( NewSize == 0 )
+		{
+			return NULL;
+		}
+		else
+		{
+			Ptr = malloc(NewSize);
+			if( !Ptr ) Errorf( "Out of memory: %s", TempStr );
+			FGlobalPlatform_AddTrackedAllocation( Ptr, NewSize, TempStr );
+			return Ptr;
+		}
+	}
+	else
+	{
+		if( NewSize == 0 )
+		{
+			FGlobalPlatform_DeleteTrackedAllocation( Ptr );
+			return NULL;
+		}
+		else
+		{
+			for( FTrackedAllocation *A = GTrackedAllocations; A; A=A->Next )
+			{
+				if( A->Ptr == Ptr )
+					break;
+			}
+			if( !A ) appErrorf( "Allocation %s not found ",TempStr);
+			A->Ptr = realloc( Ptr, NewSize );
+			A->Size = NewSize;
+			return A->Ptr;
+		}
+	}
+	unguardf(("(%i %s)",NewSize,TempStr));
+#else
+	guard(FGlobalPlatform::Realloc);
+	return realloc( Ptr, NewSize );
 	unguard;
+#endif
 }
 
 //
 // Free memory.
 //
-void FGlobalPlatform::Free(void *Ptr)
+void FGlobalPlatform::Free( void *Ptr )
 {
+#if CHECK_ALLOCS
 	guard(FGlobalPlatform::Free);
-	
-	if( Ptr )
-		free(FGlobalPlatform_DeleteTrackedAllocation(Ptr));
-
+	if( Ptr ) free(FGlobalPlatform_DeleteTrackedAllocation(Ptr));
 	unguard;
+#else
+	guard(FGlobalPlatform::Free);
+	free(Ptr);
+	unguard;
+#endif
 }
 
 /*-----------------------------------------------------------------------------
@@ -1079,10 +1216,12 @@ void FGlobalPlatform::ShutdownAfterError()
 {
 	try
 	{
-		if (InSlowTask)
-			DestroyWindow ((HWND)hWndSlowTask);
+		GuardTrap = 1;
+
+		if( InSlowTask )
+			DestroyWindow( (HWND)hWndSlowTask );
 		
-		if (ServerAlive)
+		if( ServerAlive )
 		{
 			ServerAlive = 0;
 			debug(LOG_Exit,"FGlobalPlatform::ShutdownAfterError");
@@ -1094,13 +1233,12 @@ void FGlobalPlatform::ShutdownAfterError()
 		try
 		{
 			// Double fault.
-	  		Log(LOG_Critical,"(Double fault in FGlobalPlatform::ShutdownAfterError)");
+	  		Log(LOG_Critical,"Double fault in FGlobalPlatform::ShutdownAfterError");
 		}
 		catch(...)
 		{
-			// Triple fault.
-			// System is so screwed up that this problem can't possibly be handled.
-			_exit(1);
+			// Triple fault. We are hosed.
+			ExitProcess(1);
 		}
 	}
 }
@@ -1110,7 +1248,7 @@ void FGlobalPlatform::ShutdownAfterError()
 // calling stack for debugging.
 // Not guarded.
 //
-void FGlobalPlatform::Error (const char *Msg)
+void FGlobalPlatform::Error( const char *Msg )
 {
 	if( !App.Dialog )
 	{
@@ -1132,7 +1270,6 @@ void FGlobalPlatform::Error (const char *Msg)
 	else
 	{
 		ShutdownAfterError();
-		App.Timer.Disable();
 
 	  	Log(LOG_Critical,"appError triggered:");
 	  	Log(LOG_Critical,Msg);
@@ -1172,8 +1309,9 @@ void VARARGS FGlobalPlatform::GuardMessagef(const char *Fmt, ...)
 	va_end   (ArgPtr);
 
 	Log(LOG_Critical,TempStr);
-	if (GuardTrap) strcat(ErrorHist," <- ");
+	if( GuardTrap ) strcat(ErrorHist," <- ");
 	strcat(ErrorHist,TempStr);
+	GuardTrap = 1; 
 }
 
 /*-----------------------------------------------------------------------------
@@ -1199,36 +1337,20 @@ BOOL FAR PASCAL SlowProc( HWND hWnd, WORD Msg, WPARAM wParam, LPARAM lParam )
 {
 	guard(SlowProc);
 
-	RECT 	Desk,This;
-	int  	Percent;
-
-	if (!GSlowTaskInfo.Denominator) Percent = 0;
-	else Percent = (100*GSlowTaskInfo.Numerator)/GSlowTaskInfo.Denominator;
-
+	int Percent = GSlowTaskInfo.Denominator ? (100*GSlowTaskInfo.Numerator) / GSlowTaskInfo.Denominator : 0;
 	switch( Msg )
 	{
 		case WM_INITDIALOG:
 			guard(WM_INITDIALOG);
-
 			App.Platform.hWndSlowTask = (DWORD)hWnd;
-
 			if( GSlowTaskInfo.Cancelable )
 			{
 				// Haven't found a way to handle cancellable operations
-				// without reentrancy.
+				// without reentrancy problems.
 			}
-			else
-			{
-			}
-
-			SetDlgItemText( hWnd,IDC_STATTEXT,GSlowTaskInfo.Status );
-			SendMessage( GetDlgItem(hWnd,IDC_PROGRESS1),PBM_SETPOS,(WPARAM)Percent,(LPARAM)0 );
-			SetWindowText( hWnd,GSlowTaskInfo.Title );
-
-			// Center window on screen.
-			GetClientRect(GetDesktopWindow(),&Desk);
-			GetClientRect(hWnd,              &This);
-
+			SetDlgItemText( hWnd, IDC_STATTEXT, GSlowTaskInfo.Status );
+			SendMessage( GetDlgItem(hWnd,IDC_PROGRESS1), PBM_SETPOS, (WPARAM)Percent, (LPARAM)0 );
+			SetWindowText( hWnd, GSlowTaskInfo.Title );
 			return TRUE;
 			unguard;
 		case WM_PAINT:
@@ -1236,15 +1358,17 @@ BOOL FAR PASCAL SlowProc( HWND hWnd, WORD Msg, WPARAM wParam, LPARAM lParam )
 			SetDlgItemText	(hWnd,IDC_STATTEXT,GSlowTaskInfo.Status);
 			SendMessage		(GetDlgItem(hWnd,IDC_PROGRESS1),PBM_SETPOS,(WPARAM)Percent,(LPARAM)0);
 			SetWindowText	(hWnd,GSlowTaskInfo.Title);
-			break; // Continue with default processing.
+			// Continue with default processing.
+			return FALSE;
 			unguard;
 		case WM_DESTROY:
 			guard(WM_DESTROY);
 			return TRUE;
 			unguard;
+		default:
+			// Default dialog processing.
+			return FALSE;
 	}
-	// Default dialog processing.
-	return FALSE;
 	unguard;
 }
 
@@ -1252,29 +1376,26 @@ BOOL FAR PASCAL SlowProc( HWND hWnd, WORD Msg, WPARAM wParam, LPARAM lParam )
 // Begin a slow task, optionally bringing up a progress bar.  Nested calls may be made
 // to this function, and the dialog will only go away after the last slow task ends.
 //
-void FGlobalPlatform::BeginSlowTask(const char *Task,int StatusWindow, int Cancelable)
+void FGlobalPlatform::BeginSlowTask( const char *Task,int StatusWindow, int Cancelable )
 {
 	guard(FGlobalPlatform::BeginSlowTask);
-	if( (InSlowTask==0) && !CameraManager->FullscreenCamera )
-	{
-		App.Timer.Disable();
 
+	if( InSlowTask==0 && !CameraManager->FullscreenCamera )
+	{
 		hWndSlowTask = NULL;
 
 		// Set cursor to hourglass.
-		CameraManager->SetModeCursor(NULL);
-		
+		CameraManager->SetModeCursor( NULL );		
 		if( StatusWindow )
 		{
-			strcpy (GSlowTaskInfo.Title,Task);
-			strcpy (GSlowTaskInfo.Status,"");
+			strcpy( GSlowTaskInfo.Title, Task );
+			strcpy( GSlowTaskInfo.Status, "" );
 			GSlowTaskInfo.Numerator   = 0;
 			GSlowTaskInfo.Denominator = 0;
 			GSlowTaskInfo.Cancelable  = Cancelable;
-			if( !CreateDialog(AfxGetInstanceHandle(),MAKEINTRESOURCE(IDD_SLOWTASK),(HWND)hWndParent,(DLGPROC)SlowProc) )
-			{
-				appErrorf("CreateDialog failed %i",GetLastError());
-			}
+
+			if( !CreateDialog( AfxGetInstanceHandle(), MAKEINTRESOURCE(IDD_SLOWTASK), (HWND)hWndParent, (DLGPROC)SlowProc ) )
+				appErrorf( "CreateDialog failed %i", GetLastError() );
 		}
 	}
 	InSlowTask++;
@@ -1290,7 +1411,7 @@ void FGlobalPlatform::EndSlowTask()
 	
 	if( InSlowTask==0 )
 	{
-		debug (LOG_Win,"EndSlowTask: Not begun");
+		debug( LOG_Info, "EndSlowTask: Not begun" );
 		return;
 	}
 	InSlowTask--;
@@ -1298,10 +1419,10 @@ void FGlobalPlatform::EndSlowTask()
 	{
 		// Restore cursor to original state.
 		GCameraManager->SetModeCursor(NULL);
-		if (hWndSlowTask) 
-			DestroyWindow ((HWND)hWndSlowTask);
-		App.Timer.Enable();
-		};
+		if( hWndSlowTask )
+			DestroyWindow( (HWND)hWndSlowTask );
+		hWndSlowTask = NULL;
+	}
 	unguard;
 }
 
@@ -1326,8 +1447,9 @@ int FGlobalPlatform::StatusUpdate(const char *Str, int Numerator, int Denominato
 			strcpy (GSlowTaskInfo.Status,Str);
 			SetDlgItemText((HWND)hWndSlowTask,IDC_STATTEXT,GSlowTaskInfo.Status);
 		}
-		SendMessage(GetDlgItem((HWND)hWndSlowTask,IDC_PROGRESS1),PBM_SETPOS,(WPARAM)Percent,(LPARAM)0);
+		SendMessage( GetDlgItem((HWND)hWndSlowTask, IDC_PROGRESS1), PBM_SETPOS, (WPARAM)Percent, (LPARAM)0 );
 	}
+
 	// Should return 0 if cancel is desired, but cancel isn't implemented.
 	return 1;
 	unguard;

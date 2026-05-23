@@ -1,7 +1,7 @@
 /*=============================================================================
 	NetPrv.h: Unreal networking, private (non engine-accessible) header
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -48,7 +48,7 @@ class NServerAd
 // startup, shutdown, and moderation of driver-specific items.  This
 // is a virtual base class from which specific drivers are derived.
 //
-class NDriver : public FTask
+class NDriver
 	{
 	public:
 	//
@@ -68,6 +68,7 @@ class NDriver : public FTask
 	virtual void Exit();
 	//
 	virtual int Exec(const char *Cmd,FOutputDevice *Out=GApp)=0;
+	virtual void Tick()=0;
 	//
 	virtual int CanHandleURL(char *ServerURL)=0;
 	//

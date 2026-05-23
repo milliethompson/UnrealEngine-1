@@ -1,35 +1,30 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmTwoDee 
    Appearance      =   0  'Flat
    BackColor       =   &H00000000&
    Caption         =   "2D Editor"
    ClientHeight    =   5430
-   ClientLeft      =   450
-   ClientTop       =   5040
+   ClientLeft      =   2310
+   ClientTop       =   2655
    ClientWidth     =   7515
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   6030
    HelpContextID   =   127
-   Left            =   390
    LinkTopic       =   "Form4"
-   MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   5424.373
    ScaleMode       =   0  'User
    ScaleWidth      =   7512.791
-   ShowInTaskbar   =   0   'False
-   Top             =   4500
    Visible         =   0   'False
-   Width           =   7635
    Begin VB.CommandButton Command2 
       Appearance      =   0  'Flat
       BackColor       =   &H80000005&
@@ -742,9 +737,14 @@ Begin VB.Form frmTwoDee
          Caption         =   "2D Editor &Help"
       End
    End
+   Begin VB.Menu mnuUndo 
+      Caption         =   "&Undo"
+   End
 End
 Attribute VB_Name = "frmTwoDee"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 Const GWW_HWNDPARENT = (-8)
@@ -838,7 +838,7 @@ End Function
 
 Private Function CheckAngles(MeshNum As Integer, TriNum As Integer) As Integer
 
-Dim a As Double  ' side a                   AA [1]
+Dim A As Double  ' side a                   AA [1]
 Dim b As Double  ' side b                   /\
 Dim c As Double  ' side c                  /  \
                  '                        /    \
@@ -857,7 +857,7 @@ Dim D As Double  ' Distance
     D = Sqr(((Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(2)).X - Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(1)).X) ^ 2) + ((Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(2)).Y - Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(1)).Y) ^ 2))
     c = D
     D = Sqr(((Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(3)).X - Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(2)).X) ^ 2) + ((Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(3)).Y - Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(2)).Y) ^ 2))
-    a = D
+    A = D
     D = Sqr(((Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(1)).X - Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(3)).X) ^ 2) + ((Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(1)).Y - Mesh(MeshNum).Vertex(Mesh(MeshNum).Triangle(TriNum).V(3)).Y) ^ 2))
     b = D
 
@@ -870,9 +870,9 @@ Dim D As Double  ' Distance
     'Only 1 angle needs to be checked to find
     'out if the entire triangle is valid.
     '
-    COSAA = (b ^ 2 + c ^ 2 - a ^ 2) / (2 * b * c)
-    COSAB = (a ^ 2 + c ^ 2 - b ^ 2) / (2 * a * c)
-    COSAC = (a ^ 2 + b ^ 2 - c ^ 2) / (2 * a * b)
+    COSAA = (b ^ 2 + c ^ 2 - A ^ 2) / (2 * b * c)
+    COSAB = (A ^ 2 + c ^ 2 - b ^ 2) / (2 * A * c)
+    COSAC = (A ^ 2 + b ^ 2 - c ^ 2) / (2 * A * b)
 
     'Debug.Print "Cos A: ", COSAA
     'Debug.Print "Cos B: ", COSAB
@@ -1056,18 +1056,18 @@ Private Sub DelSideRef(DelSide As Integer)
 'Search through all the Vertecis and delete the side referecnces to DelSide
 Dim i, j, k, L As Integer
 Dim AlreadyFound As Integer
-Debug.Print "DelSide"
+'Debug.Print "DelSide"
 
     Mesh(CurMesh).Side(DelSide).Exists = False
     For i = 1 To Mesh(CurMesh).NumVertices
         AlreadyFound = False
         For j = 1 To Mesh(CurMesh).Vertex(i).SidesTouching
-        Debug.Print "Index: ", Mesh(CurMesh).Vertex(i).index(1), Mesh(CurMesh).Vertex(i).index(2), Mesh(CurMesh).Vertex(i).index(3), Mesh(CurMesh).Vertex(i).index(4)
+        'Debug.Print "Index: ", Mesh(CurMesh).Vertex(i).index(1), Mesh(CurMesh).Vertex(i).index(2), Mesh(CurMesh).Vertex(i).index(3), Mesh(CurMesh).Vertex(i).index(4)
             If (AlreadyFound) Or (Mesh(CurMesh).Vertex(i).index(j) = DelSide) Then
                 'Delete reference and sort
                 AlreadyFound = True
                 Mesh(CurMesh).Vertex(i).index(j) = Mesh(CurMesh).Vertex(i).index(j + 1)
-                Debug.Print "Index: ", Mesh(CurMesh).Vertex(i).index(1), Mesh(CurMesh).Vertex(i).index(2), Mesh(CurMesh).Vertex(i).index(3), Mesh(CurMesh).Vertex(i).index(4)
+                'Debug.Print "Index: ", Mesh(CurMesh).Vertex(i).index(1), Mesh(CurMesh).Vertex(i).index(2), Mesh(CurMesh).Vertex(i).index(3), Mesh(CurMesh).Vertex(i).index(4)
                 If j = Mesh(CurMesh).Vertex(i).SidesTouching Then
                     Mesh(CurMesh).Vertex(i).index(Mesh(CurMesh).Vertex(i).SidesTouching) = 0
                     Mesh(CurMesh).Vertex(i).IndexPointer = 1
@@ -1115,8 +1115,8 @@ Private Sub DrawAll()
             If (Mesh(i).Triangle(j).Exists = True) Then
                 For k = 1 To 3
                     SideToDraw = Mesh(i).Triangle(j).S(k)
-                        Debug.Print "Tried to draw triangle : ", j
-                        Debug.Print "DrawAll", i, j, k
+                        'Debug.Print "Tried to draw triangle : ", j
+                        'Debug.Print "DrawAll", i, j, k
                         Call DrawSide(i, SideToDraw, 1)
                     'End If
                 Next k
@@ -1495,7 +1495,7 @@ Private Sub Form_Load()
 
     ClearPolyData
     AddNewMesh (True)
-    SetViewport
+    SetViewPort
     DrawAll
     Me.Grid1.Left = 0 - Me.Grid1.Width / 2
     Me.Grid1.Top = 0 - Me.Grid1.Height / 2
@@ -1512,6 +1512,9 @@ Private Sub Form_MouseDown(Button As Integer, Shift As Integer, X As Single, Y A
     Else
         DragPoint = 0 ' Drag nothing
     End If
+    
+MakeUndo
+
 End Sub
 
 Private Sub Form_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
@@ -1527,6 +1530,8 @@ Private Sub Form_MouseMove(Button As Integer, Shift As Integer, X As Single, Y A
         GY = Y
     End If
     '
+
+
 'Debug.Print "Form_MouseMove"
     If DragPoint = 1 Then
         MousePointer = 2 ' Crosshairs
@@ -1634,7 +1639,7 @@ End Sub
 
 Private Sub Form_MouseUp(Button As Integer, Shift As Integer, X As Single, Y As Single)
     If DragPoint = 2 Then
-        Call SetViewport ' Move screen around origin
+        Call SetViewPort ' Move screen around origin
         Call DrawAll
     End If
     DragPoint = 0
@@ -1643,7 +1648,7 @@ End Sub
 Private Sub Form_Resize()
 
     'Set and redraw everything
-    SetViewport
+    SetViewPort
     DrawAll
 End Sub
 
@@ -1785,6 +1790,26 @@ ErrHand:
 
 End Sub
 
+Private Sub mnuUndo_Click()
+Dim i As Integer
+
+
+Mesh(CurMesh) = MeshUndo(LastMesh)
+
+'erase all the lines
+'The real lines will reload in Drawall
+For i = 0 To MaxLines
+    If Loaded(i) Then
+        Unload Ln(i)
+        Loaded(i) = False
+    End If
+Next i
+
+
+DrawAll
+
+End Sub
+
 Private Sub New2D_Click()
     Fname = ""
     frmDialogs.TwoDeeSave.filename = ""
@@ -1913,7 +1938,7 @@ Done:
     
     On Error GoTo 0
     Call SetOrigin(OX, OY)
-    SetViewport
+    SetViewPort
     DrawAll
     Fname = frmDialogs.TwoDeeOpen.filename
     Caption = ModuleName + " - " + Fname
@@ -2176,7 +2201,7 @@ Private Sub SetOrigin(NewOX As Integer, NewOY As Integer)
     Origin2.Y2 = OY - 10 * Zoom
 End Sub
 
-Private Sub SetViewport()
+Private Sub SetViewPort()
     Dim W, H As Integer
     Dim SW, SH
     '
@@ -2262,16 +2287,16 @@ Dim i As Integer
     Next i
     'MsgBox "This is the current triangle."
 
-    Debug.Print
-    Debug.Print "Show Current Triangle"
-    Debug.Print "====================="
-    Debug.Print "Vertex 1: ", Mesh(CurMesh).Triangle(Num).V(1)
-    Debug.Print "Vertex 2: ", Mesh(CurMesh).Triangle(Num).V(2)
-    Debug.Print "Vertex 3: ", Mesh(CurMesh).Triangle(Num).V(3)
-    Debug.Print "Side 1  : ", Mesh(CurMesh).Triangle(Num).S(1)
-    Debug.Print "Side 2  : ", Mesh(CurMesh).Triangle(Num).S(2)
-    Debug.Print "Side 3  : ", Mesh(CurMesh).Triangle(Num).S(3)
-    Debug.Print "Current Side: ", CurSide
+    'Debug.Print
+    'Debug.Print "Show Current Triangle"
+    'Debug.Print "====================="
+    'Debug.Print "Vertex 1: ", Mesh(CurMesh).Triangle(Num).V(1)
+    'Debug.Print "Vertex 2: ", Mesh(CurMesh).Triangle(Num).V(2)
+    'Debug.Print "Vertex 3: ", Mesh(CurMesh).Triangle(Num).V(3)
+    'Debug.Print "Side 1  : ", Mesh(CurMesh).Triangle(Num).S(1)
+    'Debug.Print "Side 2  : ", Mesh(CurMesh).Triangle(Num).S(2)
+    'Debug.Print "Side 3  : ", Mesh(CurMesh).Triangle(Num).S(3)
+    'Debug.Print "Current Side: ", CurSide
     
     For i = 1 To 3
         If Mesh(CurMesh).Triangle(Num).S(i) = CurSide Then
@@ -2281,7 +2306,7 @@ Dim i As Integer
     'Figure out which side is immeadiately CCW to this one
     SideCCW = SidePositionInTriangle - 1
     If SideCCW < 1 Then SideCCW = 3
-    Debug.Print "Side CCW    : ", SideCCW
+    'Debug.Print "Side CCW    : ", SideCCW
     
     For i = 1 To 3
         CheckVar = Mesh(CurMesh).Triangle(Num).V(i)
@@ -2290,9 +2315,9 @@ Dim i As Integer
         End If
     Next i
     
-    Debug.Print "Vertex Opposite: ", VertexOpposite
+    'Debug.Print "Vertex Opposite: ", VertexOpposite
 
-    Debug.Print
+    'Debug.Print
 
 End Sub
 
@@ -2453,19 +2478,19 @@ Dim i As Integer
     Next i
     'MsgBox "This is the current triangle"
 
-    Debug.Print
-    Debug.Print "Current Triangle"
-    Debug.Print "================"
-    Debug.Print "Vertex 1: ", Mesh(CurMesh).Triangle(Num).V(1)
-    Debug.Print "Vertex 2: ", Mesh(CurMesh).Triangle(Num).V(2)
-    Debug.Print "Vertex 3: ", Mesh(CurMesh).Triangle(Num).V(3)
-    Debug.Print "Side 1  : ", Mesh(CurMesh).Triangle(Num).S(1)
-    Debug.Print "Side 2  : ", Mesh(CurMesh).Triangle(Num).S(2)
-    Debug.Print "Side 3  : ", Mesh(CurMesh).Triangle(Num).S(3)
-    Debug.Print "Current Side: ", CurSide
+    'Debug.Print
+    'Debug.Print "Current Triangle"
+    'Debug.Print "================"
+    'Debug.Print "Vertex 1: ", Mesh(CurMesh).Triangle(Num).V(1)
+    'Debug.Print "Vertex 2: ", Mesh(CurMesh).Triangle(Num).V(2)
+    'Debug.Print "Vertex 3: ", Mesh(CurMesh).Triangle(Num).V(3)
+    'Debug.Print "Side 1  : ", Mesh(CurMesh).Triangle(Num).S(1)
+    'Debug.Print "Side 2  : ", Mesh(CurMesh).Triangle(Num).S(2)
+    'Debug.Print "Side 3  : ", Mesh(CurMesh).Triangle(Num).S(3)
+    'Debug.Print "Current Side: ", CurSide
     
 
-    Debug.Print
+    'Debug.Print
 
 
 End Sub
@@ -2574,6 +2599,8 @@ Dim TriangleNum2 As Integer ' Triangle on the right os Share 1
 Dim OtherSide As Integer
 Dim OtherSide1 As Integer
 
+MakeUndo
+
 ' Find the Current Triangle
 TriangleNum1 = Mesh(MeshNum).Side(CurSide).Share(1)
 TriangleNum2 = Mesh(MeshNum).Side(CurSide).Share(2)
@@ -2581,7 +2608,7 @@ TriangleNum2 = Mesh(MeshNum).Side(CurSide).Share(2)
 
 'Call ShowCurrentTriangle(TriangleNum2)
 
-Debug.Print "SplitFour"
+'Debug.Print "SplitFour"
 
     'The Vertex Opposite is the one in the triangle that isn't on the current side
     For i = 1 To 3
@@ -2590,7 +2617,7 @@ Debug.Print "SplitFour"
             VertexOpposite = CheckVar
         End If
     Next i
-    Debug.Print "Vertex Opposite1: ", VertexOpposite
+    'Debug.Print "Vertex Opposite1: ", VertexOpposite
     
     If (Mesh(MeshNum).Vertex(VertexOpposite).SidesTouching + 2) > 20 Then 'MaxSideIndecies in TWODEE.BAS
         MsgBox "Too many Sides touching the Vertex Opposite"
@@ -2632,7 +2659,7 @@ Debug.Print "SplitFour"
             VertexOpposite1 = CheckVar
         End If
     Next i
-    Debug.Print "Vertex Opposite the newest 1: ", VertexOpposite1
+    'Debug.Print "Vertex Opposite the newest 1: ", VertexOpposite1
     
     If (Mesh(MeshNum).Vertex(VertexOpposite1).SidesTouching + 2) > 20 Then 'MaxSideIndecies in TWODEE.BAS
         MsgBox "Too many Sides touching the Vertex Opposite"
@@ -2731,7 +2758,7 @@ Debug.Print "SplitFour"
     NewSideBisect = Mesh(MeshNum).NumSides
     Mesh(MeshNum).Side(NewSideBisect).SV(1) = NewVertex
     
-    Debug.Print "Vertex Opposite2: ", VertexOpposite
+    'Debug.Print "Vertex Opposite2: ", VertexOpposite
     Mesh(MeshNum).Side(NewSideBisect).SV(2) = VertexOpposite
     Mesh(MeshNum).Side(NewSideBisect).Exists = True
 
@@ -2743,10 +2770,10 @@ Debug.Print "SplitFour"
     Mesh(MeshNum).Vertex(NewVertex).SidesTouching = Mesh(MeshNum).Vertex(NewVertex).SidesTouching + 1
     Mesh(MeshNum).Vertex(NewVertex).index(Mesh(MeshNum).Vertex(NewVertex).SidesTouching) = NewSideBisect
     
-    Debug.Print "Vertex       : ", NewVertex
-    Debug.Print "SidesTouching: ", Mesh(MeshNum).Vertex(NewVertex).SidesTouching
-    Debug.Print "Link 1       : ", Mesh(MeshNum).Vertex(NewVertex).index(1)
-    Debug.Print "Link 2       : ", Mesh(MeshNum).Vertex(NewVertex).index(2)
+    'Debug.Print "Vertex       : ", NewVertex
+    'Debug.Print "SidesTouching: ", Mesh(MeshNum).Vertex(NewVertex).SidesTouching
+    'Debug.Print "Link 1       : ", Mesh(MeshNum).Vertex(NewVertex).index(1)
+    'Debug.Print "Link 2       : ", Mesh(MeshNum).Vertex(NewVertex).index(2)
     
     'rebuild old triangle
     Mesh(MeshNum).Triangle(TriangleNum2).V(1) = OtherV
@@ -2787,20 +2814,20 @@ Debug.Print "SplitFour"
 
     
 
-    Debug.Print
-    Debug.Print "Old Triangle"
+    'Debug.Print
+    'Debug.Print "Old Triangle"
     Call ShowTriangle(TriangleNum2)
-    Debug.Print
-    Debug.Print "New Triangle"
+    'Debug.Print
+    'Debug.Print "New Triangle"
     Call ShowTriangle(Mesh(MeshNum).NumTriangles)
 
-    Debug.Print
-    Debug.Print "Bisected Side"
-    Debug.Print "Side Num: ", NewSideBisect
-    Debug.Print "Vertex 1: ", Mesh(MeshNum).Side(NewSideBisect).SV(1)
-    Debug.Print "Vertex 2: ", Mesh(MeshNum).Side(NewSideBisect).SV(2)
-    Debug.Print "Vertex Opposite: ", VertexOpposite
-    Debug.Print
+    'Debug.Print
+    'Debug.Print "Bisected Side"
+    'Debug.Print "Side Num: ", NewSideBisect
+    'Debug.Print "Vertex 1: ", Mesh(MeshNum).Side(NewSideBisect).SV(1)
+    'Debug.Print "Vertex 2: ", Mesh(MeshNum).Side(NewSideBisect).SV(2)
+    'Debug.Print "Vertex Opposite: ", VertexOpposite
+    'Debug.Print
 
 
 
@@ -2921,12 +2948,14 @@ Dim SideCCW As Integer
 Dim TriangleNum As Integer
 Dim OtherSide As Integer
 
+MakeUndo
+
 ' Find the Current Triangle
 TriangleNum = Mesh(MeshNum).Side(CurSide).Share(1)
 
 'Call ShowCurrentTriangle(TriangleNum)
 
-Debug.Print "SplitTwo"
+'Debug.Print "SplitTwo"
 
     'The Vertex Opposite is the one in the triangle that isn't on the current side
     For i = 1 To 3
@@ -2935,7 +2964,7 @@ Debug.Print "SplitTwo"
             VertexOpposite = CheckVar
         End If
     Next i
-    Debug.Print "Vertex Opposite1: ", VertexOpposite
+    'Debug.Print "Vertex Opposite1: ", VertexOpposite
 
     If (Mesh(MeshNum).Vertex(VertexOpposite).SidesTouching + 2) > 20 Then 'MaxSideIndecies in TWODEE.BAS
         MsgBox "Too many Sides touching the Vertex Opposite"
@@ -3048,7 +3077,7 @@ Debug.Print "SplitTwo"
     Mesh(MeshNum).Side(NewSideBisect).SV(1) = NewVertex
     Mesh(MeshNum).Side(NewSideBisect).Exists = True
     
-    Debug.Print "Vertex Opposite2: ", VertexOpposite
+    'Debug.Print "Vertex Opposite2: ", VertexOpposite
     Mesh(MeshNum).Side(NewSideBisect).SV(2) = VertexOpposite
 
     'Link VertexOpposite to the NewSide (bisect)
@@ -3059,10 +3088,10 @@ Debug.Print "SplitTwo"
     Mesh(MeshNum).Vertex(NewVertex).SidesTouching = Mesh(MeshNum).Vertex(NewVertex).SidesTouching + 1
     Mesh(MeshNum).Vertex(NewVertex).index(Mesh(MeshNum).Vertex(NewVertex).SidesTouching) = NewSideBisect
     
-    Debug.Print "Vertex       : ", NewVertex
-    Debug.Print "SidesTouching: ", Mesh(MeshNum).Vertex(NewVertex).SidesTouching
-    Debug.Print "Link 1       : ", Mesh(MeshNum).Vertex(NewVertex).index(1)
-    Debug.Print "Link 2       : ", Mesh(MeshNum).Vertex(NewVertex).index(2)
+    'Debug.Print "Vertex       : ", NewVertex
+    'Debug.Print "SidesTouching: ", Mesh(MeshNum).Vertex(NewVertex).SidesTouching
+    'Debug.Print "Link 1       : ", Mesh(MeshNum).Vertex(NewVertex).index(1)
+    'Debug.Print "Link 2       : ", Mesh(MeshNum).Vertex(NewVertex).index(2)
     
     'rebuild old triangle
     Mesh(MeshNum).Triangle(TriangleNum).V(1) = OtherV
@@ -3109,13 +3138,13 @@ Debug.Print "SplitTwo"
     'Debug.Print "New Triangle"
     'Call ShowTriangle(Mesh(MeshNum).NumTriangles)
 
-    Debug.Print
-    Debug.Print "Bisected Side"
-    Debug.Print "Side Num: ", NewSideBisect
-    Debug.Print "Vertex 1: ", Mesh(MeshNum).Side(NewSideBisect).SV(1)
-    Debug.Print "Vertex 2: ", Mesh(MeshNum).Side(NewSideBisect).SV(2)
-    Debug.Print "Vertex Opposite: ", VertexOpposite
-    Debug.Print
+    'Debug.Print
+    'Debug.Print "Bisected Side"
+    'Debug.Print "Side Num: ", NewSideBisect
+    'Debug.Print "Vertex 1: ", Mesh(MeshNum).Side(NewSideBisect).SV(1)
+    'Debug.Print "Vertex 2: ", Mesh(MeshNum).Side(NewSideBisect).SV(2)
+    'Debug.Print "Vertex Opposite: ", VertexOpposite
+    'Debug.Print
 
 End Sub
 
@@ -3291,9 +3320,9 @@ Private Sub VertIns_Click()
     If Mesh(CurMesh).Side(CurSide).Share(2) = False Then
         Call SplitTwo(CurMesh, CurSide) '1 is just temporary
     Else
-        Debug.Print "CurSide Before Split 4"
-        Debug.Print Mesh(CurMesh).Side(CurSide).Share(1)
-        Debug.Print Mesh(CurMesh).Side(CurSide).Share(2)
+        'Debug.Print "CurSide Before Split 4"
+        'Debug.Print Mesh(CurMesh).Side(CurSide).Share(1)
+        'Debug.Print Mesh(CurMesh).Side(CurSide).Share(2)
         'MsgBox "!"
         Call SplitFour(CurMesh, CurSide) '1 is just temporary
     End If
@@ -3308,7 +3337,7 @@ End Sub
 
 Private Sub ZoomIn2X_Click()
     Zoom = Zoom / 2
-    SetViewport
+    SetViewPort
     DrawGrid
     DrawAll
 End Sub
@@ -3316,7 +3345,7 @@ End Sub
 
 Private Sub ZoomOut2X_Click()
     Zoom = Zoom * 2
-    SetViewport
+    SetViewPort
     DrawGrid
     DrawAll
 End Sub
@@ -3328,5 +3357,70 @@ Public Sub ReOrderLayers()
     Image1.ZOrder 1
     ' Reset the grid layer in back behind the texture :)
     Grid1.ZOrder 1
+
+End Sub
+
+Private Sub MakeUndo()
+Dim i, j As Integer
+'Basically, I need to save the entire
+'Shape and restore it when asked.
+'
+' DOH! This is cheap.
+
+'Purge LastMesh
+' I don't need to do this
+
+'MeshUndo(LastMesh).NumVertices = 0
+'MeshUndo(LastMesh).NumSides = 0
+'MeshUndo(LastMesh).NumTriangles = 0
+'
+'For i = 1 To MaxSVertices
+'    MeshUndo(LastMesh).Vertex(i).Exists = 0
+'    MeshUndo(LastMesh).Vertex(i).X = 0
+'    MeshUndo(LastMesh).Vertex(i).Y = 0
+'    MeshUndo(LastMesh).Vertex(i).SidesTouching = 0
+'    MeshUndo(LastMesh).Vertex(i).IndexPointer = 0
+'    For j = 1 To MaxSideIndecies
+'        MeshUndo(LastMesh).Vertex(i).index(j) = 0
+'    Next j
+'Next i
+'
+'For i = 1 To MaxSides
+'    MeshUndo(LastMesh).Side(i).Exists = 0
+'    MeshUndo(LastMesh).Side(i).SV(1) = 0
+'    MeshUndo(LastMesh).Side(i).SV(2) = 0
+'    MeshUndo(LastMesh).Side(i).Share(1) = 0
+'    MeshUndo(LastMesh).Side(i).Share(2) = 0
+'Next i
+'
+'
+'For i = 1 To MaxTriangles
+'    MeshUndo(LastMesh).Triangle(i).Exists = 0
+'    MeshUndo(LastMesh).Triangle(i).V(1) = 0
+'    MeshUndo(LastMesh).Triangle(i).V(2) = 0
+'    MeshUndo(LastMesh).Triangle(i).V(3) = 0
+'    MeshUndo(LastMesh).Triangle(i).S(1) = 0
+'    MeshUndo(LastMesh).Triangle(i).S(2) = 0
+'    MeshUndo(LastMesh).Triangle(i).S(3) = 0
+'Next i
+'
+'
+'
+'
+'
+
+''erase all the lines
+'For i = 0 To MaxSides
+'    If Loaded(i) Then
+'        Unload Ln(i)
+'        Loaded(i) = False
+'    End If
+'Next i
+
+
+LastMesh = CurMesh
+MeshUndo(LastMesh) = Mesh(CurMesh)
+
+
 
 End Sub

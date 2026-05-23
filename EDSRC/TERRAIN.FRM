@@ -1,30 +1,28 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmTerrain 
    Caption         =   "Terrain Properties"
    ClientHeight    =   5205
    ClientLeft      =   3570
    ClientTop       =   2865
    ClientWidth     =   5685
-   Height          =   5565
    HelpContextID   =   315
    Icon            =   "Terrain.frx":0000
-   Left            =   3510
    LinkTopic       =   "Form1"
+   MDIChild        =   -1  'True
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   5205
    ScaleWidth      =   5685
    ShowInTaskbar   =   0   'False
-   Top             =   2565
-   Width           =   5805
    Begin VB.Frame Frame2 
       Caption         =   "TerraCon"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   4575
       Left            =   120
@@ -51,13 +49,13 @@ Begin VB.Form frmTerrain
    Begin VB.Frame Frame1 
       Caption         =   "Level Terrain Support"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   975
       Left            =   1680
@@ -92,7 +90,9 @@ Begin VB.Form frmTerrain
    End
 End
 Attribute VB_Name = "frmTerrain"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 

@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnPlatfm.cpp: All generic, platform-specific routines-specific routines.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:

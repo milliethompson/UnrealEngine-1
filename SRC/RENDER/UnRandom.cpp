@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnRandom.cpp: Random number generation code.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
@@ -30,7 +30,7 @@ private:
 	// Functions from FGlobalRandomsBase.
 	void Init();
 	void Exit();
-	void Tick(int ServerTicks);
+	void Tick(FLOAT TimeSeconds);
 
 	// Variables.
 	static FLOAT RandomDeltas[N_RANDS]; // Deltas used to update Randoms.
@@ -78,9 +78,10 @@ void FGlobalRandoms::Exit()
 //
 // Update random number tables.
 //
-void FGlobalRandoms::Tick(int ServerTicks)
+void FGlobalRandoms::Tick( FLOAT TimeSeconds )
 {
 	guard(FGlobalRandoms::Tick);
+	int ServerTicks = TimeSeconds * 35.0;
 
 	// optimize: This code would benefit greatly from a fast random number generator
 	// that generates floating point randoms from 0.0 to 1.0. This could be done with
@@ -89,7 +90,6 @@ void FGlobalRandoms::Tick(int ServerTicks)
 	// float temp=1.0, *result;
 	// int randombits = (some completely random bit pattern);
 	// *(int*)&result = (*(int*)&temp & 0xff800000) | (randombits & 0x007fffff);
-	//
 
 	// Regenerate all random bases for temporally discontinuous random numbers.
 	for( int i=0; i<N_RANDS; i++ )

@@ -1,7 +1,7 @@
 /*=============================================================================
 	Net.h: Unreal networking, public (engine-accessible) header file
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -11,13 +11,9 @@
 #ifndef _INC_UNNETPUB
 #define _INC_UNNETPUB
 
-#ifndef _INC_UNPLATFM
+#include "UnPort.h"
 #include "UnPlatfm.h"
-#endif
-
-#ifndef _INC_UNPLATFM
-#include "UnPlatfm.h"
-#endif
+#include "UnChecks.h"
 
 /*------------------------------------------------------------------------------
 	Globals
@@ -30,7 +26,7 @@ enum {NET_NAME_SIZE   = 32};
 // The action a particular socket is performing.
 //
 enum ESocketAction
-	{
+{
 	/////////////////////////////////////////////////////////////////////////////////////////
 	// Action tag        //   Value   // Meaning      // Possible next actions             //
 	/////////////////////////////////////////////////////////////////////////////////////////
@@ -42,19 +38,19 @@ enum ESocketAction
 	NS_FILE_RECEIVE	= 5, // Receiving a file		  // NS_NEGOTIATING, NS_DISCONNECTED   //
 	NS_INITIALIZING	= 6, // Used only in Init()		  // NS_NEGOTIATING, NS_DISCONNECTED   //
 	/////////////////////////////////////////////////////////////////////////////////////////
-	};
+};
 
 //
 // What the local computer is doing related to network play
 //
 enum ENetworkPlayMode
-	{
+{
 	PM_NONE				= 0,	// This machine is idle (not playing)
 	PM_LOCAL			= 1,	// This is a local-only game
 	PM_CLIENT			= 2,	// This machine is a client to a remote server
 	PM_CLIENT_SERVER	= 3,	// This machine is a client and a server
 	PM_DEDICATED_SERVER	= 4,	// This machine is a dedicated server
-	};
+};
 
 //
 // Forward declarations:
@@ -77,12 +73,12 @@ UNNETWORK_API extern NManager NetManager;
 // URL types:
 //
 enum EURLType
-	{
+{
 	URL_UNREAL_FILE		= 0,	// A local Unreal file
 	URL_UNREAL_SERVER	= 1,	// An Unreal server on the Internet
 	URL_EXTERNAL		= 2,	// Some external URL like a Web page
 	URL_INVALID			= 3,	// An invalid/unrecognizable URL
-	};
+};
 
 void MakeFullURL (const char *CurrentURL, const char *PossiblyRelativeURL, char *Result);
 void ParseFullURL(char *SourceURL,EURLType *Type, char **URLName);
@@ -123,13 +119,13 @@ class NPacket
 	virtual void Init(NSocket *SocketToSendThrough);
 	inline void Finalize()
 		{
-		GUARD;
+		guard(NPacket::Finalize);
 		if (Size>MaxSize) appError ("Packet size exceeds maximum");
-		UNGUARD("NPacket::Finalize");
+		unguard;
 		};
 	inline int AppendData(void *Src,int SrcSize)
 		{
-		GUARD;
+		guard(NPacket::AppendData);
 		if ((Size+SrcSize) <= MaxSize)
 			{
 			memcpy(&Data[Size],Src,SrcSize);
@@ -137,7 +133,7 @@ class NPacket
 			return 1;
 			}
 		else return 0;
-		UNGUARD("NPacket::AppendData");
+		unguard;
 		};
 	inline int Remaining()
 		{
@@ -215,7 +211,7 @@ class NSocket
 // the individual network drivers, and provides a transparent way of doing
 // everything you'll need to do through the drivers.
 //
-class NManager : public FTask
+class NManager
 	{
 	//////////////////////
 	// Public interface //
@@ -234,9 +230,7 @@ class NManager : public FTask
 	virtual void Init();
 	virtual void Exit();
 	//
-	virtual void TaskTick();
-	virtual void TaskExit();
-	virtual char *TaskStatus(char *Name,char *Desc);
+	virtual void Tick();
 	//
 	virtual int Exec(const char *Cmd,FOutputDevice *Out=GApp);
 	virtual int RegisterDriver(NDriver *Driver);

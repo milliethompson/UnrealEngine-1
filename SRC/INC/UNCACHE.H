@@ -1,7 +1,7 @@
 /*===============================================================================
 UnCache.h: Unreal fast memory cache support.
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Description:
@@ -41,21 +41,18 @@ Revision history:
 #define _INC_UNCACHE
 
 /*-----------------------------------------------------------------------------
-	FMemoryCache.
+	FMemCache.
 -----------------------------------------------------------------------------*/
 
-class UNREAL_API FMemoryCache
+class UNENGINE_API FMemCache
 {
 public:
 	//////////////////////
 	// Public interface //
 	//////////////////////
 
-	// Constants.
-	enum {DEFAULT_ALIGNMENT=8};		// Default boundary to align stuff on.
-
 	// Information about a cache item.
-	class UNREAL_API FCacheItem
+	class UNENGINE_API FCacheItem
 	{
 	public:
 		// Unlock the cache item.
@@ -78,7 +75,7 @@ public:
 		{
 			return Data;
 		}
-		BYTE GetSize()
+		INT GetSize()
 		{
 			return Size;
 		}
@@ -86,8 +83,9 @@ public:
 		// Private variables: Note 32-byte alignment.
 		BYTE		*Data;			// Pointer to the item's data.
 		DWORD		Id;				// This item's cache id, 0=unused.
-		INT			Time;			// Last Get() time.
-		INT			Size;			// Data size.
+		WORD		Time;			// Last Get() time.
+		WORD		Segment;		// Number of segment this item resides in.
+		INT			Size;			// Data size, not accounting for start-alignment padding.
 		INT			Cost;			// Cost to flush this item.
 		FCacheItem	*LinearNext;	// Next cache item in linear list, or NULL if last.
 		FCacheItem	*LinearPrev;	// Previous cache item in linear list, or NULL if first.
@@ -97,22 +95,23 @@ public:
 		// If the item is free(Id==0), 0;
 		// If the item is locked, COST_INFINITE;
 		// If the item is fresh (CacheTime-Time<=1), Size;
-		// If the item is old, exponentially loses 1/32nd of its value per frame.
-	friend class FMemoryCache;
+		// If the item has just become old in the last tick, Size/4.
+		// If the item is older, exponentially loses 1/32nd of its value per frame.
+	friend class FMemCache;
 	};
 
 	// Constructor.
-	FMemoryCache() {Initialized=0;}
+	FMemCache() {Initialized=0;}
 
 	// Init and exit.
-    void Init( int BytesToAllocate, int MaxItems );
-	void Exit();
+    void Init( int BytesToAllocate, int MaxItems, void *Start=NULL, int SegSize=0 );
+	void Exit( int FreeMemory );
 
 	// Flushing.
 	void Flush( DWORD Id=0, DWORD Mask=~0 );
 
 	// Creating elements.
-	BYTE *Create( DWORD Id, FCacheItem *&Item, INT CreateSize, INT Alignment=DEFAULT_ALIGNMENT );
+	BYTE *Create( DWORD Id, FCacheItem *&Item, INT CreateSize, INT Alignment=DEFAULT_ALIGNMENT, INT MaxCreateSize=0 );
 
 	// Time passing.
 	void Tick();
@@ -123,9 +122,9 @@ public:
 	// Get an element.
 	BYTE *Get( DWORD Id, FCacheItem *&Item, INT Alignment=DEFAULT_ALIGNMENT )
 	{	
-		guardSlow(FMemoryCache::Get);
+		guardSlow(FMemCache::Get);
 		NumGets++;
-		for(FCacheItem *HashItem=HashItems[Id%HASH_COUNT]; HashItem; HashItem=HashItem->HashNext )
+		for( FCacheItem *HashItem=HashItems[Id%HASH_COUNT]; HashItem; HashItem=HashItem->HashNext )
 		{
 			if( HashItem->Id == Id )
 			{
@@ -140,9 +139,31 @@ public:
 		unguardSlow;
 	}
 
+	// Get an element, extended version.
+	BYTE *GetEx( DWORD Id, FCacheItem *&Item, INT &OldTime, INT Alignment=DEFAULT_ALIGNMENT )
+	{	
+		guardSlow(FMemCache::GetEx);
+		NumGets++;
+		for( FCacheItem *HashItem=Item?Item->HashNext:HashItems[Id%HASH_COUNT]; HashItem; HashItem=HashItem->HashNext )
+		{
+			if( HashItem->Id == Id )
+			{
+				// Set the item, lock it, and return its data.
+				Item            = HashItem;
+				OldTime         = HashItem->Time;
+				HashItem->Time  = Time;
+				HashItem->Cost += COST_INFINITE;
+				return Align( HashItem->Data, Alignment );
+			}
+		}
+		return NULL;
+		unguardSlow;
+	}
+
 	// Status.
 	void Status( char *Msg );
 	void DrawCache( BYTE *Dest, int XR, int YR, int ColorBytes );
+	INT GetTime() {return Time;}
 
 private:
 	////////////////////////////
@@ -167,8 +188,9 @@ private:
 
 	// Linked list of item associated with cache memory, linked via LinearNext and
 	// LinearPrev order of memory.
+	void *ItemMemory;
 	FCacheItem *CacheItems;
-	void CreateNewFreeSpace( BYTE *Start,BYTE *End,FCacheItem *Prev,FCacheItem *Next );
+	void CreateNewFreeSpace( BYTE *Start, BYTE *End, FCacheItem *Prev, FCacheItem *Next, INT Segment );
 
 	// First item in unused item list (these items are not associated with cache
 	// memory). Linked via LinearNext in FIFO order.
@@ -202,7 +224,7 @@ private:
 	// State checking.
 	void ConditionalCheckState()
 	{
-#if defined(CHECK_ALL) || defined(_DEBUG)
+#if CHECK_ALL || defined(_DEBUG)
 		CheckState();
 #endif
 	}
@@ -211,7 +233,7 @@ friend class FCacheItem;
 };
 
 // Global scope:
-typedef FMemoryCache::FCacheItem FCacheItem;
+typedef FMemCache::FCacheItem FCacheItem;
 
 /*-----------------------------------------------------------------------------
 	The End.

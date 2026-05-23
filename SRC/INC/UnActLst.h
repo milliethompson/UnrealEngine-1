@@ -1,7 +1,7 @@
 /*=============================================================================
-	UnActLst.h: Actor list resource class definition
+	UnActLst.h: Actor list object class definition.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -14,75 +14,113 @@
 #define _INC_UNACTLST
 
 /*-----------------------------------------------------------------------------
-	UActorList.
+	FCollisionHash.
 -----------------------------------------------------------------------------*/
 
 //
-// A list of actors associated with a level.  The actor list is sparse, in that
-// actors with Class==NULL are treated as empty/nonexistant.
+// A collision hash table.
 //
-class UNREAL_API UActorList : public UDatabase
+class FCollisionHash
 {
-	RESOURCE_DB_CLASS(UActorList,AActor,RES_ActorList)
+public:
+	// Constants.
+	enum { NUM_BUCKETS = 16384             };
+	enum { BASIS_BITS  = 8                 };
+	enum { BASIS_MASK  = (1<<BASIS_BITS)-1 };
+	enum { GRAN_XY     = 256               };
+	enum { GRAN_Z      = 256               };
+	enum { XY_OFS      = 65536             };
+	enum { Z_OFS       = 65536             };
+
+	// Linked list item.
+	struct FActorLink
+	{
+		// Varibles.
+		AActor          *Actor;     // The actor.
+		FActorLink      *Next;      // Next link belonging to this collision bucket.
+		INT				iLocation;  // Based hash location.
+
+		// Functions.
+		FActorLink( AActor *InActor, FActorLink *InNext, INT iInLocation )
+		:	Actor		(InActor)
+		,	Next        (InNext)
+		,	iLocation	(iInLocation)
+		{}
+	} *Hash[NUM_BUCKETS];
+
+	// Statics.
+	static INT InitializedBasis;
+	static INT CollisionTag;
+	static INT HashX[NUM_BUCKETS];
+	static INT HashY[NUM_BUCKETS];
+	static INT HashZ[NUM_BUCKETS];
 
 	// Variables.
-	DWORD		LockType;		// ELockType (None, read, write, notrans)
-	BOOL		Trans;			// Whether transaction tracking is enabled
+	BOOL CollisionInitialized;
 
-	// Resource functions.
-	void Register				(FResourceType *Type);
-	void InitHeader				();
-	void InitData				();
-	const char *Import			(const char *Buffer, const char *BufferEnd,const char *FileType);
-	char *Export				(char *Buffer,const char *FileType,int Indent);
-	void QueryHeaderReferences	(FResourceCallback &Callback);
-	void QueryDataReferences	(FResourceCallback &Callback);
-	void PostLoad				();
-	void PreKill				();
-	void Flip					();
-
-	// Custom functions.
-	void Lock(int NewLockType);
-	void Unlock();
-
-    // Redundant compact actor arrays provided for performance.
-    struct CompactList : public DArray<AActor*,200,100> 
-    {
-        BOOL NeedsCompressing; // TRUE when the list might have elements with value 0.
-        CompactList() { NeedsCompressing = FALSE; }
-
-        // Remove an actor from the list: The actor is not removed immediately but is
-        // instead replaced with the value 0. This allows uninterrupted iteration over
-        // the list. It is assumed the actor is on the list at most once.
-        void RemoveActor(AActor * Actor)
-        {
-            ChangeElement(Actor,0);
-            NeedsCompressing = TRUE;
-        }
-        void Compress() // Compress the list if NeedsCompressing==TRUE.
-        {
-            if( NeedsCompressing )
-            {
-                RemoveElements(0); // Clear out the null entries.
-                NeedsCompressing = FALSE;
-            }
-        }
-    };
-    // These are the main lists.
-    CompactList * StaticActors        ; // List of all actors with Class != 0 && bStaticActor==TRUE.
-    CompactList * DynamicActors       ; // List of all actors with Class != 0 && bStaticActor==FALSE.
-    CompactList * CollidingActors     ; // List of all actors with Class != 0 && bCollideActors==TRUE.
-    // These are the administrative lists.
-    CompactList * ActiveActors        ; // List of all actors with Class != 0.
-    CompactList * UnusedActors        ; // List of all actors with Class == 0 && bJustDeleted==FALSE.
-    CompactList * JustDeletedActors   ; // List of all actors with Class == 0 && bJustDeleted==TRUE.
-    void RelistActors(); // Rebuild the above redundant lists from scratch by scanning the actor list.
-    void UnlistActor(AActor * Actor); // Remove an actor from the appropriate main lists (based on its properties).
-        // Note: UnlistActor does *not* remove the actor from the administrative lists.
-    void ListActor(AActor * Actor); // Add an actor to appropriate main lists (based on its properties).
-        // Note: ListActor does *not* remove the actor from the administrative lists.
-    void CheckLists(); // Debug: Check the redundant lists for correctness and completeness.
+	// Low-level actor-actor collision checking functions.
+	void  Init();
+	void  Exit();
+	void  Tick();
+	void  AddActor( AActor *Actor );
+	void  RemoveActor( AActor *Actor );
+	int   LineCheck( FCheckResult *Hits, INT ListMax, const FVector &Start, const FVector &End, FLOAT Radius, FLOAT Height );
+	int   PointCheck( const FVector &Location, FLOAT Radius, FLOAT Height, AActor **List, INT ListMax );
+	void  GetActorExtent( AActor *Actor, INT &iX0, INT &iX1, INT &iY0, INT &iY1, INT &iZ0, INT &iZ1 );
+	void  GetHashIndices( FVector Location, INT &iX, INT &iY, INT &iZ )
+	{
+		iX = Clamp(ftoi( (Location.X + XY_OFS) * (1.0/GRAN_XY) ), 0, (int)NUM_BUCKETS);
+		iY = Clamp(ftoi( (Location.Y + XY_OFS) * (1.0/GRAN_XY) ), 0, (int)NUM_BUCKETS);
+		iZ = Clamp(ftoi( (Location.Z + Z_OFS ) * (1.0/GRAN_Z ) ), 0, (int)NUM_BUCKETS);
+	}
+	FActorLink *&GetHashLink( INT iX, INT iY, INT iZ, INDEX &iLocation )
+	{
+		iLocation = iX + (iY << BASIS_BITS) + (iZ << (BASIS_BITS*2));
+		return Hash[ HashX[iX] ^ HashY[iY] ^ HashZ[iZ] ];
+	}
 };
+
+/*-----------------------------------------------------------------------------
+	Global actor and class functions
+-----------------------------------------------------------------------------*/
+
+//
+// Actor import/export functions (UnActLst.cpp).
+//
+UNENGINE_API void ExportActor
+(
+	UClass*			Class,
+	BYTE*const*		ActorBin,
+	FOutputDevice&	Out,
+	FName			PropertyName,
+	int				Indent,
+	int				Descriptive,
+	int				Flags, 
+	UClass			*Diff,
+	int				Objects, 
+	int				ArrayElement,
+	FName			Name,
+	BYTE			WhichBins[PROPBIN_MAX]
+);
+UNENGINE_API void ExportMultipleActors
+(
+	ULevel*			Level,
+	FOutputDevice&	Out,
+	FName			Name,
+	int				Indent,
+	int				Descriptive,
+	FName			Category,
+	BYTE			WhichBins[PROPBIN_MAX]
+);
+UNENGINE_API const char *ImportActorProperties
+(
+	ULevel*			Level,
+	UClass*			Class,
+	BYTE**			ActorBins,
+	const char*		Data,
+	BYTE			WhichBins[PROPBIN_MAX],
+	INT				ImportingFromFile
+);
 
 /*-----------------------------------------------------------------------------
 	The End.

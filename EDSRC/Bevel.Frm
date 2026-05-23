@@ -1,19 +1,16 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmBevel 
    Caption         =   "Bevel"
    ClientHeight    =   1935
    ClientLeft      =   6480
    ClientTop       =   6135
    ClientWidth     =   4080
-   Height          =   2295
    Icon            =   "Bevel.frx":0000
-   Left            =   6420
    LinkTopic       =   "Form1"
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1935
    ScaleWidth      =   4080
    ShowInTaskbar   =   0   'False
-   Top             =   5835
-   Width           =   4200
    Begin VB.TextBox txtCapHeight 
       BackColor       =   &H00FFFFFF&
       ForeColor       =   &H00000000&
@@ -128,7 +125,9 @@ Begin VB.Form frmBevel
    End
 End
 Attribute VB_Name = "frmBevel"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Private Sub btnCancel_Click()
     Hide

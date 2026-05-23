@@ -1,7 +1,7 @@
 /*==============================================================================
 UnKeyVal.cpp: Unreal key-value pair processing
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0.
 
 Description:
@@ -11,6 +11,7 @@ Revision history:
     * 06/15/96: Created by Mark
 ==============================================================================*/
 
+#include "Unreal.h"
 #include "UnKeyVal.h"
 #include "UnParse.h"
 
@@ -205,7 +206,7 @@ int FKeyValues::TStringList::Size() const
 //----------------------------------------------------------------------------
 void FKeyValues::TStringList::Add(const char * String)
 {
-    GUARD;
+    guard(FKeyValues::TStringList::Add);
     if( String==0 || String[0]==0 )
     {
         String =  " "; // Add a blank string (instead of an empty string).
@@ -220,7 +221,7 @@ void FKeyValues::TStringList::Add(const char * String)
     NewStrings[NewSize] = 0; // Add the second null terminator to terminate the whole list.
     Strings = NewStrings;
     FParse::FreeString(OldStrings);
-    UNGUARD( "TStringList::Add" );
+    unguard;
 }
 
 //----------------------------------------------------------------------------
@@ -228,8 +229,8 @@ void FKeyValues::TStringList::Add(const char * String)
 //----------------------------------------------------------------------------
 void FKeyValues::TStringList::Add(TStringList List)
 {
-    GUARD;
-    UNGUARD( "TStringList::Add" );
+    guard(FKeyValues::TStringList::Add);
+    unguard;
 }
 
 //----------------------------------------------------------------------------

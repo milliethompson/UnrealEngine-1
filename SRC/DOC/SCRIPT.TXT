@@ -4,6 +4,20 @@
 	Status: Early, unfinished!
 =============================================================================*/
 
+caps insensitive
+actor casts
+null context vars are null
+null context outparms aren't updated
+changing the state is slow (dumps the vf cache)
+calling many non-final functions is slow (explain 4 entry vf cache)
+classes - intrinsic vs standard
+latent functions
+gotostate auto
+
+// Instigator helps to define responsibility for events. Say a player with
+// a weapon shoots a projectile which causes a chain of 3 explosions which kills 
+// a pawn. The Instigator is the player who started the chain of events.
+
 ***************
 * Conventions *
 ***************
@@ -89,7 +103,7 @@ Dim <variable name>[(<integer dimension>)] as [<modifier> ...] <variable type>, 
 		Dim MyNumber as Integer				' Declares a variable of type integer
 		Dim Editable Message as String(32)	' Declares an editable variable of type string
 		Dim A as Byte, B as Byte, C as Byte	' Declares three separate byte variables
-		Dim MyArray(10)						' Declares an array of 10 elements
+		Dim MyArray[10] as Integer			' Declares an array of 10 elements
 
 	Declares a new variable of a certain type.  You can use the variable throughout
 	your script to hold useful values, etc.
@@ -111,10 +125,10 @@ Dim <variable name>[(<integer dimension>)] as [<modifier> ...] <variable type>, 
 		----------- --------------- ---------------------------------------------------
 		Simple		Byte			A whole number from 0 to 255
 					Integer			A whole number from –2,147,483,648 to 2,147,483,647
-					Boolean			A value of 0 (false) or 1 (true)
+					Boolean			A value of True or False
 					Real			A 32-bit floating-point number
 
-		Compound	Name			An actor name or tag name
+		Advanced	Name			An actor name or tag name
 					String(size)	A string of variable length
 					Vector			A vector with floating point X, Y, and Z components
 					Rotation		A rotation with integer Pitch, Yaw, and Roll components
@@ -130,7 +144,7 @@ Dim <variable name>[(<integer dimension>)] as [<modifier> ...] <variable type>, 
 					Model			A solid brush
 					Player			A logged-in, human player
 
-		Enums		User-definable enumerated types
+		Enum		User-definable enumerated types (packed into an 8-bit byte)
 
 	You can use the following type modifiers to change the properties of a variable
 	when you declare it:
@@ -141,6 +155,7 @@ Dim <variable name>[(<integer dimension>)] as [<modifier> ...] <variable type>, 
 		NoSave				For resource variables only - resource must not be saved
 		Editable			The property can be edited in UnrealEd
 		ExportResource		For resource variables only - export the resource with the actor
+		(expand)
 
 Const <constant name>
 
@@ -154,7 +169,7 @@ Const <constant name>
 
 	Assigns a new value to a variable.
 
-Function <function name>(<variable declaration>,...) [as <type>] [Intrinsic] [Fast] 
+Function <function name>(<variable declaration>,...) [as <type>] [Intrinsic] [Final] 
 
 	Example:
 		Function Square(X as Integer) as Integer ' Return the square of a number X
@@ -194,10 +209,10 @@ Function <function name>(<variable declaration>,...) [as <type>] [Intrinsic] [Fa
 	can't declare them yourself.
 
 	If you're writing a function that you don't need to be overridden in state blocks,
-	event blocks, or child classes, declare it as "Fast".  This enables the function to
+	event blocks, or child classes, declare it as "Final".  This enables the function to
 	be executed more rapidly than functions which are overridable.
 
-Operator <operator name> (<variable declaration>,...) [as <type>] [Intrinsic] [Fast]
+Operator <operator name> (<variable declaration>,...) [as <type>] [Intrinsic] [Final]
 
 	Example:
 		Operator + (A as Integer, B as Integer) as Integer
@@ -220,14 +235,18 @@ EndWhen
 [Default] [Editable] State <statename>
 EndState
 
+SizeOf
+ArrayCount
+EnumCount
+
 ********************************
 * UnrealScript Execution Model *
 ********************************
 
-	An UnrealServer is a fast PC on a network that Unreal players can connect to.
+	An UnrealServer is a fast PC on a network to which Unreal players can connect.
 	The server controls all gameplay and interaction between players and actors.
 
-	A server can run many maps (also called levels) simultaneously.
+	A server can run one map at a time.
 
 	Each map can contain many actors.
 
@@ -311,29 +330,7 @@ Zero-time: A command that executes in zero ticks.
 * Automatic type conversions *
 ******************************
 
-	Source      Destination		Meaning
-	--------    ---------------	--------------------------------------------------
-	Byte	 -> Boolean			True if nonzero, false if zero
-	Integer	 -> Boolean			True if nonzero, false if zero
-	Real	 -> Boolean			True if not 0.0, false if zero
-	Actor	 -> Boolean			True if it references an actor, False otherwise
-	Resource -> Boolean			True if it references a resource, False otherwise
-	Name	 -> Boolean			True if it references a name, false otherwise
-	String	 -> Boolean			True if non-empty, false if empty
-	Vector	 -> Boolean			True if any components are not 0.0, false if all zero
-	Rotation -> Boolean			True if any components are nonzero, false if all zero
-
-	Boolean	 -> Byte			Resulting byte is 1 (True) or 0 (False)
-	Integer	 -> Byte			Chops number down and only keeps the low 8 bits
-	Real	 -> Byte			Saturates to the range (0,255)
-
-	Boolean	 -> Integer			Resulting integer is 1 (True) or 0 (False)
-	Byte	 -> Integer			Converts to exact integer representation
-	Real	 -> Integer			Chops off fractional part and converts to integer
-
-	Boolean	 -> Real			Converts to 1.0 (True) or 0.0 (False)
-	Byte	 -> Real			Converts to exact real number representation
-	Integer	 -> Real			Converts to exact real number representation
+	Needs updating.
 
 	These are all of the automatic type conversions that UnrealScript performs.  Note
 	that UnrealScript can't apply multiple type conversions to get a desired result.  For
@@ -356,7 +353,7 @@ Zero-time: A command that executes in zero ticks.
 	There are also a lot of built-in type conversion functions to perform more advanced
 	conversions:
 
-	Function StrInteger(I as Integer) as String(256) ' Convert an integer to its string representation
+	Function StrInteger(I as Integer) as String[256] ' Convert an integer to its string representation
 	(to be expanded)
 
 ********************
@@ -369,259 +366,273 @@ UnHold
 Block
 UnBlock
 
-.Delay(#)
+Delay(#)
 
-************************
-* Sample BigMan script *
-************************
+//
+// Sample BigMan script.
+// By Tim Sweeney.
+//
+Class BigMan Expands Pawn
 
-'
-' Sample BigMan script
-'
-Class BigMan Expands Monster
+editable byte  CheckSightFrequency;
+editable float SightDist;
+editable real  FieldOfVision;
+int            Health;
+float          TargetLoseDist;
+int            FaceTargetTime;
+int            FaceTargetYaw;
 
-Dim CheckSightFrequency as Editable Byte
-Dim SightDist as Editable Float
-Dim FieldOfVision as Editable Float
+//
+// These are created as variables so they can be changed in UnrealEd
+// or changed for child classes.
+//
+editable Sound FarAutoSound;
+editable Sound HitSound;
+editable Sound DieSound;
+editable Sound ShootSound;
+editable Sound FootstepSound;
+editable Sound SnortSound;
 
-Dim Health as Editable Integer
+//
+// Take a longrange hit.
+//
+void RangeHit( Actor Source, Actor Instigator, byte Damage[4], vector HitLocation )
+{
+	Heath -= Damage (DM_MELEE)
+	if( Health < 0 )
+	{
+		Instigator.CreditKill (Me);
+		PlayVariedSound (DieSound);
+		goto Dead.Dying;
+	}
+	else
+	{
+		Target = Instigator;
+		goto TakeHit;
+	}
+}
 
-Dim TargetLoseDist as Float
-Dim FaceTargetTime as Integer
-Dim FaceTargetYaw  as Angle
+' Take a melee hit.
+State MeleeHit(Instigator as Actor, Damage(4) as Byte, HitLocation as Vector)
+Begin:
+	PlayAnim (HitAnim)
+	Target = Instigator
+	Goto Attack
+EndState
 
-'
-' These are created as variables so they can be changed in UnrealEd
-' or changed for child classes.
-'
-Dim FarAutoSound   as Sound
-Dim HitSound       as Sound
-Dim DieSound       as Sound
-Dim ShootSound     as Sound
-Dim FootstepSound  as Sound
-Dim SnortSound     as Sound
+' Idle state.
+state Idle
+{
+	Sub SeeTarget(Source as Actor)
+		Target         = Source
+		FaceTargetTime = 10 ' Begin facing target
+		FaceTargetYaw  = 0
+		When AnimEnd Goto AttackTarget
+	EndSub
+Begin:
+	PlayAnim(Idle,0)
+	If Random(10)=0 then 
+		PlayVariedSound(SnortSound)
+		PlayAnim (LookLeft)
+	ElseIf Random(10)=0 then 
+		PlayVariedSound(SnortSound)
+		PlayAnim (LookRight)
+	EndIf
+	Goto Idle
+}
 
-State Alive, Auto Editable
-	When Hit(Source as Actor, Weapon as Actor, Damage(4) as Byte, HitLocation as Vector)
-		Target = Source
-		Heath -= Damage(DM_MELEE)
-		'
-		If Health<0 Then
-			Source.CreditNonPlayerKill(Me)
-			Goto Dead.Dying
-		EndIf
-		'
-		PlayVariedSound (HitSound)
-		Block Hit ' Ignore successive hits while playing hit animation
-		PlayAnim(TakeHit,0)
-		UnBlock Hit
-		Goto AttackTarget
-	EndWhen
-	State Idle, Auto
-		PlayAnim(Idle,0)
-		If Random(10)=0 then 
-			PlayVariedSound(SnortSound)
-			PlayAnim (LookLeft,0)
-		ElseIf Random(10)=0 then 
-			PlayVariedSound(SnortSound)
-			PlayAnim (LookRight,0)
-		EndIf
+' Attacking our target.
+State Attack
+	Sub LoseTarget
 		Goto Idle
-		When SeeTarget(Source as Actor)
-			Target         = Source
-			FaceTargetTime = 10 ' Begin facing target
-			FaceTargetYaw  = 0
-			When AnimEnd Goto AttackTarget ' Wait till idle animation is done
-			EndWhen
-		EndState
-	State AttackTarget
-		When LoseTarget
-			Goto Idle
-		EndWhen
-		State FaceAndAdvance, Auto
-			FaceTargetTime = 10 ' Begin whipping around and facing player
-			FaceTargetYaw  = 0  ' Face straight at player
-			'
-			If InMeleeRange(Target) Then
-				' Pistol whip the player
-			Else
-				Select Case Random(4)
-					Case 0:
-						' Walk towards player
-					Case 1:
-						' Shoot left while walking
-					Case 2:
-						' Shoot right while walking
-					Case 3:
-						' Stop and shoot with both guns
-				EndSelect
-			EndIf
-		EndState
-	EndState
+	EndSub
+TakeHit:
+	PlayAnim(TakeHit)
+Begin:
+	FaceTargetTime = 10 ' Begin whipping around and facing player.
+	FaceTargetYaw  = 0  ' Face straight at player.
+
+	If InMeleeRangeOf(Target) Then
+		' Pistol whip the player
+	Else
+		Select Case Random(4)
+			Case 0:
+				' Walk towards player
+			Case 1:
+				' Shoot left while walking
+			Case 2:
+				' Shoot right while walking
+			Case 3:
+				' Stop and shoot with both guns
+		EndSelect
+	EndIf
 EndState
 
-State Dead, Auto Editable
-	State Dying, Auto
-		PlayVariedSound (DieSound)
-		PlayAnim(Dying,0)
-		Goto Dead
-	EndState
-	State Idle
-		PlayAnim(DeadFrame,0)
-	EndState
+Editable State Dead
+	Sub EnterState
+		bCollideActors = 0
+	EndSub
+Dying:
+	PlayVariedSound (DieSound)
+	PlayAnim (Dying,0)
+Begin:
+	PlayAnim (DeadFrame,0)
 EndState
+
+*************
+* Constants *
+*************
+
+True   (Boolean)
+False  (Boolean)
+Pi     (Real)
+MaxInt (Integer)
 
 ***************************
 * Root class declarations *
 ***************************
 
-'
-' Constants:
-'
-Dim Pi           as Const Real       = 3.1415926535897932
-Dim MaxInt       as Const Integer    = 2147483647
-Dim MaxByte      as Const Integer    = 255
-Dim MaxRot       as Const Integer    = 65535
-Dim RotPerDegree as Const Real       = 182.04444444444444
-Dim MetersPerWorldUnit as Const Real = 0.03
-Dim FeetPerWorldUnit as Const Real   = 0.10
-'
-' AI functions:
-'
-Function PlayAnim(Sequence as Name,Rate as Real,Wait as Boolean) Intrinsic Fast
-Function StartAnim(Sequence as Name,Rate as Real,Wait as Boolean) Intrinsic Fast
-Function PlaySound(SoundToPlay as Sound,Frequency as Real) Intrinsic Fast
-Function PlayVariedSound(SoundToPlay as Sound) Intrinsic Fast
-Function DistanceTo(OtherActor as Actor) as Real Intrinsic Fast
-Function CanSee(OtherActor as Actor) as Boolean Intrinsic Fast
-'
-' Intrinsic type conversions:
-'
-Operator Boolean (A as Byte    ) as Boolean Intrinsic Fast AutoConversion
-Operator Boolean (A as Integer ) as Boolean Intrinsic Fast AutoConversion
-Operator Boolean (A as Real    ) as Boolean Intrinsic Fast AutoConversion
-Operator Boolean (A as Actor   ) as Boolean Intrinsic Fast AutoConversion
-Operator Boolean (A as Resource) as Boolean Intrinsic Fast AutoConversion
-Operator Boolean (A as Name    ) as Boolean Intrinsic Fast AutoConversion
-Operator Boolean (A as String(256)) as Boolean Intrinsic Fast AutoConversion
-Operator Boolean (A as Vector  ) as Boolean Intrinsic Fast AutoConversion
-Operator Boolean (A as Rotation) as Boolean Intrinsic Fast AutoConversion
-'
-Operator Byte    (A as Boolean ) as Byte    Intrinsic Fast AutoConversion
-Operator Byte    (A as Integer ) as Byte    Intrinsic Fast AutoConversion
-Operator Byte    (A as Real    ) as Byte    Intrinsic Fast AutoConversion
-'
-Operator Integer (A as Boolean ) as Integer Intrinsic Fast AutoConversion
-Operator Integer (A as Byte    ) as Integer Intrinsic Fast AutoConversion
-Operator Integer (A as Real    ) as Integer Intrinsic Fast AutoConversion
-'
-Operator Real    (A as Boolean ) as Real    Intrinsic Fast AutoConversion
-Operator Real    (A as Byte    ) as Real    Intrinsic Fast AutoConversion
-Operator Integer (A as Integer ) as Integer Intrinsic Fast AutoConversion
-'
-' Integer (and also byte, boolean) operators and functions:
-'
-Operator +    (A as Integer               ) as Integer   Intrinsic Fast
-Operator -    (A as Integer               ) as Integer   Intrinsic Fast
-Operator Not  (A as Integer               ) as Integer   Intrinsic Fast
-Operator +    (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator -    (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator *    (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator /    (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator <    (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator >    (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator <=   (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator >=   (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator =    (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator <>   (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator And  (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator Or   (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator BitAnd(A as Integer, B as Integer) as Integer   Intrinsic Fast
-Operator BitOr(A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator BitXor(A as Integer, B as Integer) as Integer   Intrinsic Fast
-Operator <<   (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Operator >>   (A as Integer, B as Integer ) as Integer   Intrinsic Fast
-Function IntegerStr(A as Integer          ) as String(256) Intrinsic Fast
-Function Random(Max as Integer            ) as Integer   Intrinsic Fast
-'
-' Real operators and functions:
-'
-Operator +    (A as Real                  ) as Real      Intrinsic Fast
-Operator -    (A as Real                  ) as Real      Intrinsic Fast
-Operator +    (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator -    (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator *    (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator /    (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator ^    (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator <    (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator >    (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator <=   (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator >=   (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator =    (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator <>   (A as Real, B as Real       ) as Real      Intrinsic Fast
-Operator Mod  (A as Real, B as Real       ) as Real      Intrinsic Fast
-Function Abs  (A as Real                  ) as Real      Intrinsic Fast
-Function Sqrt (A as Real                  ) as Real      Intrinsic Fast
-Function RealStr(A as Real                ) as String(256) Intrinsic Fast
-Function Int  (A as Real                  ) as Integer   Intrinsic Fast
-Function Sin  (A as Real                  ) as Real      Intrinsic Fast
-Function Cos  (A as Real                  ) as Real      Intrinsic Fast
-Function Tan  (A as Real                  ) as Real      Intrinsic Fast
-Function Atn  (A as Real                  ) as Real      Intrinsic Fast
-Function Exp  (A as Real                  ) as Real      Intrinsic Fast
-Function Log  (A as Real                  ) as Real      Intrinsic Fast
-Function RandomReal(                      ) as Real      Intrinsic Fast
-'
-' String operators and functions:
-'
-Operator +    (A as String(256), B(256) as String   ) as String(256) Intrinsic Fast
-Operator <    (A as String(256), B(256) as String   ) as Integer   Intrinsic Fast
-Operator >    (A as String(256), B(256) as String   ) as Integer   Intrinsic Fast
-Operator <=   (A as String(256), B(256) as String   ) as Integer   Intrinsic Fast
-Operator >=   (A as String(256), B(256) as String   ) as Integer   Intrinsic Fast
-Operator =    (A as String(256), B(256) as String   ) as Integer   Intrinsic Fast
-Operator <>   (A as String(256), B(256) as String   ) as Integer   Intrinsic Fast
-Function Val  (A as String(256))                      as Real      Intrinsic Fast
-'
-' Vector operators and functions
-'
-Operator +    (A as Vector                ) as Vector    Intrinsic Fast
-Operator -    (A as Vector                ) as Vector    Intrinsic Fast
-Operator +    (A as Vector, B as Vector   ) as Vector    Intrinsic Fast
-Operator -    (A as Vector, B as Vector   ) as Vector    Intrinsic Fast
-Operator =    (A as Vector, B as Vector   ) as Integer   Intrinsic Fast
-Operator <>   (A as Vector, B as Vector   ) as Integer   Intrinsic Fast
-Function Size (A as Vector                ) as Real      Intrinsic Fast
-Function VectorStr(A as Integer           ) as Real      Intrinsic Fast
-Function Dot  (A as Vector, B as Vector   ) as Real      Intrinsic Fast
-Function Cross(A as Vector, B as Vector   ) as Vector    Intrinsic Fast
-Function Scale(A as Vector, B as Real     ) as Vector    Intrinsic Fast
-'
-' Rotation operators and functions
-'
-Operator +    (A as Rotation, B as Rotation) as Rotation Intrinsic Fast
-Operator -    (A as Rotation, B as Rotation) as Rotation Intrinsic Fast
-Function GetXAxis (A as Rotation           ) as Vector   Intrinsic Fast
-Function GetYAxis (A as Rotation           ) as Vector   Intrinsic Fast
-Function GetZAxis (A as Rotation           ) as Vector   Intrinsic Fast
-Function GetUnXAxis (A as Rotation         ) as Vector   Intrinsic Fast
-Function GetUnYAxis (A as Rotation         ) as Vector   Intrinsic Fast
-Function GetUnZAxis (A as Rotation         ) as Vector   Intrinsic Fast
-Function RandomRotation(                   ) as Rotation Intrinsic Fast
-'
 ' Root functions needed:
-' CurrentStateName()
-' Str(Resource)
-' StatusMessage (for players)
-' Log(str)
-' Debug(str)
-' Error(str)
 ' CVar functions (get, set)
 ' SpawnActor
-' Global (non-class) functions & modules
 ' How to teleport?
 ' bOnGround, or OnGround()
+
+*************************
+* Sample Trigger script *
+*************************
+
+/*-----------------------------------------------------------------------------
+	Inventory.
+-----------------------------------------------------------------------------*/
+
+//
+// An Inventory actor is asking this actor whether it wants to pick it up.
+// Return True to accept it, False to reject it.
+//
+bool PickupQuery( Item as Inventory )
+{
+	return false
+}
+
 '
+' A Pawn is asking this Inventory actor if it wants to preempt a pickup from occuring.
+' Return True to preempt, False to ignore.
+'
+function PreemptPickupQuery( Holder as Pawn ) as boolean
+	return false
+endfunction
+
+'
+' We're being notified that we just picked up an Inventory actor.
+'
+void PickupNotify( Item as Inventory )
+{
+}
+
+'
+' Add an inventory actor to this pawn's inventory. Returns 1 if added.
+' If the actor chooses not to add the thing, it must kill the actor passed to it
+' and return -1.
+'
+final function AddInventory( Item as Inventory ) as boolean
+
+	' Link the inventory actor into the top of our inventory chain.
+	Item.Parent     = Me
+	Item.Inventory  = Inventory
+	Item.Instigator = Me
+	Inventory       = Item
+
+	' Success.
+	return true
+endfunction
+
+'
+' Delete an actor from inventory.  Returns true if the actor existed and was
+' deleted, or false if the actor doesn't exist in our inventory.
+' Does not destroy the inventory actor.
+'
+final function DeleteInventory( Item as Inventory ) as boolean
+	' Remove Item from linked list.
+	Dim Link as Actor
+	for( Link=Me; Link.Inventory!=NoActor; Link=Link.Inventory )
+		if Link.Inventory = Item then
+			' Found it.
+			Link.Inventory = Link.Inventory.Inventory
+			return true
+		endif
+	next
+	return false
+endfunction
+
+/*=============================================================================
+	Trigger: Unreal engine trigger class.
+
+	A Trigger senses things happening in its proximity and generates 
+	sends Trigger/UnTrigger to actors whose names match 'EventName'.
+
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
+	Compiled with UnrealScript 1.0, written with tabs=4.
+
+	Revision history:
+		* Created by Tim Sweeney.
+=============================================================================*/
+
+class Trigger expands Triggers;
+
+//-----------------------------------------------------------------------------
+// Variables.
+
+// Trigger types.
+enum ETriggerType
+{
+	TT_Proximity,	// Triggered by pawn in proximity.
+	TT_Shoot,		// Triggered by shooting.
+};
+
+// Variables.
+var() ETriggerType   TriggerType;      // Type of the trigger.
+var() string[80]     Message;          // Human readable triggering message.
+var() boolean        bTriggerOnceOnly; // Only trigger once and then stop.
+
+//-----------------------------------------------------------------------------
+// Engine functions.
+
+//
+// Called when something touches the trigger.
+//
+void Touch( Other as Actor )
+{
+	if( Event != NoName )
+		// Broadcast the Trigger message to all matching actors.
+		Broadcast( Event ).Trigger( Other, Me );
+
+	if( Message != "" )
+		// Send a string message to the toucher.
+		Other.Instigator.TextMsg( LOG_Play, Message );
+
+	if( bTriggerOnceOnly )
+		// Ignore future touches.
+		bCollideActors = False;
+}
+
+//
+// When something untouches the trigger.
+//
+void UnTouch( Other as Actor )
+{
+	if( Event != NoName )
+		// Untrigger all matching actors.
+		Broadcast( Event ).UnTrigger( Other, Me );
+}
+
+*********************
+* Optimization tips *
+*********************
+
+1. Overall slow language, avoid large loops & things.
+2. Use final functions when you don't need overloading ability.
+3. Use probe masks, Ignores, Enable/Disable.
 
 ***********
 * The End *

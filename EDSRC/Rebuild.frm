@@ -1,45 +1,45 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{BDC217C8-ED16-11CD-956C-0000C04E4C0A}#1.1#0"; "tabctl32.ocx"
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "comctl32.ocx"
 Begin VB.Form frmRebuilder 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Rebuilder"
    ClientHeight    =   6375
-   ClientLeft      =   5835
-   ClientTop       =   3225
+   ClientLeft      =   8835
+   ClientTop       =   3345
    ClientWidth     =   3855
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H00808080&
-   Height          =   6735
    HelpContextID   =   118
    Icon            =   "Rebuild.frx":0000
-   Left            =   5775
    LinkTopic       =   "Form4"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   6375
    ScaleWidth      =   3855
    ShowInTaskbar   =   0   'False
-   Top             =   2925
-   Width           =   3975
    Begin VB.CommandButton UpdStats 
       Appearance      =   0  'Flat
       BackColor       =   &H80000005&
       Caption         =   "&Upd Stats"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   1740
@@ -52,13 +52,13 @@ Begin VB.Form frmRebuilder
       BackColor       =   &H80000005&
       Caption         =   "&Close"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   2940
@@ -72,13 +72,13 @@ Begin VB.Form frmRebuilder
       Caption         =   "&Rebuild Geometry"
       Default         =   -1  'True
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   375
       Left            =   60
@@ -92,56 +92,57 @@ Begin VB.Form frmRebuilder
       TabIndex        =   3
       Top             =   60
       Width           =   3735
-      _Version        =   65536
       _ExtentX        =   6588
       _ExtentY        =   10186
-      _StockProps     =   15
-      Caption         =   "Lighting  "
-      ForeColor       =   0
-      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      TabsPerRow      =   3
-      Tab             =   2
-      TabOrientation  =   0
-      Tabs            =   3
+      _Version        =   327680
       Style           =   1
-      TabMaxWidth     =   0
       TabHeight       =   564
       ShowFocusRect   =   0   'False
+      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
       TabCaption(0)   =   "Geometry  "
+      TabPicture(0)   =   "Rebuild.frx":030A
       Tab(0).ControlCount=   2
-      Tab(0).ControlEnabled=   0   'False
+      Tab(0).ControlEnabled=   -1  'True
       Tab(0).Control(0)=   "AutoBSP"
+      Tab(0).Control(0).Enabled=   0   'False
       Tab(0).Control(1)=   "Frame8"
+      Tab(0).Control(1).Enabled=   0   'False
       TabCaption(1)   =   "BSP  "
       Tab(1).ControlCount=   4
       Tab(1).ControlEnabled=   0   'False
       Tab(1).Control(0)=   "Frame4"
+      Tab(1).Control(0).Enabled=   0   'False
       Tab(1).Control(1)=   "Frame1"
+      Tab(1).Control(1).Enabled=   0   'False
       Tab(1).Control(2)=   "Frame3"
+      Tab(1).Control(2).Enabled=   0   'False
       Tab(1).Control(3)=   "AutoLights"
+      Tab(1).Control(3).Enabled=   -1  'True
       TabCaption(2)   =   "Lighting  "
       Tab(2).ControlCount=   2
-      Tab(2).ControlEnabled=   -1  'True
+      Tab(2).ControlEnabled=   0   'False
       Tab(2).Control(0)=   "Frame6"
+      Tab(2).Control(0).Enabled=   0   'False
       Tab(2).Control(1)=   "Frame5"
+      Tab(2).Control(1).Enabled=   0   'False
       Begin VB.CheckBox AutoLights 
          Caption         =   "&Auto rebuild lighting"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   -74280
@@ -153,13 +154,13 @@ Begin VB.Form frmRebuilder
       Begin VB.Frame Frame3 
          Caption         =   "BSP Rebuild options"
          BeginProperty Font 
-            name            =   "Arial"
-            charset         =   0
-            weight          =   700
-            size            =   12
-            underline       =   0   'False
-            italic          =   -1  'True
-            strikethrough   =   0   'False
+            Name            =   "Arial"
+            Size            =   12
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   -1  'True
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   975
          Left            =   -74880
@@ -169,13 +170,13 @@ Begin VB.Form frmRebuilder
          Begin VB.CheckBox BuildZones 
             Caption         =   "Build Visibility Zones"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   180
@@ -187,13 +188,13 @@ Begin VB.Form frmRebuilder
          Begin VB.CheckBox OptGeom 
             Caption         =   "&Optimize Geometry"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   180
@@ -206,13 +207,13 @@ Begin VB.Form frmRebuilder
       Begin VB.Frame Frame1 
          Caption         =   "Optimization"
          BeginProperty Font 
-            name            =   "Arial"
-            charset         =   0
-            weight          =   700
-            size            =   12
-            underline       =   0   'False
-            italic          =   -1  'True
-            strikethrough   =   0   'False
+            Name            =   "Arial"
+            Size            =   12
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   -1  'True
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1935
          Left            =   -74880
@@ -222,13 +223,13 @@ Begin VB.Form frmRebuilder
          Begin VB.OptionButton Lame 
             Caption         =   "&Lame    (fast rebuild)"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   240
@@ -239,13 +240,13 @@ Begin VB.Form frmRebuilder
          Begin VB.OptionButton Good 
             Caption         =   "&Good    (medium rebuild)"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   240
@@ -257,13 +258,13 @@ Begin VB.Form frmRebuilder
          Begin VB.OptionButton Optimal 
             Caption         =   "&Optimal (Go grab a cup of coffee)"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   240
@@ -277,10 +278,9 @@ Begin VB.Form frmRebuilder
             TabIndex        =   70
             Top             =   1140
             Width           =   3255
-            _Version        =   65536
             _ExtentX        =   5741
             _ExtentY        =   661
-            _StockProps     =   64
+            _Version        =   327680
             Max             =   100
             SelStart        =   15
             TickFrequency   =   5
@@ -290,13 +290,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   2  'Center
             Caption         =   "15"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1440
@@ -308,13 +308,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Balance Tree"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2040
@@ -325,13 +325,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label Label1 
             Caption         =   "Minimize cuts"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   240
@@ -343,13 +343,13 @@ Begin VB.Form frmRebuilder
       Begin VB.Frame Frame4 
          Caption         =   "BSP Stats"
          BeginProperty Font 
-            name            =   "Arial"
-            charset         =   0
-            weight          =   700
-            size            =   12
-            underline       =   0   'False
-            italic          =   -1  'True
-            strikethrough   =   0   'False
+            Name            =   "Arial"
+            Size            =   12
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   -1  'True
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1695
          Left            =   -74880
@@ -360,13 +360,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Polys"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   240
@@ -378,13 +378,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Nodes"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   240
@@ -396,13 +396,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Ratio"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   240
@@ -414,13 +414,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Leaves"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1680
@@ -432,13 +432,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Branches"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -450,13 +450,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Fronts"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1560
@@ -468,13 +468,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Backs"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1560
@@ -486,13 +486,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Coplanars"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1560
@@ -504,13 +504,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Avg Dep"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -522,13 +522,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Max Dep"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -539,13 +539,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label EdPolys 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   960
@@ -556,13 +556,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label Leaves 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2400
@@ -573,13 +573,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label Backs 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2375
@@ -590,13 +590,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label Fronts 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2375
@@ -607,13 +607,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label Coplanars 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2375
@@ -624,13 +624,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label Branches 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2375
@@ -641,13 +641,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label AvgDepth 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   960
@@ -658,13 +658,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MaxDepth 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   960
@@ -675,13 +675,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label Ratio 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   960
@@ -692,13 +692,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label Nodes 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   960
@@ -709,13 +709,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label pBranches 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2880
@@ -726,13 +726,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label pLeaves 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2880
@@ -743,13 +743,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label pBacks 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2880
@@ -760,13 +760,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label pFronts 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2880
@@ -777,13 +777,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label pCoplanars 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   2880
@@ -795,65 +795,30 @@ Begin VB.Form frmRebuilder
       Begin VB.Frame Frame8 
          Caption         =   "Map Geometry Stats"
          BeginProperty Font 
-            name            =   "Arial"
-            charset         =   0
-            weight          =   700
-            size            =   12
-            underline       =   0   'False
-            italic          =   -1  'True
-            strikethrough   =   0   'False
+            Name            =   "Arial"
+            Size            =   12
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   -1  'True
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   3675
-         Left            =   -74880
+         Left            =   120
          TabIndex        =   22
          Top             =   480
          Width           =   3495
-         Begin VB.Label Label32 
-            Alignment       =   1  'Right Justify
-            Caption         =   "Planes"
-            BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
-            EndProperty
-            Height          =   195
-            Left            =   240
-            TabIndex        =   84
-            Top             =   3240
-            Width           =   975
-         End
-         Begin VB.Label MapPlanes 
-            Caption         =   "?"
-            BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
-            EndProperty
-            Height          =   255
-            Left            =   1320
-            TabIndex        =   83
-            Top             =   3240
-            Width           =   1215
-         End
          Begin VB.Label Label28 
             Alignment       =   1  'Right Justify
             Caption         =   "Sides"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   195
             Left            =   240
@@ -864,13 +829,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapSides 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -881,13 +846,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapPoints 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -898,13 +863,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapVectors 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -915,13 +880,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapBounds 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -932,13 +897,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapZones 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -950,13 +915,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Vectors"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   195
             Left            =   240
@@ -968,13 +933,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Bounds"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   195
             Left            =   240
@@ -986,13 +951,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Zones"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   195
             Left            =   240
@@ -1004,13 +969,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Points"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   195
             Left            =   240
@@ -1021,13 +986,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapTotalPolys 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -1038,13 +1003,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapAvgPolys 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -1055,13 +1020,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapSpecial 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -1072,13 +1037,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapSubtract 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -1089,13 +1054,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapAdd 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -1106,13 +1071,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label MapBrushes 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1320
@@ -1124,13 +1089,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Special"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   480
@@ -1142,13 +1107,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Average Polys"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -1160,13 +1125,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Subtract"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   240
@@ -1178,13 +1143,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Add"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -1196,13 +1161,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Brushes"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   480
@@ -1214,13 +1179,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Total Polys"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -1232,16 +1197,16 @@ Begin VB.Form frmRebuilder
       Begin VB.CheckBox AutoBSP 
          Caption         =   "&Auto rebuild BSP"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
-         Left            =   -74040
+         Left            =   960
          TabIndex        =   21
          Top             =   5280
          Value           =   1  'Checked
@@ -1250,16 +1215,16 @@ Begin VB.Form frmRebuilder
       Begin VB.Frame Frame5 
          Caption         =   "Lighting Stats"
          BeginProperty Font 
-            name            =   "Arial"
-            charset         =   0
-            weight          =   700
-            size            =   12
-            underline       =   0   'False
-            italic          =   -1  'True
-            strikethrough   =   0   'False
+            Name            =   "Arial"
+            Size            =   12
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   -1  'True
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   2175
-         Left            =   120
+         Left            =   -74880
          TabIndex        =   6
          Top             =   480
          Width           =   3375
@@ -1267,13 +1232,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Avg Size"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   660
@@ -1285,13 +1250,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Max Size"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   660
@@ -1303,13 +1268,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Texel coverage"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   180
@@ -1321,13 +1286,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Mesh Points"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   300
@@ -1339,13 +1304,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Meshes"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   660
@@ -1356,13 +1321,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label LightMeshes 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1500
@@ -1375,13 +1340,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label LightMeshPts 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1500
@@ -1394,13 +1359,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label LightAvgSize 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1500
@@ -1413,13 +1378,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label LightMaxSize 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1500
@@ -1432,13 +1397,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label LightCacheSize 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1500
@@ -1452,13 +1417,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Lights"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   420
@@ -1470,13 +1435,13 @@ Begin VB.Form frmRebuilder
             Alignment       =   1  'Right Justify
             Caption         =   "Square Meters"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   300
@@ -1487,13 +1452,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label LightMeters 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1500
@@ -1506,13 +1471,13 @@ Begin VB.Form frmRebuilder
          Begin VB.Label LightCount 
             Caption         =   "?"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   1500
@@ -1526,29 +1491,29 @@ Begin VB.Form frmRebuilder
       Begin VB.Frame Frame6 
          Caption         =   "Raytracing Options"
          BeginProperty Font 
-            name            =   "Arial"
-            charset         =   0
-            weight          =   700
-            size            =   12
-            underline       =   0   'False
-            italic          =   -1  'True
-            strikethrough   =   0   'False
+            Name            =   "Arial"
+            Size            =   12
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   -1  'True
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1095
-         Left            =   120
+         Left            =   -74880
          TabIndex        =   4
          Top             =   2760
          Width           =   3375
          Begin VB.CheckBox LightSel 
             Caption         =   "Apply selected lights and lights in selected zone descriptors only."
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   375
             Left            =   240
@@ -1560,7 +1525,9 @@ Begin VB.Form frmRebuilder
    End
 End
 Attribute VB_Name = "frmRebuilder"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 Dim UpdatingTab As Integer
@@ -1581,9 +1548,15 @@ Private Sub Command2_Click()
     Hide
 End Sub
 
-Private Sub Form_Paint()
-    UpdStats_Click
-End Sub
+'
+' Lesson learned: You can't do things like with OLE: the FORM_Paint function could be called
+' while we're in the middle of an existing OLE RPC call and then this would call Ed.Server.GetProp,
+' which violates the rule of one active RPC call at a time. This really is only the tip of the
+' iceberg of problems with OLE and mixed-language programming.
+'
+'Private Sub Form_Paint()
+'    UpdStats_Click
+'End Sub
 
 Private Sub UpdStats_Click()
     Select Case Tab1.Tab
@@ -1694,6 +1667,7 @@ Private Sub GoLights()
 End Sub
 
 Private Sub RefreshBSPStats()
+    Exit Sub
     EdPolys.Caption = Ed.Server.GetProp("BSP", "Polys")
     Nodes.Caption = Ed.Server.GetProp("BSP", "Nodes")
     MaxDepth.Caption = Ed.Server.GetProp("BSP", "MaxDepth")
@@ -1731,7 +1705,6 @@ Private Sub RefreshGeomStats()
     MapSides.Caption = Ed.Server.GetProp("Map", "Sides")
     MapBounds.Caption = Ed.Server.GetProp("Map", "Bounds")
     MapZones.Caption = Ed.Server.GetProp("Map", "Zones")
-    MapPlanes.Caption = Ed.Server.GetProp("Map", "Planes")
 End Sub
 
 Private Sub RefreshLightStats()
@@ -1783,19 +1756,6 @@ Private Sub UpdateTab(N As Integer)
         UpdatingTab = 0
     End If
 End Sub
-
-Private Sub Tab_Click(PreviousTab As Integer)
-
-End Sub
-
-Private Sub Tab_DblClick()
-
-End Sub
-
-Private Sub Tab_DragDrop(Source As Control, X As Single, Y As Single)
-
-End Sub
-
 
 Private Sub Tab1_Click(PreviousTab As Integer)
     UpdateTab (Tab1.Tab)

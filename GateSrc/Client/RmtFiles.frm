@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form RemoteFiles 
    BorderStyle     =   1  'Fixed Single
    Caption         =   "Remote Files"
@@ -6,16 +6,13 @@ Begin VB.Form RemoteFiles
    ClientLeft      =   4425
    ClientTop       =   5265
    ClientWidth     =   3870
-   Height          =   4785
    Icon            =   "RmtFiles.frx":0000
-   Left            =   4365
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   4425
    ScaleWidth      =   3870
-   Top             =   4965
-   Width           =   3990
    Begin VB.CommandButton RemoteFilesRefresh 
       Caption         =   "&Refresh"
       Height          =   315
@@ -52,7 +49,9 @@ Begin VB.Form RemoteFiles
    End
 End
 Attribute VB_Name = "RemoteFiles"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' RmtFiles.frm: GateClient remote file lister/picker.
@@ -146,19 +145,21 @@ End Sub
 ' Refresh the remote file list.
 '
 Private Sub RemoteFilesRefresh_Click()
-
+    Dim S As String
+    
     ' Init the result file list.
     LocalGateClient.ResultFileList = ""
     
     ' Execute the request command line.
     LocalGateClient.SafeExec (CmdLine)
-    
+
     ' Empty the listbox.
     RemoteList.Clear
     
     ' Fill the list box with the results.
-    While LocalGateClient.ResultFileList <> ""
-        RemoteList.AddItem NextSTRING(LocalGateClient.ResultFileList, ";")
+    S = LocalGateClient.ResultFileList
+    While S <> ""
+        RemoteList.AddItem NextSTRING(S, ";")
     Wend
     
     ' Select first item.

@@ -1,7 +1,7 @@
 /*==============================================================================
 	UnChecks.cpp: For adding checks to your code
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Description:
@@ -13,21 +13,22 @@
 
 #include "Unreal.h"
 
-#include <stdio.h>
-#define UNREAL_VERSION
-static const int MaxMessageLength       = 200   ;
-static const int MaxSourceNameLength    = 200   ;
-static const int MaxCombinedMessageLength = 
-        MaxMessageLength
-    +   MaxSourceNameLength
-    +   50                     // Extra room for line number and other text.
-    ;
+/*-----------------------------------------------------------------------------
+	Globals.
+-----------------------------------------------------------------------------*/
 
+static const int MaxMessageLength       = 200;
+static const int MaxSourceNameLength    = 200;
+static const int MaxCombinedMessageLength = MaxMessageLength + MaxSourceNameLength + 50;
 
-//============================================================================
-//                   A check failed - report it
-//============================================================================
-void checkFailed( const char * Message, const char * SourceFileName, int LineNumber )
+/*-----------------------------------------------------------------------------
+	Check functions.
+-----------------------------------------------------------------------------*/
+
+//
+// Report a failed check.
+//
+void checkFailed( const char *Message, const char *SourceFileName, int LineNumber )
 {
     char CombinedMessage[MaxCombinedMessageLength];
     char * Text = CombinedMessage;
@@ -43,7 +44,7 @@ void checkFailed( const char * Message, const char * SourceFileName, int LineNum
     {
         Text += sprintf( Text, " [Line: %i] ", LineNumber );
     }
-    #if defined( UNREAL_VERSION )
+    #if defined( ENGINE_VERSION )
     {
         // Failure implementation for Unreal:
         appError( CombinedMessage );
@@ -55,34 +56,38 @@ void checkFailed( const char * Message, const char * SourceFileName, int LineNum
     #endif
 }
 
-//============================================================================
-//                   A check failed - report it
-//============================================================================
+//
+// Report a failed check.
+//
 extern void checkFailed( const char * SourceFileName, int LineNumber )
 {
     checkFailed( 0, SourceFileName, LineNumber );
 }
 
-//============================================================================
-//                   A check failed - report it
-//============================================================================
+//
+// Report a failed check.
+//
 extern void checkFailed( int LineNumber )
 {
     checkFailed( 0, 0, LineNumber );
 }
 
-//============================================================================
-//                   A check failed - report it
-//============================================================================
+//
+// Report a failed check.
+//
 extern void checkFailed( const char * Message )
 {
     checkFailed( Message, 0, 0 );
 }
 
-//============================================================================
-//                   A check failed - report it
-//============================================================================
+//
+// Report a failed check.
+//
 extern void checkFailed( )
 {
     checkFailed( "Failure" );
 }
+
+/*-----------------------------------------------------------------------------
+	The End.
+-----------------------------------------------------------------------------*/

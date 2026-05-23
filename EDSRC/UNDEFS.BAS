@@ -12,17 +12,14 @@ Attribute VB_Name = "undefs"
 '-----------------------------------------------
 Option Explicit
 
-'
-' Constants
-'
+' Constants.
 Global Const MAXSWORD = 32767 ' Max signed word
 Global Const MAXVERTICES = 12 ' Max vertices per polygon
 Global Const MAXBRUSHPOLYS = 250 ' Max polys per brush
 Global Const GWW_HWNDPARENT As Integer = -8 ' For SetWindowWord
 Global Const Pi As Double = 3.14159265358979
-'
-' Types:
-'
+
+' Types.
 Type FVECTOR ' Floating point vector
     X As Single
     Y As Single
@@ -48,9 +45,7 @@ Type BRUSHTYPE
     SourceProperties As String
 End Type
 
-'
-' Surface flags (from UnRes.h)
-'
+' Surface flags.
 Global Const PF_INVISIBLE = &H1&
 Global Const PF_MASKED = &H2&
 Global Const PF_TRANSPARENT = &H4&
@@ -74,9 +69,7 @@ Global Const PF_ZONE_PORTAL = &H4000000
 Global Const PF_DIRTY = &H8000000
 Global Const PF_SPECIALLIT = &H100000
 
-'
-' Show flags for opening cameras:
-'
+' Show flags for opening cameras.
 Global Const SHOW_FRAME = &H1          ' Show world bounding cube
 Global Const SHOW_ACTOR_RADII = &H2    ' Show actor radii
 Global Const SHOW_BACKDROP = &H4       ' Show background scene
@@ -94,6 +87,36 @@ Global Const SHOW_REALTIME = &H4000    ' Update window in realtime
 Global Const SHOW_NOCAPTURE = &H8000   ' No mouse capture
 
 Global Const SHOW_NORMAL = SHOW_FRAME + SHOW_ACTORS + SHOW_BRUSH
+
+' Scroll Bar Constants
+Public Const SB_HORZ = 0
+Public Const SB_VERT = 1
+Public Const SB_CTL = 2
+Public Const SB_BOTH = 3
+
+' Scroll Bar Commands
+Public Const SB_LINEUP = 0
+Public Const SB_LINELEFT = 0
+Public Const SB_LINEDOWN = 1
+Public Const SB_LINERIGHT = 1
+Public Const SB_PAGEUP = 2
+Public Const SB_PAGELEFT = 2
+Public Const SB_PAGEDOWN = 3
+Public Const SB_PAGERIGHT = 3
+Public Const SB_THUMBPOSITION = 4
+Public Const SB_THUMBTRACK = 5
+Public Const SB_TOP = 6
+Public Const SB_LEFT = 6
+Public Const SB_BOTTOM = 7
+Public Const SB_RIGHT = 7
+Public Const SB_ENDSCROLL = 8
+
+'
+' Texture flags.
+'
+Global Const TF_NoTile = &H1
+Global Const TF_BumpMap = &H2
+Global Const TF_Blur = &H4
 
 '
 ' Render types for cameras
@@ -165,7 +188,7 @@ Public Const HWND_NOTOPMOST = -2
 
 ' Win32 API imports:
 Declare Function GetWindowLong Lib "user32" Alias "GetWindowLongA" (ByVal hwnd As Long, ByVal nIndex As Long) As Long
-Declare Function SetWindowWord Lib "user32" (ByVal hwnd As Long, ByVal index As Long, ByVal wNewWord As Integer) As Integer
+Declare Function SetWindowWord Lib "user32" (ByVal hwnd As Long, ByVal Index As Long, ByVal wNewWord As Integer) As Integer
 Declare Function RedrawWindow Lib "user32" (ByVal hwnd As Long, ByVal lprcUpdate As Long, ByVal hrgnUpdate As Long, ByVal fuRedraw As Long) As Long
 Declare Function UpdateWindow Lib "user32" (ByVal hwnd As Long) As Long
 Declare Function GdiFlush Lib "gdi32" () As Long
@@ -176,6 +199,49 @@ Declare Function GetDesktopWindow Lib "user32" () As Long
 Declare Function SetWindowLong Lib "user32" Alias "SetWindowLongA" (ByVal hwnd As Long, ByVal nIndex As Long, ByVal dwNewLong As Long) As Long
 Declare Function SetParent Lib "user32" (ByVal hWndChild As Long, ByVal hWndNewParent As Long) As Long
 Declare Function SetWindowPos Lib "user32" (ByVal hwnd As Long, ByVal hWndInsertAfter As Long, ByVal X As Long, ByVal Y As Long, ByVal CX As Long, ByVal CY As Long, ByVal wFlags As Long) As Long
+
+' Edit Control Messages
+Public Const EM_GETSEL = &HB0
+Public Const EM_SETSEL = &HB1
+Public Const EM_GETRECT = &HB2
+Public Const EM_SETRECT = &HB3
+Public Const EM_SETRECTNP = &HB4
+Public Const EM_SCROLL = &HB5
+Public Const EM_LINESCROLL = &HB6
+Public Const EM_SCROLLCARET = &HB7
+Public Const EM_GETMODIFY = &HB8
+Public Const EM_SETMODIFY = &HB9
+Public Const EM_GETLINECOUNT = &HBA
+Public Const EM_LINEINDEX = &HBB
+Public Const EM_SETHANDLE = &HBC
+Public Const EM_GETHANDLE = &HBD
+Public Const EM_GETTHUMB = &HBE
+Public Const EM_LINELENGTH = &HC1
+Public Const EM_REPLACESEL = &HC2
+Public Const EM_GETLINE = &HC4
+Public Const EM_LIMITTEXT = &HC5
+Public Const EM_CANUNDO = &HC6
+Public Const EM_UNDO = &HC7
+Public Const EM_FMTLINES = &HC8
+Public Const EM_LINEFROMCHAR = &HC9
+Public Const EM_SETTABSTOPS = &HCB
+Public Const EM_SETPASSWORDCHAR = &HCC
+Public Const EM_EMPTYUNDOBUFFER = &HCD
+Public Const EM_GETFIRSTVISIBLELINE = &HCE
+Public Const EM_SETREADONLY = &HCF
+Public Const EM_SETWORDBREAKPROC = &HD0
+Public Const EM_GETWORDBREAKPROC = &HD1
+Public Const EM_GETPASSWORDCHAR = &HD2
+
+' GetWindow() Constants
+Public Const GW_HWNDFIRST = 0
+Public Const GW_HWNDLAST = 1
+Public Const GW_HWNDNEXT = 2
+Public Const GW_HWNDPREV = 3
+Public Const GW_OWNER = 4
+Public Const GW_CHILD = 5
+Public Const GW_MAX = 5
+Declare Function GetWindow Lib "user32" (ByVal hwnd As Long, ByVal wCmd As Long) As Long
 
 ' Window field offsets for GetWindowLong() and GetWindowWord()
 Public Const GWL_WNDPROC = (-4)
@@ -231,8 +297,6 @@ Public Const WS_EX_PALETTEWINDOW = (WS_EX_WINDOWEDGE Or WS_EX_TOOLWINDOW Or WS_E
 
 ' Messages
 Public Const WM_SETREDRAW = 11
-Public Const EM_SETTABSTOPS = &HCB
-Public Const EM_UNDO = &HC7
 
 ' Registry constants
 Public NoReadRegistry As Boolean
@@ -366,6 +430,7 @@ Sub SendBrush(UnrealEdServer As Object, Optional More As Variant)
         Text = "BRUSH SET" & CR & CR
     End If
     '
+    Text = Text & "BEGIN POLYLIST" & CR
     For i = 1 To Brush.NumPolys
         '
         Text = Text & "BEGIN POLYGON"
@@ -393,9 +458,10 @@ Sub SendBrush(UnrealEdServer As Object, Optional More As Variant)
         ' GouraudGradient, Bitflags
         '
         Text = Text & CR
+        Text = Text & "END POLYGON" & CR
         '
     Next i
-    Text = Text & "ENDBRUSH"
+    Text = Text & "END POLYLIST" & CR
     '
     Ed.BeginSlowTask "Sending brush"
     UnrealEdServer.SlowExec Text
@@ -665,33 +731,30 @@ End Function
 ' my a multi-select Common Dialog.
 '
 Function GrabFname(ByRef Fnames As String) As String
-    Dim X As Integer
-    Dim Y As Integer
-    Dim Path As String
-    Dim Result As String
-    '
-    Fnames = Trim(Fnames)
-    X = InStr(Fnames, " ")
-    '
-    If (X = 0) Then
-        '
-        ' No files
-        '
+    Dim X As Long, Y As Long
+    Dim Path As String, Result As String
+    
+    X = InStr(Fnames, Chr(0))
+    
+    If X = 0 Then
+        
+        ' No files.
         Result = Fnames
         Fnames = ""
     Else
         Path = Left(Fnames, X - 1)
         Fnames = Trim(Mid(Fnames, X + 1))
-        '
-        Y = InStr(Fnames, " ")
-        If (Y = 0) Then
+        
+        Y = InStr(Fnames, Chr(0))
+        If Y = 0 Then
             Result = Path + "\" + Fnames
             Fnames = ""
         Else
             Result = Path + "\" + Trim(Left(Fnames, Y - 1))
-            Fnames = Path + " " + Trim(Mid(Fnames, Y))
+            Fnames = Path + Trim(Mid(Fnames, Y))
         End If
     End If
+    
     GrabFname = Result
 End Function
 
@@ -700,17 +763,17 @@ End Function
 ' path or extension)
 '
 Function GetFileNameOnly(ByVal Fname As String) As String
-    '
+    
     While InStr(Fname, "\") <> 0
         Fname = Mid(Fname, InStr(Fname, "\") + 1)
     Wend
-    '
+    
     If InStr(Fname, ".") <> 0 Then
         Fname = Left(Fname, InStr(Fname, ".") - 1)
     End If
-    '
+    
     GetFileNameOnly = Fname
-    '
+
 End Function
 
 '

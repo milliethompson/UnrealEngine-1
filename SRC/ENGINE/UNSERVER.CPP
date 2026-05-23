@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnServer.cpp: Player login/logout/information functions
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -9,280 +9,208 @@
 =============================================================================*/
 
 #include "Unreal.h"
-#include "UnCheat.h"
 
 enum {MAX_SERVER_PLAYERS	= 256};
 enum {MAX_WORLD_LEVELS		= 64};
 
 /*-----------------------------------------------------------------------------
-	FUnrealServer init & exit
+	FGlobalUnrealServer init & exit.
 -----------------------------------------------------------------------------*/
 
 //
-// Start up the server
+// Start up the server.
 //
-void FUnrealServer::Init()
-	{
-	GUARD;
-	//
-	Ticks		= 0;
-	Rate		= 35; 
-	IsPaused	= FALSE;
+void FGlobalUnrealServer::Init()
+{
+	guard(FGlobalUnrealServer::Init);
+
+	TimeSeconds	= 0.0;
+	Pauseable	= 1;
+	Paused		= 0;
 	NoCollision = 0;
-	//
-	// Allocate server array:
-	//
-	ServerArray = new("Server",CREATE_Unique)UArray(64);
-	//
-	// Allocate all resources the server needs:
-	//
-	Players = new("PlayerList",CREATE_Unique)TArray<UPlayer>(MAX_SERVER_PLAYERS);
-	//
-	// Add all newly-allocated resources to the server array for tracking:
-	//
-	ServerArray->Add(Players);
-	GRes.AddToRoot(ServerArray);
-	//
-	// Allocate the world:
-	//
-	Levels = new("World",CREATE_Unique)TArray<ULevel >(MAX_WORLD_LEVELS);
-	GRes.AddToRoot(Levels);
-	//
-	// Allocate first level:
-	//
-	ULevel *Level = new("TestLev",CREATE_Unique)ULevel(1);
-	//
+
+	// Allocate server array.
+	ServerArray = new("Server",CREATE_Unique)UArray(0);
+
+	// Allocate all objects the server needs.
+	Players = new("PlayerList",CREATE_Unique)TArray<UPlayer*>(0);
+
+	// Add all newly-allocated objects to the server array for tracking.
+	ServerArray->AddItem(Players);
+	GObj.AddToRoot(ServerArray);
+
 	debug (LOG_Init,"Server initialized");
-	//
-	// Start task:
-	//
-	GTaskManager->AddTask(this,NULL,GApp,PRIORITY_Realtime,TASK_NoUserKill);
-	//
-	UNGUARD("FUnrealServer::Init");
-	};
+	unguard;
+}
 
 //
-// Shut down the server
+// Shut down the server.
 //
-void FUnrealServer::Exit()
-	{
-	GUARD;
-	//
-	// End task:
-	//
-	GTaskManager->KillTask(this);
-	//
-	// Remove all players
-	//
+void FGlobalUnrealServer::Exit()
+{
+	guard(FGlobalUnrealServer::Exit);
+
+	// Remove all players.
 	int PlayerCount = Players->Num;
-	for (int i=PlayerCount-1; i>=0; i--)
-		{
+	for( int i=PlayerCount-1; i>=0; i-- )
+	{
 		LogoutPlayer(Players->Element(i));
-		};
+	}
 	Players->Kill();
-	//
-	// Close and kill all levels
-	//
-	for (i=0; i<Levels->Num; i++)
-		{
-		Levels->Element(i)->Kill();
-		};
-	//
-	// Remove from root array:
-	//
-	GRes.RemoveFromRoot(ServerArray); 
+
+	// Close and kill all levels.
+	if( Level )
+	{
+		GObj.RemoveFromRoot(Level);
+		Level->Kill();
+	}
+
+	// Remove from root array.
+	GObj.RemoveFromRoot(ServerArray); 
 	ServerArray->Kill();
-	//
-	GRes.RemoveFromRoot(Levels);
-	Levels->Kill();
-	//
+
 	debugf (LOG_Exit,"Server shut down, %i player(s) logged off",PlayerCount);
-	UNGUARD("FUnrealServer::Init");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	FUnrealServer command line
+	FGlobalUnrealServer command line.
 -----------------------------------------------------------------------------*/
 
-int FUnrealServer::Exec(const char *Cmd,FOutputDevice *Out)
-	{
-	GUARD;
+int FGlobalUnrealServer::Exec( const char *Cmd,FOutputDevice *Out )
+{
+	guard(FGlobalUnrealServer::Exec);
 	const char *Str = Cmd;
-	//
-	if (GetCMD(&Str,"STATUS"))
-		{
-		if (GetCMD(&Str,"SERVER") || !Str[0])
-			{
-			Out->Logf("   SERVER - Ok, Ticks=%i",Ticks);
-			return Str[0]!=0;
-			}
-		else return 0;
-		}
-	else if (GetCMD(&Str,"PLAYERSONLY"))
-		{
+
+	if( GetCMD(&Str,"PLAYERSONLY") )
+	{
 		PlayersOnly ^= 1;
 		Out->Log(PlayersOnly ? "Updating players only" : "Updating all actors");
 		return 1;
-		}
-	else if (GetCMD(&Str,"COLLISION"))
-		{
+	}
+	else if( GetCMD(&Str,"COLLISION") )
+	{
 		NoCollision ^= 1;
 		return 1;
-		}
-	else if (GetCMD(&Str,"DEBUG"))
+	}
+	else if( GetCMD(&Str,"DEBUG") )
+	{
+		if( GetCMD(&Str,"CRASH") )
 		{
-		if (GetCMD(&Str,"CRASH"))
-			{
 			appError ("Unreal crashed at your request");
 			return 1;
-			}
-		else if (GetCMD(&Str,"GPF"))
-			{
+		}
+		else if( GetCMD(&Str,"GPF") )
+		{
 			Out->Log("Unreal crashing with voluntary GPF");
 			*(int *)NULL = 123;
 			return 1;
-			}
-		else if (GetCMD(&Str,"EATMEM"))
-			{
+		}
+		else if( GetCMD(&Str,"EATMEM") )
+		{
 			Out->Log("Eating up all available memory");
-			while (1)
-				{
+			while( 1 )
+			{
 				void *Eat = GApp->Malloc(65536,"EatMem");
 				memset(Eat,0,65536);
-				};
-			return 1;
 			}
-		else return 0;
+			return 1;
 		}
-	else return 0; // Not executed
-	//
-	UNGUARD("FUnrealServer::Exec");
-	};
+		else return 0;
+	}
+	else return 0; // Not executed.
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	FUnrealServer player login/logout
+	FGlobalUnrealServer player login/logout.
 -----------------------------------------------------------------------------*/
 
 //
-// Log a new player in and return his UPlayer resource or NULL if not accepted.
+// Log a new player in and return his UPlayer object or NULL if not accepted.
 //
-UPlayer *FUnrealServer::Login (ULevel *Level,const char *Name, FSocket *Socket)
-	{
-	GUARD;
+UPlayer *FGlobalUnrealServer::Login( ULevel *Level, const char *Name, FSocket *Socket )
+{
+	guard(FGlobalUnrealServer::Login);
 	UPlayer *NewPlayer;
-	//
-	if (new(Name,FIND_Optional)UPlayer) return NULL; // Already logged in
-	//
-	// Add new player resource:
-	//
+
+	if( new(Name,FIND_Optional)UPlayer )
+	{
+		// Already logged in.
+		return NULL;
+	}
+
+	// Add new player object.
 	NewPlayer = new(Name,CREATE_Unique)UPlayer;
-	//
-	// Set player's information:
-	//
+
+	// Set player's information.
 	NewPlayer->Socket	= Socket;
 	NewPlayer->Level	= Level;
 	NewPlayer->iActor	= INDEX_NONE;
-	//
-	// Add to player list:
-	//
-	Players->Add(NewPlayer);
-	//
-	debugf (LOG_Server,"Player %s logged in",NewPlayer->Name);
+
+	// Add to player list.
+	Players->AddItem(NewPlayer);
+
+	debugf (LOG_ComeGo,"Player %s logged in",NewPlayer->GetName());
 	return NewPlayer;
-	//
-	UNGUARD("FUnrealServer::Login");
-	};
+
+	unguard;
+}
 
 //
-// Log a player out
+// Log a player out.
 //
-void FUnrealServer::LogoutPlayer (UPlayer *Player)
-	{
-	GUARD;
-	//
-	//	Remove entry from player list:
-	//
-	Players->Delete(Player);
-	//
-	// Kill player resource:
-	//
-	debugf (LOG_Server,"Player %s logged out",Player->Name);
-	Player->Kill;
-	//
-	UNGUARD("FUnrealServer::LogoutPlayer");
-	};
+void FGlobalUnrealServer::LogoutPlayer (UPlayer *Player)
+{
+	guard(FGlobalUnrealServer::LogoutPlayer);
+
+	//	Remove entry from player list.
+	Players->RemoveItem(Player);
+
+	// Kill player object.
+	debugf (LOG_ComeGo,"Player %s logged out",Player->GetName());
+	Player->Kill();
+
+	unguard;
+}
 
 //
-// Log a player on a particular socket out:
+// Log a player on a particular socket out.
 //
-void FUnrealServer::LogoutSocket (FSocket *Socket)
-	{
-	};
+void FGlobalUnrealServer::LogoutSocket( FSocket *Socket )
+{
+}
 
 /*-----------------------------------------------------------------------------
-	Server tasking functions
+	Server timer tick function.
 -----------------------------------------------------------------------------*/
 
 //
-// Server task exit function.
-//
-void FUnrealServer::TaskExit()
-	{
-	GUARD;
-	// Does nothing
-	UNGUARD("FUnrealServer::TaskExit");
-	};
-
-//
-// Server task status function.
-//
-char *FUnrealServer::TaskStatus(char *Name,char *Desc)
-	{
-	GUARD;
-	//
-	sprintf(Name,"UnrealServer");
-	sprintf(Desc,"Levels=%i, Players=%i",Levels->Num,Players->Num);
-	return Name;
-	//
-	UNGUARD("FUnrealServer::TaskStatus");
-	};
-
-/*-----------------------------------------------------------------------------
-	Server timer tick function
------------------------------------------------------------------------------*/
-
-//
-// Calls ILevel::Tick for all levels that are up for playing.  Doesn't do anything
+// Calls ULevel::Tick for all levels that are up for playing.  Doesn't do anything
 // with levels that are being edited, because the editor cameras take care
 // of all updating (when editing a level with player controls, the editor
 // cameras handle kTick calls).
 //
-void FUnrealServer::TaskTick()
+void FGlobalUnrealServer::Tick( FLOAT DeltaSeconds )
 {
-	GUARD;
+	guard(FGlobalUnrealServer::Tick);
 
 	UCamera	*Camera,*ActiveCamera;
-	ULevel	*Level,*ActiveLevel;
-	INDEX	iActiveActor;
+	ULevel	*ActiveLevel;
+	AActor	*ActiveActor;
 
+	// Tick the cache.
+	GCache.Tick();
+
+	// Update time.
+	TimeSeconds += DeltaSeconds;
+
+	// Init states and info.
 	LevelTickTime			= 0;
-	GServer.ActorTickTime	= 0;
+	ScriptExecTime			= 0;
+	ActorTickTime			= 0;
 	AudioTickTime			= 0;
 	ActorCollisionFrags		= 0;
-
-    // Slow-motion (useful for debugging)
-    static int SlowMotionTicks = 0;
-    BOOL IsPaused = this->IsPaused;
-    if(!IsPaused && GCheat->SlowMotion)
-    {
-        SlowMotionTicks++;
-        if (SlowMotionTicks < 10) IsPaused = TRUE;
-        else SlowMotionTicks = 0;
-    }
-    else SlowMotionTicks = 0;
-
-	// Update virtual (server-based) ticks:
-	if (!IsPaused) Ticks++;
 
 	// Note: We don't refresh the cache here; we refresh it
 	// in the rendering code instead, since it's more sensible
@@ -291,7 +219,7 @@ void FUnrealServer::TaskTick()
 	// Find active (input) camera:
 	ActiveCamera 	= NULL;
 	ActiveLevel 	= NULL;
-	iActiveActor	= INDEX_NONE;
+	ActiveActor		= NULL;
 	for (int i=0; i<GCameraManager->CameraArray->Num; i++)
 	{
 		Camera = GCameraManager->CameraArray->Element(i);
@@ -299,66 +227,104 @@ void FUnrealServer::TaskTick()
 		{
 			ActiveCamera	= Camera;
 			ActiveLevel		= Camera->Level;
-			iActiveActor	= Camera->iActor;
+			ActiveActor		= (AActor *)Camera->Actor;
 			break;
 		}
 	}
 
-	// Update all in-play levels:
-	for (i=0; i<Levels->Num; i++)
+	// Update the level:
+	if( Level )
 	{
-		Level = Levels->Element(i);
+		int IsPlay    = Level->GetState()==LEVEL_UpPlay;
+		int IsEdit    = Level->GetState()==LEVEL_UpEdit;
+		int NowPaused = 0;
 
-		int IsPlay = Level->GetState()==LEVEL_UpPlay;
-		int IsEdit = Level->GetState()==LEVEL_UpEdit;
-
-		if (IsPlay || (IsEdit && ActiveCamera && ActiveCamera->IsRealtime()))
+		if( IsPlay || (IsEdit && ActiveCamera && ActiveCamera->IsRealtime()) )
 		{
-            if( Level==ActiveLevel /*&& IsPlay*/ && iActiveActor != INDEX_NONE && ActiveCamera != 0 && ActiveCamera->Current )
+			// Gather input.
+			for( int iActor=0; iActor<Level->Num; iActor++ )
+			{
+				AActor *Actor = Level->Element(iActor);
+			}
+
+			// Get actions.
+            if( Level==ActiveLevel && ActiveActor && ActiveCamera && ActiveCamera->Current )
             {
-                ActiveCamera->Console->UpdateActionStatus();
+                //!!ActiveCamera->Console->UpdateActionStatus();
+				//Get pause status!!
+				NowPaused = Pauseable && 0;
             }
-            if( !IsPaused )
+
+			// Handle change of pause state.
+			if( NowPaused && !Paused )
+			{
+                GAudio.Pause();
+                Level->Log( LOG_Play, "Paused");
+				Paused = 1;
+			}
+			else if( Paused && !NowPaused )
+			{
+				GAudio.UnPause();
+				Paused = 0;
+			}
+
+			// Update the level.
+            if( !Paused )
             {
-			    Level->Tick(IsEdit || PlayersOnly,(Level==ActiveLevel)?iActiveActor:INDEX_NONE);
+			    Level->Tick
+				(
+					IsEdit || PlayersOnly,
+					(Level==ActiveLevel) ? ActiveActor : NULL,
+					DeltaSeconds
+				);
             }
 		}
+		else
+		{
+			// Update level time only.
+			Level->Tick( 2, NULL, DeltaSeconds );
+		}
 	}
-	UNGUARD("FUnrealServer::Tick");
+	unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	UPlayer resource implementation
+	UPlayer object implementation.
 -----------------------------------------------------------------------------*/
 
-void UPlayer::Register(FResourceType *Type)
-	{
-	GUARD;
-	Type->HeaderSize = sizeof (UPlayer);
-	Type->RecordSize = 0;
-	Type->Version    = 1;
-	Type->TypeFlags  = RTF_ScriptReferencable;
-	strcpy (Type->Descr,"Player");
-	UNGUARD("UPlayer::Register");
-	};
 void UPlayer::InitHeader()
-	{
-	GUARD;
+{
+	guard(UPlayer::InitHeader);
+
+	// Init UObject info.
+	UObject::InitHeader();
+	
+	// Init UPlayer info.
 	Socket	= NULL;
 	Level   = NULL;
 	iActor	= INDEX_NONE;
-	UNGUARD("UPlayer::InitHeader");
-	};
-void UPlayer::Flip()
-	{
-	GUARD;
-	//
-	appError("Not implemented; resource type is not saveable.");
-	//
-	UNGUARD("UPlayer::Flip");
-	};
-AUTOREGISTER_RESOURCE(RES_Player,UPlayer,0xB2D90874,0xCCD211cf,0x91360000,0xC028B992);
+	unguard;
+}
+IMPLEMENT_CLASS(UPlayer);
 
 /*-----------------------------------------------------------------------------
-	The End
+	Accessors.
+-----------------------------------------------------------------------------*/
+
+// Get the server's level.
+ULevel *FGlobalUnrealServer::GetLevel()
+{
+	return Level;
+}
+
+// Set the server's level.
+void FGlobalUnrealServer::SetLevel( ULevel *ThisLevel )
+{
+	if( Level ) GObj.RemoveFromRoot(Level);
+	Level = ThisLevel;
+	if( Level ) GObj.AddToRoot(Level);
+}
+
+/*-----------------------------------------------------------------------------
+	The End.
 -----------------------------------------------------------------------------*/

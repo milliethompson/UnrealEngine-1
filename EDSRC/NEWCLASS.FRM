@@ -1,29 +1,26 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmNewClass 
    Caption         =   "Create a new actor class"
    ClientHeight    =   1755
    ClientLeft      =   3765
    ClientTop       =   8385
    ClientWidth     =   4590
-   Height          =   2115
    Icon            =   "NewClass.frx":0000
-   Left            =   3705
    LinkTopic       =   "Form1"
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1755
    ScaleWidth      =   4590
    ShowInTaskbar   =   0   'False
-   Top             =   8085
-   Width           =   4710
    Begin VB.Frame Frame1 
       Caption         =   "Actor Class"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   1095
       Left            =   120
@@ -84,7 +81,9 @@ Begin VB.Form frmNewClass
    End
 End
 Attribute VB_Name = "frmNewClass"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Private Sub Cancel_Click()
     GResult = 0

@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmImportMap 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Import a map"
@@ -6,27 +6,24 @@ Begin VB.Form frmImportMap
    ClientLeft      =   2340
    ClientTop       =   5205
    ClientWidth     =   2925
-   Height          =   1890
    Icon            =   "ImpMap.frx":0000
-   Left            =   2280
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1530
    ScaleWidth      =   2925
    ShowInTaskbar   =   0   'False
-   Top             =   4905
-   Width           =   3045
    Begin VB.Frame Frame1 
       Caption         =   "Import Map Options"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   975
       Left            =   120
@@ -71,7 +68,9 @@ Begin VB.Form frmImportMap
    End
 End
 Attribute VB_Name = "frmImportMap"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 

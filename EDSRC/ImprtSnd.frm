@@ -1,18 +1,14 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmSoundImportDlg 
    Caption         =   "Import a sound"
    ClientHeight    =   2145
-   ClientLeft      =   6285
-   ClientTop       =   10755
+   ClientLeft      =   4305
+   ClientTop       =   6870
    ClientWidth     =   4935
-   Height          =   2550
-   Icon            =   "ImprtSnd.frx":0000
-   Left            =   6225
    LinkTopic       =   "Form2"
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   2145
    ScaleWidth      =   4935
-   Top             =   10410
-   Width           =   5055
    Begin VB.CommandButton Cancel 
       BackColor       =   &H00C0C0C0&
       Cancel          =   -1  'True
@@ -45,13 +41,13 @@ Begin VB.Form frmSoundImportDlg
    Begin VB.Frame Frame1 
       Caption         =   "Sound name"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   1515
       Left            =   60
@@ -124,7 +120,9 @@ Begin VB.Form frmSoundImportDlg
    End
 End
 Attribute VB_Name = "frmSoundImportDlg"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 Dim ThisFname
@@ -151,7 +149,7 @@ Public Sub DoNext()
     If frmSoundImportDlg.Fname = "" Then
         GlobalAbortedModal = 0
         AutoOk = 0
-        Unload Me ' !!!!!!!!!WAS HIDE ME -- A BUG!!!!!!!!!!!!!!
+        Unload Me
     End If
     '
     frmSoundImportDlg.SoundName = GetFileNameOnly(Fname)

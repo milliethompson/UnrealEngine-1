@@ -1,29 +1,26 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmNewTex 
    Caption         =   "Create a new texture"
    ClientHeight    =   2715
    ClientLeft      =   4695
    ClientTop       =   9135
    ClientWidth     =   4245
-   Height          =   3075
    Icon            =   "NewTex.frx":0000
-   Left            =   4635
    LinkTopic       =   "Form1"
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   2715
    ScaleWidth      =   4245
    ShowInTaskbar   =   0   'False
-   Top             =   8835
-   Width           =   4365
    Begin VB.Frame Frame2 
       Caption         =   "Size"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   795
       Left            =   60
@@ -68,13 +65,13 @@ Begin VB.Form frmNewTex
    Begin VB.Frame Frame1 
       Caption         =   "Texture"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   11.25
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   11.25
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   1215
       Left            =   60
@@ -136,7 +133,9 @@ Begin VB.Form frmNewTex
    End
 End
 Attribute VB_Name = "frmNewTex"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Private Sub Cancel_Click()
     GResult = 0

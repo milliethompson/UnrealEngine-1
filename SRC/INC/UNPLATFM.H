@@ -4,7 +4,7 @@
 	This structure is shared between the generic Unreal code base and
 	the platform-specific routines.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -14,149 +14,82 @@
 #ifndef _INC_UNPLATFM
 #define _INC_UNPLATFM
 
-#ifndef _INC_UNPORT
-#include "UnPort.h"
-#endif
-
 /*------------------------------------------------------------------------------
 	Globals.
 ------------------------------------------------------------------------------*/
 
-UNREAL_API extern class FGlobalPlatform *GApp;
+UNENGINE_API extern class FGlobalPlatform *GApp;
 
 /*------------------------------------------------------------------------------
 	FOutputDevice.
 ------------------------------------------------------------------------------*/
 
-//
-// Logging event constants for platform logging subsystem
-//
+// Logging event constants for FOutputDevice.
 enum ELogType
 {
 	LOG_None		= 0,  // Nothing.
 	LOG_Info        = 1,  // General info & non-error response to 'Exec'.
-	LOG_Critical    = 2,  // Critical errors, should always print.
-	LOG_Win         = 3,  // Errors from Windows platform code.
-	LOG_Net         = 4,  // Errors/warnings from networking calls.
-	LOG_Ed          = 5,  // Errors/warnings in Editor interface.
-	LOG_Rend        = 6,  // Errors/warnings in rendering engine.
-	LOG_File        = 7,  // Errors/warnings during file i/o.
-	LOG_Audio       = 8,  // Messages about DDE conversation.
-	LOG_Res         = 9,  // Resource errors/warnings.
-	LOG_Actor       = 10, // Actor information.
-	LOG_Server      = 11, // Server information.
-	LOG_Bug         = 12, // Quick debug message.
-	LOG_Init        = 13, // Initializing.
-	LOG_Exit        = 14, // Exiting.
-	LOG_Bsp         = 15, // Bsp.
-	LOG_Trans       = 16, // Transaction system.
-	LOG_Cmd         = 17, // Command line.
-	LOG_Play        = 18, // General gameplay messages.
-	LOG_Chat        = 19, // A chat message during gameplay.
-	LOG_Whisper     = 20, // A whisper message during gameplay.
-	LOG_Session     = 21, // A session-related message from the server.
-	LOG_Client      = 22, // A gameplay message from the client.
-	LOG_ComeGo      = 23, // A gameplay message regarding players coming and going.
-	LOG_Console		= 24, // Console commands.
-	LOG_ExecError	= 25, // Error response to Exec.
-	LOG_Task		= 26, // Task manager.
-	LOG_Debug		= 27, // Messages to show when debugging only.
-	LOG_Script		= 28, // Messages to show when debugging only.
-	LOG_MAX			= 29, // Unused tag representing maximum log value.
+	LOG_Critical    = 2,  // Critical engine errors.
+	LOG_Actor       = 3,  // Actor debug print.
+	LOG_Debug       = 4,  // Internal engine debug messages.
+	LOG_Init        = 5,  // Subsystem initializing.
+	LOG_Exit        = 6,  // Subsystem exiting.
+	LOG_Cmd         = 7,  // Command line echoed.
+	LOG_Play        = 8,  // General gameplay messages.
+	LOG_Chat        = 9,  // A chat message during gameplay.
+	LOG_Whisper     = 10, // A whisper message during gameplay.
+	LOG_Session     = 11, // A session-related message from the server.
+	LOG_Client      = 12, // A gameplay message from the client.
+	LOG_ComeGo      = 13, // A gameplay message regarding players coming and going.
+	LOG_Console		= 14, // Console commands.
+	LOG_ExecError	= 15, // Error response to Exec.
+	LOG_Problem		= 16, // Non-critical problem report.
+	LOG_ScriptWarn	= 17, // A script debugging warning.
+	LOG_ScriptLog	= 18, // A script logging message.
+	LOG_MAX			= 19, // Unused tag representing maximum log value.
 };
 
-//
 // An output device.  Player consoles, the debug log, and the script
 // compiler result text accumulator are output devices.
-//
-class UNREAL_API FOutputDevice
+class UNENGINE_API FOutputDevice
 {
 public:
-
-	virtual void Log(ELogType MsgType, const char *Text)=0;
-	virtual void Log(const char *Text);
-	virtual void VARARGS Logf(ELogType MsgType, const char *Fmt,...);
-	virtual void VARARGS Logf(const char *Fmt,...);
-	virtual void SpawnConsoleMessage();
+	virtual void Write(const void *Data, int Length, ELogType MsgType=LOG_None)=0;
+	virtual int  Log(ELogType MsgType, const char *Text);
+	virtual int  Log(const char *Text);
+	virtual int  VARARGS Logf(ELogType MsgType, const char *Fmt,...);
+	virtual int  VARARGS Logf(const char *Fmt,...);
 };
 
-/*------------------------------------------------------------------------------
-	FTask.
-------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------
+	File mappings.
+----------------------------------------------------------------------------*/
 
-//
-// Priority of a task.
-//
-enum ETaskPriority
+class FFileMapping
 {
-	PRIORITY_Realtime	= 0,	// The server.
-	PRIORITY_Normal		= 1,	// Normal priority.
-	PRIORITY_Camera		= 2,	// Only is run when other tasks are caught up.
+friend class FGlobalPlatform;
+private:
+	char   Filename[256];
+	HANDLE hFile;
+	HANDLE hFileMapping;
+	void   *Base;
 };
 
-//
-// Bit flags affecting a task.
-//
-enum ETaskFlags
+/*----------------------------------------------------------------------------
+	Platform features.
+----------------------------------------------------------------------------*/
+
+enum EPlatformFeatureFlags
 {
-	TASK_NoUserKill		= 1,	// Task can't be killed by user.
-	TASK_Paused			= 2,	// Task is paused.
+	PLAT_MMX		= 1,	// Supports MMX instrutions.
+	PLAT_PentiumPro	= 2,	// PentiumPro or better processor.
 };
-
-//
-// An Unreal task.
-//
-class UNREAL_API FTask
-{
-public:
-
-	FTask *Owner;				// Task owning this task, or NULL.
-	FOutputDevice *Out;			// Where to send task output.
-	ETaskPriority Priority;		// Priority of task.
-	int TaskFlags;				// Flags affecting task.
-	int TaskID;					// Unique number identifying task.
-	int TaskTickTime;			// CPU time consumed by most recent tick.
-
-	virtual void TaskTick()=0;
-	virtual void TaskExit()=0;
-	virtual char *TaskStatus(char *Name,char *Desc)=0;
-};
-
-/*------------------------------------------------------------------------------
-	FTaskManager.
-------------------------------------------------------------------------------*/
-
-//
-// Task manager.  Tracks all active tasks.  Tasks include
-// things like: The server daemon for a particular in-play
-// level; a camera; or a worker task like Ping.
-//
-// A task does not correspond to a Windows task or thread;
-// all tasks are run cooperative from Unreal's one and only
-// main thread via their Tick functions.
-//
-class FTaskManager
-{
-public:
-
-	virtual void Init()=0;
-	virtual void Exit()=0;
-	virtual int Exec(const char *Cmd,FOutputDevice *Out=(FOutputDevice *)GApp)=0;
-
-	virtual FTask *GetTaskByID(int TaskID)=0;
-	virtual int AddTask(FTask *Task,FTask *Owner,FOutputDevice *Out,ETaskPriority Priority,int Flags)=0;
-	virtual void KillTask(FTask *Task)=0;
-	virtual void KillTasksUsing(FOutputDevice *Out)=0;
-};
-UNREAL_API extern class FTaskManager *GTaskManager;
 
 /*----------------------------------------------------------------------------
 	FGlobalPlatform.
 ----------------------------------------------------------------------------*/
 
-//
 // Platform-specific code's communication structure.
-//
 class FGlobalPlatform : public FOutputDevice
 {
 public:
@@ -167,21 +100,26 @@ public:
 	// Variables //
 	///////////////
 
-	DWORD   PlatformVersion;
+	// Platform info.
+	DWORD   PlatformVersion;	// Version of the platform specific code.
+	DWORD	Features;			// Platform feature bits.
+
+	// Windows.
 	DWORD	hWndLog;
 	DWORD	hWndParent;
 	DWORD	hWndSlowTask;
-	DWORD	Debugging;			// =1 if run in debugger with debug version.
-	DWORD	InAppError;			// =1 if program is caught in error handler.
-	DWORD	InSlowTask;			// >0 if in a slow task.
-	DWORD	ServerLaunched;		// =1 if server has been launched.
-	DWORD	ServerAlive;		// =1 if server is up and running.
-	DWORD	LogAlive;			// =1 if logging window is up and running.
-	DWORD	GuardTrap;			// =1 if error was trapped in guarded code with try/except.
-	DWORD   KnownButtons;		// Mouse buttons that are definitely pressed.
-	DWORD	LaunchWithoutLog;	// Launch with log hidden.
-	DWORD	MMX,PentiumPro,Extra2,Extra3; // Processor features present.
 
+	// Flags.
+	BOOL	Debugging;			// =1 if run in debugger with debug version.
+	BOOL	InAppError;			// =1 if program is caught in error handler.
+	BOOL	InSlowTask;			// >0 if in a slow task.
+	BOOL	ServerLaunched;		// =1 if server has been launched.
+	BOOL	ServerAlive;		// =1 if server is up and running.
+	BOOL	LogAlive;			// =1 if logging window is up and running.
+	BOOL	GuardTrap;			// =1 if error was trapped in guarded code with try/except.
+	BOOL	LaunchWithoutLog;	// Launch with log hidden.
+
+	// Logging info.
 	BYTE	LogEventEnabled[LOG_MAX];
 	CHAR	**LogEventNames;
 	FILE	*LogFile;
@@ -192,16 +130,12 @@ public:
 	char	CmdLine			[512];	// Command line.
 	char	LogFname		[256];	// Name of log file.
 	char	ErrorHist		[2048];	// Error history.
-	BYTE	KeyDown			[256];
-	BYTE	KeyPressed		[256];
 
 	//////////////////////////////////
 	// Platform-specific subsystems //
 	//////////////////////////////////
 
-	class FRenderDevice			*RenDev;
-	class FCameraManager		*CameraManager;
-    class FPlatformInput        *Input;
+	class FCameraManagerBase	*CameraManager;
 	// Platform-dependent global audio class goes here
 	// Other global platform-specific subsystem classes go here...
 
@@ -210,14 +144,13 @@ public:
 	///////////////
 
 	// Logging.
-	virtual void	Log(ELogType Event,const char *Text);
+	virtual void	Write(const void *Data, int Length, ELogType MsgType=LOG_None);
 	virtual void	OpenLog(const char *Fname);
 	virtual void	CloseLog();
 
 	// Memory allocation.
-	virtual void	*VARARGS Malloc(int Size,char *Fmt,...);
-	virtual void	*VARARGS MallocAligned(int Size,int Alignment,char *Fmt,...);
-	virtual void	*VARARGS Realloc(void *Ptr,int NewSize,char *Fmt,...);
+	virtual void	*VARARGS Malloc(int Size,const char *Fmt,...);
+	virtual void	*VARARGS Realloc(void *Ptr,int NewSize,const char *Fmt,...);
 	virtual void	Free(void *Ptr);
 
 	// Application init & exit & critical event.
@@ -227,7 +160,7 @@ public:
 	virtual void	Exit();
 	virtual void	Error(const char *Msg);
 	virtual void	VARARGS Errorf(const char *Fmt,...);
-	virtual int		VARARGS DebugBoxf(char *Fmt,...);
+	virtual int		VARARGS DebugBoxf(const char *Fmt,...);
 	virtual void    CheckMachineState();
 	virtual void	ShutdownAfterError();
 	virtual void	DebugBreak();
@@ -244,17 +177,16 @@ public:
 	virtual QWORD	MicrosecondTime();
 	virtual FLOAT	CpuToMilliseconds(INT CpuCycles);
 	virtual void	SystemTime(INT *Year,INT *Month,INT *DayOfWeek,INT *Day,INT *Hour,INT *Min,INT *Sec,INT *MSec);
-	virtual DWORD	CreateFileMapping(const char *Name, int MaxSize, BYTE **Address);
-	virtual void    CloseFileMapping(DWORD Handle);
-	virtual void	*GetProcAddress(char *ModuleName,char *ProcName,int Checked);
+	virtual BYTE*	CreateFileMapping(FFileMapping &File, const char *Name, int MaxSize);
+	virtual void    CloseFileMapping(FFileMapping &File,INT Trunc);
+	virtual void*	GetProcAddress(const char *ModuleName,const char *ProcName,int Checked);
 	virtual void	SetParent(DWORD hWndParent);
 	virtual void	RequestExit();
 	virtual void	EdCallback(WORD Code,WORD Param);
 	virtual void	Show();
 	virtual void	Minimize();
 	virtual void	Hide();
-	virtual int		MessageBox(const char *Text,const char *Title,int YesNo); // YesNo: 1=yes/no, 0=ok
-	virtual void	ResetKeyboard();
+	virtual int		MessageBox(const char *Text,const char *Title="Message",int YesNo=0);
 	virtual void	Enable();
 	virtual void	Disable();
 	virtual void    LaunchURL(char *URL, char *Extra);
@@ -262,6 +194,8 @@ public:
 	virtual void	GetMemoryInfo(int *MemoryInUse,int *MemoryAvailable);
 	virtual int		Exec(const char *Cmd,FOutputDevice *Out=GApp);
 	virtual int		EnableFastMath(int Enable);
+	virtual int		IsNan(FLOAT f);
+	virtual int     FindFile(const char *In,char *Out);
 
     // Reading/writing profile (.ini) values.
     virtual const char * DefaultProfileFileName() const; // What is the default profile file name?
@@ -332,9 +266,7 @@ public:
     );	
 };
 
-//
-// Editor callback codes:
-//
+// Editor callback codes.
 enum EUnrealEdCallbacks
 {
 	EDC_None			= 0,	// Nothing.
@@ -353,66 +285,7 @@ enum EUnrealEdCallbacks
 	EDC_ActorChange		= 43,	// Change in actors.
 };
 
-//
-//	Keys scan codes, stolen from windows VK_ definitions.
-//
-enum EKeyScan
-{
-	K_PLUS 			= 0x6B,
-	K_BACKSPACE 	= 0x08,
-	K_CTRL 			= 0x11,
-	K_DECIMAL 		= 0x6e,
-	K_DELETE 		= 0x2e,
-	K_DIVIDE 		= 0x6f,
-	K_DOWN 			= 0x28,
-	K_END 			= 0x23,
-	K_ESCAPE 		= 0x1b,
-	K_F1 			= 0x70,
-	K_F2 			= 0x71,
-	K_F3 			= 0x72,
-	K_F4 			= 0x73,
-	K_F5 			= 0x74,
-	K_F6 			= 0x75,
-	K_F7 			= 0x76,
-	K_F8 			= 0x77,
-	K_F9 			= 0x78,
-	K_F10 			= 0x79,
-	K_F11 			= 0x7a,
-	K_F12 			= 0x7b,
-	K_HOME 			= 0x24,
-	K_INSERT 		= 0x2D,
-	K_LBUTTON 		= 0x01,
-	K_LEFT 			= 0x25,
-	K_MBUTTON 		= 0x04,
-	K_MULTIPLY 		= 0x6a,
-	K_NUMPAD0		= 0x60,
-	K_NUMPAD1 		= 0x61,
-	K_NUMPAD2 		= 0x62,
-	K_NUMPAD3 		= 0x63,
-	K_NUMPAD4 		= 0x64,
-	K_NUMPAD5 		= 0x65,
-	K_NUMPAD6 		= 0x66,
-	K_NUMPAD7 		= 0x67,
-	K_NUMPAD8 		= 0x68,
-	K_NUMPAD9 		= 0x69,
-	K_PAUSE 		= 0x13,
-	K_PAGEUP 		= 0x21,
-	K_PAGEDOWN		= 0x22,
-	K_RBUTTON 		= 0x02,
-	K_ENTER 		= 0x0d,
-	K_RIGHT 		= 0x27,
-	K_SHIFT 		= 0x10,
-	K_SPACE 		= 0x20,
-	K_SUBTRACT 		= 0x6D,
-	K_TAB 			= 0x09,
-	K_UP 			= 0x26,
-	K_MENU			= 0x12,
-	K_ALT			= 0x12,
-};
-
-//
 // Help messages sent to main window.
-//
 enum EMainWindowCmds
 {
 	IDC_HELP_ABOUT		= 32783,
@@ -421,34 +294,6 @@ enum EMainWindowCmds
 	IDC_HELP_TOPICS		= 32782,
 	IDC_HELP_WEB		= 32792,
 };
-
-/*----------------------------------------------------------------------------
-	GUARD mechanism.
-----------------------------------------------------------------------------*/
-
-//
-// !! Note !!
-// This is outdated by the new guard()/unguard macros defined in
-// UnChecks.h.
-
-//
-// GUARD and UNGUARD macros, which are used to display the calling
-// stack after appError's and GPF's for debuggerless debugging.
-//
-#if defined(_DEBUG) || NO_GUARD
-	inline void VARARGS DO_NOTHINGF(...) {};
-	#define GUARD			{
-	#define UNGUARD_BEGIN	}if(0){
-	#define UNGUARD_END		};
-	#define UNGUARD_MSGF	DO_NOTHINGF
-	#define UNGUARD(s)		};
-#else
-	#define GUARD			try{
-	#define UNGUARD_BEGIN	}catch(...){if(GApp->Debugging) GApp->DebugBreak();
-	#define UNGUARD_END		GApp->GuardTrap=1; throw;};
-	#define UNGUARD_MSGF	GApp->GuardMessagef
-	#define UNGUARD(s)		}catch(...){if(GApp->Debugging) GApp->DebugBreak(); UNGUARD_MSGF(s); GApp->GuardTrap=1; *(char*)NULL=0;};
-#endif
 
 /*-----------------------------------------------------------------------------
 	Convenience macros.
@@ -459,10 +304,12 @@ enum EMainWindowCmds
 #define appError			GApp->Error
 #define appErrorf			GApp->Errorf
 #define appMalloc			GApp->Malloc
-#define appMallocAligned	GApp->MallocAligned
 #define appRealloc			GApp->Realloc
 #define appFree				GApp->Free
+#define appMessageBox		GApp->MessageBox
+#define appDebugBoxf		GApp->DebugBoxf
 #define appMallocArray(elements,type,descr) (type *)GApp->Malloc((elements)*sizeof(type),descr)
+#define appIsNan(f)         GApp->IsNan(f)
 
 /*----------------------------------------------------------------------------
 	The End.

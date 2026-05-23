@@ -1,18 +1,15 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form Editor 
    Caption         =   "Viewer/Editor"
    ClientHeight    =   3975
    ClientLeft      =   1770
    ClientTop       =   2730
    ClientWidth     =   7410
-   Height          =   4575
    Icon            =   "Editor.frx":0000
-   Left            =   1710
    LinkTopic       =   "Form1"
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   3975
    ScaleWidth      =   7410
-   Top             =   2190
-   Width           =   7530
    Begin VB.TextBox EditorText 
       Height          =   3975
       Left            =   0
@@ -51,7 +48,9 @@ Begin VB.Form Editor
    End
 End
 Attribute VB_Name = "Editor"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' Editor.frm: GateClient text editor/viewer that

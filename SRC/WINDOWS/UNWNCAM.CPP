@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnWnCam.cpp: Unreal Windows-platform specific camera manager implementation
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	The FWindowsCameraManager tracks all windows resources associated
@@ -12,13 +12,14 @@
 		* Created by Tim Sweeney
 =============================================================================*/
 
-#include "StdAfx.h"		/* Precompiled Windows headers */
-#include "UnWn.h"		/* UnWn header */
+#include "StdAfx.h"
+#include "UnWn.h"
 
 /*-----------------------------------------------------------------------------
 	Types.
 -----------------------------------------------------------------------------*/
 
+// Camera window status.
 enum EWinCameraStatus
 {
 	WIN_CameraOpening	= 0, // Camera is opening and hWndCamera is still unknown.
@@ -26,14 +27,12 @@ enum EWinCameraStatus
 	WIN_CameraClosing	= 2, // Camera is closing and CloseCamera has been called.
 };
 
-//
-// Platform-specific camera info
-//
+// Platform-specific camera info.
 class FWinCamera
 {
 public:
-	// This is typecasted to the BYTE Platform[64] field of the
-	// CAMERA_STRUCT structure to hold platform-specific camera info.
+	// This is typecasted to the BYTE PlatformSpecific[256] field of UCamera
+	// to hold platform-specific camera info.
 
 	EWinCameraStatus Status;	// Status of the camera.
 	HWND        hWndCamera;		// hWnd of camera window.
@@ -64,25 +63,16 @@ public:
 // The following define causes Unreal.h to place the FWinCamera
 // class into UCamera's platform-specific union.  This enables
 // us to access the windows-specific information in a camera
-// via Camera->Win.
+// via Camera->Win().
 //
-#define PLATFORM_CAMERA_CLASS FWinCamera
-#include "InitGuid.h"	/* Initialize GUID's */
-
-#include "Unreal.h"
 #include "UnWnCam.h"
 #include "UnRenDev.h"
-#include "DMouse.h"
-#include "UnInput.h"
+#include "Other\DMouse.h"
 #include "UnConfig.h"
-#include "UnAction.h"
+#include "d3d.h"
 
-FVector FMeshViewStartLocation = {100.0,100.0,+60.0};
-
-static inline BOOL PlayingGame(DWORD ShowFlags)
-{
-	return GEditor == 0 || (ShowFlags&SHOW_PlayerCtrl)!=0;
-}
+FVector FMeshViewStartLocation(100.0,100.0,+60.0);
+FRenderDevice *FindRenderDevice();
 
 /*-----------------------------------------------------------------------------
 	FWindowsCameraManager constructor.
@@ -93,21 +83,21 @@ static inline BOOL PlayingGame(DWORD ShowFlags)
 // to be validated.  Not guarded.
 //
 FWindowsCameraManager::FWindowsCameraManager()
-	{
+{
 	Initialized		= 0;
 	UseDirectMouse	= 0;
 	UseDirectDraw	= 0;
 	InMenuLoop		= 0;
-	//
+
 	dd				= NULL;
 	ddFrontBuffer	= NULL;
 	ddBackBuffer	= NULL;
 	ddPalette		= NULL;
 	ddNumModes		= 0;
-	//
+
 	hMemScreenDC	= NULL;
 	DMouseHandle	= NULL;
-	};
+}
 
 /*--------------------------------------------------------------------------------
 	FWindowsCameraManager general utility functions.
@@ -132,8 +122,8 @@ UCamera *FWindowsCameraManager::CurrentCamera()
 	HWND hWndActive = GetActiveWindow();
 	if
 	(
-		hWndActive==FullscreenhWndDD
-	||	hWndActive==TestCamera->Win.hWndCamera
+		hWndActive == FullscreenhWndDD
+	||	hWndActive == TestCamera->Win().hWndCamera
 	)
 	{
 		return TestCamera;
@@ -176,7 +166,7 @@ void FWindowsCameraManager::MakeCurrent( UCamera *Camera )
 // mode of the nearest x-size to the current window. If already in
 // fullscreen, returns to non-fullscreen.
 //
-void FWindowsCameraManager::MakeFullscreen(UCamera *Camera)
+void FWindowsCameraManager::MakeFullscreen( UCamera *Camera )
 {
 	guard(FWindowsCameraManager::MakeFullscreen);
 
@@ -185,15 +175,26 @@ void FWindowsCameraManager::MakeFullscreen(UCamera *Camera)
 		// Go back to running in a window.
 		EndFullscreen();
 	}
+	else if( GCameraManager->RenDev )
+	{
+		// Fullscreen via some rendering device.
+		if( FullscreenCamera )
+			EndFullscreen();
+		SaveFullscreenWindowRect(Camera);
+		FullscreenCamera = Camera;
+		FullscreenhWndDD = NULL;
+		SetCapture( Camera->Win().hWndCamera );
+		SystemParametersInfo( SPI_SETMOUSE, 0, CaptureMouseInfo, 0 );
+		ShowCursor( FALSE );
+	}
 	else
 	{
 		// Go into fullscreen, matching closest DirectDraw mode to current window size.
 		int BestMode=-1;
-		int BestDelta=MAXINT;
-		
+		int BestDelta=MAXINT;		
 		for( int i=0; i<ddNumModes; i++ )
 		{
-			int Delta = Abs(ddModeWidth[i]-Camera->SXR);
+			int Delta = Abs(ddModeWidth[i]-Camera->X);
 			if( Delta < BestDelta )
 			{
 				BestMode  = i;
@@ -215,9 +216,36 @@ void FWindowsCameraManager::MakeFullscreen(UCamera *Camera)
 	unguard;
 }
 
+//
+// Try to go to hardware.
+//
+void TryHardware3D( UCamera *Camera )
+{
+	FRenderDevice *NewRenDev = FindRenderDevice();
+	if( GCameraManager->RenDev )
+	{
+		GCameraManager->RenDev->Exit3D();
+		GCameraManager->RenDev = NULL;
+	}
+	else if( !NewRenDev )
+	{
+		debugf( "No 3d hardware detected" );
+	}
+	else if( !NewRenDev->Init3D( Camera, Camera->X, Camera->Y ) )
+	{
+		debugf( "3d hardware initialization failed" );
+	}
+	else
+	{
+		GCameraManager->RenDev = NewRenDev;
+		GCameraManager->MakeFullscreen( Camera );
+		Camera->Console->NoteResize();
+	}
+}
+
 int	FWindowsCameraManager::IsHardware3D(UCamera *Camera)
 {
-	//return GApp->RenDev && GetMenuState(GetMenu(Camera->Win.hWndCamera),ID_HARDWARE_3D,MF_BYCOMMAND)&MF_CHECKED;
+	//return RenDev && GetMenuState(GetMenu(Camera->Win().hWndCamera),ID_HARDWARE_3D,MF_BYCOMMAND)&MF_CHECKED;
 	return 0;
 }
 
@@ -240,12 +268,12 @@ void FWindowsCameraManager::SaveFullscreenWindowRect(UCamera *Camera)
 {
 	guard(FWindowsCameraManager::SaveFullscreenWindowRect);
 
-	GetWindowRect (Camera->Win.hWndCamera,&Camera->Win.SavedWindowRect);
+	GetWindowRect (Camera->Win().hWndCamera,&Camera->Win().SavedWindowRect);
 
-	Camera->Win.SavedColorBytes = Camera->ColorBytes;
-	Camera->Win.SavedCaps		= Camera->Caps;
-	Camera->Win.SavedSXR		= Camera->SXR;
-	Camera->Win.SavedSYR		= Camera->SYR;
+	Camera->Win().SavedColorBytes = Camera->ColorBytes;
+	Camera->Win().SavedCaps		= Camera->Caps;
+	Camera->Win().SavedSXR		= Camera->X;
+	Camera->Win().SavedSYR		= Camera->Y;
 
 	unguard;
 }
@@ -336,19 +364,23 @@ void FWindowsCameraManager::StoreMove(FLOAT MouseX,FLOAT MouseY,int LButton,int 
 	FGlobalPlatform Command line.
 -----------------------------------------------------------------------------*/
 
-int FWindowsCameraManager::Exec(const char *Cmd,FOutputDevice *Out)
+int FWindowsCameraManager::Exec( const char *Cmd, FOutputDevice *Out )
 {
 	guard(FWindowsCameraManager::Exec);
 	const char *Str = Cmd;
 
-	if( GetCMD(&Str,"STATUS") )
+	if( GetCMD(&Str,"RENDEV") )
 	{
-		if( GetCMD(&Str,"CAMERAMAN") || !Str[0] )
-		{
-			Out->Logf("   CAMERAMAN - %i camera(s)",CameraArray->Num);
-			return Str[0]!=0;
-		}
-		else return 0;
+		if( RenDev )
+			return RenDev->Exec(Str,Out);
+		else
+			Out->Logf( "3d hardware not active" );
+		return 1;
+	}
+	else if( GetCMD(&Str,"GOHARD") )
+	{
+		TryHardware3D( CameraArray->Element(0) );
+		return 1;
 	}
 	else if( GetCMD(&Str,"CAMERA") )
 	{
@@ -358,13 +390,13 @@ int FWindowsCameraManager::Exec(const char *Cmd,FOutputDevice *Out)
 			for( int i=0; i<CameraArray->Num; i++ )
 			{
 				UCamera *Camera = CameraArray->Element(i);
-				Out->Logf("   %s (%ix%i)",Camera->Name,Camera->SXR,Camera->SYR);
+				Out->Logf("   %s (%ix%i)",Camera->GetName(),Camera->X,Camera->Y);
 			}
 			return 1;
 		}
 		else if( GetCMD(&Str,"OPEN") )
 		{
-			ULevel *Level = GServer.Levels->Num ? GServer.Levels->Element(0) : NULL;
+			ULevel *Level = GServer.GetLevel();
 
 			if( Level )
 			{
@@ -379,48 +411,46 @@ int FWindowsCameraManager::Exec(const char *Cmd,FOutputDevice *Out)
 					else Temp=1;
 				}
 				else Camera = new(NULL,CREATE_Unique)UCamera(Level);
+				checkState(Camera->Actor!=NULL);
 
-				APawn *CameraActor  = &Camera->GetActor();
-
-				DWORD hWndParent=0; GetDWORD(Str,"HWND=",&hWndParent);
+				DWORD hWndParent=0;
+				GetDWORD(Str,"HWND=",&hWndParent);
 
 				GetINT (Str,"X=", &Camera->OpenX);
 				GetINT (Str,"Y=", &Camera->OpenY);
-				GetINT (Str,"XR=",&Camera->SXR);
-				GetINT (Str,"YR=",&Camera->SYR);
-				GetFLOAT(Str,"FOV=",&CameraActor->FovAngle);
+				GetINT (Str,"XR=",&Camera->X);
+				GetINT (Str,"YR=",&Camera->Y);
+				GetFLOAT(Str,"FOV=",&Camera->Actor->FovAngle);
 
-				if (Camera->SXR<0) Camera->SXR=0;
-				if (Camera->SYR<0) Camera->SYR=0;
+				if (Camera->X<0) Camera->X=0;
+				if (Camera->Y<0) Camera->Y=0;
 
-				CameraActor->Misc1=0;
-				CameraActor->Misc2=0;
-				GetINT(Str,"FLAGS=",&CameraActor->ShowFlags);
-				GetINT(Str,"REN=",  &CameraActor->RendMap);
-				GetINT(Str,"MISC1=",&CameraActor->Misc1);
-				GetINT(Str,"MISC2=",&CameraActor->Misc2);
+				Camera->Actor->Misc1=0;
+				Camera->Actor->Misc2=0;
+				Camera->MiscRes=NULL;
+				GetINT(Str,"FLAGS=",&Camera->Actor->ShowFlags);
+				GetINT(Str,"REN=",  &Camera->Actor->RendMap);
+				GetINT(Str,"MISC1=",&Camera->Actor->Misc1);
+				GetINT(Str,"MISC2=",&Camera->Actor->Misc2);
 
-				if( (CameraActor->RendMap==REN_MeshView) && !Temp )
-				{
-					CameraActor->Location = FMeshViewStartLocation;
-					CameraActor->ViewRot.Yaw=0x6000;
-				}
-				switch( CameraActor->RendMap )
+				switch( Camera->Actor->RendMap )
 				{
 					case REN_TexView:
-						GetUTexture(Str,"TEXTURE=",(UTexture **)&Camera->MiscRes); 
+						GetUTexture(Str,"TEXTURE=",*(UTexture **)&Camera->MiscRes); 
 						break;
 					case REN_MeshView:
-						GetUMeshMap(Str,"MESH=",(UMeshMap **)&Camera->MiscRes); 
+						if( !Temp )
+						{
+							Camera->Actor->Location = FMeshViewStartLocation;
+							Camera->Actor->ViewRotation.Yaw=0x6000;
+						}
+						GetOBJ(Str,"MESH=", UMesh::GetBaseClass(), (UObject **)&Camera->MiscRes); 
 						break;
 					case REN_TexBrowser:
-						GetNAME(Str,"FAMILY=",&Camera->MiscName); 
+						GetUTextureSet(Str,"SET=",*(UTextureSet**)&Camera->MiscRes); 
 						break;
 					case REN_MeshBrowser:
-						GetNAME(Str,"FAMILY=",	&Camera->MiscName); 
-						break;
-					default:
-						if(Camera->IsOrtho()) Camera->ColorBytes = 1;
+						GetUArray(Str,"ARRAY=",*(UArray**)&Camera->MiscRes); 
 						break;
 				}
 				Camera->OpenWindow(hWndParent,0);
@@ -430,7 +460,7 @@ int FWindowsCameraManager::Exec(const char *Cmd,FOutputDevice *Out)
 		}
 		else if( GetCMD(&Str,"HIDESTANDARD") )
 		{
-			GCameraManager->ShowCameraWindows(SHOW_StandardView,0);
+			ShowCameraWindows(SHOW_StandardView,0);
 			return 1;
 		}
 		else if( GetCMD(&Str,"CLOSE") )
@@ -438,17 +468,17 @@ int FWindowsCameraManager::Exec(const char *Cmd,FOutputDevice *Out)
 			UCamera *Camera;
 			if( GetCMD(&Str,"ALL") )
 			{
-				GCameraManager->CloseWindowChildren(0);
+				CloseWindowChildren(0);
 			}
 			else if( GetCMD(&Str,"FREE") )
 			{
-				GCameraManager->CloseWindowChildren(MAXDWORD);
+				CloseWindowChildren(MAXDWORD);
 			}
-			else if( GetUCamera(Str,"NAME=",&Camera) )
+			else if( GetUCamera(Str,"NAME=",Camera) )
 			{
 				Camera->Kill();
 			}
-			else Out->Log("Missing name");
+			else Out->Log( "Missing name" );
 			return 1;
 		}
 		else return 0;
@@ -562,7 +592,6 @@ char *FWindowsCameraManager::ddError(HRESULT Result)
 		case DDERR_WASSTILLDRAWING:					return "DDERR_WASSTILLDRAWING";
 		case DDERR_WRONGMODE:						return "DDERR_WRONGMODE";
 		case DDERR_XALIGN:							return "DDERR_XALIGN";
-#ifdef DDRAW_2
 		case DDERR_CANTPAGELOCK:					return "DDERR_CANTPAGELOCK";
 		case DDERR_CANTPAGEUNLOCK:					return "DDERR_CANTPAGEUNLOCK";
 		case DDERR_DCALREADYCREATED:				return "DDERR_DCALREADYCREATED";
@@ -570,7 +599,43 @@ char *FWindowsCameraManager::ddError(HRESULT Result)
 		case DDERR_NOMIPMAPHW:						return "DDERR_NOMIPMAPHW";
 		case DDERR_NOTPAGELOCKED:					return "DDERR_NOTPAGELOCKED";
 		case DDERR_CANTLOCKSURFACE:					return "DDERR_CANTLOCKSURFACE";
-#endif
+		case D3DERR_BADMAJORVERSION:				return "D3DERR_BADMAJORVERSION";
+		case D3DERR_BADMINORVERSION:				return "D3DERR_BADMINORVERSION";
+//		case D3DERR_INVALID_DEVICE:					return "D3DERR_INVALID_DEVICE";
+		case D3DERR_EXECUTE_CREATE_FAILED:			return "D3DERR_EXECUTE_CREATE_FAILED";
+		case D3DERR_EXECUTE_DESTROY_FAILED:			return "D3DERR_EXECUTE_DESTROY_FAILED";
+		case D3DERR_EXECUTE_LOCK_FAILED:			return "D3DERR_EXECUTE_LOCK_FAILED";
+		case D3DERR_EXECUTE_UNLOCK_FAILED:			return "D3DERR_EXECUTE_UNLOCK_FAILED";
+		case D3DERR_EXECUTE_LOCKED:					return "D3DERR_EXECUTE_LOCKED";
+		case D3DERR_EXECUTE_NOT_LOCKED:				return "D3DERR_EXECUTE_NOT_LOCKED";
+		case D3DERR_EXECUTE_FAILED:					return "D3DERR_EXECUTE_FAILED";
+		case D3DERR_EXECUTE_CLIPPED_FAILED:			return "D3DERR_EXECUTE_CLIPPED_FAILED";
+		case D3DERR_TEXTURE_NO_SUPPORT:				return "D3DERR_TEXTURE_NO_SUPPORT";
+		case D3DERR_TEXTURE_CREATE_FAILED:			return "D3DERR_TEXTURE_CREATE_FAILED";
+		case D3DERR_TEXTURE_DESTROY_FAILED:			return "D3DERR_TEXTURE_DESTROY_FAILED";
+		case D3DERR_TEXTURE_LOCK_FAILED:			return "D3DERR_TEXTURE_LOCK_FAILED";
+		case D3DERR_TEXTURE_UNLOCK_FAILED:			return "D3DERR_TEXTURE_UNLOCK_FAILED";
+		case D3DERR_TEXTURE_LOAD_FAILED:			return "D3DERR_TEXTURE_LOAD_FAILED";
+		case D3DERR_TEXTURE_SWAP_FAILED:			return "D3DERR_TEXTURE_SWAP_FAILED";
+		case D3DERR_TEXTURE_LOCKED:					return "D3DERR_TEXTURE_LOCKED";
+		case D3DERR_TEXTURE_NOT_LOCKED:				return "D3DERR_TEXTURE_NOT_LOCKED";
+		case D3DERR_TEXTURE_GETSURF_FAILED:			return "D3DERR_TEXTURE_GETSURF_FAILED";
+		case D3DERR_MATRIX_CREATE_FAILED:			return "D3DERR_MATRIX_CREATE_FAILED";
+		case D3DERR_MATRIX_DESTROY_FAILED:			return "D3DERR_MATRIX_DESTROY_FAILED";
+		case D3DERR_MATRIX_SETDATA_FAILED:			return "D3DERR_MATRIX_SETDATA_FAILED";
+		case D3DERR_MATRIX_GETDATA_FAILED:			return "D3DERR_MATRIX_GETDATA_FAILED";
+		case D3DERR_SETVIEWPORTDATA_FAILED:			return "D3DERR_SETVIEWPORTDATA_FAILED";
+		case D3DERR_MATERIAL_CREATE_FAILED:			return "D3DERR_MATERIAL_CREATE_FAILED";
+		case D3DERR_MATERIAL_DESTROY_FAILED:		return "D3DERR_MATERIAL_DESTROY_FAILED";
+		case D3DERR_MATERIAL_SETDATA_FAILED:		return "D3DERR_MATERIAL_SETDATA_FAILED";
+		case D3DERR_MATERIAL_GETDATA_FAILED:		return "D3DERR_MATERIAL_GETDATA_FAILED";
+		case D3DERR_LIGHT_SET_FAILED:				return "D3DERR_LIGHT_SET_FAILED";
+		case D3DERR_SCENE_IN_SCENE:					return "D3DERR_SCENE_IN_SCENE";
+		case D3DERR_SCENE_NOT_IN_SCENE:				return "D3DERR_SCENE_NOT_IN_SCENE";
+		case D3DERR_SCENE_BEGIN_FAILED:				return "D3DERR_SCENE_BEGIN_FAILED";
+		case D3DERR_SCENE_END_FAILED:				return "D3DERR_SCENE_END_FAILED";
+//		case D3DERR_INBEGIN:						return "D3DERR_INBEGIN";
+//		case D3DERR_NOTINBEGIN:						return "D3DERR_NOTINBEGIN";
 		default:									return "Unknown error";
 	}
 	unguard;
@@ -643,9 +708,9 @@ void FWindowsCameraManager::FindAvailableModes(UCamera *Camera)
 
 		SetFocus(hWndFocus);
 	}
-	if( Camera->Win.hWndCamera )
+	if( Camera->Win().hWndCamera )
 	{
-		HMENU hMenu  = GetMenu(Camera->Win.hWndCamera);
+		HMENU hMenu  = GetMenu(Camera->Win().hWndCamera);
 		if (!hMenu) 
 			goto Done;
 
@@ -661,11 +726,11 @@ void FWindowsCameraManager::FindAvailableModes(UCamera *Camera)
 		int n=GetMenuItemCount(hSizes);
 		for (int i=0; i<n; i++) if (!DeleteMenu(hSizes,0,MF_BYPOSITION)) appErrorf("DeleteMenu failed %i",GetLastError());
 
-		AppendMenu(hSizes,MF_STRING,ID_COLOR_8BIT,"&8-bit color");
-		AppendMenu(hSizes,MF_STRING,ID_COLOR_16BIT,"&16-bit color");
-		AppendMenu(hSizes,MF_STRING,ID_COLOR_32BIT,"&32-bit color");
+		AppendMenu( hSizes, MF_STRING, ID_COLOR_8BIT,  "&8-bit color"  );
+		AppendMenu( hSizes, MF_STRING, ID_COLOR_16BIT, "&16-bit color" );
+		AppendMenu( hSizes, MF_STRING, ID_COLOR_32BIT, "&32-bit color" );
 
-		if( !(Camera->GetActor().ShowFlags & SHOW_ChildWindow) )
+		if( !(Camera->Actor->ShowFlags & SHOW_ChildWindow) )
 		{
 			AppendMenu(hSizes,MF_SEPARATOR,0,NULL);
 
@@ -688,7 +753,7 @@ void FWindowsCameraManager::FindAvailableModes(UCamera *Camera)
 				if (!AppendMenu(hSizes,MF_STRING,ID_DDMODE_0+i,Text)) 
 					appErrorf("AppendMenu failed %i",GetLastError());
 			}
-			DrawMenuBar(Camera->Win.hWndCamera);
+			DrawMenuBar(Camera->Win().hWndCamera);
 		}
 	}
 	Done:;
@@ -698,15 +763,19 @@ void FWindowsCameraManager::FindAvailableModes(UCamera *Camera)
 //
 // DirectDraw driver enumeration callback.
 //
-BOOL WINAPI ddEnumDriversCallback(GUID *GUID, char *DriverDescription, char *DriverName,
-    void *Context)
+BOOL WINAPI ddEnumDriversCallback( GUID *GUID, char *DriverDescription, char *DriverName, void *Context )
 {
 	guard(ddEnumDriversCallback);
-
 	FWindowsCameraManager *CameraManager = (FWindowsCameraManager *)Context;
-	debugf(LOG_Win,"   %s (%s)",DriverName,DriverDescription);
-	return DDENUMRET_OK;
 
+	debugf(LOG_Info,"   %s (%s)",DriverName,DriverDescription);
+	if( CameraManager->NumDD < FWindowsCameraManager::MAX_DD )
+	{
+		if( GUID ) CameraManager->ddGUIDs[CameraManager->NumDD] = *GUID;
+		CameraManager->NumDD++;
+	}
+
+	return DDENUMRET_OK;
 	unguard;
 }
 
@@ -736,25 +805,33 @@ int FWindowsCameraManager::ddInit()
 		return 0;
 	}
 
+	// Show available DirectDraw drivers. This is useful in analyzing the
+	// log for the cause of errors.
+	NumDD = 0;
+	debug(LOG_Info,"DirectDraw drivers:");
+	ddEnumFunc( ddEnumDriversCallback, this );
+	if( NumDD == 0 )
+	{
+		debug(LOG_Init,"No DirectDraw drivers found");
+		return 0;
+	}
+
 	// Init direct draw and see if it's available.
 	IDirectDraw *dd1;
-	Result = (*ddCreateFunc)(NULL, &dd1, NULL);
+	Result = (*ddCreateFunc)( NULL, &dd1, NULL );
+	//Result = (*ddCreateFunc)( NumDD==1 ? NULL : &ddGUIDs[NumDD-1], &dd1, NULL );
 	if( Result != DD_OK )
 	{
 		debugf(LOG_Init,"DirectDraw created failed: %s",ddError(Result));
    		return 0;
 	}
-#ifdef DDRAW_1
-		dd = dd1;
-#else
-		Result = dd1->QueryInterface(IID_IDirectDraw2,(void**)&dd);
-		if( Result != DD_OK )
-		{
-			dd1->Release();
-			debugf(LOG_Init,"DirectDraw2 interface not available");
-   			return 0;
-		}
-#endif
+	Result = dd1->QueryInterface(IID_IDirectDraw2,(void**)&dd);
+	if( Result != DD_OK )
+	{
+		dd1->Release();
+		debugf(LOG_Init,"DirectDraw2 interface not available");
+   		return 0;
+	}
 	debug(LOG_Init,"DirectDraw initialized successfully");
 
 	// Find out DirectDraw capabilities.
@@ -777,11 +854,6 @@ int FWindowsCameraManager::ddInit()
 	sprintf(Caps+strlen(Caps)," MEM=%i",D.dwVidMemTotal);
 	debug(LOG_Init,Caps);
 
-	// Show available DirectDraw drivers. This is useful in analyzing the
-	// log for the cause of errors.
-	debug(LOG_Win,"DirectDraw drivers:");
-	ddEnumFunc(ddEnumDriversCallback,this);
-
 	return 1;
 	unguard;
 }
@@ -801,7 +873,7 @@ int FWindowsCameraManager::ddSetMode(HWND hWndParent,int Width, int Height,int C
 
 	if( !dd )
 	{
-		debug (LOG_Win,"DirectDraw: Not initialized");
+		debug (LOG_Info,"DirectDraw: Not initialized");
 		return 0;
 	}
 
@@ -810,19 +882,15 @@ int FWindowsCameraManager::ddSetMode(HWND hWndParent,int Width, int Height,int C
 	Result = dd->SetCooperativeLevel(hWndParent,DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN | DDSCL_ALLOWMODEX | DDSCL_ALLOWREBOOT);
 	if( Result != DD_OK )
 	{
-		debugf(LOG_Win,"DirectDraw SetCooperativeLevel: %s",ddError(Result));
+		debugf(LOG_Info,"DirectDraw SetCooperativeLevel: %s",ddError(Result));
 		GAudio.UnPause();
    		return 0;
 	}
-	debugf(LOG_Info,"Setting %ix%i %i",Width,Height,ColorBytes*8);
-#ifdef DDRAW_1
-		Result = dd->SetDisplayMode (Width,Height,ColorBytes*8);
-#else
-		Result = dd->SetDisplayMode (Width,Height,ColorBytes*8,0,0);
-#endif
+	debugf( LOG_Info, "Setting %ix%i %i", Width, Height, ColorBytes*8 );
+	Result = dd->SetDisplayMode (Width,Height,ColorBytes*8,0,0);
 	if( Result != DD_OK )
 	{
-		debugf(LOG_Win,"DirectDraw Failed %ix%ix%i: %s",Width,Height,ColorBytes,ddError(Result));
+		debugf(LOG_Info,"DirectDraw Failed %ix%ix%i: %s",Width,Height,ColorBytes,ddError(Result));
 		ddEndMode();
 		GAudio.UnPause();
    		return 0;
@@ -834,31 +902,37 @@ int FWindowsCameraManager::ddSetMode(HWND hWndParent,int Width, int Height,int C
 
 	SurfaceDesc.dwSize = sizeof(DDSURFACEDESC);
 	SurfaceDesc.dwFlags = DDSD_CAPS | DDSD_BACKBUFFERCOUNT;
-	SurfaceDesc.dwBackBufferCount = 2;
 	SurfaceDesc.ddsCaps.dwCaps    =
 		DDSCAPS_PRIMARYSURFACE |
 		DDSCAPS_FLIP           |
 		DDSCAPS_COMPLEX        |
 		DDSCAPS_VIDEOMEMORY;
+
+	// Update caps if hardware 3d.
+	if( Caps & CC_Hardware3D )
+		SurfaceDesc.ddsCaps.dwCaps |= DDSCAPS_3DDEVICE;
+
+	// Update caps if low-res.
 	if( Width==320 )
-	{
 		SurfaceDesc.ddsCaps.dwCaps |= DDSCAPS_MODEX;
-	}
-	else
+
+	// Create the best possible surface for rendering.
+	if( 1 )
 	{
 		// Try triple-buffered video memory surface.
+		SurfaceDesc.dwBackBufferCount = 2;
 		Result = dd->CreateSurface(&SurfaceDesc, &ddFrontBuffer, NULL);
 		Descr  = "Triple buffer";
 	}
-	if( (Width==320) || (Result != DD_OK) )
+	if( Result != DD_OK )
    	{
 		// Try to get a double buffered video memory surface.
 		SurfaceDesc.dwBackBufferCount = 1; 
 		Result = dd->CreateSurface(&SurfaceDesc, &ddFrontBuffer, NULL);
 		Descr  = "Double buffer";
     }
-	if( Result != DD_OK )
-	   {
+	if( (Result != DD_OK) && !(Caps & CC_Hardware3D) )
+	{
 		// Settle for a main memory surface.
 		SurfaceDesc.ddsCaps.dwCaps &= ~DDSCAPS_VIDEOMEMORY;
 		Result = dd->CreateSurface(&SurfaceDesc, &ddFrontBuffer, NULL);
@@ -866,22 +940,19 @@ int FWindowsCameraManager::ddSetMode(HWND hWndParent,int Width, int Height,int C
     }
 	if( Result != DD_OK )
 	{
-		debugf(LOG_Win,"DirectDraw, no available modes %s",ddError(Result));
+		debugf(LOG_Info,"DirectDraw, no available modes %s",ddError(Result));
 		ddEndMode();
 		GAudio.UnPause();
 	   	return 0;
 	}
-	debugf (LOG_Win,"DirectDraw: %s, %ix%i, Stride=%i",Descr,Width,Height,SurfaceDesc.lPitch);
-
-#ifdef DDRAW_2
-	debugf (LOG_Win,"DirectDraw: Rate=%i",SurfaceDesc.dwRefreshRate);
-#endif
+	debugf (LOG_Info,"DirectDraw: %s, %ix%i, Stride=%i",Descr,Width,Height,SurfaceDesc.lPitch);
+	debugf (LOG_Info,"DirectDraw: Rate=%i",SurfaceDesc.dwRefreshRate);
 
 	// Get a pointer to the back buffer.
 	caps.dwCaps = DDSCAPS_BACKBUFFER;
 	if( ddFrontBuffer->GetAttachedSurface(&caps, &ddBackBuffer) != DD_OK )
 	{
-		debugf(LOG_Win,"DirectDraw GetAttachedSurface failed %s",ddError(Result));
+		debugf(LOG_Info,"DirectDraw GetAttachedSurface failed %s",ddError(Result));
 		ddEndMode();
 		GAudio.UnPause();
 	}
@@ -889,7 +960,7 @@ int FWindowsCameraManager::ddSetMode(HWND hWndParent,int Width, int Height,int C
 	// Get pixel format.
 	DDPIXELFORMAT PixelFormat;
 	PixelFormat.dwSize = sizeof(DDPIXELFORMAT);
-	Result = ddFrontBuffer->GetPixelFormat(&PixelFormat);
+	Result = ddFrontBuffer->GetPixelFormat( &PixelFormat );
 	if( Result != DD_OK )
 	{
 		ddEndMode();
@@ -897,7 +968,7 @@ int FWindowsCameraManager::ddSetMode(HWND hWndParent,int Width, int Height,int C
 	}
 	
 	// See if we're in a 16-bit color mode.
-	if ((ColorBytes==2) && (PixelFormat.dwRBitMask==0xf800)) 
+	if( ColorBytes==2 && PixelFormat.dwRBitMask==0xf800 ) 
 		Caps |= CC_RGB565;
 	else 
 		Caps &= ~CC_RGB565;
@@ -948,7 +1019,7 @@ void FWindowsCameraManager::ddEndMode()
 	guard(FWindowsCameraManager::ddEndMode);
 
 	HRESULT Result;
-	debugf(LOG_Win,"DirectDraw End Mode");
+	debugf( LOG_Info, "DirectDraw End Mode" );
 	if( dd )
 	{
 		// Release all buffers.
@@ -957,20 +1028,24 @@ void FWindowsCameraManager::ddEndMode()
 		if (ddPalette)     {ddPalette->Release();        ddPalette = NULL;};
 
 		Result = dd->SetCooperativeLevel (App.Dialog->m_hWnd,DDSCL_NORMAL);
-		if (Result!=DD_OK) debugf(LOG_Win,"DirectDraw SetCooperativeLevel: %s",ddError(Result));
+		if( Result!=DD_OK )
+			debugf(LOG_Info,"DirectDraw SetCooperativeLevel: %s",ddError(Result));
 
 		Result = dd->RestoreDisplayMode();
-		if (Result!=DD_OK) debugf(LOG_Win,"DirectDraw RestoreDisplayMode: %s",ddError(Result));
+		if( Result!=DD_OK )
+			debugf(LOG_Info,"DirectDraw RestoreDisplayMode: %s",ddError(Result));
 
 		Result = dd->FlipToGDISurface(); // Ignore error (this is ok).
 
-		SetCapture (NULL);
-		if (ShowCursor(TRUE)>0) 
-			ShowCursor(FALSE);
+		SetCapture( NULL );
+		SystemParametersInfo( SPI_SETMOUSE, 0, NormalMouseInfo, 0 );
+		if( ShowCursor(TRUE) > 0 )
+			ShowCursor( FALSE );
 	}
-	if( GApp->GuardTrap )
+	if( !GApp->GuardTrap )
 	{
-		// Flush the cache, unless we're ending DirectDraw due to a crash.
+		// Flush the cache unless we're ending DirectDraw due to a crash.
+		debugf( "Flushing cache" );
 		GCache.Flush();
 	}
 	unguard;
@@ -998,12 +1073,18 @@ void FWindowsCameraManager::ddExit()
 // Try to set DirectDraw mode with a particular camera.
 // Returns 1 if success, 0 if failure.
 //
-int FWindowsCameraManager::ddSetCamera(UCamera *Camera, int Width, int Height,
-	int ColorBytes, int RequestedCaps)
+int FWindowsCameraManager::ddSetCamera
+(
+	UCamera *Camera,
+	int Width,
+	int Height,
+	int ColorBytes,
+	int RequestedCaps
+)
 {
 	guard(FWindowsCameraManager::ddSetCamera);
 
-	if (FullscreenCamera)
+	if( FullscreenCamera )
 		EndFullscreen();
 	
 	SaveFullscreenWindowRect(Camera);
@@ -1011,20 +1092,20 @@ int FWindowsCameraManager::ddSetCamera(UCamera *Camera, int Width, int Height,
 	Camera->Hold();
 	FullscreenCamera = Camera;
 
-	if( !ddSetMode(Camera->Win.hWndCamera,Width,Height,ColorBytes,RequestedCaps) )
+	if( !ddSetMode(Camera->Win().hWndCamera,Width,Height,ColorBytes,RequestedCaps) )
 	{
-		RECT *Rect = &Camera->Win.SavedWindowRect;
+		RECT *Rect = &Camera->Win().SavedWindowRect;
 
 		Camera->Unhold	();
 		InitFullscreen	();
-		MoveWindow		(Camera->Win.hWndCamera,Rect->left,Rect->top,Rect->right-Rect->left,Rect->bottom-Rect->top,1);
-		SetOnTop		(Camera->Win.hWndCamera);
+		MoveWindow		(Camera->Win().hWndCamera,Rect->left,Rect->top,Rect->right-Rect->left,Rect->bottom-Rect->top,1);
+		SetOnTop		(Camera->Win().hWndCamera);
 		GApp->MessageBox("DirectDraw was unable to set the requested video mode.","Can't use DirectDraw support",0);
 		return 0;
 	}
 	else Camera->Unhold();
 
-	FullscreenhWndDD = Camera->Win.hWndCamera;
+	FullscreenhWndDD = Camera->Win().hWndCamera;
 
 	// Resize frame buffer without redrawing.
 	ResizeCameraFrameBuffer
@@ -1036,19 +1117,16 @@ int FWindowsCameraManager::ddSetCamera(UCamera *Camera, int Width, int Height,
 		BLIT_DIRECTDRAW,
 		0
 	);
-	SetCapture (Camera->Win.hWndCamera);
-	ShowCursor (FALSE);
+	SetCapture(Camera->Win().hWndCamera);
+	SystemParametersInfo(SPI_SETMOUSE,0,CaptureMouseInfo,0);
+	ShowCursor(FALSE);
 
-	GGfx.SetPalette();
+	SetPalette(GGfx.DefaultPalette);
 
-	if (UseDirectMouse)
+	if( UseDirectMouse )
 		dmStart();
 
 	Camera->Caps = RequestedCaps;
-	if (Camera->Caps & CC_Hardware3D)
-	{
-		GApp->RenDev->Init3D();
-	}
 	return 1;
 	unguard;
 }
@@ -1135,37 +1213,16 @@ void FWindowsCameraManager::dmTick()
 			State & MOUSE_BUTTON3_ASYNC, // Middle button.
 			State & MOUSE_BUTTON2_ASYNC  // Right button.
 		);
+		/*!!
         if( GApp->Input->CapturingMouse() )
 			{
-            const int dX = MouseX; /* DMouseState.mouse_delta_x;*/
-            const int dY = MouseY; /* DMouseState.mouse_delta_y;*/
+            const int dX = MouseX; // DMouseState.mouse_delta_x;
+            const int dY = MouseY; // DMouseState.mouse_delta_y;
             GApp->Input->NoteChange( FPlatformInput::M_MouseR, dX );
             GApp->Input->NoteChange( FPlatformInput::M_MouseB, dY );
 			}
+		*/
 		}
-	unguard;
-}
-
-//
-// Return the stored mouse movement, and reset it.
-//
-void FWindowsCameraManager::GetStoredMove(UCamera *Camera,FVector *Move,FFloatRotation *Rot)
-{
-	guard(FWindowsCameraManager::GetStoredMove);
-	if( Camera==CurrentCamera() )
-	{
-		if (DMouseHandle) 
-			dmTick();
-
-		*Move = StoredMove;
-		*Rot  = StoredRot;
-
-		ResetModes();
-	}
-	else
-	{
-		Move->X = Move->Y = Move->Z = Rot->Pitch = Rot->Yaw = Rot->Roll = 0.0;
-	}
 	unguard;
 }
 
@@ -1227,11 +1284,10 @@ void FWindowsCameraManager::SetCameraClientSize(UCamera *Camera, int NewWidth, i
 {
 	guard(FWindowsCameraManager::SetCameraClientSize);
 
-	Camera->Win.Aspect = NewHeight ? ((FLOAT)NewWidth / (FLOAT)NewHeight) : 1.0;
+	Camera->Win().Aspect = NewHeight ? ((FLOAT)NewWidth / (FLOAT)NewHeight) : 1.0;
 
-	APawn *Actor  = &Camera->GetActor();
 	StopClippingCursor	(Camera,0);
-	SetSize				(Camera->Win.hWndCamera,NewWidth,NewHeight,(Actor->ShowFlags & SHOW_Menu)?TRUE:FALSE);
+	SetSize				(Camera->Win().hWndCamera,NewWidth,NewHeight,(Camera->Actor->ShowFlags & SHOW_Menu)?TRUE:FALSE);
 
 	if( UpdateProfile )
 	{
@@ -1249,15 +1305,15 @@ void FWindowsCameraManager::SetCameraBufferSize(UCamera *Camera, int NewWidth, i
 	int NewColorBytes)
 {
 	guard(FWindowsCameraManager::SetCameraBufferSize);
-	if( Camera->Locked || Camera->OnHold )
+	if( Camera->IsLocked() || Camera->OnHold )
 	{
 		// A virtual buffer is being written to by rendering routines.
 		// Set NeedResize to cause virtual screen buffer to be
 		// resized on next call to cameraUnlock.
-		Camera->Win.NeedResize			= 1;
-		Camera->Win.ResizeSXR			= NewWidth;
-		Camera->Win.ResizeSYR			= NewHeight;
-		Camera->Win.ResizeColorBytes	= NewColorBytes;
+		Camera->Win().NeedResize		= 1;
+		Camera->Win().ResizeSXR			= NewWidth;
+		Camera->Win().ResizeSYR			= NewHeight;
+		Camera->Win().ResizeColorBytes	= NewColorBytes;
 	}
 	else
 	{
@@ -1266,7 +1322,7 @@ void FWindowsCameraManager::SetCameraBufferSize(UCamera *Camera, int NewWidth, i
 	unguard;
 }
 
-void FWindowsCameraManager::SetColorDepth(UCamera *Camera, int NewColorBytes)
+void FWindowsCameraManager::SetColorDepth( UCamera *Camera, int NewColorBytes )
 {
 	guard(FWindowsCameraManager::SetColorDepth);
 
@@ -1275,21 +1331,21 @@ void FWindowsCameraManager::SetColorDepth(UCamera *Camera, int NewColorBytes)
 		UCamera *TempCamera = CameraArray->Element(i);
 		if( (Camera==TempCamera)||(Camera==NULL) )
 		{
-			if( TempCamera->Win.hWndCamera==FullscreenhWndDD )
+			if( TempCamera->Win().hWndCamera==FullscreenhWndDD )
 			{
 				ddSetCamera
 				(
 					TempCamera,
-					TempCamera->SXR,
-					TempCamera->SYR,
-					(TempCamera->Caps & CC_Hardware3D) ? 2 : NewColorBytes,
-					(TempCamera->Caps & CC_Hardware3D) ? 1 : 0
+					TempCamera->X,
+					TempCamera->Y,
+					NewColorBytes,
+					TempCamera->Caps
 				);
-				GGfx.SetPalette();
+				SetPalette(GGfx.DefaultPalette);
 			}
 			else
 			{
-				SetCameraBufferSize(TempCamera,TempCamera->SXR,TempCamera->SYR,NewColorBytes);
+				SetCameraBufferSize(TempCamera,TempCamera->X,TempCamera->Y,NewColorBytes);
 				FindAvailableModes(TempCamera);
 			}
 		}
@@ -1309,9 +1365,9 @@ void FWindowsCameraManager::FreeCameraStuff(UCamera *Camera)
 {
 	guard(FWindowsCameraManager::FreeCameraStuff);
 
-	if (Camera->Win.BitmapInfo	!= NULL) appFree		(Camera->Win.BitmapInfo);
-	if (Camera->Win.hBitmap		!= NULL) DeleteObject	(Camera->Win.hBitmap);
-	if (Camera->Win.hFile		!= NULL) CloseHandle	(Camera->Win.hFile);
+	if (Camera->Win().BitmapInfo	!= NULL) appFree		(Camera->Win().BitmapInfo);
+	if (Camera->Win().hBitmap		!= NULL) DeleteObject	(Camera->Win().hBitmap);
+	if (Camera->Win().hFile			!= NULL) CloseHandle	(Camera->Win().hFile);
 
 	unguard;
 }
@@ -1320,34 +1376,33 @@ void FWindowsCameraManager::FreeCameraStuff(UCamera *Camera)
 // Allocate a DIB for a camera.  Camera must not be locked.
 // Can't fail.
 //
-void FWindowsCameraManager::AllocateCameraDIB(UCamera *Camera, int BlitType)
+void FWindowsCameraManager::AllocateCameraDIB( UCamera *Camera, int BlitType )
 {
 	guard(FWindowsCameraManager::AllocateCameraDIB);
 
 	// Free existing DIBSection stuff if it has been allocated.
-	FreeCameraStuff (Camera);
+	FreeCameraStuff( Camera );
 
-	UTexture *Texture = Camera->Texture;
+	UTexture *Texture   = Camera->Texture;
 	Texture->USize		= 0;
 	Texture->VSize		= 0;
 	Texture->ColorBytes	= 0;
 
-	BYTE *TextureData = NULL;
+	BYTE *TextureData   = NULL;
 
 	// Allocate DIB for the camera.
 	DWORD DataSize = sizeof(BITMAPINFOHEADER) + 256*sizeof(RGBQUAD);
-	if( (BlitType!=BLIT_DIBSECTION)&&(BlitType!=BLIT_DIRECTDRAW) )
-	{
-		DataSize += Align4(Camera->SXR) * Camera->SYR * Camera->ColorBytes;
-	}
+	if( BlitType!=BLIT_DIBSECTION && BlitType!=BLIT_DIRECTDRAW )
+		DataSize += Align(Camera->X,4) * Camera->Y * Camera->ColorBytes;
+
 	BITMAPINFO *BitmapInfo		= (BITMAPINFO *)appMalloc(DataSize,"BitmapInfo");
 	BITMAPINFOHEADER *Header	= &BitmapInfo->bmiHeader;
 	Header->biSize				= sizeof(BITMAPINFOHEADER);
-	Header->biWidth				= (int)Camera->SXR;
-	Header->biHeight			= -(int)Camera->SYR; // Direction = 1 bottom-up, -1 top-down
+	Header->biWidth				= (int)Camera->X;
+	Header->biHeight			= -(int)Camera->Y; // Direction = 1 bottom-up, -1 top-down
 	Header->biPlanes			= 1;
 	Header->biBitCount			= Camera->ColorBytes * 8;
-	Header->biSizeImage			= Camera->SXR * Camera->SYR * Camera->ColorBytes;
+	Header->biSizeImage			= Camera->X * Camera->Y * Camera->ColorBytes;
 	Header->biXPelsPerMeter		= 0;
 	Header->biYPelsPerMeter		= 0;
 	Header->biClrUsed			= 0;
@@ -1356,33 +1411,37 @@ void FWindowsCameraManager::AllocateCameraDIB(UCamera *Camera, int BlitType)
 	if( Camera->ColorBytes == 1 )
 	{
 		// 256-color.
-		Camera->Caps &= ~(CC_RGB565);
 		Header->biCompression = BI_RGB;
+		GGfx.DefaultPalette->Lock(LOCK_Read);
 		for( int i=0; i<256; i++ )
 		{
-			BitmapInfo->bmiColors[i].rgbRed   = GGfx.DefaultColors[i].Red;
-			BitmapInfo->bmiColors[i].rgbGreen = GGfx.DefaultColors[i].Green;
-			BitmapInfo->bmiColors[i].rgbBlue  = GGfx.DefaultColors[i].Blue;
+			BitmapInfo->bmiColors[i].rgbRed   = GGfx.DefaultPalette(i).R;
+			BitmapInfo->bmiColors[i].rgbGreen = GGfx.DefaultPalette(i).G;
+			BitmapInfo->bmiColors[i].rgbBlue  = GGfx.DefaultPalette(i).B;
 		}
+		GGfx.DefaultPalette->Unlock(LOCK_Read);
 	}
 	else if( Camera->ColorBytes==2 )
 	{
-		// 16-bit color (565).
-		Camera->Caps |= CC_RGB565;
-		Header->biCompression = BI_BITFIELDS;
-		*(DWORD *)&BitmapInfo->bmiColors[0]=0xF800;
-		*(DWORD *)&BitmapInfo->bmiColors[1]=0x07E0;
-		*(DWORD *)&BitmapInfo->bmiColors[2]=0x001F;
-		/* Use this to default to RGB-555)
-		Camera->Caps &= ~(CC_RGB565);
-		Header->biCompression = BI_RGB;
-		*(DWORD *)&BitmapInfo->bmiColors[0]=0;
-		*/
+		if( Camera->Caps & CC_RGB565 )
+		{
+			// 16-bit color (565).
+			Header->biCompression = BI_BITFIELDS;
+			*(DWORD *)&BitmapInfo->bmiColors[0]=0xF800;
+			*(DWORD *)&BitmapInfo->bmiColors[1]=0x07E0;
+			*(DWORD *)&BitmapInfo->bmiColors[2]=0x001F;
+		}
+		else
+		{
+			Header->biCompression = BI_BITFIELDS;
+			*(DWORD *)&BitmapInfo->bmiColors[0]=0x7C00;
+			*(DWORD *)&BitmapInfo->bmiColors[1]=0x03E0;
+			*(DWORD *)&BitmapInfo->bmiColors[2]=0x001F;
+		}
 	}
 	/* Disabled - 24 bit color is not supported anymore.
 	else if( Camera->ColorBytes==3 ) // 24-bit color.
 	{
-		Camera->Caps &= ~(CC_RGB565);
 		Header->biCompression = BI_RGB;
 		*(DWORD *)&BitmapInfo->bmiColors[0]=0;
 	}
@@ -1390,70 +1449,70 @@ void FWindowsCameraManager::AllocateCameraDIB(UCamera *Camera, int BlitType)
 	else if( Camera->ColorBytes == 4 )
 	{
 		// 32-bit color.
-		Camera->Caps &= ~(CC_RGB565);
-		Header->biCompression = BI_RGB;
+		Header->biCompression  = BI_RGB;
 		*(DWORD *)&BitmapInfo->bmiColors[0]=0;
 	}
 	else
 	{
-		appErrorf("Invalid color depth %i",Camera->ColorBytes);
+		appErrorf( "Invalid color depth %i", Camera->ColorBytes );
 	}
-	Camera->Win.BitmapInfo = BitmapInfo;
+	Camera->Win().BitmapInfo = BitmapInfo;
 
 	if( BlitType == BLIT_DIBSECTION )
 	{
-		// Create file mapping for DIB section:
-
-		// Create unique name for file mapping
+		// Create unique name for file mapping.
 		char Name[256];
 		sprintf(Name,"CameraDIB%i_%i",(int)GApp->hWndLog,(int)Camera);
-		Camera->Win.hFile = CreateFileMapping ((HANDLE)0xFFFFFFFF,NULL,PAGE_READWRITE,0,0x800000,Name);
+		Camera->Win().hFile = CreateFileMapping( (HANDLE)0xFFFFFFFF, NULL, PAGE_READWRITE, 0, 0x800000, Name );
 
-		if( Camera->Win.hFile==NULL )
-			appError
+		if( Camera->Win().hFile==NULL ) appError
 			(
 				"Unreal has run out of virtual memory. "
 				"To prevent this condition, you must free up more space "
 				"on your primary hard disk."
 			);
 		
-		if( Camera->SXR && Camera->SYR )
+		if( Camera->X && Camera->Y )
 		{
 			HDC TempDC = GetDC(0);
-			Camera->Win.hBitmap = CreateDIBSection(TempDC,Camera->Win.BitmapInfo,DIB_RGB_COLORS,(void**)&TextureData,Camera->Win.hFile,0);
-			ReleaseDC (0,TempDC);
-			if( Camera->Win.hBitmap==NULL )
-			{
-				// CreateDibSection fails mainly when we run out of memory:
-				GApp->Logf("CreateDIBSection failed, Size=%ix%i",Camera->SXR,Camera->SYR);
-				appError
-				(
-					"Unreal has run out of virtual memory. "
-					"To prevent this condition, you must free up more space "
-					"on your primary hard disk."
-				);
-			}
+			checkState(TempDC!=NULL);
+			Camera->Win().hBitmap = CreateDIBSection
+			(
+				TempDC,
+				Camera->Win().BitmapInfo,
+				DIB_RGB_COLORS, 
+				(void**)&TextureData,
+				Camera->Win().hFile,
+				0
+			);
+			ReleaseDC( 0, TempDC );
+			if( Camera->Win().hBitmap==NULL ) appError
+			(
+				"Unreal has run out of virtual memory. "
+				"To prevent this condition, you must free up more space "
+				"on your primary hard disk."
+			);
 		}
-		else Camera->Win.hBitmap=NULL;
+		else Camera->Win().hBitmap = NULL;
 	}
 	else if( BlitType == BLIT_DIRECTDRAW )
 	{
-		TextureData = (BYTE *)Camera->Win.BitmapInfo + sizeof(BITMAPINFOHEADER);
-		if (Camera->ColorBytes==1) TextureData += 256*sizeof(RGBQUAD);
+		TextureData = (BYTE *)Camera->Win().BitmapInfo + sizeof(BITMAPINFOHEADER);
+		if( Camera->ColorBytes==1 )
+			TextureData += 256*sizeof(RGBQUAD);
 	}
 
-	// Set texture resource data.
-	Camera->Data        = &Camera->Win.BitmapInfo;
-	Texture->Data		= TextureData;
+	// Set texture object data.
+	Texture->SetData(TextureData);
 
-	Texture->USize		= Camera->SXR;
-	Texture->VSize		= Camera->SYR;
+	Texture->USize		= Camera->X;
+	Texture->VSize		= Camera->Y;
 	Texture->ColorBytes	= Camera->ColorBytes;
-	Texture->Palette	= GGfx.GammaPalette;
+	Texture->Palette	= GGfx.DefaultPalette;
 
 	// Flag texture and camera to force custom freeing.
-	Camera->SetFlags(RF_NoFree);
-	Camera->Texture->SetFlags(RF_NoFree);
+	Camera->SetFlags(RF_NoFreeData);
+	Camera->Texture->SetFlags(RF_NoFreeData);
 
 	unguard;
 }
@@ -1465,24 +1524,24 @@ void FWindowsCameraManager::AllocateCameraDIB(UCamera *Camera, int BlitType)
 //
 // Resize the camera's frame buffer. Unconditional.
 //
-void FWindowsCameraManager::ResizeCameraFrameBuffer(UCamera *Camera, 
-	int NewSXR, int NewSYR, int NewColorBytes, int BlitType, int Redraw)
+void FWindowsCameraManager::ResizeCameraFrameBuffer( UCamera *Camera, 
+	int NewSXR, int NewSYR, int NewColorBytes, int BlitType, int Redraw )
 {
 	guard(FWindowsCameraManager::ResizeCameraFrameBuffer);
 
-	Camera->Win.NeedResize = 0;
+	Camera->Win().NeedResize = 0;
 
 	// Ignore resize orders if no change in sizes.
-	Camera->SXR				= NewSXR;
-	Camera->SYR				= NewSYR;
+	Camera->X				= NewSXR;
+	Camera->Y				= NewSYR;
 	Camera->ColorBytes		= NewColorBytes;
 
 	Camera->Console->NoteResize();
 
 	AllocateCameraDIB(Camera,BlitType);
-	Camera->UpdateWindow(); // Redraw camera menu/title.
+	Camera->UpdateWindow();
 	
-	if (Redraw && Camera->SXR && Camera->SYR)
+	if( Redraw && Camera->X && Camera->Y )
 		Camera->Draw(0);
 	
 	unguard;
@@ -1502,13 +1561,13 @@ void FWindowsCameraManager::StopClippingCursor( UCamera *Camera, int RestorePos 
 	guard(FWindowsCameraManager::StopClippingCursor);
 
 	int DoShowCursor=0;
-	if( Camera->Win.SaveCursor.x >= 0 )
+	if( Camera->Win().SaveCursor.x >= 0 )
 	{
 		if( RestorePos )
         {
-            SetCursorPos( Camera->Win.SaveCursor.x,Camera->Win.SaveCursor.y );
+            SetCursorPos( Camera->Win().SaveCursor.x,Camera->Win().SaveCursor.y );
         }
-		Camera->Win.SaveCursor.x = -1;
+		Camera->Win().SaveCursor.x = -1;
 		Camera->Move( BUT_LASTRELEASE,0,0,0,0 );
 		DoShowCursor = 1;
 	}
@@ -1517,7 +1576,10 @@ void FWindowsCameraManager::StopClippingCursor( UCamera *Camera, int RestorePos 
   	ClipCursor( NULL );
 
 	if( !FullscreenCamera )
+	{
 		SetCapture( NULL );
+		SystemParametersInfo( SPI_SETMOUSE, 0, NormalMouseInfo, 0 );
+	}
 	
 	if( DoShowCursor )
 		ShowCursor( TRUE );
@@ -1539,7 +1601,7 @@ void FWindowsCameraManager::StopClippingCursor( UCamera *Camera, int RestorePos 
 LRESULT FAR PASCAL CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 {
 	guard(CameraWndProc);
-	if( GApp && GApp->ServerAlive && !GApp->InAppError )
+	if( GApp && GApp->ServerAlive && !GApp->InAppError && !GApp->hWndSlowTask )
 	{
 		return ((FWindowsCameraManager *)(GApp->CameraManager))->CameraWndProc
 		(
@@ -1575,13 +1637,13 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 	for( int i=0; i<CameraArray->Num; i++ )
 	{
 		Camera = CameraArray->Element(i);
-		if( Camera->Win.hWndCamera==hWnd )
+		if( Camera->Win().hWndCamera==hWnd )
 		{
 			// Found existing camera.
 			Found=1;
 			break;
 		}
-     	else if( (Camera->Win.hWndCamera==NULL) && (iMessage==WM_CREATE) )
+     	else if( (Camera->Win().hWndCamera==NULL) && (iMessage==WM_CREATE) )
        	{
 			// Found camera that is being created.
 			Found=1;
@@ -1595,28 +1657,28 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 		switch( iMessage )
 		{
 			case WM_CREATE:
-				debug (LOG_Win,"Couldn't find camera on create");
+				debug (LOG_Info,"Couldn't find camera on create");
 				break;
 			case WM_DESTROY:
-				debug (LOG_Win,"Couldn't find camera on destroy");
+				debug (LOG_Info,"Couldn't find camera on destroy");
 				break;
 			case WM_PAINT:
-				debug (LOG_Win,"Couldn't find camera on paint");
+				debug (LOG_Info,"Couldn't find camera on paint");
 				break;
 		}
 		return DefWindowProc (hWnd,iMessage,wParam,lParam);
 	}
 	if (Camera->OnHold) return 0;
 
-	APawn *Actor	= (Camera->iActor!=INDEX_NONE) ? &Camera->GetActor() : NULL;
-	ShowFlags		= Actor ? Actor->ShowFlags : 0;
+	ShowFlags = Camera->Actor ? Camera->Actor->ShowFlags : 0;
 
 	// Message handler.
 	switch (iMessage)
 	{
 		case WM_CREATE:
+		{
 			guard(WM_CREATE);
-			if( Camera->Win.hWndCamera != NULL )
+			if( Camera->Win().hWndCamera != NULL )
 			{
 				appError("Window already exists");
 				return -1;
@@ -1624,8 +1686,8 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			else
 			{
          		// Set hWndCamera.
-         		Camera->Win.hWndCamera = hWnd;
-				Camera->Win.Status     = WIN_CameraNormal; 
+         		Camera->Win().hWndCamera = hWnd;
+				Camera->Win().Status     = WIN_CameraNormal; 
 
          		// Set up the the palette for this window.
          		HDC hDC = GetDC(hWnd);
@@ -1634,11 +1696,11 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
          		ReleaseDC      (hWnd,hDC);
 
          		// Paint DIB (which was allocated before window was created).
-				if( Camera->SXR && Camera->SYR )
+				if( Camera->X && Camera->Y )
 				{
-					ICamera CameraInfo;
-         			if (Camera->Lock(&CameraInfo))
-						Camera->Unlock(&CameraInfo,1);
+         			if( Camera->Lock(LOCK_ReadWrite|LOCK_CanFail) )
+						// Unlock and blit it.
+						Camera->Unlock(LOCK_ReadWrite,1);
 				}
 
 				// Make this camera current and update its title bar.
@@ -1646,13 +1708,24 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 				return 0;
 			}
 			unguard;
+		}
 		case WM_DESTROY:
+		{
 			guard(WM_DESTROY);
 
 			// If there's an existing Camera structure corresponding to
 			// this window, deactivate it.
-			if (FullscreenCamera)
+			if( FullscreenCamera )
 				EndFullscreen();
+
+			// Restore focus to caller if desired.
+			DWORD ParentWindow=0;
+			GetDWORD( GApp->CmdLine, "HWND=", &ParentWindow );
+			if( ParentWindow )
+			{
+				SetParent( Camera->Win().hWndCamera, NULL );
+				SetFocus( (HWND)ParentWindow );
+			}
 
 			// Free DIB section stuff (if any).
 			FreeCameraStuff   (Camera);
@@ -1660,41 +1733,44 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			// Stop clipping but don't restore cursor position.
 			StopClippingCursor(Camera,0);
 
-			if( Camera->Win.Status==WIN_CameraNormal )
+			if( Camera->Win().Status==WIN_CameraNormal )
 			{
 				// Closed by user clicking on window's close button.
 				// Must call general-purpose camera closing routine.
 				
-				Camera->Win.Status = WIN_CameraClosing; // Prevent recursion.
+				Camera->Win().Status = WIN_CameraClosing; // Prevent recursion.
 				Camera->Kill();
 			}
-			debug(LOG_Win,"Closed camera");
+			debug(LOG_Info,"Closed camera");
 			return 0;
 			unguard;
+		}
 		case WM_PAINT:
+		{
 			guard(WM_PAINT);
-
 			if
 			(
-				IsWindowVisible(Camera->Win.hWndCamera)
-			&&	Camera->SXR 
-			&&  Camera->SYR
+				IsWindowVisible(Camera->Win().hWndCamera)
+			&&	Camera->X 
+			&&  Camera->Y
 			&&	!FullscreenCamera
 			&&	!Camera->OnHold
 			)
 			{
 				PAINTSTRUCT ps;
-				ICamera CameraInfo;
 
 				BeginPaint(hWnd,&ps);
-         		if (Camera->Lock(&CameraInfo))
-					Camera->Unlock (&CameraInfo,1);
+         		if( Camera->Lock(LOCK_ReadWrite|LOCK_CanFail) )
+					// Unlock and blit it.
+					Camera->Unlock(LOCK_ReadWrite,1);
 				EndPaint(hWnd,&ps);
 				return 0;
 			}
 			else return -1;
 			unguard;
+		}
 		case WM_PALETTECHANGED:
+		{
 			guard(WM_PALETTECHANGED);
 			if( ((HWND)wParam != hWnd) && (Camera->ColorBytes==1) && (!FullscreenCamera) )
 			{				 
@@ -1705,7 +1781,9 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			}
 			return 0;
 			unguard;
+		}
 		case WM_QUERYNEWPALETTE:
+		{
 			guard(WM_QUERYNEWPALETTE);
 			if( (Camera->ColorBytes==1) && (!FullscreenCamera) )
 			{
@@ -1717,19 +1795,21 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			}
 			else return FALSE;
 			unguard;
+		}
 		case WM_COMMAND:
+		{
 			guard(WM_COMMAND);
       		switch (wParam)
 			{
-				case ID_MAP_DYNLIGHT:	Actor->RendMap=REN_DynLight; break;
-				case ID_MAP_PLAINTEX:	Actor->RendMap=REN_PlainTex; break;
-				case ID_MAP_WIRE:		Actor->RendMap=REN_Wire; break;
-				case ID_MAP_OVERHEAD:	Actor->RendMap=REN_OrthXY; break;
-				case ID_MAP_XZ:  		Actor->RendMap=REN_OrthXZ; break;
-				case ID_MAP_YZ:  		Actor->RendMap=REN_OrthYZ; break;
-				case ID_MAP_POLYS:		Actor->RendMap=REN_Polys; break;
-				case ID_MAP_POLYCUTS:	Actor->RendMap=REN_PolyCuts; break;
-				case ID_MAP_ZONES:		Actor->RendMap=REN_Zones; break;
+				case ID_MAP_DYNLIGHT:	Camera->Actor->RendMap=REN_DynLight; break;
+				case ID_MAP_PLAINTEX:	Camera->Actor->RendMap=REN_PlainTex; break;
+				case ID_MAP_WIRE:		Camera->Actor->RendMap=REN_Wire; break;
+				case ID_MAP_OVERHEAD:	Camera->Actor->RendMap=REN_OrthXY; break;
+				case ID_MAP_XZ:  		Camera->Actor->RendMap=REN_OrthXZ; break;
+				case ID_MAP_YZ:  		Camera->Actor->RendMap=REN_OrthYZ; break;
+				case ID_MAP_POLYS:		Camera->Actor->RendMap=REN_Polys; break;
+				case ID_MAP_POLYCUTS:	Camera->Actor->RendMap=REN_PolyCuts; break;
+				case ID_MAP_ZONES:		Camera->Actor->RendMap=REN_Zones; break;
 				case ID_WIN_320:		SetCameraClientSize(Camera,320,200,1); break;
 				case ID_WIN_400:		SetCameraClientSize(Camera,400,300,1); break;
 				case ID_WIN_512:		SetCameraClientSize(Camera,512,384,1); break;
@@ -1739,26 +1819,26 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 				case ID_COLOR_16BIT:	SetColorDepth(Camera,2); break;
 				case ID_COLOR_32BIT:	SetColorDepth(Camera,4); break;
 
-				case ID_SHOW_BACKDROP:	Actor->ShowFlags ^= SHOW_Backdrop; break;
+				case ID_SHOW_BACKDROP:	Camera->Actor->ShowFlags ^= SHOW_Backdrop; break;
 
 				case ID_ACTORS_SHOW:
-					Actor->ShowFlags &= ~(SHOW_Actors | SHOW_ActorIcons | SHOW_ActorRadii); 
-					Actor->ShowFlags |= SHOW_Actors; 
+					Camera->Actor->ShowFlags &= ~(SHOW_Actors | SHOW_ActorIcons | SHOW_ActorRadii); 
+					Camera->Actor->ShowFlags |= SHOW_Actors; 
 					break;
 				case ID_ACTORS_ICONS:
-					Actor->ShowFlags &= ~(SHOW_Actors | SHOW_ActorIcons | SHOW_ActorRadii); 
-					Actor->ShowFlags |= SHOW_Actors | SHOW_ActorIcons;
+					Camera->Actor->ShowFlags &= ~(SHOW_Actors | SHOW_ActorIcons | SHOW_ActorRadii); 
+					Camera->Actor->ShowFlags |= SHOW_Actors | SHOW_ActorIcons;
 					break;
 				case ID_ACTORS_RADII:
-					Actor->ShowFlags &= ~(SHOW_Actors | SHOW_ActorIcons | SHOW_ActorRadii); 
-					Actor->ShowFlags |= SHOW_Actors | SHOW_ActorIcons | SHOW_ActorRadii;
+					Camera->Actor->ShowFlags &= ~(SHOW_Actors | SHOW_ActorIcons | SHOW_ActorRadii); 
+					Camera->Actor->ShowFlags |= SHOW_Actors | SHOW_ActorRadii;
 					break;
 				case ID_ACTORS_HIDE:
-					Actor->ShowFlags &= ~(SHOW_Actors | SHOW_ActorIcons | SHOW_ActorRadii); 
+					Camera->Actor->ShowFlags &= ~(SHOW_Actors | SHOW_ActorIcons | SHOW_ActorRadii); 
 					break;
-				case ID_SHOW_COORDS:	Actor->ShowFlags ^= SHOW_Coords; break;
-				case ID_SHOW_BRUSH:		Actor->ShowFlags ^= SHOW_Brush; break;
-				case ID_SHOW_MOVINGBRUSHES: Actor->ShowFlags ^= SHOW_MovingBrushes; break;
+				case ID_SHOW_COORDS:	Camera->Actor->ShowFlags ^= SHOW_Coords; break;
+				case ID_SHOW_BRUSH:		Camera->Actor->ShowFlags ^= SHOW_Brush; break;
+				case ID_SHOW_MOVINGBRUSHES: Camera->Actor->ShowFlags ^= SHOW_MovingBrushes; break;
 
 				case ID_HELP_ABOUT:		PostMessage(App.Dialog->m_hWnd,WM_COMMAND,IDC_HELP_ABOUT,0); break;
 				case ID_HELP_TOPICS:	PostMessage(App.Dialog->m_hWnd,WM_COMMAND,IDC_HELP_TOPICS,0); break;
@@ -1783,13 +1863,16 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 					Toggle(GetMenu(hWnd),ID_WIN_TOP);
 					SetOnTop(hWnd);
 					break;
+				case ID_HARDWARE_3D:
+					TryHardware3D( Camera );
+					break;
 				default:
-				if( (wParam>=ID_DDMODE_0) && (wParam<=ID_DDMODE_9) )
+				if( wParam>=ID_DDMODE_0 && wParam<=ID_DDMODE_9 )
 				{
 					ddSetCamera
 					(
 						Camera,
-						ddModeWidth[wParam-ID_DDMODE_0],
+						ddModeWidth [wParam-ID_DDMODE_0],
 						ddModeHeight[wParam-ID_DDMODE_0],
 						IsHardware3D(Camera) ? 2 : Camera->ColorBytes,
 						IsHardware3D(Camera) ? CC_Hardware3D : 0
@@ -1800,39 +1883,33 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			Camera->UpdateWindow();
 			return 0;
 			unguard;
+		}
 		case WM_KEYDOWN:
 		case WM_SYSKEYDOWN:
 		{
 			guard(WM_KEYDOWN);
 
 			// Get key code.
-			int Key = wParam;
-			
-			// Set the key as pressed if it's not already down.
-			if (!GApp->KeyDown[(BYTE)Key])
-				GApp->KeyPressed[(BYTE)Key] = 1;
+			EInputKey Key = (EInputKey)wParam;
 
-			// Mark the key as down.
-			GApp->KeyDown [(BYTE)Key] = 1;
-
-			// See if the game should absorb ther keystroke.
-			if (((Key==VK_UP) || (Key==VK_DOWN) || (Key==VK_LEFT) || (Key==VK_RIGHT) ||
-				(Key==VK_PRIOR) || (Key==VK_NEXT)) &&
-				Camera->Key(Key+256))
-			{
-				if (!Camera->IsRealtime())
+			// Send key to input system.
+			if( Camera->Process(Key,IST_Press) )
+			{	
+				// Redraw if the camera won't be redrawn on timer.
+				if( !Camera->IsRealtime() )
 					Camera->Draw(0);
 			}
-			else if	(Key==K_F1)		PostMessage ((HWND)Camera->ParentWindow,iMessage,K_F2,lParam);
-			else if (Key==K_DELETE)	Camera->Key(Key);
-			else if (Key==K_ENTER)	Camera->Key(Key);
-			else if (Key==VK_F11)	Camera->Key(Key+256);
-			else if (Key!=VK_TAB)	PostMessage ((HWND)Camera->ParentWindow,iMessage,wParam,lParam);
-            if( PlayingGame(ShowFlags) && Key < 256 && GApp->Input->CapturingKeyboard() ) // < 256 is a safety check
+
+			// Send to UnrealEd.
+			if( Camera->ParentWindow && GEditor )
 			{
-                const FInput::TSwitch Switch = GApp->Input->WindowsKeySwitches[Key];
-                GApp->Input->Press(Switch);
-            }
+				if( Key==IK_F1 )
+					PostMessage ((HWND)Camera->ParentWindow,iMessage,IK_F2,lParam);
+				else if( Key!=IK_Tab && Key!=IK_Enter )
+					PostMessage ((HWND)Camera->ParentWindow,iMessage,wParam,lParam);
+			}
+
+			// Set the cursor.
 			SetModeCursor(Camera);
 
 			return 0;
@@ -1842,70 +1919,84 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 		case WM_SYSKEYUP:
 		{
 			guard(WM_KEYUP);
-			int Key = wParam;
-			GApp->KeyDown[(BYTE)Key] = 0;
 
-			if( Camera->ParentWindow )
-			{				
-				// Pass keystroke on to UnrealEd.
-				if		(Key==K_F1)		PostMessage((HWND)Camera->ParentWindow,iMessage,K_F2,lParam);
-				else if (Key!=VK_TAB)	PostMessage((HWND)Camera->ParentWindow,iMessage,wParam,lParam);
+			// Send to the input system.
+			EInputKey Key = (EInputKey)wParam;
+			if( Camera->Process(Key,IST_Release) )
+			{	
+				// Redraw if the camera won't be redrawn on timer.
+				if( !Camera->IsRealtime() )
+					Camera->Draw(0);
 			}
+
+			// Pass keystroke on to UnrealEd.
+			if( Camera->ParentWindow && GEditor )
+			{				
+				if( Key == IK_F1 )
+					PostMessage((HWND)Camera->ParentWindow,iMessage,IK_F2,lParam);
+				else if( Key!=IK_Tab && Key!=IK_Enter )
+					PostMessage((HWND)Camera->ParentWindow,iMessage,wParam,lParam);
+			}
+
+			// Set the cursor.
 			SetModeCursor(Camera);
-            if( PlayingGame(ShowFlags) && Key < 256 && GApp->Input->CapturingKeyboard() ) // <256 is a safety check
-    		{
-                GApp->Input->Release( GApp->Input->WindowsKeySwitches[Key] );
-            }
 			return 0;
 			unguard;
 		}
 		case WM_SYSCHAR:
 		case WM_CHAR:
 		{
-			guard(WM_SYSCHAR);
+			guard(WM_CHAR);
 			int Key = wParam;
-			if( (Key!=K_ENTER) && Camera->Key(Key) )
+			if( Key!=IK_Enter && Camera->Key(Key) )
 			{
-				if (!Camera->IsRealtime())
+				// Redraw if needed.
+				if( !Camera->IsRealtime() )
 					Camera->Draw(0);
 				
 				SetModeCursor(Camera);
 			}
-			else if (iMessage==WM_SYSCHAR)
+			else if( iMessage == WM_SYSCHAR )
 			{
-				return DefWindowProc (hWnd,iMessage,wParam,lParam);
+				// Perform default processing.
+				return DefWindowProc( hWnd, iMessage, wParam, lParam );
 			}
 			return 0;
 			unguard;
 		}
 		case WM_KILLFOCUS:
+		{
 			guard(WM_KILLFOCUS);
-			StopClippingCursor (Camera,0);
-			GApp->ResetKeyboard();
+			StopClippingCursor( Camera, 0 );
+			Camera->Input->ResetInput();
+			if( FullscreenCamera )
+				EndFullscreen();
             MakeCurrent(0);
 			return 0;
+
 			unguard;
+		}
 		case WM_SETFOCUS:
+		{
 			guard(WM_SETFOCUS);
-			// This window has just received the input focus.  Update the "*"'s in the
-			// camera titles to show which one is current.
-			GApp->ResetKeyboard();
+
+			// Reset camera's input.
+			Camera->Input->ResetInput();
 			
-			if( Camera )
-				MakeCurrent(Camera);
-            
-			if( PlayingGame(ShowFlags) )
-            { 
-                GApp->Input->CaptureDevices(TRUE); 
-                GApp->Input->StartNextInputCycle();
-            }
-			return 0;
+			// Make this camera current.
+			MakeCurrent( Camera );
+            return 0;
+
 			unguard;
+		}
 		case WM_ERASEBKGND:
-			// Prevents Windows from repainting client background in white.
+		{
+			// Prevent Windows from repainting client background in white.
 			return 0;
 			break;
+		}
 		case WM_SETCURSOR:
+		{
 			guard(WM_SETCURSOR);
 			if( (LOWORD(lParam)==1) || GApp->InSlowTask )
 			{
@@ -1919,7 +2010,9 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 				return DefWindowProc (hWnd,iMessage,wParam,lParam);
 			}
 			unguard;
+		}
 		case WM_LBUTTONDBLCLK:
+		{
 			guard(WM_LBUTTONDBLCLK);
             if (ShowFlags & SHOW_NoCapture)
 			{
@@ -1929,49 +2022,33 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			}
 			return 0;
 			unguard;
+		}
 		case WM_LBUTTONDOWN:
 		case WM_RBUTTONDOWN:
 		case WM_MBUTTONDOWN:
+		{
 			guard(WM_BUTTONDOWN);
-			
+
 			if( InMenuLoop )
-				return DefWindowProc (hWnd,iMessage,wParam,lParam);
+				return DefWindowProc( hWnd, iMessage, wParam, lParam );
 			
 			if( iMessage == WM_LBUTTONDOWN )
 			{
-                if( PlayingGame(ShowFlags) && GApp->Input->CapturingMouse() )
-                {
-                    GApp->Input->Press( FPlatformInput::S_LeftMouse );
-                }
-				GApp->KnownButtons |= MK_LBUTTON;
 				MovedSinceLeftClick = 0;
 				StartTimeLeftClick = GetMessageTime();
-				GApp->KeyDown [K_LBUTTON] = 1;
-				GApp->KeyPressed [K_LBUTTON] = 1;
+				Camera->Process(IK_LButton,IST_Press);
 			}
 			else if( iMessage == WM_RBUTTONDOWN )
 			{
-                if( PlayingGame(ShowFlags) && GApp->Input->CapturingMouse() )
-                {
-                    GApp->Input->Press( FPlatformInput::S_RightMouse );
-                }
-				GApp->KnownButtons |= MK_RBUTTON;
 				MovedSinceRightClick = 0;
 				StartTimeRightClick = GetMessageTime();
-				GApp->KeyDown [K_RBUTTON] = 1;
-				GApp->KeyPressed [K_RBUTTON] = 1;
+				Camera->Process(IK_RButton,IST_Press);
 			}
 			else if( iMessage == WM_MBUTTONDOWN )
 			{
-                if( PlayingGame(ShowFlags) && GApp->Input->CapturingMouse() )
-                {
-                    GApp->Input->Press( FPlatformInput::S_MiddleMouse );
-                }
-				GApp->KnownButtons |= MK_MBUTTON;
 				MovedSinceMiddleClick = 0;
 				StartTimeMiddleClick = GetMessageTime();
-				GApp->KeyDown [K_MBUTTON] = 1;
-				GApp->KeyPressed [K_MBUTTON] = 1;
+				Camera->Process(IK_MButton,IST_Press);
 			}
 			if( ShowFlags & SHOW_NoCapture )
 			{
@@ -1981,10 +2058,10 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			}
 			else
 			{
-				if( Camera->Win.SaveCursor.x==-1 )
+				if( Camera->Win().SaveCursor.x == -1 )
 				{
 					RECT TempRect;
-					GetCursorPos    (&(Camera->Win.SaveCursor));
+					GetCursorPos    (&(Camera->Win().SaveCursor));
 					GetClientRect   (hWnd,&TempRect);
 					
 					// Get screen coords of this window.
@@ -1996,8 +2073,16 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 					ClipCursor      (&TempRect); 
 					
 					ShowCursor      (FALSE);
-					if (!FullscreenCamera) SetCapture (hWnd);
-					if (UseDirectMouse) dmStart();
+					if( !FullscreenCamera )
+					{
+						SetCapture( hWnd );
+						SystemParametersInfo( SPI_SETMOUSE, 0, CaptureMouseInfo, 0 );
+
+					}
+					if( UseDirectMouse )
+					{
+						dmStart();
+					}
 					
 					// Tell camera that an initial mouse button was just hit.
 					Camera->Move(BUT_FIRSTHIT,0,0,0,0);
@@ -2005,10 +2090,14 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			}
 			return 0;
 			unguard;
+		}
 		case WM_MOUSEACTIVATE:
+		{
 			// Activate this window and send the mouse-down message.
 			return MA_ACTIVATE;
+		}
 		case WM_ACTIVATE:
+		{
 			guard(WM_ACTIVATE);
 			if( wParam==0 )
 			{
@@ -2018,6 +2107,7 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			}
 			return 0;
 			unguard;
+		}
 		case WM_LBUTTONUP:
 		case WM_RBUTTONUP:
 		case WM_MBUTTONUP:
@@ -2025,19 +2115,10 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			guard(WM_LBUTTONUP);
 
 			// Exit if in menu loop.
-			if (InMenuLoop)
+			if( InMenuLoop )
 				return DefWindowProc (hWnd,iMessage,wParam,lParam);
 
-            if( PlayingGame(ShowFlags) && GApp->Input->CapturingMouse() )
-            {
-                GApp->Input->Release
-                ( 
-                    iMessage == WM_LBUTTONUP    ? FPlatformInput::S_LeftMouse 
-                :   iMessage == WM_RBUTTONUP    ? FPlatformInput::S_RightMouse
-                :                                 FPlatformInput::S_MiddleMouse
-                );
-            }
-			if (Camera->Win.SaveCursor.x==-1) 
+			if( Camera->Win().SaveCursor.x==-1 )
 				break;
 
 			// Remember mouse cursor position of original click.
@@ -2046,120 +2127,103 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			TempPoint.y = 0;
 			ClientToScreen(hWnd,&TempPoint);
 
-			int X = Camera->Win.SaveCursor.x - TempPoint.x;
-			int Y = Camera->Win.SaveCursor.y - TempPoint.y;
-			int DeltaTime;
-
-			// Stop clipping mouse to current window, and restore original position.
-			if( (!(wParam&GApp->KnownButtons)&(MK_LBUTTON|MK_MBUTTON|MK_RBUTTON)) )
-            {
-                StopClippingCursor (Camera,1);
-            }
+			int X = Camera->Win().SaveCursor.x - TempPoint.x;
+			int Y = Camera->Win().SaveCursor.y - TempPoint.y;
 
 			// Get time interval to determine if a click occured.
-			if 		(iMessage == WM_LBUTTONUP) DeltaTime = GetMessageTime() - StartTimeLeftClick;
-			else if (iMessage == WM_MBUTTONUP) DeltaTime = GetMessageTime() - StartTimeMiddleClick;
-			else if (iMessage == WM_RBUTTONUP) DeltaTime = GetMessageTime() - StartTimeRightClick;
+			int DeltaTime, Button;
+			EInputKey iKey;
+			if( iMessage == WM_LBUTTONUP )
+			{
+				DeltaTime = GetMessageTime() - StartTimeLeftClick;
+				iKey      = IK_LButton;
+				Button    = BUT_LEFT;
+			}
+			else if( iMessage == WM_MBUTTONUP )
+			{
+				DeltaTime = GetMessageTime() - StartTimeMiddleClick;
+				iKey      = IK_MButton;
+				Button    = BUT_MIDDLE;
+			}
+			else
+			{
+				DeltaTime = GetMessageTime() - StartTimeRightClick;
+				iKey      = IK_RButton;
+				Button    = BUT_RIGHT;
+			}
 
-			// Prevent bounce.
-			int Click = (DeltaTime>20) && (DeltaTime<600);
+			// Send to the input system.
+			Camera->Input->Process(*Camera,iKey,IST_Release);
 
-			// Handle mouse clicks in the editor.
+			// Stop clipping mouse to current window, and restore original position.
+			if
+			(
+				!Camera->Input->KeyDown(IK_LButton)
+			&&	!Camera->Input->KeyDown(IK_MButton)
+			&&	!Camera->Input->KeyDown(IK_RButton)
+			)
+                StopClippingCursor( Camera, 1 );
+
+			// Get state of the special keys.
 			int j = (wParam & MK_SHIFT)   != 0;
 			int k = (wParam & MK_CONTROL) != 0;
 
-			if( iMessage==WM_LBUTTONUP )
+			// Handle camera clicking.
+			if
+			(
+				DeltaTime>20
+			&&	DeltaTime<600 
+			&&	Camera
+			&&	!FullscreenCamera
+			&&	!Camera->OnHold
+			&&	Camera->X 
+			&&	Camera->Y 
+			&&	!( MovedSinceLeftClick || MovedSinceRightClick || MovedSinceMiddleClick )
+			)
 			{
-				GApp->KnownButtons &= ~MK_LBUTTON;
-				GApp->KeyDown [K_LBUTTON] = 0;
-				if( Click && !(MovedSinceLeftClick||MovedSinceRightClick||MovedSinceMiddleClick) )
-				{
-					if
-					(
-						Camera
-					&&	!FullscreenCamera
-					&&	!Camera->OnHold
-					&&	Camera->SXR 
-					&&	Camera->SYR
-					)
-					{
-						Camera->Click(BUT_LEFT,X,Y,j,k);
-						if (!Camera->IsRealtime()) 
-							Camera->Draw(0);
-					}
-				}
-				MovedSinceLeftClick = 0;
+				Camera->Click( Button, X, Y, j, k );
+				if( !Camera->IsRealtime() )
+					Camera->Draw(0);
 			}
-			else if( iMessage == WM_RBUTTONUP )
-			{
-				GApp->KnownButtons &= ~MK_RBUTTON;
-				GApp->KeyDown [K_RBUTTON] = 0;
-				if( Click && !(MovedSinceLeftClick||MovedSinceRightClick||MovedSinceMiddleClick) )
-				{
-					if
-					(
-						Camera
-					&&	!FullscreenCamera
-					&&	!Camera->OnHold
-					&&	Camera->SXR 
-					&&	Camera->SYR
-					)
-					{
-						Camera->Click(BUT_RIGHT,X,Y,j,k);
-						if (!Camera->IsRealtime())
-							Camera->Draw(0);
-					}
-				}
-				MovedSinceRightClick   = 0;
-			}
-			else if( iMessage==WM_MBUTTONUP )
-			{
-				GApp->KnownButtons &= ~MK_MBUTTON;
-				GApp->KeyDown [K_MBUTTON] = 0;
-				if( Click && !(MovedSinceLeftClick||MovedSinceRightClick||MovedSinceMiddleClick) )
-				{
-					if
-					(
-						Camera
-					&&	!FullscreenCamera
-					&&	!Camera->OnHold
-					&&	Camera->SXR
-					&&	Camera->SYR
-					)
-					{
-						Camera->Click(BUT_MIDDLE,X,Y,j,k);
-						if (!Camera->IsRealtime())
-							Camera->Draw(0);
-					}
-				}
-				MovedSinceMiddleClick = 0;
-			}
+			
+			// Update times.
+			if		( iMessage == WM_LBUTTONUP )	MovedSinceLeftClick		= 0;
+			else if	( iMessage == WM_RBUTTONUP )	MovedSinceRightClick	= 0;
+			else if	( iMessage == WM_MBUTTONUP )	MovedSinceMiddleClick	= 0;
+
 			return 0;
 			unguard;
 		}
 		case WM_ENTERMENULOOP:
+		{
 			guard(WM_ENTERMENULOOP);
 			InMenuLoop = 1;
-			StopClippingCursor (Camera,0);
+			StopClippingCursor( Camera, 0 );
 			Camera->UpdateWindow(); // Update checkmarks and such.
 			return 0;
 			unguard;
+		}
 		case WM_EXITMENULOOP:
+		{
 			guard(WM_EXITMENULOOP);
 			InMenuLoop = 0;
 			return 0;
 			unguard;
+		}
 		case WM_CANCELMODE:
+		{
 			guard(WM_CANCELMODE);
 			StopClippingCursor(Camera,0);
 			return 0;
 			unguard;
+		}
 		case WM_MOUSEMOVE:
-			{
+		{
 			guard(WM_MOUSEMOVE);
 
 			// If in a window, see if cursor has been captured; if not, ignore mouse movement.
-			if (InMenuLoop) break;
+			if( InMenuLoop )
+				break;
 
 			int Updated  = 0;
 			RECT TempRect;
@@ -2170,22 +2234,11 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			TempPoint.y=(TempRect.top+TempRect.bottom)/2;
 
             WORD Buttons = wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON);
-            if( PlayingGame(ShowFlags) && GApp->Input->CapturingMouse() )
-            {
-                if( Buttons==0 )
-                {
-                    // Sanity check to make sure no mouse release events were missed:
-                    GApp->Input->Release( FPlatformInput::S_LeftMouse   ); 
-                    GApp->Input->Release( FPlatformInput::S_RightMouse  );
-                    GApp->Input->Release( FPlatformInput::S_MiddleMouse );
-                }
-                Camera->Console->GetActions()->UsePlainMouseMovements( FullscreenCamera != 0 );
-            }
 
-            if ((!FullscreenCamera) && (Camera->Win.SaveCursor.x==-1)) 
+            if( !FullscreenCamera && (Camera->Win().SaveCursor.x==-1) )
 				break;
 			
-			if (UseDirectMouse && Camera->IsRealtime() && (ShowFlags & SHOW_PlayerCtrl)) 
+			if( UseDirectMouse && Camera->IsRealtime() && (ShowFlags & SHOW_PlayerCtrl) )
 				break;
 
 			// Make relative to window center.
@@ -2193,25 +2246,28 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
             int dX = 0; // Accumulated X change.
             int dY = 0; // Accumulated Y change.
 			
+			// Grab all pending mouse movement.
 			Loop:
-			Buttons = wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON);
-            Points  = MAKEPOINTS(lParam);
-			int X        = Points.x - TempPoint.x;
-			int Y        = Points.y - TempPoint.y;
-			int j        = (wParam & MK_SHIFT)   != 0;
-			int k        = (wParam & MK_CONTROL) != 0;
+			Buttons		= wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON);
+            Points		= MAKEPOINTS(lParam);
+			int X       = Points.x - TempPoint.x;
+			int Y       = Points.y - TempPoint.y;
+			int j       = (wParam & MK_SHIFT)   != 0;
+			int k       = (wParam & MK_CONTROL) != 0;
             dX += X;
             dY += Y;
 
 			if( Abs(X)>2 || Abs(Y)>2 )
 			{
-				if (wParam & MK_LBUTTON) MovedSinceLeftClick   = 1;
-				if (wParam & MK_RBUTTON) MovedSinceRightClick  = 1;
-				if (wParam & MK_MBUTTON) MovedSinceMiddleClick = 1;
+				// Set moved-flags.
+				if( wParam & MK_LBUTTON ) MovedSinceLeftClick   = 1;
+				if( wParam & MK_RBUTTON ) MovedSinceRightClick  = 1;
+				if( wParam & MK_MBUTTON ) MovedSinceMiddleClick = 1;
 			}
 			
 			if( Buttons || FullscreenCamera)
 			{
+				// Process valid movement.
 				int CameraButtonFlags = 0;
 				if (Buttons & MK_LBUTTON) CameraButtonFlags |= BUT_LEFT;
 				if (Buttons & MK_RBUTTON) CameraButtonFlags |= BUT_RIGHT;
@@ -2227,7 +2283,7 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 				Updated=1;
 
 				MSG Msg;
-				if( PeekMessage(&Msg,Camera->Win.hWndCamera,WM_MOUSEMOVE,WM_MOUSEMOVE,PM_REMOVE) )
+				if( PeekMessage(&Msg,Camera->Win().hWndCamera,WM_MOUSEMOVE,WM_MOUSEMOVE,PM_REMOVE) )
 				{
                     POINTS Points = MAKEPOINTS(lParam);
 					TempPoint.x = Points.x;
@@ -2237,79 +2293,78 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 					goto Loop;
 				}
 			}
-            if( PlayingGame(ShowFlags) && GApp->Input->CapturingMouse() )
-            {   
-                GApp->Input->NoteChange( FPlatformInput::M_MouseR, dX );
-                GApp->Input->NoteChange( FPlatformInput::M_MouseB, dY );
-            }
-			if( (Camera->Win.SaveCursor.x>=0 && Buttons) || (FullscreenCamera && !InMenuLoop) )
+			if( (Camera->Win().SaveCursor.x>=0 && Buttons) || FullscreenCamera )
 			{
+				// Put cursor back in middle of window.
 				RECT TempRect;
 				GetClientRect  (hWnd,&TempRect);
-
 				POINT TempPoint;
 				TempPoint.x =  (TempRect.left+TempRect.right)/2;
 				TempPoint.y =  (TempRect.top+TempRect.bottom)/2;
 				ClientToScreen (hWnd,&TempPoint);
 				SetCursorPos   (TempPoint.x,TempPoint.y);
+
+				// Send to input subsystem.
+				if( X ) Camera->Input->Process(*Camera,IK_MouseX,IST_Axis,+X);
+				if( Y ) Camera->Input->Process(*Camera,IK_MouseY,IST_Axis,-Y);
 			}
 			if( Updated && !Camera->IsRealtime() )
 			{
 				// Camera isn't realtime, so we must update the frame here and now.
-				if (!GApp->KeyDown[K_TAB])
+				if( !Camera->Input->KeyDown(IK_Tab) )
+				{
+					// Update this camera window for UnrealEd.
 					Camera->Draw(0);
+				}
 				else 
+				{
+					// Update all camera windows for UnrealEd.
 					for (int i=0; i<CameraArray->Num; i++)
 						CameraArray->Element(i)->Draw(0);
+				}
 			}
 			return 0;
 			unguard;
 		}
 		case WM_SIZE:
+		{
 			guard(WM_SIZE);
 			if( !FullscreenCamera )
 			{
 				int X = LOWORD(lParam);	// New width of client area.
 				int Y = HIWORD(lParam); // New height of client area.
-				SetCameraBufferSize(Camera,Align4(X),Y,Camera->ColorBytes);
-                // Heuristic mouse range.
-                GApp->Input->SetMovementRange( FPlatformInput::M_MouseR, -500, 500 );
-                GApp->Input->SetMovementRange( FPlatformInput::M_MouseB, -500, 500 );
+				SetCameraBufferSize(Camera,Align(X,4),Y,Camera->ColorBytes);
         	}
-            else
-            {
-                // Heuristic mouse range.
-                GApp->Input->SetMovementRange( FPlatformInput::M_MouseR, -1000, 1000 );
-                GApp->Input->SetMovementRange( FPlatformInput::M_MouseB, -1000, 1000 );
-            }
       		return 0;
 			unguard;
+		}
 		case WM_SIZING:
+		{
 			guard(WM_SIZING);
-			if( !(Actor->ShowFlags & SHOW_ChildWindow) )
+			if( !(Camera->Actor->ShowFlags & SHOW_ChildWindow) )
 			{
 				RECT *Rect = (RECT *)lParam,rClient;
 				rClient.top		= 0;
 				rClient.left	= 0;
 				rClient.bottom	= 0;
 				rClient.right	= 0;
-				AdjustWindowRect(&rClient,GetWindowLong(hWnd,GWL_STYLE),(Actor->ShowFlags & SHOW_Menu)?TRUE:FALSE);
+				AdjustWindowRect(&rClient,GetWindowLong(hWnd,GWL_STYLE),(Camera->Actor->ShowFlags & SHOW_Menu)?TRUE:FALSE);
 				
 				int ExtraX = rClient.right  - rClient.left;
 				int ExtraY = rClient.bottom - rClient.top;
 				int  X     = Rect->right    - Rect->left - ExtraX;
 				int  Y     = Rect->bottom   - Rect->top  - ExtraY;
 				
-				if (X && Y)
+				if( X && Y )
 				{
 					// Force aspect ratio to be reasonable.
 					if( (wParam==WMSZ_LEFT) || (wParam==WMSZ_RIGHT) )
 					{
-						Rect->bottom = Rect->top + ExtraY + X / Camera->Win.Aspect + 0.5;
+						Rect->bottom = Rect->top + ExtraY + X / Camera->Win().Aspect + 0.5;
 					}
 					else if( (wParam==WMSZ_TOP) || (wParam==WMSZ_BOTTOM) )
 					{
-						Rect->right = Rect->left + ExtraX + Y * Camera->Win.Aspect + 0.5;
+						Rect->right = Rect->left + ExtraX + Y * Camera->Win().Aspect + 0.5;
 					}
 					else
 					{
@@ -2318,12 +2373,12 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 
 						if( Aspect > NewAspect )
 						{
-							Camera->Win.Aspect = NewAspect;
+							Camera->Win().Aspect = NewAspect;
 							Rect->bottom = Rect->top  + ExtraY + X / NewAspect;
 						}
 						else if( Aspect < NewAspect )
 						{
-							Camera->Win.Aspect = NewAspect;
+							Camera->Win().Aspect = NewAspect;
 							Rect->right  = Rect->left + ExtraX + Y * NewAspect;
 						}
 					}
@@ -2331,17 +2386,19 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 			}
 			return TRUE;
 			unguard;
+		}
 		case WM_SYSCOMMAND:
-			{
+		{
 			guard(WM_SYSCOMMAND);
 			int nID = wParam & 0xFFF0;
 			if( (nID==SC_SCREENSAVE) || (nID==SC_MONITORPOWER) )
 			{
 				if (nID==SC_SCREENSAVE)
-					debugf(LOG_Win,"Received SC_SCREENSAVE");
+					debugf(LOG_Info,"Received SC_SCREENSAVE");
 				else
-					debugf(LOG_Win,"Received SC_MONITORPOWER");
+					debugf(LOG_Info,"Received SC_MONITORPOWER");
 
+				/*!!
 				if( GApp->Input->CapturingJoystick() )
 				{
 					// Inhibit screen saver.
@@ -2352,49 +2409,58 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 					// Allow screen saved to take over.
 					return 0;
 				}
+				*/
 			}
-			else
-			{				
-				return DefWindowProc(hWnd,iMessage,wParam,lParam);
-			}
+			else return DefWindowProc(hWnd,iMessage,wParam,lParam);
 			unguard;
 		}
 		case WM_POWER:
+		{
 			guard(WM_POWER);
 			if( wParam )
 			{
 				if( wParam == PWR_SUSPENDREQUEST )
 				{
-					debugf(LOG_Win,"Received WM_POWER suspend");
+					debugf(LOG_Info,"Received WM_POWER suspend");
 
+					/*!!
 					if (GApp->Input->CapturingJoystick())
 						return PWR_FAIL;
 					else
 						return PWR_OK;
+					*/
+					return PWR_OK;
 				}
 				else
 				{
-					debugf(LOG_Win,"Received WM_POWER");
+					debugf(LOG_Info,"Received WM_POWER");
 					return DefWindowProc(hWnd,iMessage,wParam,lParam);
 				}
 			}
 			return 0;
 			unguard;
+		}
 		case WM_DISPLAYCHANGE:
+		{
 			guard(WM_DISPLAYCHANGE);
-			debugf(LOG_Win,"Camera %s: WM_DisplayChange",Camera->Name);
+			debugf(LOG_Info,"Camera %s: WM_DisplayChange",Camera->GetName());
 			unguard;
 			return 0;
+		}
 		case WM_WININICHANGE:
+		{
 			guard(WM_WININICHANGE);
-			if (!DeleteDC(hMemScreenDC)) appErrorf("DeleteDC failed %i",GetLastError());
+			if( !DeleteDC(hMemScreenDC) ) appErrorf("DeleteDC failed %i",GetLastError());
 			hMemScreenDC = CreateCompatibleDC (NULL);
 			return 0;
 			unguard;
+		}
 		default:
+		{
 			guard(WM_UNKNOWN);
-			return DefWindowProc (hWnd,iMessage,wParam,lParam);
+			return DefWindowProc( hWnd, iMessage, wParam, lParam );
 			unguard;
+		}
 	}
 	unguard;
 }
@@ -2405,7 +2471,7 @@ LRESULT FWindowsCameraManager::CameraWndProc(HWND hWnd, UINT iMessage, WPARAM wP
 
 //
 // Initialize the platform-specific camera manager subsystem.
-// Must be called after the Unreal resource manager has been initialized.
+// Must be called after the Unreal object manager has been initialized.
 // Must be called before any cameras are created.
 //
 void FWindowsCameraManager::Init()
@@ -2458,23 +2524,32 @@ void FWindowsCameraManager::Init()
 	}
 	else UseDirectMouse=0;
 
+	// Temporary: Always disable DirectMouse.
+	UseDirectMouse = 0; 
+
+	// Get mouse info.
+	SystemParametersInfo(SPI_GETMOUSE,0,NormalMouseInfo,0);
+	debugf(LOG_Init,"Mouse info: %i %i %i",NormalMouseInfo[0],NormalMouseInfo[1],NormalMouseInfo[2]);
+	CaptureMouseInfo[0] = 0;   // First threshold.
+	CaptureMouseInfo[1] = 0;   // Second threshold.
+	CaptureMouseInfo[2] = 256; // Speed.
+
 	// Init fullscreen information.
 	InitFullscreen();
 
-	// Add camera array to root of the resource tree.
-	CameraArray = new("Cameras", CREATE_Unique)TArray<UCamera>(MAX_CAMERAS);
-	GRes.AddToRoot(CameraArray);
+	// Add camera array to root of the object tree.
+	CameraArray = new("Cameras", CREATE_Unique)TArray<UCamera*>(0);
+	GObj.AddToRoot(CameraArray);
 
 	// Initialize DirectDraw. This must happen after the camera array is allocated.
 	UseDirectDraw=1;
 	GetONOFF(GApp->CmdLine,"DDRAW=",&UseDirectDraw);
-	if (UseDirectDraw) ddInit();
+	if( UseDirectDraw ) ddInit();
+
+	// Init rendering device.
+	RenDev = NULL;
 
 	debug(LOG_Init,"Camera manager initialized");
-
-	// Add this to the task list.
-	GTaskManager->AddTask(this,NULL,GApp,PRIORITY_Camera,TASK_NoUserKill);
-
 	unguard;
 }
 
@@ -2485,10 +2560,17 @@ void FWindowsCameraManager::Exit()
 {
 	guard(FWindowsCameraManager::Exit);
 
-	GRes.RemoveFromRoot(CameraArray);
+	GObj.RemoveFromRoot(CameraArray);
 
+	// Shut down rendering device.
+	if( RenDev )
+	{
+		RenDev->Exit3D();
+		RenDev = NULL;
+	}
+	
 	// Shut down DirectDraw.
-	if (UseDirectDraw) 
+	if( UseDirectDraw )
 		ddExit();
 
 	// Clean up Windows resources.
@@ -2511,20 +2593,21 @@ void FWindowsCameraManager::ShutdownAfterError()
 	{
 		EndFullscreen();
 
-		SetCapture	(NULL);
-  		ShowCursor  (TRUE);
-		ClipCursor  (NULL);
-		ddExit		();
+		SetCapture				(NULL);
+		SystemParametersInfo	(SPI_SETMOUSE,0,NormalMouseInfo,0);
+  		ShowCursor				(TRUE);
+		ClipCursor				(NULL);
+		ddExit					();
 
 		for( int i=CameraArray->Num-1; i>=0; i-- )
    		{
 			UCamera *Camera = CameraArray->Element(i);
-			DestroyWindow(Camera->Win.hWndCamera);
+			DestroyWindow(Camera->Win().hWndCamera);
 		}
 	}
 	catch(...)
 	{
-		debugf(LOG_Win,"Double fault in FWindowsCameraManager::ShutdownAfterError");
+		debugf(LOG_Info,"Double fault in FWindowsCameraManager::ShutdownAfterError");
 	}
 }
 
@@ -2534,36 +2617,36 @@ void FWindowsCameraManager::ShutdownAfterError()
 Order of calls when opening a camera:
 
 	UCamera *MyCamera = new("MyCamera",CREATE_Unique)UCamera;
-		// This allocates the camera as an Unreal resource.
+		// This allocates the camera as an Unreal object.
 		// UCamera::UCamera adds the camrea to CameraArray.
 		// UCamera::UCamera assigns an actor to the camera.
 		// UCamera::UCamera allocates a texture for the camera.
-		// UCamera::InitHeader calls FCameraManager::InitCameraWindow().
-		// On return, the camera resource is valid but its window is not, and it
+		// UCamera::InitHeader calls FCameraManagerBase::InitCameraWindow().
+		// On return, the camera object is valid but its window is not, and it
 		//     is still not visible.
 
-	MyCamera->SXR=320; MyCamera->SYR=200; MyCamera->ColorBytes=1;
+	MyCamera->X=320; MyCamera->Y=200; MyCamera->ColorBytes=1;
 		// Here you are initializing the camera's vital properties that
 		// must be set before opening the camera window.
 
 	MyCamera->OpenCamera();
-		// Here you are telling the UCamera resource to open up a window.
-		// UCamera::OpenCamera calls FCameraManager::OpenCameraWindow().
+		// Here you are telling the UCamera object to open up a window.
+		// UCamera::OpenCamera calls FCameraManagerBase::OpenCameraWindow().
 		// GlobalCameraManager::OpenCameraWindow does whatever platform-specific
 		//     stuff that is needed to open the camera window.
 		// GlobalCameraManager::OpenCameraWindow sets the camera texture's size and data.
 		// On return: If Temporary=1, the camera is visible. Otherwise it's invisible.
 		// Now the camera is ready for use.
 
-Order of calls when closing a camera via resource functions:
+Order of calls when closing a camera via object functions:
 
 	MyCamera->Kill();
-		// Here you are destroying the camera resource.
+		// Here you are destroying the camera object.
 		// UCamera::PreKill destroys the camera's actor.
-		// UCamera::PreKill calls FCameraManager::CloseCameraWindow.
+		// UCamera::PreKill calls FCameraManagerBase::CloseCameraWindow.
 		// UCamera::PreKill removes the camera from CameraArray.
 		// UCamera::PreKill destroys the camera's texture.
-		// The Unreal resource manager destroys the camera resource.
+		// The Unreal object manager destroys the camera resource.
 
 Order of calls when closing a camera by clicking on its close button:
 
@@ -2572,32 +2655,45 @@ Order of calls when closing a camera by clicking on its close button:
 //
 // Initialize the platform-specific information stored within the camera.
 //
-void FWindowsCameraManager::InitCameraWindow(UCamera *Camera)
+void FWindowsCameraManager::InitCameraWindow( UCamera *Camera )
 {
 	guard(FWindowsCameraManager::InitCameraWindow);
 
 	// Set color bytes based on screen resolution.
 	HWND hwndDesktop = GetDesktopWindow();
 	HDC  hdcDesktop  = GetDC(hwndDesktop);
-	switch(GetDeviceCaps(hdcDesktop,BITSPIXEL))
+
+	switch( GetDeviceCaps( hdcDesktop, BITSPIXEL ) )
 	{
-		case 8:  Camera->ColorBytes = 1;  break;
-		case 16: Camera->ColorBytes = 2;  break;
-		case 24: Camera->ColorBytes = 4;  break;
-		case 32: Camera->ColorBytes = 4;  break;
-		default: Camera->ColorBytes = 2;  break;
+		case 8:
+			Camera->ColorBytes  = 1; 
+			break;
+		case 16:
+			Camera->ColorBytes  = 2;
+			Camera->Caps       |= CC_RGB565;
+			break;
+		case 24:
+			Camera->ColorBytes  = 4;
+			break;
+		case 32: 
+			Camera->ColorBytes  = 4;
+			break;
+		default: 
+			Camera->ColorBytes  = 2; 
+			Camera->Caps       |= CC_RGB565;
+			break;
 	}
 
 	// Init other stuff.
 	ReleaseDC(hwndDesktop,hdcDesktop);
-	Camera->Win.Status		= WIN_CameraOpening;
-	Camera->Win.hWndCamera	= NULL;
-	Camera->Win.BitmapInfo	= NULL;
-	Camera->Win.hBitmap		= NULL;
-	Camera->Win.hFile		= NULL;
-	Camera->Win.NeedResize  = 0;
-	Camera->Win.SaveCursor.x= -1;
-	Camera->Win.Aspect		= Camera->SYR ? ((FLOAT)Camera->SXR/(FLOAT)Camera->SYR) : 1.0;
+	Camera->Win().Status		= WIN_CameraOpening;
+	Camera->Win().hWndCamera	= NULL;
+	Camera->Win().BitmapInfo	= NULL;
+	Camera->Win().hBitmap		= NULL;
+	Camera->Win().hFile		= NULL;
+	Camera->Win().NeedResize  = 0;
+	Camera->Win().SaveCursor.x= -1;
+	Camera->Win().Aspect		= Camera->Y ? ((FLOAT)Camera->X/(FLOAT)Camera->Y) : 1.0;
 	
 	unguard;
 }
@@ -2610,58 +2706,61 @@ void FWindowsCameraManager::InitCameraWindow(UCamera *Camera)
 //		SXR,SYR		Screen X&Y resolutions, default is 320x200
 //		ColorBytes	Color bytes (1,2,4), default is 1
 //
-void FWindowsCameraManager::OpenCameraWindow(UCamera *Camera,DWORD ParentWindow,int Temporary)
+void FWindowsCameraManager::OpenCameraWindow( UCamera *Camera, DWORD ParentWindow, int Temporary )
 {
 	guard(FWindowsCameraManager::OpenCameraWindow);
+	checkState(Camera->Actor!=NULL);
 
-
-	UTexture		*Texture	= Camera->Texture;
-	APawn			*Actor		= &Camera->GetActor();
+	UTexture		*Texture = Camera->Texture;
 	RECT       		rTemp;
 	HWND       		hWnd;
 	DWORD			Style;
 	int				OpenX,OpenY,OpenXL,OpenYL,SetActive,IsNew;
 
 	// Align on 4-byte boundary for speed.
-	Camera->SXR			= Align4(Camera->SXR);
-	Camera->SYR			= Camera->SYR;
+	Camera->X			= Align(Camera->X,4);
+	Camera->Y			= Camera->Y;
+
+	// User window of launcher if no parent window was specified.
+	if( ParentWindow == 0 )
+		GetDWORD( GApp->CmdLine, "HWND=", &ParentWindow );
 
 	// Create a DIB for the camera.
 	if( Temporary )
 	{
 		Camera->ColorBytes	= 1;
 
-		Texture->USize		= Camera->SXR;
-		Texture->VSize		= Camera->SYR;
-		Texture->DataSize	= Camera->SXR * Camera->SYR;
+		Texture->USize		= Camera->X;
+		Texture->VSize		= Camera->Y;
+		Texture->Max		= Camera->X * Camera->Y;
 
-		if (Camera->ColorBytes!=1)
-			GApp->Error ("Can only open 8-bit temporary cameras");
+		if( Camera->ColorBytes!=1 )
+			appError( "Can only open 8-bit temporary cameras" );
 		
-		Camera->Texture->AllocData(0);
-		debug (LOG_Info,"Opened temporary camera");
+		Camera->Texture->Realloc();
+		debug( LOG_Info, "Opened temporary camera" );
 
-		Camera->Win.hWndCamera = (HWND)NULL;
+		Camera->Win().hWndCamera = (HWND)NULL;
    	}
 	else
 	{
-   		AllocateCameraDIB(Camera,BLIT_DEFAULT);
+   		AllocateCameraDIB( Camera, BLIT_DEFAULT );
 
 		// Figure out size we must specify to get appropriate client area.
 		rTemp.left   = 100;
 		rTemp.top    = 100;
-		rTemp.right  = Camera->SXR+100;
-		rTemp.bottom = Camera->SYR+100;
+		rTemp.right  = Camera->X + 100;
+		rTemp.bottom = Camera->Y + 100;
 
-		if( ParentWindow && (Actor->ShowFlags & SHOW_ChildWindow) )
+		if( ParentWindow && (Camera->Actor->ShowFlags & SHOW_ChildWindow) )
 		{
 			Style = WS_VISIBLE | WS_CHILD | WS_CLIPSIBLINGS;
-   			AdjustWindowRect(&rTemp,Style,0);
+   			AdjustWindowRect( &rTemp, Style, 0 );
 		}
 		else
 		{
 			Style = WS_OVERLAPPEDWINDOW;
-   			AdjustWindowRect(&rTemp,Style,(Actor->ShowFlags & SHOW_Menu)?TRUE:FALSE);
+   			AdjustWindowRect(&rTemp,Style,(Camera->Actor->ShowFlags & SHOW_Menu)?TRUE:FALSE);
 		}
 
 		// Set position and size.
@@ -2675,44 +2774,42 @@ void FWindowsCameraManager::OpenCameraWindow(UCamera *Camera,DWORD ParentWindow,
 		OpenYL = rTemp.bottom - rTemp.top;
 
 		// Create window.
-		if (Camera->Win.hWndCamera)
+		if( Camera->Win().hWndCamera )
 		{
 			// Resizing existing camera.
-			if (Actor->ShowFlags & SHOW_Menu)
-				SetMenu(Camera->Win.hWndCamera,Camera->Win.hMenu);
+			if (Camera->Actor->ShowFlags & SHOW_Menu)
+				SetMenu(Camera->Win().hWndCamera,Camera->Win().hMenu);
 			else
-				SetMenu(Camera->Win.hWndCamera,NULL);
+				SetMenu(Camera->Win().hWndCamera,NULL);
 
-			SetWindowPos(Camera->Win.hWndCamera,HWND_TOP,OpenX,OpenY,OpenXL,OpenYL,SWP_NOACTIVATE);
+			SetWindowPos(Camera->Win().hWndCamera,HWND_TOP,OpenX,OpenY,OpenXL,OpenYL,SWP_NOACTIVATE);
 			SetActive = 0;
 			IsNew = 0;
 		}
 		else
 		{
 			// Creating new camera.
-			Camera->ParentWindow	= ParentWindow;
-			Camera->Win.hWndCamera 	= NULL; // So camera's message processor recognizes it.
-			Camera->Win.Status		= WIN_CameraOpening; // Note that hWndCamera is unknown
+			Camera->ParentWindow		= ParentWindow;
+			Camera->Win().hWndCamera 	= NULL; // So camera's message processor recognizes it.
+			Camera->Win().Status		= WIN_CameraOpening; // Note that hWndCamera is unknown
 
-			Camera->Win.hMenu=LoadMenu
+			Camera->Win().hMenu=LoadMenu
 			(
 				AfxGetInstanceHandle(),
 				MAKEINTRESOURCE(GDefaults.LaunchEditor?IDR_EDITORCAM:IDR_PLAYERCAM)
 			);
-			if( ParentWindow && (Actor->ShowFlags & SHOW_ChildWindow) )
+			if( ParentWindow && (Camera->Actor->ShowFlags & SHOW_ChildWindow) )
 			{
-				DeleteMenu(Camera->Win.hMenu,ID_WIN_TOP,MF_BYCOMMAND);
+				DeleteMenu(Camera->Win().hMenu,ID_WIN_TOP,MF_BYCOMMAND);
 			}
 			if( (!GDefaults.LaunchEditor) && (!GNetManager) )
 			{
-				DeleteMenu(Camera->Win.hMenu,1,MF_BYPOSITION);
-				DeleteMenu(Camera->Win.hMenu,ID_NETGAME,MF_BYCOMMAND);
+				DeleteMenu(Camera->Win().hMenu,1,MF_BYPOSITION);
+				DeleteMenu(Camera->Win().hMenu,ID_NETGAME,MF_BYCOMMAND);
 			}
-			
-			if (!GApp->MMX)
-				EnableMenuItem(Camera->Win.hMenu,ID_TRUE_COLOR,MF_BYCOMMAND|MF_GRAYED);
 
-			hWnd=CreateWindowEx(
+			hWnd=CreateWindowEx
+			(
 				0,
 				CAMERA_NAME,			// Class name.
 				CAMERA_NAME,			// Window name.
@@ -2722,14 +2819,15 @@ void FWindowsCameraManager::OpenCameraWindow(UCamera *Camera,DWORD ParentWindow,
 				OpenXL,					// Window Width, or CW_USEDEFAULT.
 				OpenYL,					// Window Height, or CW_USEDEFAULT.
 				(HWND)ParentWindow,		// Parent window handle or NULL.
-				Camera->Win.hMenu,		// Menu handle.
+				Camera->Win().hMenu,	// Menu handle.
 				AfxGetInstanceHandle(), // Instance handle.
-				NULL);					// lpstr (NULL=unused).
+				NULL					// lpstr (NULL=unused).
+			);
 			
-			if (hWnd==NULL)
+			if( hWnd==NULL )
 				GApp->Error("CreateWindow failed");
 			
-			if (!Camera->Win.hWndCamera)
+			if( !Camera->Win().hWndCamera )
 				appErrorf("Camera window didn't recognize itself (%i)",CameraArray->Num);
 			
 			debug (LOG_Info,"Opened camera");
@@ -2738,22 +2836,22 @@ void FWindowsCameraManager::OpenCameraWindow(UCamera *Camera,DWORD ParentWindow,
 
 			FindAvailableModes(Camera);
 		}
-		if( ParentWindow && (Actor->ShowFlags & SHOW_ChildWindow) )
+		if( ParentWindow && (Camera->Actor->ShowFlags & SHOW_ChildWindow) )
 		{
 			// Force this to be a child.
 			SetWindowLong(hWnd,GWL_STYLE,WS_VISIBLE|WS_POPUP);
-			if (Actor->ShowFlags & SHOW_Menu)
-				SetMenu(hWnd,Camera->Win.hMenu);
+			if( Camera->Actor->ShowFlags & SHOW_Menu )
+				SetMenu(hWnd,Camera->Win().hMenu);
 		}
-		if( Camera->SXR && Camera->SYR )
+		if( Camera->X && Camera->Y )
 		{
-			ShowWindow(Camera->Win.hWndCamera,SW_SHOWNORMAL);
+			ShowWindow(Camera->Win().hWndCamera,SW_SHOWNORMAL);
 			if (SetActive)
-				SetActiveWindow(Camera->Win.hWndCamera);
+				SetActiveWindow(Camera->Win().hWndCamera);
 		}
-		Camera->Win.Aspect = Camera->SYR ? ((FLOAT)Camera->SXR/(FLOAT)Camera->SYR) : 1.0;
+		Camera->Win().Aspect = Camera->Y ? ((FLOAT)Camera->X/(FLOAT)Camera->Y) : 1.0;
 		
-		if (!IsNew) 
+		if( !IsNew )
 			Camera->Draw(0);
 	}
 	unguard;
@@ -2761,21 +2859,21 @@ void FWindowsCameraManager::OpenCameraWindow(UCamera *Camera,DWORD ParentWindow,
 
 //
 // Close a camera window.  Assumes that the camera has been openened with
-// OpenCameraWindow.  Does not affect the camera's resource, only the
+// OpenCameraWindow.  Does not affect the camera's object, only the
 // platform-specific information associated with it.
 //
 void FWindowsCameraManager::CloseCameraWindow(UCamera *Camera)
 {
 	guard(FWindowsCameraManager::CloseCameraWindow);
 
-	if( (Camera->Win.hWndCamera) && (Camera->Win.Status == WIN_CameraNormal) )
+	if( (Camera->Win().hWndCamera) && (Camera->Win().Status == WIN_CameraNormal) )
 	{
 		// So WM_DESTROY knows not to recurse.
-		Camera->Win.Status = WIN_CameraClosing;
+		Camera->Win().Status = WIN_CameraClosing;
 
 		// WM_DETROY frees the camera's bitmaps and sets status to
 		// WIN_CameraClosing.
-		DestroyWindow(Camera->Win.hWndCamera);
+		DestroyWindow(Camera->Win().hWndCamera);
 	}
 	unguard;
 }
@@ -2786,22 +2884,21 @@ void FWindowsCameraManager::CloseCameraWindow(UCamera *Camera)
 
 //
 // Lock the camera window and set the approprite Screen and RealScreen fields
-// if CameraInfo.  Returns 1 if locked successfully, 0 if failed.  Note that a
+// of Camera.  Returns 1 if locked successfully, 0 if failed.  Note that a
 // lock failing is not a critical error; it's a sign that a DirectDraw mode
 // has ended or the user has closed a camera window.
 //
-int FWindowsCameraManager::LockCameraWindow(UCamera *Camera,ICamera *CameraInfo)
+int FWindowsCameraManager::LockCameraWindow(UCamera *Camera)
 {
 	guard(FWindowsCameraManager::LockCameraWindow);
-	if( Camera->Win.hWndCamera )
+	if( Camera->Win().hWndCamera )
 	{
-		if( !IsWindow(Camera->Win.hWndCamera) )
+		if( !IsWindow(Camera->Win().hWndCamera) )
 	    {
 			// Window closed!
-      		debugf( LOG_Win,"Lock: Window %i closed",(int)Camera->Win.hWndCamera );
+      		debugf( LOG_Info,"Lock: Window %i closed",(int)Camera->Win().hWndCamera );
       		return 0;
       	}
-		CameraInfo->Data = (BYTE *)Camera->GetData();
 	}
 
 	// Obtain pointer to screen.
@@ -2812,7 +2909,7 @@ int FWindowsCameraManager::LockCameraWindow(UCamera *Camera,ICamera *CameraInfo)
 		{
 			Result = ddFrontBuffer->Restore();
    			if (Result != DD_OK)
-				debugf(LOG_Win,"DirectDraw Lock Restore failed %s",ddError(Result));
+				debugf(LOG_Info,"DirectDraw Lock Restore failed %s",ddError(Result));
 			
 			EndFullscreen();
 			return 0;
@@ -2820,80 +2917,98 @@ int FWindowsCameraManager::LockCameraWindow(UCamera *Camera,ICamera *CameraInfo)
 		ZeroMemory(&ddSurfaceDesc,sizeof(ddSurfaceDesc));
   		ddSurfaceDesc.dwSize = sizeof(ddSurfaceDesc);
 
-		Result = ddBackBuffer->Lock(NULL,&ddSurfaceDesc,DDLOCK_WAIT,NULL);
+		Result = ddBackBuffer->Lock( NULL, &ddSurfaceDesc, DDLOCK_WAIT, NULL );
   		if( Result != DD_OK )
 		{
-			debugf(LOG_Win,"DirectDraw Lock failed: %s",ddError(Result));
+			debugf(LOG_Info,"DirectDraw Lock failed: %s",ddError(Result));
   			return 0;
 		}
-		CameraInfo->RealScreen  = (BYTE *)ddSurfaceDesc.lpSurface;
+		Camera->RealScreen  = (BYTE *)ddSurfaceDesc.lpSurface;
 
-		if (ddSurfaceDesc.lPitch)	CameraInfo->Stride = ddSurfaceDesc.lPitch/CameraInfo->ColorBytes;
-		else						CameraInfo->Stride = CameraInfo->SXR;
+		if (ddSurfaceDesc.lPitch)	Camera->Stride = ddSurfaceDesc.lPitch/Camera->ColorBytes;
+		else						Camera->Stride = Camera->X;
 
-		Camera->Texture->Data		= CameraInfo->RealScreen;
-		if( CameraInfo->RealScreen == NULL )
+		Camera->Texture->SetData(Camera->RealScreen);
+		if( Camera->RealScreen == NULL )
 		{
-			debug(LOG_Win,"Lock: DirectDraw Lock Refused");
+			debug(LOG_Info,"Lock: DirectDraw Lock Refused");
 			EndFullscreen();
 			return 0;
 		}
 	}
-	else CameraInfo->RealScreen = Camera->Texture->GetData();
-	
-	if (CameraInfo->RealScreen==NULL)
+	else
+	{
+		Camera->RealScreen = &Camera->Texture->Element(0);
+	}
+
+	// Make sure screen is valid.
+	if( Camera->RealScreen==NULL )
 		return 0;
 
-	Camera->Texture->CameraCaps = Camera->Caps;
-	return 1;
+	// Lock rendering device.
+	if( RenDev ) RenDev->Lock3D( Camera );
 
+	// Apply camera caps to texture.	
+	Camera->Texture->CameraCaps = Camera->Caps;
+
+	// Success.
+	return 1;
 	unguard;
 }
 
 //
 // Unlock the camera window.  If Blit=1, blits the camera's frame buffer.
 //
-void FWindowsCameraManager::UnlockCameraWindow(UCamera *Camera,ICamera *CameraInfo,int Blit)
+void FWindowsCameraManager::UnlockCameraWindow(UCamera *Camera,int Blit)
 {
 	guard(FWindowsCameraManager::UnlockCameraWindow);
 
 	DrawTime=0;
 	clock(DrawTime);
 
+	// Unlock 3d device.
+	if( RenDev )
+		RenDev->Unlock3D( Camera, Blit );
+
 	// Unlock DirectDraw.
 	if( FullscreenCamera && FullscreenhWndDD )
 	{
 		HRESULT Result;
 		Result = ddBackBuffer->Unlock(ddSurfaceDesc.lpSurface);
-		if (Result!=DD_OK) 
-			debugf(LOG_Win,"DirectDraw Unlock: %s",ddError(Result));
+		if( Result ) 
+		 	debugf(LOG_Info,"DirectDraw Unlock: %s",ddError(Result));
 	}
 
 	// Blit, if desired.
-	if( Blit && Camera->Win.hWndCamera && IsWindow(Camera->Win.hWndCamera) && !Camera->OnHold )
+	if( Blit && Camera->Win().hWndCamera && IsWindow(Camera->Win().hWndCamera) && !Camera->OnHold )
 	{
-		if( (FullscreenCamera == Camera) && FullscreenhWndDD )
+		if( FullscreenCamera==Camera && FullscreenhWndDD )
 		{
 			// Blitting with DirectDraw.
 			HRESULT Result = ddFrontBuffer->Flip(NULL,DDFLIP_WAIT);
 			if( Result != DD_OK )
 			{
-				debugf(LOG_Win,"DirectDraw Flip failed: %s",ddError(Result));
+				debugf( LOG_Info, "DirectDraw Flip failed: %s", ddError(Result) );
 				EndFullscreen();
 			}
 		}
-		else
+		else if( !RenDev )
 		{
 			// Blitting with CreateDIBSection.
-			if( CameraInfo->Screen && Camera->Win.hBitmap )
+			if( Camera->Screen && Camera->Win().hBitmap )
 			{
-				HDC hDC=GetDC	(Camera->Win.hWndCamera);
-				if (hDC==NULL)
-					GApp->Error ("GetDC failed");
+				HDC hDC=GetDC( Camera->Win().hWndCamera );
+				if( hDC == NULL )
+					appError( "GetDC failed" );
+
+				if( SelectObject( hMemScreenDC, Camera->Win().hBitmap ) == NULL )
+					appError("SelectObject failed");
 				
-				SelectObject	(hMemScreenDC,Camera->Win.hBitmap);
-				BitBlt			(hDC,0,0,Camera->SXR,Camera->SYR,hMemScreenDC,0,0,SRCCOPY);
-				ReleaseDC		(Camera->Win.hWndCamera,hDC);
+				if( BitBlt( hDC, 0, 0, Camera->X, Camera->Y, hMemScreenDC, 0, 0, SRCCOPY ) == NULL )
+					appError("BitBlt failed");
+				
+				if( ReleaseDC( Camera->Win().hWndCamera, hDC ) == NULL )
+					appError("ReleaseDC failed");
 			}
 		}
 	}
@@ -2923,7 +3038,10 @@ void FWindowsCameraManager::SetModeCursor(UCamera *Camera)
 		SetCursor (LoadCursor(NULL,IDC_WAIT));
 		return;
 	}
-	int Mode = GEditor ? GEditor->edcamMode(Camera) : EM_None;
+	int Mode;
+	if( !GEditor ) Mode=EM_None;
+	else if( Camera ) Mode=GEditor->edcamMode(Camera);
+	else Mode=GEditor->Mode;
 	HCURSOR hCursor;
 
 	switch( Mode )
@@ -2965,28 +3083,27 @@ void FWindowsCameraManager::UpdateCameraWindow(UCamera *Camera)
 {
 	guard(FWindowsCameraManager::UpdateCameraWindow);
 
-	APawn	*Actor		= &Camera->GetActor();
-	DWORD	RendMap		= Actor->RendMap;
-	DWORD	ShowFlags	= Actor->ShowFlags;
-	HMENU	hMenu		= Camera->Win.hMenu;
+	DWORD	RendMap		= Camera->Actor->RendMap;
+	DWORD	ShowFlags	= Camera->Actor->ShowFlags;
+	HMENU	hMenu		= Camera->Win().hMenu;
 	ULevel	*Level;
 	char 	WindowName [80];
 
-	if (Camera->Win.NeedResize)
-		ResizeCameraFrameBuffer (Camera,Camera->Win.ResizeSXR,Camera->Win.ResizeSYR,Camera->Win.ResizeColorBytes,BLIT_DEFAULT,1);
+	if (Camera->Win().NeedResize)
+		ResizeCameraFrameBuffer (Camera,Camera->Win().ResizeSXR,Camera->Win().ResizeSYR,Camera->Win().ResizeColorBytes,BLIT_DEFAULT,1);
 
-	if ((Camera->Win.hWndCamera==NULL)||(Camera->OnHold)) 
+	if ((Camera->Win().hWndCamera==NULL)||(Camera->OnHold)) 
 		return;
 
 	// Set camera window's name to show resolution.
-	if( (Camera->Level->GetState()==LEVEL_UpPlay)||((Actor->ShowFlags&SHOW_PlayerCtrl)) )
+	if( (Camera->Level->GetState()==LEVEL_UpPlay)||((Camera->Actor->ShowFlags&SHOW_PlayerCtrl)) )
 	{
 		Level = Camera->Level;
 		sprintf(WindowName,"Unreal");
 	}
 	else
 	{
-		switch( Actor->RendMap )
+		switch( Camera->Actor->RendMap )
 		{
 			case REN_Wire:		strcpy(WindowName,"Persp map"); break;
 			case REN_OrthXY:	strcpy(WindowName,"Overhead map"); break;
@@ -2995,18 +3112,18 @@ void FWindowsCameraManager::UpdateCameraWindow(UCamera *Camera)
 			default:			strcpy(WindowName,CAMERA_NAME); break;
 		}
 	}
-	if( Camera->SXR && Camera->SYR )
+	if( Camera->X && Camera->Y )
 	{
-		sprintf(WindowName+strlen(WindowName)," (%i x %i)",Camera->SXR,Camera->SYR);
+		sprintf(WindowName+strlen(WindowName)," (%i x %i)",Camera->X,Camera->Y);
 		if (Camera == CurrentCamera()) 
 			strcat (WindowName," *");
 	}
-	SetWindowText(Camera->Win.hWndCamera,WindowName);
+	SetWindowText(Camera->Win().hWndCamera,WindowName);
 
-	if (Actor->ShowFlags & SHOW_Menu) 
-		SetMenu(Camera->Win.hWndCamera,Camera->Win.hMenu);
+	if( Camera->Actor->ShowFlags & SHOW_Menu )
+		SetMenu(Camera->Win().hWndCamera,Camera->Win().hMenu);
 	else
-		SetMenu(Camera->Win.hWndCamera,NULL);
+		SetMenu(Camera->Win().hWndCamera,NULL);
 
 	// Update menu, Map rendering.
 	CheckMenuItem(hMenu,ID_MAP_PLAINTEX, (RendMap==REN_PlainTex  ? MF_CHECKED:MF_UNCHECKED));
@@ -3027,14 +3144,14 @@ void FWindowsCameraManager::UpdateCameraWindow(UCamera *Camera)
 
 	// Actor showing.
 	DWORD ShowFilter = ShowFlags & (SHOW_Actors | SHOW_ActorIcons | SHOW_ActorRadii);
-	CheckMenuItem(hMenu,ID_ACTORS_ICONS,MF_UNCHECKED);
-	CheckMenuItem(hMenu,ID_ACTORS_RADII,MF_UNCHECKED);
-	CheckMenuItem(hMenu,ID_ACTORS_SHOW,MF_UNCHECKED);
-	CheckMenuItem(hMenu,ID_ACTORS_HIDE,MF_UNCHECKED);
+	CheckMenuItem(hMenu,ID_ACTORS_ICONS, MF_UNCHECKED);
+	CheckMenuItem(hMenu,ID_ACTORS_RADII, MF_UNCHECKED);
+	CheckMenuItem(hMenu,ID_ACTORS_SHOW,  MF_UNCHECKED);
+	CheckMenuItem(hMenu,ID_ACTORS_HIDE,  MF_UNCHECKED);
 
 	if		(ShowFilter==(SHOW_Actors | SHOW_ActorIcons)) CheckMenuItem(hMenu,ID_ACTORS_ICONS,MF_CHECKED);
-	else if (ShowFilter==(SHOW_Actors | SHOW_ActorRadii | SHOW_ActorIcons)) CheckMenuItem(hMenu,ID_ACTORS_RADII,MF_CHECKED);
-	else if (ShowFilter==(SHOW_Actors)) CheckMenuItem(hMenu,ID_ACTORS_SHOW,MF_CHECKED);
+	else if (ShowFilter==(SHOW_Actors | SHOW_ActorRadii)) CheckMenuItem(hMenu,ID_ACTORS_RADII,MF_CHECKED);
+	else if (ShowFilter==(SHOW_Actors                  )) CheckMenuItem(hMenu,ID_ACTORS_SHOW,MF_CHECKED);
 	else CheckMenuItem(hMenu,ID_ACTORS_HIDE,MF_CHECKED);
 
 	// Color depth.
@@ -3055,10 +3172,9 @@ void FWindowsCameraManager::EnableCameraWindows(DWORD ShowFlags,int DoEnable)
   	for( int i=0; i<CameraArray->Num; i++ )
 	{
 		UCamera *Camera   = CameraArray->Element(i);
-		APawn   *Actor    = &Camera->GetActor();
-		if( (Actor->ShowFlags & ShowFlags)==ShowFlags )
+		if( (Camera->Actor->ShowFlags & ShowFlags)==ShowFlags )
 		{
-			EnableWindow(Camera->Win.hWndCamera,DoEnable);
+			EnableWindow(Camera->Win().hWndCamera,DoEnable);
 		}
 	}
 	unguard;
@@ -3074,10 +3190,9 @@ void FWindowsCameraManager::ShowCameraWindows(DWORD ShowFlags,int DoShow)
 	for( int i=0; i<CameraArray->Num; i++ )
 	{
 		UCamera *Camera   = CameraArray->Element(i);
-		APawn   *Actor    = &Camera->GetActor();
-		if( (Actor->ShowFlags & ShowFlags)==ShowFlags )
+		if( (Camera->Actor->ShowFlags & ShowFlags)==ShowFlags )
 		{
-			ShowWindow(Camera->Win.hWndCamera,DoShow?SW_SHOWNORMAL:SW_HIDE);
+			ShowWindow(Camera->Win().hWndCamera,DoShow?SW_SHOWNORMAL:SW_HIDE);
 		}
 	}
 	unguard;
@@ -3095,31 +3210,24 @@ void FWindowsCameraManager::ShowCameraWindows(DWORD ShowFlags,int DoShow)
 // palettes to clash when changed dynamically; this bug results in colors going
 // awry in UnrealEd if the palette is changed.
 //
-void FWindowsCameraManager::SetPalette(UPalette *Palette,UPalette *GammaPalette)
+void FWindowsCameraManager::SetPalette( UPalette *Palette )
 {
 	guard(FWindowsCameraManager::SetPalette);
+	Palette->Lock(LOCK_Read);
 
-	PALETTEENTRY	PaletteEntry[256],GammaPaletteEntry[256];
-	RGBQUAD			RGBColors[256],GammaRGBColors[256];
+	PALETTEENTRY	PaletteEntry[256];
+	RGBQUAD			RGBColors[256];
 
 	// Note that Unreal's and Windows' palette formats are the same.
-	memcpy(PaletteEntry,     Palette->GetData(),     256*4);
-	memcpy(GammaPaletteEntry,GammaPalette->GetData(),256*4);
+	memcpy(PaletteEntry, Palette->GetData(), 256*4);
 
 	for( int i=10; i<246; i++ )
 	{
 		PaletteEntry 	[i].peFlags     = PalFlags();
-		GammaPaletteEntry[i].peFlags    = 0;
-
 		RGBColors		[i].rgbRed      = PaletteEntry[i].peRed;
      	RGBColors    	[i].rgbGreen    = PaletteEntry[i].peGreen;
      	RGBColors    	[i].rgbBlue     = PaletteEntry[i].peBlue;
 		RGBColors    	[i].rgbReserved = 0;
-
-		GammaRGBColors	[i].rgbRed      = GammaPaletteEntry[i].peRed;
-     	GammaRGBColors	[i].rgbGreen    = GammaPaletteEntry[i].peGreen;
-     	GammaRGBColors	[i].rgbBlue     = GammaPaletteEntry[i].peBlue;
-		GammaRGBColors	[i].rgbReserved = 0;
 	}
 	
 	if( !SetPaletteEntries(hLogicalPalette,10,236,&PaletteEntry[10]) )
@@ -3131,15 +3239,15 @@ void FWindowsCameraManager::SetPalette(UPalette *Palette,UPalette *GammaPalette)
 		for( i=0; i<CameraArray->Num; i++ )
 	   	{
 			UCamera *Camera = CameraArray->Element(i);
-			if( (Camera->ColorBytes==1) && Camera->Win.hBitmap )
+			if( (Camera->ColorBytes==1) && Camera->Win().hBitmap )
 			{
-				if (!SelectObject(hMemScreenDC,Camera->Win.hBitmap))		appErrorf("SelectObject failed %i",GetLastError());
+				if (!SelectObject(hMemScreenDC,Camera->Win().hBitmap))		appErrorf("SelectObject failed %i",GetLastError());
 				if (!SetDIBColorTable(hMemScreenDC,10,236,&RGBColors[10]))	appErrorf("SetDIBColorTable failed %i",GetLastError());
 
-  				HDC hDC = GetDC (Camera->Win.hWndCamera); if (!hDC)			appErrorf("GetDC failed %i",GetLastError());
+  				HDC hDC = GetDC (Camera->Win().hWndCamera); if (!hDC)		appErrorf("GetDC failed %i",GetLastError());
 				if (!SelectPalette(hDC,hLogicalPalette,PalFlags()==0))		appErrorf("SelectPalette failed %i",GetLastError());
    				if (RealizePalette(hDC)==GDI_ERROR)							appErrorf("RealizePalette failed %i",GetLastError());
-   				if (!ReleaseDC(Camera->Win.hWndCamera,hDC))					appErrorf("ReleaseDC failed %i",GetLastError());
+   				if (!ReleaseDC(Camera->Win().hWndCamera,hDC))				appErrorf("ReleaseDC failed %i",GetLastError());
 			}
 		}
 	}
@@ -3150,13 +3258,14 @@ void FWindowsCameraManager::SetPalette(UPalette *Palette,UPalette *GammaPalette)
 		{
 			if( FullscreenhWndDD )
 			{
-				HRESULT Result = ddPalette->SetEntries(0,0,256,GammaPaletteEntry);
+				HRESULT Result = ddPalette->SetEntries(0,0,256,PaletteEntry);
 				if (Result!=DD_OK) 
 					appErrorf("SetEntries failed: %s",ddError(Result));
 			}
 			else appError("Fullscreen camera not found");
 		}
 	}
+	Palette->Unlock(LOCK_Read);
 	unguard;
 }
 
@@ -3176,38 +3285,42 @@ void FWindowsCameraManager::EndFullscreen()
 	{
 		StopClippingCursor (Camera,0);
 
-		RECT *Rect		= &Camera->Win.SavedWindowRect;
-		int  SXR		= Camera->Win.SavedSXR;
-		int  SYR		= Camera->Win.SavedSYR;
-		int  ColorBytes = Camera->Win.SavedColorBytes;
-		int  Caps		= Camera->Win.SavedCaps;
+		RECT *Rect		= &Camera->Win().SavedWindowRect;
+		int  SXR		= Camera->Win().SavedSXR;
+		int  SYR		= Camera->Win().SavedSYR;
+		int  ColorBytes = Camera->Win().SavedColorBytes;
+		int  Caps		= Camera->Win().SavedCaps;
 
 		Camera->Hold();
+		if( RenDev )
+		{
+			Camera->Caps &= ~CC_Hardware3D;
+			RenDev->Exit3D();
+			RenDev = NULL;
+			if( ShowCursor(TRUE) > 0 )
+				ShowCursor( FALSE );
+		}
 		if( FullscreenhWndDD )
 		{
-			if( Camera->Caps & CC_Hardware3D )
-			{
-				Camera->Caps &= ~CC_Hardware3D;
-				GApp->RenDev->Exit3D();
-			}
-			debug(LOG_Win,"DirectDraw session ending");
+			debug( LOG_Info, "DirectDraw session ending" );
 			ddEndMode();
 		}
-		else GApp->Error("Unknown fullscreen mode");
 
-		InitFullscreen	();
-		MoveWindow		(Camera->Win.hWndCamera,Rect->left,Rect->top,Rect->right-Rect->left,Rect->bottom-Rect->top,1);
+		InitFullscreen();
+		MoveWindow( Camera->Win().hWndCamera, Rect->left, Rect->top, Rect->right-Rect->left, Rect->bottom-Rect->top, 1 );
 
 		Camera->Unhold();
 		Camera->ColorBytes = 0; // Force resize frame buffer.
+		Camera->Caps = Caps;
 
-		ResizeCameraFrameBuffer	(Camera,SXR,SYR,ColorBytes,BLIT_DIBSECTION,0);
-		GGfx.SetPalette			();
+		ResizeCameraFrameBuffer( Camera, SXR, SYR, ColorBytes, BLIT_DIBSECTION, 0 );
+		SetPalette( GGfx.DefaultPalette );
 
 		// Fix always-on-top status affected by DirectDraw.
-		SetOnTop				(Camera->Win.hWndCamera);
+		SetOnTop( Camera->Win().hWndCamera );
 	}
-	
+
+	// Release DirectMouse.	
 	if( DMouseHandle )
 		dmEnd();
 
@@ -3251,15 +3364,15 @@ void FWindowsCameraManager::Poll()
 // all realtime cameras, and all non-realtime cameras which have been
 // updated, to be blitted.
 //
-void FWindowsCameraManager::TaskTick()
+void FWindowsCameraManager::Tick()
 {
-	guard(FWindowsCameraManager::TaskTick);
+	guard(FWindowsCameraManager::Tick);
 
-	if (!GApp->ServerAlive) 
+	if( !GApp->ServerAlive )
 		return;
 
 	// Exit if we're in game mode and all cameras are closed.
-	if( (CameraArray->Num==0) && (!GDefaults.LaunchEditor) )
+	if( CameraArray->Num==0 && !GDefaults.LaunchEditor )
 	{
 		debug (LOG_Exit,"Tick: Requesting exit");
 		GApp->RequestExit();
@@ -3271,7 +3384,7 @@ void FWindowsCameraManager::TaskTick()
   	for( int i=0; i<CameraArray->Num; i++ )
 	{
 		UCamera *Camera = CameraArray->Element(i);
-		if( !IsWindow(Camera->Win.hWndCamera) )
+		if( !IsWindow(Camera->Win().hWndCamera) )
 		{
 			// Window was closed via close button.
 			Camera->Kill();
@@ -3279,7 +3392,7 @@ void FWindowsCameraManager::TaskTick()
 		}
   		if( Camera->IsRealtime() && ((Camera==FullscreenCamera) || (FullscreenCamera==NULL)) )
 		{
-			if( Camera->SXR && Camera->SYR && !Camera->OnHold )
+			if( Camera->X && Camera->Y && !Camera->OnHold )
 			{
 				if( (!BestCamera) || (Camera->LastUpdateTime < BestCamera->LastUpdateTime) )
 				{
@@ -3293,27 +3406,6 @@ void FWindowsCameraManager::TaskTick()
 		BestCamera->Draw(0);
 		BestCamera->LastUpdateTime = GApp->MicrosecondTime()/1024;
 	}
-	unguard;
-}
-
-void FWindowsCameraManager::TaskExit()
-{
-	guard(FWindowsCameraManager::TaskExit);
-
-	debugf(LOG_Exit,"Camera manager task exiting");
-	GApp->RequestExit();
-
-	unguard;
-}
-
-char *FWindowsCameraManager::TaskStatus(char *Name, char *Desc)
-{
-	guard(FWindowsCameraManager::TaskStatus);
-
-	sprintf(Name,"CameraManager");
-	sprintf(Desc,"%i Cameras",CameraArray->Num);
-	return Name;
-
 	unguard;
 }
 

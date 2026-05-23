@@ -3,7 +3,9 @@ BEGIN
   MultiUse = -1  'True
 END
 Attribute VB_Name = "DbManager"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' DbMan.cls: Gatekeeper server database manager class.

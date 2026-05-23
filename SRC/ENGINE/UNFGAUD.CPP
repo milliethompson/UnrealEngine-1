@@ -4,7 +4,7 @@ DESCRIPTION:  Implementation of the "FGlobalAudio" class and related
               routines.
 NOTICE:       Copyright 1996 Epic MegaGames, Inc.  This software is a trade
               secret.
-TOOLS:        Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
+TOOLS:        Compiled with Visual C++ 4.0.
 FORMAT:       8 characters per tabstop, 100 characters per line.
 HISTORY:
   When      Who                 What
@@ -15,22 +15,13 @@ HISTORY:
                                 be played, based on an integer song number.
 =============================================================================*/
 
-/*
---------------------------------------------
-ADBG:  Define this symbol to enable extra
-       logfile output for audio debugging
---------------------------------------------
-*/
-//#define ADBG
-
 /********************************* INCLUDES ********************************/
 
 #pragma warning (disable : 4201) /* nonstandard extension used : nameless struct/union */
 
-#include <stdlib.h>		/* For min()/max() */
-#include <Windows.h>		/* For GetTickCount(), and required for Galaxy.h */
 #include "Unreal.h"		/* Unreal headers (includes "UnFGAud.h") */
-#include "SoundEng.h"		/* Declarations for using SoundEng.lib */
+#include "UnSound.h"
+#include "UnAudio.h"		/* Declarations for using UnAudio.lib */
 #include "UnConfig.h"
 
 /********************************* HEADERS *********************************/
@@ -50,37 +41,6 @@ ADBG:  Define this symbol to enable extra
 ** The instantiation of the global audio class.
 */
 FGlobalAudio GAudio;
-
-/****************************************************
-The following variables should be treated as if they
-were private member variables of FGlobalAudio.  See
-comments at the top of this file.
-****************************************************/
-
-/*
-** flag_audio_inited:
-** Set to 1 after Init() has been called but before Exit() has been
-** called.  This just means that the global audio stuff has been
-** initialized.  This is not the same as flag_galaxy_inited.  If
-** there's no sound card present, flag_audio_inited will initialize
-** to 1, but flag_galaxy_inited will stay 0.
-*/
-static int	flag_audio_inited = 0;
-
-/*
-** flag_editor_mode:
-** Set to 1 if running in 'editor' mode, which means music
-** does not automatically play and sound resources are not
-** loaded into galaxy.
-*/
-static int	flag_editor_mode = 0;
-
-/*
-** flag_paused:
-** Set to 1 if output is temporarily paused by ::Pause().
-** Set back to 0 when output is restored by ::UnPause().
-*/
-static int	flag_paused = 0;
 
 /*
 ** num_ticks:
@@ -111,9 +71,9 @@ static unsigned long	num_ticks = 0L;
 void CDECL
 plog(char *msg)
 {
-	if (msg[0] != '\0' && msg[strlen(msg) - 1] != '\n')
+	if (msg[0] != '\0' && msg[strlen(msg) - 1] == '\n')
 		msg[strlen(msg) - 1] = '\0';
-	debugf(LOG_Audio, msg);
+	debugf(LOG_Debug, "%s", msg);
 } /* End plog() */
 
 /*************************************************************************
@@ -140,11 +100,17 @@ plog(char *msg)
 int
 FGlobalAudio::Init(int MakeActive)
 {
-	GUARD;
+	guard(FGlobalAudio::Init);
+
+	/* If UnrealEd is running, disable audio. */
+	if (GEditor)
+	{
+		MakeActive = 0;
+	}
 
 	/* Connect sound engine log output to Unreal log. */
 	SoundEngLogSetup(plog);
-	SoundEngLogDetail(1);
+//	SoundEngLogDetail(1);
 	plog("FGlobalAudio::Init()\n");
 
     // Stuff added by Mark: to be checked by Ammon...
@@ -155,18 +121,21 @@ FGlobalAudio::Init(int MakeActive)
         SfxVolumeSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "SoundVolume", 127 ) );        
         DirectSoundFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "UseDirectSound", TRUE ) );
         FilterFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "EnableFilter", TRUE ) );
+        Use16BitFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "Enable16Bit", TRUE ) );
+        SurroundFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "EnableSurround", TRUE ) );
+        MixingRateSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "MixingRate", 22050 ) );        
     }
 
 	/* Initialize sound engine. */
 	if (!SoundEngGlobalInit(MakeActive))
+//	if (!SoundEngGlobalInit(1))
 	{
 		/* Init failed. */
 		return 0;
 	}
-	SpecifySong(1);
 
 	return 1;
-	UNGUARD("FGlobalAudio::Init");
+	unguard;
 } /* End FGlobalAudio::Init() */
 
 /*
@@ -183,14 +152,76 @@ FGlobalAudio::Init(int MakeActive)
 void
 FGlobalAudio::Exit(void)
 {
-	GUARD;
+	guard(FGlobalAudio::Exit);
 
 	plog("FGlobalAudio::Exit()\n");
 
 	SoundEngGlobalDeinit();
 
-	UNGUARD("FGlobalAudio::Exit");
+	unguard;
 } /* End FGlobalAudio::Exit() */
+
+/*
+** FGlobalAudio::Restart:
+** Restarts the audio system, returning it to its present
+** state, except changes to global settings such as
+** mixing rate, direct sound flag, etc., will take effect.
+**
+** Parameters:
+**	NONE
+**
+** Returns:
+**	NONE
+*/
+void
+FGlobalAudio::Restart(void)
+{
+	guard(FGlobalAudio::Restart);
+
+	USound *Sound;		/* Used for object enumeration loop. */
+	int	count;		/* Count of objects. */
+	char	sSong[256];	/* Temporary name of song file. */
+	char *	pSong;		/* Temporary song pointer. */
+
+	plog("FGlobalAudio::Restart()\n");
+
+	/* Shut off the sound system. */
+	SoundEngMusicGetSongName(sSong, 255);
+	pSong = SoundEngMusicGetSongPtr();
+	SoundEngLocalDeinit();
+	SoundEngGlobalDeinit();
+
+	/* Restart sound system. */
+	SoundEngGlobalInit(1);
+	if (pSong != NULL)
+		SoundEngMusicSpecifySong(pSong, 0);
+	else
+		SoundEngMusicSpecifySong(sSong, 1);
+
+	/* Register all sound effects with sound engine. */
+	/* Loop through all USound objects. */
+	count = 0;
+	FOR_ALL_TYPED_OBJECTS(Sound,USound)
+	{
+		/*
+		** Load this sound into sound engine, saving
+		** the sound ID returned by the sound engine.
+		*/
+//		bug("Registering %s",Sound->Name);
+		Sound->SoundID = SoundEngSoundRegister(Sound->GetData());
+		if (Sound->SoundID == -1)
+		{
+			appErrorf("Failed registering %s",Sound->GetName());
+		}
+//		bug("Registered %s",Sound->Name);
+		count++;
+	}
+	END_FOR_ALL_TYPED_OBJECTS;
+
+	SoundEngLocalInit();
+
+	unguard;
+} /* End FGlobalAudio::Restart() */
 
 /*
 ** FGlobalAudio::InitLevel:
@@ -217,32 +248,32 @@ FGlobalAudio::Exit(void)
 int
 FGlobalAudio::InitLevel(int MaxIndices)
 {
-	GUARD;
+	guard(FGlobalAudio::InitLevel);
 
-	USound *Sound;	/* Used for resource enumeration loop. */
-	int	count;	/* Count of resources. */
+	USound *Sound;	/* Used for object enumeration loop. */
+	int	count;	/* Count of objects. */
 
 	plog("FGlobalAudio::InitLevel()\n");
 
 	/* Register all sound effects with sound engine. */
-	/* Loop through all USound resources. */
+	/* Loop through all USound objects. */
 	count = 0;
-	FOR_ALL_TYPED_RES(Sound, RES_Sound, USound)
+	FOR_ALL_TYPED_OBJECTS(Sound,USound)
 	{
 		/*
 		** Load this sound into sound engine, saving
 		** the sound ID returned by the sound engine.
 		*/
 //		bug("Registering %s",Sound->Name);
-		Sound->SoundID = SoundEngSoundRegister(Sound->Data);
+		Sound->SoundID = SoundEngSoundRegister(Sound->GetData());
 		if (Sound->SoundID == -1)
 		{
-			appErrorf("Failed registering %s",Sound->Name);
+			appErrorf("Failed registering %s",Sound->GetName());
 		}
 //		bug("Registered %s",Sound->Name);
 		count++;
 	}
-	END_FOR_ALL_TYPED_RES;
+	END_FOR_ALL_TYPED_OBJECTS;
 
 	/* Perform local init of sound engine. */
 	if (!SoundEngLocalInit())
@@ -252,7 +283,7 @@ FGlobalAudio::InitLevel(int MaxIndices)
 	}
 
 	return 1;
-	UNGUARD("FGlobalAudio::InitLevel()");
+	unguard;
 } /* End FGlobalAudio::InitLevel() */
 
 /*
@@ -270,26 +301,26 @@ FGlobalAudio::InitLevel(int MaxIndices)
 void
 FGlobalAudio::ExitLevel(void)
 {
-	GUARD;
+	guard(FGlobalAudio::ExitLevel);
 	plog("FGlobalAudio::ExitLevel()\n");
 
-	USound *Sound;	/* Used for resource enumeration loop. */
-	int	count;	/* Count of resources. */
+	USound *Sound;	/* Used for object enumeration loop. */
+	int	count;	/* Count of objects. */
 
 	/* Perform local shutdown of sound engine. */
 	SoundEngLocalDeinit();
 
-	/* Mark all sound resources as no longer registered. */
+	/* Mark all sound objects as no longer registered. */
 	count = 0;
-	FOR_ALL_TYPED_RES(Sound, RES_Sound, USound)
+	FOR_ALL_TYPED_OBJECTS(Sound,USound)
 	{
-		/* Mark this sound resource as no longer registered. */
+		/* Mark this sound objects as no longer registered. */
 		Sound->SoundID = -1;
 		count++;
 	}
-	END_FOR_ALL_TYPED_RES;
+	END_FOR_ALL_TYPED_OBJECTS;
 
-	UNGUARD("FGlobalAudio::ExitLevel()");
+	unguard;
 } /* End FGlobalAudio::ExitLevel() */
 
 /*
@@ -306,7 +337,7 @@ FGlobalAudio::ExitLevel(void)
 void
 FGlobalAudio::Tick(void)
 {
-	GUARD;
+	guard(FGlobalAudio::Tick);
 
 // Don't log here unless necessary for debugging,
 // as this is called *very* often.
@@ -318,7 +349,7 @@ FGlobalAudio::Tick(void)
 	/* Force sound engine update. */
 	SoundEngUpdate();
 
-	UNGUARD("FGlobalAudio::Tick()");
+	unguard;
 } /* End FGlobalAudio::Tick() */
 
 /*
@@ -339,12 +370,12 @@ FGlobalAudio::Tick(void)
 void
 FGlobalAudio::SetOrigin(const FVector *Where, const FRotation *Angles)
 {
-	GUARD;
+	guard(FGlobalAudio::SetOrigin);
 
 	SoundEngSetOrigin(Where->X, Where->Y, Where->Z,
 			Angles->Yaw, Angles->Pitch, Angles->Roll);
 
-	UNGUARD("FGlobalAudio::SetOrigin");
+	unguard;
 } /* End FGlobalAudio::SetOrigin() */
 
 /*
@@ -359,10 +390,20 @@ FGlobalAudio::SetOrigin(const FVector *Where, const FRotation *Angles)
 ** with prior versions of source.
 **
 ** Parameters:
-**	Name	Description
-**	----	-----------
-**	Source	Position of sound source in map.
-**	usnd	Pointer to USound resource to be played.
+**	Name		Description
+**	----		-----------
+**	Source		Position of sound source in map.
+**	usnd		Pointer to USound object to be played.
+**	SoundRadius	Radius in world units at which the
+**			sound becomes inaudible.
+**	fScale		Volume scalar.  The sound effect's
+**			calculated volume will be multiplied
+**			by this value (1.0 = normal,
+**			0.0 = silent).
+**	fPitchmod	Pitch multiplier.  The sound effect's
+**			pitch will be multiplied by this
+**			value (to raise or lower the pitch
+**			accordingly; 1.0 = normal pitch).
 **
 ** Returns:
 **	Value	Meaning
@@ -373,9 +414,10 @@ FGlobalAudio::SetOrigin(const FVector *Where, const FRotation *Angles)
 INT
 FGlobalAudio::PlaySfxOrigined(const FVector *Source, USound *usnd,
 					const FLOAT SoundRadius,
-					const FLOAT fScale)
+					const FLOAT fScale,
+					const FLOAT fPitchmod)
 {
-	GUARD;
+	guard(FGlobalAudio::PlaySfxOrigined);
 	INT	pid;
 
 	/* Check for bogus arguments. */
@@ -385,18 +427,19 @@ FGlobalAudio::PlaySfxOrigined(const FVector *Source, USound *usnd,
 	}
 
 	/* Play the sound. */
-	pid = SoundEngSoundPlayLocated(
+	pid = SoundEngSoundPlayLocatedEx(
 				usnd->SoundID,	/* Registered ID of sound */
 				1,		/* actor ID */
 				Source->X,	/* World location */
 				Source->Y,
-				Source->Z);
+				Source->Z,
+				fPitchmod);
 	SoundEngSoundSetRadius(pid, SoundRadius);
 	SoundEngSoundScaleVolume(pid, fScale);
 
 	return pid;
 
-	UNGUARD("FGlobalAudio::PlaySfxOrigined");
+	unguard;
 } /* End FGlobalAudio::PlaySfxOrigined() */
 
 /*
@@ -408,15 +451,25 @@ FGlobalAudio::PlaySfxOrigined(const FVector *Source, USound *usnd,
 ** FGlobalAudio::SetOrigin().
 **
 ** Parameters:
-**	Name	Description
-**	----	-----------
-**	Source	Position of sound source in map.
-**	usnd	Pointer to USound resource to be played.
-**	iActor	Unique number (usually actor index) that
-**		identifies the actor/thing/object/etc
-**		that made this sound.  May be -1 for
-**		sounds that are not associated with
-**		anything in particular.
+**	Name		Description
+**	----		-----------
+**	Source		Position of sound source in map.
+**	usnd		Pointer to USound object to be played.
+**	iActor		Unique number (usually actor index) that
+**			identifies the actor/thing/object/etc
+**			that made this sound.  May be -1 for
+**			sounds that are not associated with
+**			anything in particular.
+**	SoundRadius	Radius in world units at which the
+**			sound becomes inaudible.
+**	fScale		Volume scalar.  The sound effect's
+**			calculated volume will be multiplied
+**			by this value (1.0 = normal,
+**			0.0 = silent).
+**	fPitchmod	Pitch multiplier.  The sound effect's
+**			pitch will be multiplied by this
+**			value (to raise or lower the pitch
+**			accordingly; 1.0 = normal pitch).
 **
 ** Returns:
 **	Value	Meaning
@@ -426,10 +479,12 @@ FGlobalAudio::PlaySfxOrigined(const FVector *Source, USound *usnd,
 */
 INT
 FGlobalAudio::PlaySfxLocated(const FVector *Source, USound *usnd,
-				const INT iActor, const FLOAT SoundRadius,
-				const FLOAT fScale)
+				const INT iActor,
+				const FLOAT SoundRadius,
+				const FLOAT fScale,
+				const FLOAT fPitchmod)
 {
-	GUARD;
+	guard(FGlobalAudio::PlaySfxLocated);
 	INT	pid;
 
 	/* Check for bogus arguments. */
@@ -439,18 +494,19 @@ FGlobalAudio::PlaySfxLocated(const FVector *Source, USound *usnd,
 	}
 
 	/* Play the sound. */
-	pid = SoundEngSoundPlayLocated(
+	pid = SoundEngSoundPlayLocatedEx(
 				usnd->SoundID,	/* Registered ID of sound */
 				iActor,		/* actor ID */
 				Source->X,	/* World location */
 				Source->Y,
-				Source->Z);
+				Source->Z,
+				fPitchmod);
 	SoundEngSoundSetRadius(pid, SoundRadius);
 	SoundEngSoundScaleVolume(pid, fScale);
 
 	return pid;
 
-	UNGUARD("FGlobalAudio::PlaySfxOrigined");
+	unguard;
 } /* End FGlobalAudio::PlaySfxLocated() */
 
 /*
@@ -461,9 +517,15 @@ FGlobalAudio::PlaySfxLocated(const FVector *Source, USound *usnd,
 ** error message beeps, not in-game sound effects.
 **
 ** Parameters:
-**	Name	Description
-**	----	-----------
-**	usnd	Pointer to the USound to be played.
+**	Name		Description
+**	----		-----------
+**	usnd		Pointer to the USound to be played.
+**	fVolume		Volume level (0.0 = silent, 1.0 =
+**			maximum).
+**	fPitchmod	Pitch multiplier.  The sound effect's
+**			pitch will be multiplied by this
+**			value (to raise or lower the pitch
+**			accordingly; 1.0 = normal pitch).
 **
 ** Returns:
 **	Value	Meaning
@@ -472,9 +534,11 @@ FGlobalAudio::PlaySfxLocated(const FVector *Source, USound *usnd,
 **		in calls to SfxStop(), etc.
 */
 INT
-FGlobalAudio::PlaySfxPrimitive(USound *usnd)
+FGlobalAudio::PlaySfxPrimitive(USound *usnd,
+			const INT fVolume,
+			const FLOAT fPitchmod)
 {
-	GUARD;
+	guard(FGlobalAudio::PlaySfxPrimitive);
 	INT	pid;
 
 	/* Check for bogus arguments. */
@@ -484,13 +548,14 @@ FGlobalAudio::PlaySfxPrimitive(USound *usnd)
 	}
 
 	/* Play the sound. */
-	pid = SoundEngSoundPlay(usnd->SoundID,
-			CSOUND_MAX_VOLUME,
-			CSOUND_PAN_CENTER);
+	pid = SoundEngSoundPlayEx(usnd->SoundID,
+			(int)((float)CSOUND_MAX_VOLUME * fVolume),
+			CSOUND_PAN_CENTER,
+			fPitchmod);
 
 	return pid;
 
-	UNGUARD("FGlobalAudio::PlaySfxPrimitive");
+	unguard;
 } /* End FGlobalAudio::PlaySfxPrimitive() */
 
 /*
@@ -582,11 +647,11 @@ FGlobalAudio::SfxMoveActor(const INT iActor, const FVector *Where,
 INT
 FGlobalAudio::MusicVolumeSet(INT NewVol)
 {
-	GUARD;
+	guard(FGlobalAudio::MusicVolumeSet);
 
 	return SoundEngMusicVolumeSet(NewVol);
 
-	UNGUARD("FGlobalAudio::MusicVolumeSet");
+	unguard;
 } /* End FGlobalAudio::MusicVolumeSet() */
 
 /*
@@ -604,11 +669,11 @@ FGlobalAudio::MusicVolumeSet(INT NewVol)
 INT
 FGlobalAudio::MusicVolumeGet(void)
 {
-	GUARD;
+	guard(FGlobalAudio::MusicVolumeGet);
 
 	return SoundEngMusicVolumeGet();
 
-	UNGUARD("FGlobalAudio::MusicVolumeGet");
+	unguard;
 } /* End FGlobalAudio::MusicVolumeGet() */
 
 /*
@@ -628,11 +693,11 @@ FGlobalAudio::MusicVolumeGet(void)
 INT
 FGlobalAudio::SfxVolumeSet(INT NewVol)
 {
-	GUARD;
+	guard(FGlobalAudio::SfxVolumeSet);
 
 	return SoundEngSfxVolumeSet(NewVol);
 
-	UNGUARD("FGlobalAudio::SfxVolumeSet");
+	unguard;
 } /* End FGlobalAudio::SfxVolumeSet() */
 
 /*
@@ -650,12 +715,85 @@ FGlobalAudio::SfxVolumeSet(INT NewVol)
 INT
 FGlobalAudio::SfxVolumeGet(void)
 {
-	GUARD;
+	guard(FGlobalAudio::SfxVolumeGet);
 
 	return SoundEngSfxVolumeGet();
 
-	UNGUARD("FGlobalAudio::SfxVolumeGet");
+	unguard;
 } /* End FGlobalAudio::SfxVolumeGet() */
+
+/*
+** MusicFade:
+** Starts the music fading in or fading out.
+** The fade takes about two seconds.
+**
+** Parameters:
+**	Name		Description
+**	----		-----------
+**	fFadeOut	Flag; nonzero if fade-out is to be started.
+**			Zero if fade-in is to be started.
+**
+** Returns:
+**	NONE
+*/
+void
+FGlobalAudio::MusicFade(INT fFadeOut)
+{
+	SoundEngMusicFade(fFadeOut);
+} /* End FGlobalAudio::MusicFade() */
+
+/*
+** MusicFade:
+** Starts the sound effects fading in or fading out.
+** The fade takes about two seconds.
+**
+** Parameters:
+**	Name		Description
+**	----		-----------
+**	fFadeOut	Flag; nonzero if fade-out is to be started.
+**			Zero if fade-in is to be started.
+**
+** Returns:
+**	NONE
+*/
+void
+FGlobalAudio::SfxFade(INT fFadeOut)
+{
+	SoundEngSfxFade(fFadeOut);
+} /* End FGlobalAudio::SfxFade() */
+
+/*
+** ReverbParamsSet:
+** Specifies parameters for reverberation (sound reflection).
+** The current reverberation parameters are applied to all
+** sound effects except continuously looping samples.
+**
+** Parameters:
+**	Name	Description
+**	----	-----------
+**	Space	Value ranging from zero to about 1000.
+**		Zero means no reverb.  Larger numbers
+**		represent increasing "room sizes" (i.e.
+**		increasing time delays between audible
+**		reflections).
+**	Depth	Value ranging from 1 to 99, specifying
+**		the amount of regeneration, where one
+**		is minimum (not audible), and 99 is
+**		maximum (ridiculously reflective).
+**		Typical depth values are in the range
+**		of about 25 to 50.  Higher values might
+**		be used for wierd special effects.
+**		Values less than 25 are almost inaudible,
+**		thus not very useful.
+**
+** Returns:
+**	NONE
+*/
+void
+FGlobalAudio::ReverbParamsSet(INT Space, INT Depth)
+{
+	SoundEngReverbParamsSet(Space, Depth);
+} /* End FGlobalAudio::ReverbParamsSet() */
 
 /*
 ** FGlobalAudio::DirectSoundFlagGet:
@@ -672,13 +810,13 @@ FGlobalAudio::SfxVolumeGet(void)
 **	0	Unreal will not use DirectSound.
 */
 INT
-FGlobalAudio::DirectSoundFlagGet(void)
+FGlobalAudio::DirectSoundFlagGet()
 {
-	GUARD;
+	guard(FGlobalAudio::DirectSoundFlagGet);
 
 	return SoundEngDirectSoundFlagGet();
 
-	UNGUARD("FGlobalAudio::DirectSoundFlagGet");
+	unguard;
 } /* End FGlobalAudio::DirectSoundFlagGet() */
 
 /*
@@ -701,11 +839,11 @@ FGlobalAudio::DirectSoundFlagGet(void)
 INT
 FGlobalAudio::DirectSoundFlagSet(INT val)
 {
-	GUARD;
+	guard(FGlobalAudio::DirectSoundFlagSet);
 
 	return SoundEngDirectSoundFlagSet(val);
 
-	UNGUARD("FGlobalAudio::DirectSoundFlagSet");
+	unguard;
 } /* End FGlobalAudio::DirectSoundFlagSet() */
 
 /*
@@ -725,11 +863,11 @@ FGlobalAudio::DirectSoundFlagSet(INT val)
 INT
 FGlobalAudio::FilterFlagGet(void)
 {
-	GUARD;
+	guard(FGlobalAudio::FilterFlagGet);
 
 	return SoundEngFilterFlagGet();
 
-	UNGUARD("FGlobalAudio::FilterFlagGet");
+	unguard;
 } /* End FGlobalAudio::FilterFlagGet() */
 
 /*
@@ -752,12 +890,113 @@ FGlobalAudio::FilterFlagGet(void)
 INT
 FGlobalAudio::FilterFlagSet(INT val)
 {
-	GUARD;
+	guard(FGlobalAudio::FilterFlagSet);
 
 	return SoundEngFilterFlagSet(val);
 
-	UNGUARD("FGlobalAudio::FilterFlagSet");
+	unguard;
 } /* End FGlobalAudio::FilterFlagSet() */
+
+/*
+** FGlobalAudio::Use16BitFlagGet:
+** Retrieves the current setting of the sound system's
+** 16-bit playback enable flag.
+**
+** Parameters:
+**	NONE
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	1	16-bit playback is enabled.
+**	0	16-bit playback is not enabled.
+*/
+INT
+FGlobalAudio::Use16BitFlagGet(void)
+{
+	guard(FGlobalAudio::Use16BitFlagGet);
+
+	return SoundEng16BitFlagGet();
+
+	unguard;
+} /* End FGlobalAudio::Use16BitFlagGet() */
+
+/*
+** FGlobalAudio::Use16BitFlagSet:
+** Changes the sound system's 16-bit playback enable flag.
+** The change will not take effect until ::Init() is called.
+**
+** Parameters:
+**	Name	Description
+**	----	-----------
+**	val	New enable setting.
+**		0 means don't use 16-bit playback.
+**		Other means use 16-bit playback.
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	any	Previous setting of 16-bit playback flag.
+*/
+INT
+FGlobalAudio::Use16BitFlagSet(INT val)
+{
+	guard(FGlobalAudio::Use16BitFlagSet);
+
+	return SoundEng16BitFlagSet(val);
+
+	unguard;
+} /* End FGlobalAudio::Use16BitFlagSet() */
+
+/*
+** FGlobalAudio::SurroundFlagGet:
+** Retrieves the current setting of the sound system's
+** surround sound enable flag.
+**
+** Parameters:
+**	NONE
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	1	Surround effects are enabled.
+**	0	Surround effects are not enabled.
+*/
+INT
+FGlobalAudio::SurroundFlagGet(void)
+{
+	guard(FGlobalAudio::SurroundFlagGet);
+
+	return SoundEngSurroundFlagGet();
+
+	unguard;
+} /* End FGlobalAudio::SurroundFlagGet() */
+
+/*
+** FGlobalAudio::SurroundFlagSet:
+** Changes the sound system's surround sound enable flag.
+**
+** Parameters:
+**	Name	Description
+**	----	-----------
+**	val	New enable setting.
+**		0 means don't enable surround effects.
+**		Other means enable surround effects.
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	any	Previous setting of flag.
+*/
+INT
+FGlobalAudio::SurroundFlagSet(INT val)
+{
+	guard(FGlobalAudio::SurroundFlagSet);
+
+	return SoundEngSurroundFlagSet(val);
+
+	unguard;
+} /* End FGlobalAudio::SurroundFlagSet() */
 
 /*
 ** FGlobalAudio::MixingRateSet:
@@ -776,11 +1015,11 @@ FGlobalAudio::FilterFlagSet(INT val)
 INT
 FGlobalAudio::MixingRateSet(INT val)
 {
-	GUARD;
+	guard(FGlobalAudio::MixingRateSet);
 
 	return SoundEngMixingRateSet(val);
 
-	UNGUARD("FGlobalAudio::MixingRateSet");
+	unguard;
 } /* End FGlobalAudio::MixingRateSet() */
 
 /*
@@ -796,13 +1035,13 @@ FGlobalAudio::MixingRateSet(INT val)
 **	any	Current audio driver mixing rate in Hertz.
 */
 INT
-FGlobalAudio::MixingRateGet(void)
+FGlobalAudio::MixingRateGet()
 {
-	GUARD;
+	guard(FGlobalAudio::MixingRateGet);
 
 	return SoundEngMixingRateGet();
 
-	UNGUARD("FGlobalAudio::MixingRateSet");
+	unguard;
 } /* End FGlobalAudio::MixingRateGet() */
 
 /*
@@ -819,11 +1058,11 @@ FGlobalAudio::MixingRateGet(void)
 void
 FGlobalAudio::Pause(void)
 {
-	GUARD;
+	guard(FGlobalAudio::Pause);
 
 	SoundEngPause();
 
-	UNGUARD("FGlobalAudio::Pause");
+	unguard;
 } /* End FGlobalAudio::Pause() */
 
 /*
@@ -839,11 +1078,11 @@ FGlobalAudio::Pause(void)
 void
 FGlobalAudio::UnPause(void)
 {
-	GUARD;
+	guard(FGlobalAudio::UnPause);
 
 	SoundEngUnPause();
 
-	UNGUARD("FGlobalAudio::UnPause");
+	unguard;
 } /* End FGlobalAudio::UnPause() */
 
 /*
@@ -854,28 +1093,23 @@ FGlobalAudio::UnPause(void)
 ** Parameters:
 **	Name	Description
 **	----	-----------
-**	iSong	Song number of song to be played.
-**		The song number becomes part of the song
-**		filename, i.e. SONGx.S3M, where 'x' is
-**		the specified number.
+**	pSong	Pointer to UMusic object containing the song
+**		to be played.
 **
 ** Returns:
 **	NONE
 */
 void
-FGlobalAudio::SpecifySong(int iSong)
+FGlobalAudio::SpecifySong(UMusic *pSong)
 {
-	GUARD;
+	guard(FGlobalAudio::SpecifySong);
 
-	char	stmp[256];
+	if (pSong == NULL)
+		SoundEngMusicSpecifySong((char *)NULL, 0);
+	else
+		SoundEngMusicSpecifySong((char *)pSong->GetData(), 0);
 
-	/* Hack until songs are stored as resources. */
-	sprintf(stmp, "..\\Music\\Song%d.s3m", iSong);
-	SoundEngMusicSpecifySong(stmp);
-	plog("Selecting music:");
-	plog(stmp);
-
-	UNGUARD("FGlobalAudio::SpecifySong");
+	unguard;
 } /* End FGlobalAudio::SpecifySong() */
 
 /*******************************************************************
@@ -901,7 +1135,7 @@ FGlobalAudio::SpecifySong(int iSong)
 int
 FGlobalAudio::Exec(const char *Cmd,FOutputDevice *Out)
 {
-	GUARD;
+	guard(FGlobalAudio::Exec);
 	const char *Str = Cmd;
 	char stmp[80];
 	char stmp2[80];
@@ -926,7 +1160,7 @@ FGlobalAudio::Exec(const char *Cmd,FOutputDevice *Out)
 	}
 	else if (GetCMD(&Str, "HELP"))
 	{
-		Out->Log("   AUDIOLOG LEVEL=n - Specify sound system log detail level, where 'n' is 1 to 5");
+		Out->Log("   AUDIOLOG LEVEL=n - Specify sound system log detail level, where 'n' is 1 to 9");
 		return 0;
 	}
 	else
@@ -935,7 +1169,7 @@ FGlobalAudio::Exec(const char *Cmd,FOutputDevice *Out)
 	}
 	return 0;
 
-	UNGUARD("FGlobalAudio::Exec");
+	unguard;
 } /* End FGlobalAudio::Exec() */
 
 /*

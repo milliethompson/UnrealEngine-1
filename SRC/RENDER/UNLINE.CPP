@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnLine.cpp: INCLUDABLE C FILE for drawing lines.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	This is used to avoid the overhead of establishing a stack frame and calling
@@ -26,19 +26,19 @@
 	//
 	// Bounds check
 	//
-	if ((X1 < 0.0         ) || (X2 < 0.0          ) ||
-		(Y1 < 0.0         ) || (Y2 < 0.0          ) ||
-		(X1 > Camera->FSXR) || (X2 > Camera->FSXR ) ||
-		(Y1 > Camera->FSYR) || (Y2 > Camera->FSYR))
+	if ((X1 < 0.0       ) || (X2 < 0.0        ) ||
+		(Y1 < 0.0       ) || (Y2 < 0.0        ) ||
+		(X1 > Camera->FX) || (X2 > Camera->FX ) ||
+		(Y1 > Camera->FY) || (Y2 > Camera->FY))
 		{
-		debugf(LOG_Rend,"Line: Bounds (%f,%f) (%f,%f)",X1,Y1,X2,Y2);
+		debugf(LOG_Problem,"Line: Bounds (%f,%f) (%f,%f)",X1,Y1,X2,Y2);
 		goto LABEL2(Out);
 		};
 	ColorBytes=Camera->ColorBytes;
 	//
 	// Depth shading
 	//
-#ifdef  DEPTHSHADE
+#ifdef DEPTHSHADE
 		#define DEPTHSETUP(Arclen) FixDG = (FixG2-FixG1)/Arclen;
 		G1 = 65536.0 * 12 - RZ1 * 65536.0 * 100000.0; if (G1<0.0) G1=0.0;
 		G2 = 65536.0 * 12 - RZ2 * 65536.0 * 100000.0; if (G2<0.0) G2=0.0;

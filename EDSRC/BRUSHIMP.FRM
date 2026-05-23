@@ -1,19 +1,19 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmBrushImp 
    Caption         =   "Import a brush"
    ClientHeight    =   3690
    ClientLeft      =   4395
    ClientTop       =   2940
    ClientWidth     =   4425
-   Height          =   4050
+   ControlBox      =   0   'False
    Icon            =   "BrushImp.frx":0000
-   Left            =   4335
    LinkTopic       =   "Form1"
+   MaxButton       =   0   'False
+   MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   3690
    ScaleWidth      =   4425
    ShowInTaskbar   =   0   'False
-   Top             =   2640
-   Width           =   4545
    Begin VB.CommandButton Cancel 
       Cancel          =   -1  'True
       Caption         =   "&Cancel"
@@ -104,7 +104,9 @@ Begin VB.Form frmBrushImp
    End
 End
 Attribute VB_Name = "frmBrushImp"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Private Sub Cancel_Click()
     Me.Hide

@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnRaster.cpp: Unreal polygon rasterizer
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -25,23 +25,23 @@ inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTra
 {
 	guardSlow(TRasterSetup::CalcBound);
 	const TTransformT *P;
-	INT	MinX,MaxX,MinY,MaxY;
+	FLOAT MinX,MaxX,MinY,MaxY;
 
-	MinY = MaxY = Pts[0].IntY;
-	MinX = MaxX = Pts[0].IntX;
+	MinY = MaxY = Pts[0].ScreenY;
+	MinX = MaxX = Pts[0].ScreenX;
 
 	P = &Pts [1];
 	for (int i=1; i<NumPts; i++)
 	{
-		if		(P->IntX < MinX) MinX = P->IntX;
-		else if (P->IntX > MaxX) MaxX = P->IntX;
+		if	    (P->ScreenX < MinX) MinX = P->ScreenX;
+		else if (P->ScreenX > MaxX) MaxX = P->ScreenX;
 
-		if		(P->IntY < MinY) MinY = P->IntY;
-		else if (P->IntY > MaxY) MaxY = P->IntY;
+		if		(P->ScreenY < MinY) MinY = P->ScreenY;
+		else if (P->ScreenY > MaxY) MaxY = P->ScreenY;
 		P++;
 	}
-	BoxBounds.MinX = Unfix(MinX);
-	BoxBounds.MaxX = Unfix(MaxX);
+	BoxBounds.MinX = MinX/65536.0;
+	BoxBounds.MaxX = MaxX/65536.0;
 	BoxBounds.MinY = MinY;
 	BoxBounds.MaxY = MaxY;
 	unguardSlow;
@@ -52,46 +52,47 @@ inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTra
 //
 template <class TRasterSideSetupT,class TRasterLineT,class TRasterPolyT,class TThisT,class TTransformT>
 inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTransformT>::Setup
-(const ICamera &Camera, const TTransformT *Pts, int NumPts, FMemPool *MemPool)
+(const UCamera *Camera, const TTransformT *Pts, int NumPts, FMemStack *MemStack)
 {
 	guard(TRasterSetup::Setup);
-	clockSlow(Setup);
+	STAT(clockSlow(GStat.RasterSetup));
 
 	const TTransformT	*P1,*P2;
-	int					iTop,iBottom,TopY,BottomY,Y,i,j;
+	int					iTop,iBottom,Y,i,j;
+	FLOAT				TopY,BottomY;
 	TRasterSideSetupT	*Side,**SidePtr;
 
-	Mem    = MemPool;
-	MemTop = Mem->GetFast(0);
+	Mem = MemStack;
+	Mark.Push(*Mem);
 
 	// Find top/bottom.
-	TopY    = Pts[0].IntY; iTop    = 0;
-	BottomY = Pts[0].IntY; iBottom = 0;
+	TopY    = Pts[0].ScreenY; iTop    = 0;
+	BottomY = Pts[0].ScreenY; iBottom = 0;
 
 	P1 = &Pts [1];
-	for ( i=1; i<NumPts; i++ )
-		{
-		if		(P1->IntY < TopY   ) {TopY    = P1->IntY; iTop    = i;}
-		else if (P1->IntY > BottomY) {BottomY = P1->IntY; iBottom = i;};
+	for( i=1; i<NumPts; i++ )
+	{
+		if		(P1->ScreenY < TopY   ) {TopY    = P1->ScreenY; iTop    = i;}
+		else if (P1->ScreenY > BottomY) {BottomY = P1->ScreenY; iBottom = i;};
 		P1++;
-		};
-	StartY = TopY;
-	EndY   = BottomY;
+	}
+	StartY = ftoi(TopY-0.5);
+	EndY   = ftoi(BottomY-0.5);
 
 	// Rasterize left side.
 	i       = iTop;
 	P1      = &Pts[i]; 
 	Y       = StartY;
 	SidePtr = &LeftSide;
-	while ( i != iBottom )
+	while( i != iBottom )
 	{
 		j			= (i>=1) ? (i-1) : (NumPts-1);
 		P2			= &Pts[j];
-		Side		= (TRasterSideSetupT *)Mem->GetFast(sizeof(TRasterSideSetupT));
+		Side		= new(*Mem)TRasterSideSetupT;
 		*SidePtr	= Side;
 		SidePtr		= &Side->Next;
 		Side->DY	= ftoi(P2->ScreenY-0.5) - Y;
-		Side->SetupSide (P1,P2,Y);
+		Side->SetupSide( P1, P2, Y );
 		Y		   += Side->DY;
 		P1			= P2;
 		i			= j;
@@ -103,15 +104,15 @@ inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTra
 	P1		= &Pts[i]; 
 	Y       = StartY;
 	SidePtr = &RightSide;
-	while (i != iBottom)
+	while( i != iBottom )
 	{
 		j        = ((i+1)<NumPts) ? (i+1) : 0;
 		P2       = &Pts[j];
-		Side     = (TRasterSideSetupT *)Mem->GetFast(sizeof(TRasterSideSetupT));
+		Side     = new(*Mem)TRasterSideSetupT;
 		*SidePtr = Side;
 		SidePtr  = &Side->Next;
 		Side->DY = ftoi(P2->ScreenY-0.5) - Y;
-		Side->SetupSide (P1,P2,Y);
+		Side->SetupSide( P1, P2, Y );
 		P1		 = P2;
 		Y       += Side->DY;
 		i		 = j;
@@ -121,7 +122,7 @@ inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTra
 	STAT(GStat.NumSides += NumPts;)
 	STAT(GStat.NumRasterPolys ++;)
 
-	unclockSlow(Setup);
+	STAT(unclockSlow(GStat.RasterSetup));
 	unguard;
 }
 
@@ -133,61 +134,62 @@ inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTra
 //
 template <class TRasterSideSetupT,class TRasterLineT,class TRasterPolyT,class TThisT,class TTransformT>
 inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTransformT>::SetupCached
-(const ICamera &Camera, const TTransformT *Pts, int NumPts, FMemPool *TempPool, FMemPool *CachePool, TRasterSideSetupT **Cache)
+(const UCamera *Camera, const TTransformT *Pts, int NumPts, FMemStack *TempPool, FMemStack *CachePool, TRasterSideSetupT **Cache)
 {
 	guard(TRasterSetup::SetupCached);
-	clockSlow(SetupCached);
+	STAT(clockSlow(GStat.RasterSetupCached));
 
 	const TTransformT	*P1,*P2;
-	int					iTop,iBottom,Y,i,j,TopY,BottomY;
+	int					iTop,iBottom,Y,i,j;
+	FLOAT               TopY,BottomY;
 	TRasterSideSetupT	*Side,**SidePtr;
 
-	Mem    = TempPool;
-	MemTop = Mem->GetFast(0);
+	Mem = TempPool;
+	Mark.Push(*Mem);
 
 	// Find top/bottom.
-	TopY = BottomY = Pts[0].IntY;
+	TopY = BottomY = Pts[0].ScreenY;
 	iTop = iBottom = 0;
 
 	P1       = &Pts [1];
-	for ( i=1; i<NumPts; i++ )
+	for( i=1; i<NumPts; i++ )
 	{
-		if (P1->IntY < TopY   ) {TopY    = P1->IntY; iTop    = i;};
-		if (P1->IntY > BottomY) {BottomY = P1->IntY; iBottom = i;};
+		if (P1->ScreenY < TopY   ) {TopY    = P1->ScreenY; iTop    = i;};
+		if (P1->ScreenY > BottomY) {BottomY = P1->ScreenY; iBottom = i;};
 		P1++;
 	}
-	StartY = TopY;
-	EndY   = BottomY;
+	StartY = ftoi(TopY-0.5);
+	EndY   = ftoi(BottomY-0.5);
 
 	// Rasterize left side.
 	Y       = TopY;
 	i       = iTop;
 	P1      = &Pts[i]; 
 	SidePtr = &LeftSide;
-	while ( i != iBottom )
+	while( i != iBottom )
 	{
 		j			= (i>=1) ? (i-1) : (NumPts-1);
 		P2			= &Pts[j];
 
 		TRasterSideSetupT **CachePtr = &Cache[P1->iSide];
-		if ( (P1->iSide==INDEX_NONE) || (*CachePtr == NULL) )
+		if( P1->iSide==INDEX_NONE || *CachePtr==NULL )
 		{
-			if (P1->iSide==INDEX_NONE)
+			if( P1->iSide==INDEX_NONE )
 			{
-				Side = (TRasterSideSetupT *)TempPool->GetFast(sizeof(TRasterSideSetupT));
+				Side = new(*TempPool)TRasterSideSetupT;
 			}
 			else
 			{
-				Side = (TRasterSideSetupT *)CachePool->GetFast(sizeof(TRasterSideSetupT));
+				Side = new(*CachePool)TRasterSideSetupT;
 				*CachePtr=Side;
 			}
-			Side->DY = P2->IntY - Y;
+			Side->DY = ftoi(P2->ScreenY-0.5) - Y;
 			Side->SetupSide (P1,P2,Y);
 		}
 		else
 		{
 			Side		= *CachePtr;
-			Side->DY	= P2->IntY - Y;
+			Side->DY	= ftoi(P2->ScreenY-0.5) - Y;
 			STAT(GStat.NumSidesCached++);
 		}
 		*SidePtr	= Side;
@@ -203,30 +205,30 @@ inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTra
 	i		= iTop;
 	P1		= &Pts[i]; 
 	SidePtr = &RightSide;
-	while ( i != iBottom )
-		{
+	while( i != iBottom )
+	{
 		j        = ((i+1)<NumPts) ? (i+1) : 0;
 		P2       = &Pts[j];
 
 		TRasterSideSetupT **CachePtr = &Cache[P2->iSide];
-		if ( (P2->iSide==INDEX_NONE) || (*CachePtr == NULL) )
+		if( P2->iSide==INDEX_NONE || *CachePtr==NULL )
 		{
 			if ( P2->iSide==INDEX_NONE )
 			{
-				Side = (TRasterSideSetupT *)TempPool->GetFast(sizeof(TRasterSideSetupT));
+				Side = new(*TempPool)TRasterSideSetupT;
 			}
 			else
 			{
-				Side = (TRasterSideSetupT *)CachePool->GetFast(sizeof(TRasterSideSetupT));
+				Side = new(*CachePool)TRasterSideSetupT;
 				*CachePtr=Side;
 			}
-			Side->DY = P2->IntY - Y;
-			Side->SetupSide (P1,P2,Y);
+			Side->DY = ftoi(P2->ScreenY-0.5) - Y;
+			Side->SetupSide( P1, P2, Y );
 		}
 		else
 		{
 			Side		= *CachePtr;
-			Side->DY	= P2->IntY - Y;
+			Side->DY	= ftoi(P2->ScreenY-0.5) - Y;
 			STAT(GStat.NumSidesCached++);
 		}
 		*SidePtr = Side;
@@ -240,7 +242,7 @@ inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTra
 	STAT(GStat.NumSides += NumPts;)
 	STAT(GStat.NumRasterPolys ++;)
 
-	unclockSlow(SetupCached);
+	STAT(unclockSlow(GStat.RasterSetupCached));
 	unguard;
 }
 
@@ -251,8 +253,8 @@ template <class TRasterSideSetupT,class TRasterLineT,class TRasterPolyT,class TT
 inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTransformT>::Generate
 (TRasterPolyT *Raster) const
 {
-	GUARD;
-	clockSlow(Generate);
+	guard(TRasterSetup::Generate);
+	STAT(clockSlow(GStat.RasterGenerate));
 
 	Raster->StartY = StartY;
 	Raster->EndY   = EndY;
@@ -263,16 +265,14 @@ inline void TRasterSetup<TRasterSideSetupT,TRasterLineT,TRasterPolyT,TThisT,TTra
 		TRasterLineT *Line = &Raster->Lines[0];
 		while(Side)
 		{
-			Side->GenerateSide(Line,c,Side->DY);
+			Side->GenerateSide( Line, c, Side->DY );
 			Line += Side->DY;
 			Side  = Side->Next;
 		}
 		Side = RightSide;
 	}
-	unclockSlow(Generate);
-	UNGUARD_BEGIN;
-	UNGUARD_MSGF("TRasterSetup::Generate (Start=%i, End=%i)",StartY,EndY);
-	UNGUARD_END;
+	STAT(unclockSlow(GStat.Generate));
+	unguardf(("(Start=%i, End=%i)",StartY,EndY));
 }
 
 /*-----------------------------------------------------------------------------
@@ -289,9 +289,9 @@ inline void TRasterPoly<TRasterLineT,TRasterPointT>::ForceForwardFace
 {
 	guardSlow(TRasterPoly::ForceForwardFace);
 	TRasterLineT *Line = &Lines[0];
-	for ( int i=StartY; i<EndY; i++ )
+	for( int i=StartY; i<EndY; i++ )
 	{
-		if ( Line->IsBackwards() )
+		if( Line->IsBackwards() )
 		{
 			TRasterPointT Temp	= Line->Start;
 			Line->Start			= Line->End;
@@ -308,10 +308,10 @@ inline void TRasterPoly<TRasterLineT,TRasterPointT>::ForceForwardFace
 template <class TRasterLineT,class TRasterPointT>
 inline void TRasterPoly<TRasterLineT,TRasterPointT>::DrawFlat
 (
-	const ICamera &Camera,
-	BYTE Color,
-	FSpanBuffer *SpanBuffer
-	)
+	const UCamera*	Camera,
+	BYTE			Color,
+	FSpanBuffer*	SpanBuffer
+)
 {
 	guard(TRasterPoly::DrawFlat);
 
@@ -327,7 +327,7 @@ inline void TRasterPoly<TRasterLineT,TRasterPointT>::DrawFlat
 
 			// Set up.
 			const TRasterLineT	*Line	= &Lines [NewStartY-StartY];
-			BYTE				*Dest	= Camera.Screen + NewStartY * Camera.ByteStride;
+			BYTE				*Dest	= Camera->Screen + NewStartY * Camera->ByteStride;
 			FSpan				**Index	= &SpanBuffer->Index[NewStartY-SpanBuffer->StartY];
 
 			// Draw all spans.
@@ -338,7 +338,7 @@ inline void TRasterPoly<TRasterLineT,TRasterPointT>::DrawFlat
 				{
 					Line->DrawFlatSpanClipped( Camera,Dest,Color,ThisSpan );
 				}
-				Dest += Camera.ByteStride;
+				Dest += Camera->ByteStride;
 				Line++;
 			}
 		}
@@ -347,12 +347,12 @@ inline void TRasterPoly<TRasterLineT,TRasterPointT>::DrawFlat
 	{
 		// Not span clipped.
 		const TRasterLineT	*Line = &Lines [0];
-		BYTE				*Dest = Camera.Screen + StartY * Camera.ByteStride;
+		BYTE				*Dest = Camera->Screen + StartY * Camera->ByteStride;
 
 		for( int i=StartY; i<EndY; i++ )
 		{
 			Line->DrawFlatSpan( Camera,Dest,Color );
-			Dest += Camera.ByteStride;
+			Dest += Camera->ByteStride;
 			Line++;
 		}
 	}
@@ -365,9 +365,9 @@ inline void TRasterPoly<TRasterLineT,TRasterPointT>::DrawFlat
 template <class TRasterLineT,class TRasterPointT>
 inline void TRasterPoly<TRasterLineT,TRasterPointT>::Draw
 (
-	const ICamera &Camera,
-	FPolySpanTextureInfoBase &Info,
-	FSpanBuffer *SpanBuffer
+	const UCamera*				Camera,
+	FPolySpanTextureInfoBase&	Info,
+	FSpanBuffer*				SpanBuffer
 )
 {
 	guard(TRasterPoly::Draw);
@@ -381,7 +381,7 @@ inline void TRasterPoly<TRasterLineT,TRasterPointT>::Draw
 			int NewEndY   = Min(EndY,  SpanBuffer->EndY);
 
 			// Set up.
-			BYTE			*Dest				= Camera.Screen + NewStartY * Camera.ByteStride;
+			BYTE			*Dest				= Camera->Screen + NewStartY * Camera->ByteStride;
 			TRasterLineT	*Line,*Line1		= &Lines [NewStartY-StartY];
 			FSpan			**Index,**Index1	= &SpanBuffer->Index[NewStartY-SpanBuffer->StartY];
 
@@ -407,7 +407,7 @@ inline void TRasterPoly<TRasterLineT,TRasterPointT>::Draw
 				{
 					Line->DrawSpanClipped(Camera,Dest,Info,i,ThisSpan);
 				}
-				Dest += Camera.ByteStride;
+				Dest += Camera->ByteStride;
 				Line++;
 			}
 		}
@@ -415,7 +415,7 @@ inline void TRasterPoly<TRasterLineT,TRasterPointT>::Draw
 	else
 	{
 		// Draw without span clipping.
-		BYTE			*Dest        = Camera.Screen + StartY * Camera.ByteStride;
+		BYTE			*Dest        = Camera->Screen + StartY * Camera->ByteStride;
 		TRasterLineT	*Line,*Line1 = &Lines [0];
 
 		// Set up all spans.
@@ -431,7 +431,7 @@ inline void TRasterPoly<TRasterLineT,TRasterPointT>::Draw
 		for( i=StartY; i<EndY; i++ )
 		{
 			Line->DrawSpan(Camera,Dest,Info,i);
-			Dest += Camera.ByteStride;
+			Dest += Camera->ByteStride;
 			Line++;
 		}
 	}
@@ -451,12 +451,12 @@ template void TRasterPoly
 	<
 	class FRasterLine,
 	class FRasterPoint
-	>::DrawFlat(const ICamera &Camera,BYTE Color,FSpanBuffer *SpanBuffer);
+	>::DrawFlat(const UCamera *Camera,BYTE Color,FSpanBuffer *SpanBuffer);
 template void TRasterPoly
 	<
 	class FRasterLine,
 	class FRasterPoint
-	>::Draw(const ICamera &Camera,FPolySpanTextureInfoBase &Info,FSpanBuffer *SpanBuffer);
+	>::Draw(const UCamera *Camera,FPolySpanTextureInfoBase &Info,FSpanBuffer *SpanBuffer);
 template void TRasterSetup
 	<
 	class FRasterSideSetup,
@@ -464,7 +464,7 @@ template void TRasterSetup
 	class FRasterPoly,
 	class FRasterSetup,
 	class FTransform
-	>::Setup(const ICamera &Camera,const FTransform *Pts, int NumPts, FMemPool *Mem);
+	>::Setup(const UCamera *Camera,const FTransform *Pts, int NumPts, FMemStack *Mem);
 template void TRasterSetup
 	<
 	class FRasterSideSetup,
@@ -472,7 +472,7 @@ template void TRasterSetup
 	class FRasterPoly,
 	class FRasterSetup,
 	class FTransform
-	>::SetupCached(const ICamera &Camera,const FTransform *Pts, int NumPts, FMemPool *TempPool, FMemPool *CachePool, FRasterSideSetup **Cache);
+	>::SetupCached(const UCamera *Camera,const FTransform *Pts, int NumPts, FMemStack *TempPool, FMemStack *CachePool, FRasterSideSetup **Cache);
 template void TRasterSetup
 	<
 	class FRasterSideSetup,
@@ -499,35 +499,35 @@ template void TRasterPoly
 	<
 	class FRasterTexLine,
 	class FRasterTexPoint
-	>::DrawFlat(const ICamera &Camera,BYTE Color,FSpanBuffer *SpanBuffer);
+	>::DrawFlat(const UCamera *Camera,BYTE Color,FSpanBuffer *SpanBuffer);
 template void TRasterPoly
 	<
 	class FRasterTexLine,
 	class FRasterTexPoint
-	>::Draw(const ICamera &Camera,FPolySpanTextureInfoBase &Info,FSpanBuffer *SpanBuffer);
+	>::Draw(const UCamera *Camera,FPolySpanTextureInfoBase &Info,FSpanBuffer *SpanBuffer);
 template void TRasterSetup
 	<
 	class FRasterTexSideSetup,
 	class FRasterTexLine,
 	class FRasterTexPoly,
 	class FRasterTexSetup,
-	class FTransTex
-	>::Setup(const ICamera &Camera,const FTransTex *Pts, int NumPts, FMemPool *Mem);
+	class FTransTexture
+	>::Setup(const UCamera *Camera,const FTransTexture *Pts, int NumPts, FMemStack *Mem);
 template void TRasterSetup
 	<
 	class FRasterTexSideSetup,
 	class FRasterTexLine,
 	class FRasterTexPoly,
 	class FRasterTexSetup,
-	class FTransTex
-	>::CalcBound(const FTransTex *Pts, int NumPts, FScreenBounds &Bounds);
+	class FTransTexture
+	>::CalcBound(const FTransTexture *Pts, int NumPts, FScreenBounds &Bounds);
 template void TRasterSetup
 	<
 	class FRasterTexSideSetup,
 	class FRasterTexLine,
 	class FRasterTexPoly,
 	class FRasterTexSetup,
-	class FTransTex
+	class FTransTexture
 	>::Generate(FRasterTexPoly *Raster) const;
 
 /*-----------------------------------------------------------------------------

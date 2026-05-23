@@ -1,7 +1,7 @@
 /*==============================================================================
 UnChecks.h: Unified debugging and assertion code.
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 Summary:
@@ -17,8 +17,8 @@ Summary:
 		unguardfSlow((PrintfStyleExpression));
 
 	Compile-time options:
-		NO_GUARD		(Off by default) Disables try/catch exception handling in guard.
-		NO_SLOW_GUARD	(On by default)  Disables try/catch exception handling in guardSlow.
+		DO_GUARD		(On by default ) Enables try/catch exception handling in guard.
+		DP_SLOW_GUARD	(Off by default) Enables try/catch exception handling in guardSlow.
 		CHECK_ALL		(Off by default) Perform all checks in release versions.
 
     Checking functions:
@@ -39,13 +39,6 @@ Summary:
         void debugLogic  (BOOL Condition);
         void debugOutput (BOOL Condition);
         void debugState  (BOOL Condition);
-
-	Logging functions:
-
-		void log		(PrintfStyleExpression);
-		void logInit	(PrintfStyleExpression);
-		void logExit	(PrintfStyleExpression);
-		void logInfo	(PrintfStyleExpression);
 
 	Other useful functions and macros:
 
@@ -153,14 +146,14 @@ Revision history:
 // For showing calling stack when errors occur in major functions.
 // Meant to be enabled in release builds.
 //
-#if defined(_DEBUG) || NO_GUARD /* No guard mechanism */
+#if defined(_DEBUG) || !DO_GUARD /* No guard mechanism */
 	#define guard(func)			{static const char __FUNC_NAME__[]=#func;
-	#define unguardf(msg)		}
 	#define unguard				}
+	#define unguardf(msg)		}
 #else /* Enable guard mechansim */
 	#define guard(func)			{static const char __FUNC_NAME__[]=#func; try{
-	#define unguardf(msg)		}catch(...){if(GApp->Debugging) GApp->DebugBreak(); GApp->GuardMessagef("%s",__FUNC_NAME__); GApp->GuardMessagef msg; GApp->GuardTrap=1; throw;}} /* Must enclose msg in double parenthesis */
-	#define unguard				}catch(...){if(GApp->Debugging) GApp->DebugBreak(); GApp->GuardMessagef("%s",__FUNC_NAME__); GApp->GuardTrap=1; throw;}}
+	#define unguard				}catch(char *Err){throw Err;}catch(...){if(GApp->Debugging) GApp->DebugBreak(); GApp->GuardMessagef("%s",__FUNC_NAME__); throw;}}
+	#define unguardf(msg)		}catch(char *Err){throw Err;}catch(...){if(GApp->Debugging) GApp->DebugBreak(); GApp->GuardMessagef("%s",__FUNC_NAME__); GApp->GuardMessagef msg; throw;}} /* Must enclose msg in double parenthesis */
 #endif
 
 //
@@ -168,14 +161,15 @@ Revision history:
 // For showing calling stack when errors occur in performance-critical functions.
 // Meant to be disabled in release builds.
 //
-#if defined(_DEBUG) || NO_GUARD || NO_SLOW_GUARD /* No slow guard mechanism */
+#if defined(_DEBUG) || !DO_GUARD || !DO_SLOW_GUARD /* No slow guard mechanism */
 	#define guardSlow(func)		static const char __FUNC_NAME__[]=#func;{
 	#define unguardfSlow(msg)	}
 	#define unguardSlow			}
+	#define unguardfSlow(msg)	}
 #else /* Enable slow guard mechansim */
 	#define guardSlow(func)		guard(func)
-	#define unguardfSlow(msg)	unguardf(msg)
 	#define unguardSlow			unguard
+	#define unguardfSlow(msg)	unguardf(msg)
 #endif
 
 /*-----------------------------------------------------------------------------
@@ -187,7 +181,7 @@ Revision history:
 // checkXYZ is performed in all versions in which the corresponding CHECK_XYZ is defined to 1.
 // debugXYZ is performed only in _DEBUG builds and only when the above criteria are met.
 //
-#if defined(_DEBUG) || defined(CHECK_ALL)
+#if defined(_DEBUG) || CHECK_ALL
     // Debug code: Use 1 to enable a check, or 0 to disable it.
     // You may use these macros in your own code: if(CHECK_INPUT) ...
     #define CHECK_INPUT  1
@@ -257,7 +251,7 @@ Revision history:
 //
 // Define all debugXYZ macros.
 //
-#if defined(_DEBUG) || defined(CHECK_ALL)
+#if defined(_DEBUG) || CHECK_ALL
     // Debug checks are the same as simple checks when debugging:
     #define debugInput(Condition)  checkInput(Condition)  
     #define debugLogic(Condition)  checkLogic(Condition)  
@@ -286,11 +280,11 @@ Revision history:
 // checkFailed functions.  These are referenced by the checkXYZ and debugXYZ macros, but
 // you may call them directly when you want to cause a critical error.
 //
-extern void UNREAL_API checkFailed( const char * Message, const char * SourceFileName, int LineNumber );
-extern void UNREAL_API checkFailed( const char * SourceFileName, int LineNumber );
-extern void UNREAL_API checkFailed( const char * Message );
-extern void UNREAL_API checkFailed( int LineNumber );
-extern void UNREAL_API checkFailed( );
+void UNENGINE_API checkFailed( const char * Message, const char * SourceFileName, int LineNumber );
+void UNENGINE_API checkFailed( const char * SourceFileName, int LineNumber );
+void UNENGINE_API checkFailed( const char * Message );
+void UNENGINE_API checkFailed( int LineNumber );
+void UNENGINE_API checkFailed( );
 
 /*-----------------------------------------------------------------------------
 	Static constants.
@@ -304,28 +298,6 @@ extern void UNREAL_API checkFailed( );
 // a guard() block.
 //
 static const char __FUNC_NAME__[] = "Unknown";
-
-//
-// Here is a convenience definition for when you want to do something
-// conditionally for debug code only, but you don't want to use
-// #if and the macro preprocessor.
-//
-#if _DEBUG
-    static const int DebugCode = 1;
-#else
-    static const int DebugCode = 0;
-#endif
-
-/*-----------------------------------------------------------------------------
-	Logging.
------------------------------------------------------------------------------*/
-
-//
-// Logging macros.  For displaying information on the console.
-// These only work when called when there is a FGlobalApp *GApp in the
-// current scope.
-//
-#define logf GApp->Logf
 
 /*-----------------------------------------------------------------------------
 	The End.

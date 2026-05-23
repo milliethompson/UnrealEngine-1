@@ -2,7 +2,7 @@
 	UnWn.cpp: Unreal startup
 	Used by: Log window
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -15,8 +15,7 @@
 #include "Net.h"
 #include "UnWnCam.h"
 #include "UnConfig.h"
-#include "UnWnProp.h" // Properties dialog.
-#include "UnInput.h"
+#include "UnWnProp.h"
 
 /////////////////////////////////////////////////////////////////////////////
 // Globals.
@@ -24,14 +23,12 @@
 
 CUnrealWnApp			App;
 FWindowsCameraManager	CameraManager;
-extern FTaskManager		*TaskManager;
 
-extern UNRENDER_API  FGlobalRender  *GRendPtr;
-extern UNGAME_API    FGameBase	    *GGamePtr;
-extern UNNETWORK_API NDriver		*GDirectPlayDriver;
-extern UNEDITOR_API  FGlobalEditor	GUnrealEditor;
-
-FRenderDevice *FindRenderDevice();
+extern UNRENDER_API  FRenderBase		*GRendPtr;
+extern UNRENDER_API	 FEditorRenderBase	*GEditorRendPtr;
+extern UNGAME_API    FGameBase			*GGamePtr;
+extern UNNETWORK_API NDriver			*GDirectPlayDriver;
+extern UNEDITOR_API  FGlobalEditor		GUnrealEditor;
 
 /////////////////////////////////////////////////////////////////////////////
 // CUnrealWnApp.
@@ -79,7 +76,6 @@ CUnrealWnApp::CUnrealWnApp()
 	AlwaysOnTop					= 0;
 	InOle						= 0;
 	OleCrashed					= 0;
-	PlatformCrashed				= 0;
 	hWndMain					= NULL;
 	hWndCallback				= NULL;
 	UsageCount					= 0;
@@ -143,9 +139,6 @@ BOOL CUnrealWnApp::InitInstance()
 	// Set globals.
 	GApp					= &Platform;
 	Platform.CameraManager  = &CameraManager;
-	Platform.RenDev			= FindRenderDevice();
-    Platform.Input          = &GPlatformInput;        
-    GInput.PlatformInput    = &GPlatformInput;
 
 	// Password dialog.
 	#if 0
@@ -211,9 +204,12 @@ BOOL CUnrealWnApp::InitInstance()
 	}
 
 	// Only register the server?
-	if (mystrstr(CmdLine,"/REGSERVER")||mystrstr(CmdLine,"-REGSERVER")) 
+	if( mystrstr(CmdLine,"/REGSERVER")||mystrstr(CmdLine,"-REGSERVER") )
 		return FALSE;
-	
+
+	// Init defaults based on command line.
+	GDefaults.Init(CmdLine);
+
 	// Launch with splash screen?
 	if (!(mystrstr(CmdLine,"-LOG")||mystrstr(CmdLine,"-EDITOR"))) 
 		Platform.LaunchWithoutLog=1;
@@ -222,17 +218,13 @@ BOOL CUnrealWnApp::InitInstance()
 	AfxOleLockApp();
 	Dialog = new CUnrealWnDlg;
 
-	Timer.Init(40);
-	int ExceptionExit=0;
-	if (Platform.Debugging)
+	// Handle debugging or regular.
+	if( Platform.Debugging )
 	{
-		AfxMessageBox("Running in debug mode");
-		m_pMainWnd		= Dialog;
+		m_pMainWnd = Dialog;
 
-		Dialog->Create(IDD_UNWN_DIALOG);
+		Dialog->Create(IDD_LOG);
 		MessagePump();
-
-		Timer.Exit();
 		GUnreal.Exit();
 	}
 	else
@@ -243,30 +235,22 @@ BOOL CUnrealWnApp::InitInstance()
 
 			m_pMainWnd	= Dialog;
 
-			Dialog->Create(IDD_UNWN_DIALOG);
+			Dialog->Create(IDD_LOG);
 			MessagePump();
 
 			Platform.ServerAlive = 0;
 			if (OleCrashed || Platform.InAppError) goto Crashed;
 
-			Timer.Exit();
 			GUnreal.Exit();
-
 			unguard;
 		}
 		catch(...)
 		{
 			// Exception due to appError call or GPF.
 			Crashed:
-			ExceptionExit			= 1;
-			PlatformCrashed			= 1;
-			Timer.Exit();
+			Platform.GuardTrap = 1;
 
-			if( OleCrashed || InOle )
-			{
-				// Ole has already cleaned up after the error.
-			}
-			else
+			if( !OleCrashed && !InOle )
 			{
 				Platform.Logf("Shutting down Unreal engine");
 				Platform.ShutdownAfterError();
@@ -291,12 +275,10 @@ BOOL CUnrealWnApp::InitInstance()
 
 	// Since the dialog has been closed, return FALSE so that we exit the
 	// application, rather than start the MFC message pump.
-
 	Out:
 	GdiFlush();
 	AfxOleUnlockApp();
-	//_exit(0); // Force buggy MFC Ole code to shut down
-
+	ExitProcess(1); // Force buggy MFC Ole code to shut down.
 	return FALSE;
 }
 
@@ -318,12 +300,12 @@ void CUnrealWnApp::InitializeUnreal()
 	GUnreal.Init
 	(
 		&Platform,
-		TaskManager,
 		Platform.CameraManager,
 		GRendPtr,
 		GGamePtr,
 		IsNet    ? &NetManager    : NULL,
-		IsEditor ? &GUnrealEditor : NULL
+		IsEditor ? &GUnrealEditor : NULL,
+		IsEditor ? GEditorRendPtr : NULL
 	);
 	unguard;
 }
@@ -341,7 +323,7 @@ void CUnrealWnApp::UnrealLockApp()
 	guard(CUnrealWnApp::UnrealLockApp);
 
 	UsageCount++;
-	debugf(LOG_Win,"UnrealLockApp %i",UsageCount);
+	debugf(LOG_Info,"UnrealLockApp %i",UsageCount);
 
 	unguard;
 }
@@ -354,7 +336,7 @@ void CUnrealWnApp::UnrealUnlockApp()
 {
 	guard(CUnrealWnApp::UnrealUnlockApp);
 
-	debugf(LOG_Win,"UnrealUnlockApp %i",UsageCount);
+	debugf(LOG_Info,"UnrealUnlockApp %i",UsageCount);
 	
 	if (--UsageCount <= 0)
 		App.Dialog->Exit();
@@ -372,7 +354,7 @@ void CUnrealWnApp::UnrealUnlockApp()
 //
 void CUnrealWnApp::FinalizeErrorText()
 {
-	strcat(App.Platform.ErrorHist, ".  " GAME_NAME " " GAME_VERSION
+	strcat(App.Platform.ErrorHist, " <- " GAME_NAME " " GAME_VERSION
 		" was compiled on " __DATE__ ".");
 	strcat(App.Platform.ErrorHist,"\r\n\r\nTo report this error, send the "
 		" " LOG_PARTIAL " file to Epic along with a description of "
@@ -443,10 +425,10 @@ void CUnrealWnApp::RegisterFileTypes(char *BaseDir)
 					RegDoSet	(Key4,Base + ENGINE_PARTIAL + " FILE=\"%1\"");
 				RegCloseKey		(Key4);
 			RegCloseKey			(Key3);
-			//
+
 			Temp=fopen(EDITOR_FNAME,"rb");
-			if (Temp)
-				{
+			if( Temp )
+			{
 				fclose(Temp);
 				RegCreateKey	(Key2,"edit",&Key3);
 					RegDoSet	(Key3,EDIT_COMMAND);
@@ -454,11 +436,12 @@ void CUnrealWnApp::RegisterFileTypes(char *BaseDir)
 						RegDoSet(Key4,Base + EDITOR_PARTIAL + " FILE=\"%1\"");
 					RegCloseKey	(Key4);
 				RegCloseKey		(Key3);
-				};
+			}
 		RegCloseKey				(Key2);
 	RegCloseKey					(Key1);
 
 	// Register with Internet Explorer.
+	/*
 	RegCreateKey				(HKEY_CLASSES_ROOT,"Unreal",&Key1);
 		RegDoSet				(Key1,"URL:Unreal Protocol");
 		RegCreateKey			(Key1,"DefaultIcon",&Key2);
@@ -475,6 +458,7 @@ void CUnrealWnApp::RegisterFileTypes(char *BaseDir)
 			RegCloseKey			(Key3);
 		RegCloseKey				(Key2);
 	RegCloseKey					(Key1);
+	*/
 
 	// Register with Netscape.
 	/*
@@ -526,17 +510,18 @@ void CUnrealWnApp::OnFileLoadGame()
 	
 	SetCurrentDirectory((CString)BaseDir + MAP_RELATIVE_PATH);
 	CFileDialog LoadDialog
-		(
+	(
 		TRUE,MAP_EXTENSION,NULL,OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
 		LOAD_MAP_MASK,
 		NULL
-		);
-	if (LoadDialog.DoModal()==IDOK)
-		{
-		// Load it.
-		};
+	);
+	if( LoadDialog.DoModal()==IDOK )
+	{
+		Platform.BeginSlowTask("Loading game",1,0);
+		GUnreal.EnterWorld( LoadDialog.GetPathName(), 1 );
+		Platform.EndSlowTask();
+	}
 	SetCurrentDirectory(BaseDir);
-	
 	unguard;
 }
 
@@ -551,12 +536,13 @@ void CUnrealWnApp::OnFileSaveGame()
 		SAVE_MAP_MASK,
 		NULL
 	);
-	if( SaveDialog.DoModal()==IDOK )
+	if( SaveDialog.DoModal()==IDOK && GServer.GetLevel() )
 	{
-		// Save it
+		Platform.BeginSlowTask( "Saving game", 1, 0 );
+		GObj.SaveDependent( GServer.GetLevel(), SaveDialog.GetPathName() );
+		Platform.EndSlowTask();
 	}
 	SetCurrentDirectory(BaseDir);
-
 	unguard;
 }
 

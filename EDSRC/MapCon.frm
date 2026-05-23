@@ -1,4 +1,5 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{0BA686C6-F7D3-101A-993E-0000C0EF6F5E}#1.0#0"; "THREED32.OCX"
 Begin VB.Form frmMapToolbar 
    BorderStyle     =   4  'Fixed ToolWindow
    Caption         =   "Map Toolbar"
@@ -8,37 +9,34 @@ Begin VB.Form frmMapToolbar
    ClientWidth     =   5025
    ControlBox      =   0   'False
    BeginProperty Font 
-      name            =   "MS Sans Serif"
-      charset         =   0
-      weight          =   700
-      size            =   8.25
-      underline       =   0   'False
-      italic          =   0   'False
-      strikethrough   =   0   'False
+      Name            =   "MS Sans Serif"
+      Size            =   8.25
+      Charset         =   0
+      Weight          =   700
+      Underline       =   0   'False
+      Italic          =   0   'False
+      Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Height          =   3705
    HelpContextID   =   114
    Icon            =   "MapCon.frx":0000
-   Left            =   2970
    LinkTopic       =   "Form8"
    MaxButton       =   0   'False
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   3345
    ScaleWidth      =   5025
    ShowInTaskbar   =   0   'False
-   Top             =   9480
-   Width           =   5145
    Begin VB.Frame Frame8 
       Caption         =   "Selected Brushes"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   3135
       Left            =   3240
@@ -48,13 +46,13 @@ Begin VB.Form frmMapToolbar
       Begin VB.Frame Frame5 
          Caption         =   "Solidity"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1095
          Left            =   120
@@ -64,13 +62,13 @@ Begin VB.Form frmMapToolbar
          Begin VB.CommandButton SetStat 
             Caption         =   "Set"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   840
@@ -82,13 +80,13 @@ Begin VB.Form frmMapToolbar
          Begin VB.OptionButton NonSolid 
             Caption         =   "Non-solid"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -99,13 +97,13 @@ Begin VB.Form frmMapToolbar
          Begin VB.OptionButton SemiSolid 
             Caption         =   "Semi-solid"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -116,13 +114,13 @@ Begin VB.Form frmMapToolbar
          Begin VB.OptionButton Solid 
             Caption         =   "Solid"
             BeginProperty Font 
-               name            =   "MS Sans Serif"
-               charset         =   0
-               weight          =   400
-               size            =   8.25
-               underline       =   0   'False
-               italic          =   0   'False
-               strikethrough   =   0   'False
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   255
             Left            =   120
@@ -134,13 +132,13 @@ Begin VB.Form frmMapToolbar
       End
       Begin VB.TextBox GrpName 
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   315
          Left            =   120
@@ -151,13 +149,13 @@ Begin VB.Form frmMapToolbar
       Begin VB.CommandButton SetGrpName 
          Caption         =   "Set Group Name"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   300
          Left            =   120
@@ -179,13 +177,13 @@ Begin VB.Form frmMapToolbar
          _StockProps     =   78
          Caption         =   "X"
          BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          BevelWidth      =   1
       End
@@ -199,6 +197,15 @@ Begin VB.Form frmMapToolbar
          _ExtentX        =   450
          _ExtentY        =   450
          _StockProps     =   78
+         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          BevelWidth      =   1
          Picture         =   "MapCon.frx":030A
       End
@@ -212,6 +219,15 @@ Begin VB.Form frmMapToolbar
          _ExtentX        =   450
          _ExtentY        =   450
          _StockProps     =   78
+         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          BevelWidth      =   1
          Picture         =   "MapCon.frx":095C
       End
@@ -225,6 +241,15 @@ Begin VB.Form frmMapToolbar
          _ExtentX        =   450
          _ExtentY        =   450
          _StockProps     =   78
+         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          BevelWidth      =   1
          Picture         =   "MapCon.frx":0FAE
       End
@@ -238,6 +263,15 @@ Begin VB.Form frmMapToolbar
          _ExtentX        =   450
          _ExtentY        =   450
          _StockProps     =   78
+         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          BevelWidth      =   1
          Picture         =   "MapCon.frx":1600
       End
@@ -251,6 +285,15 @@ Begin VB.Form frmMapToolbar
          _ExtentX        =   450
          _ExtentY        =   450
          _StockProps     =   78
+         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          BevelWidth      =   1
          Picture         =   "MapCon.frx":1C52
       End
@@ -264,6 +307,15 @@ Begin VB.Form frmMapToolbar
          _ExtentX        =   450
          _ExtentY        =   450
          _StockProps     =   78
+         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          BevelWidth      =   1
          Picture         =   "MapCon.frx":22A4
       End
@@ -277,6 +329,15 @@ Begin VB.Form frmMapToolbar
          _ExtentX        =   450
          _ExtentY        =   450
          _StockProps     =   78
+         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          BevelWidth      =   1
          Picture         =   "MapCon.frx":28F6
       End
@@ -290,6 +351,15 @@ Begin VB.Form frmMapToolbar
          _ExtentX        =   450
          _ExtentY        =   450
          _StockProps     =   78
+         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
          BevelWidth      =   1
          Picture         =   "MapCon.frx":2F48
       End
@@ -297,13 +367,13 @@ Begin VB.Form frmMapToolbar
          BackStyle       =   0  'Transparent
          Caption         =   "Wireframe Color:"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -315,13 +385,13 @@ Begin VB.Form frmMapToolbar
    Begin VB.CommandButton Expand 
       Caption         =   ">"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   2880
@@ -333,13 +403,13 @@ Begin VB.Form frmMapToolbar
    Begin VB.CommandButton Help 
       Caption         =   "&Help"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   2280
@@ -351,13 +421,13 @@ Begin VB.Form frmMapToolbar
    Begin VB.CommandButton Done 
       Caption         =   "&Done"
       BeginProperty Font 
-         name            =   "MS Sans Serif"
-         charset         =   0
-         weight          =   400
-         size            =   8.25
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   255
       Left            =   1560
@@ -369,13 +439,13 @@ Begin VB.Form frmMapToolbar
    Begin VB.Frame Frame1 
       Caption         =   "Copy"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   9.75
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   9.75
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   975
       Left            =   120
@@ -387,13 +457,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "From Brush"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -407,13 +477,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "To Brush"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -426,13 +496,13 @@ Begin VB.Form frmMapToolbar
    Begin VB.Frame Frame4 
       Caption         =   "Commands"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   9.75
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   9.75
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   975
       Left            =   120
@@ -444,13 +514,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "Duplicate"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -464,13 +534,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "Delete"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -483,13 +553,13 @@ Begin VB.Form frmMapToolbar
    Begin VB.Frame Frame3 
       Caption         =   "Select"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   9.75
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   9.75
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   2775
       Left            =   1560
@@ -501,13 +571,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "Non-solids"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -521,13 +591,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "Semi-solids"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -541,13 +611,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "Next"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -561,13 +631,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "Previous"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -581,13 +651,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "Last"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   840
@@ -601,13 +671,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "First"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   840
@@ -621,13 +691,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "Subtracts"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -641,13 +711,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "Adds"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -661,13 +731,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "None"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -681,13 +751,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "All"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -700,13 +770,13 @@ Begin VB.Form frmMapToolbar
    Begin VB.Frame Frame2 
       Caption         =   "Order"
       BeginProperty Font 
-         name            =   "Arial"
-         charset         =   0
-         weight          =   700
-         size            =   9.75
-         underline       =   0   'False
-         italic          =   -1  'True
-         strikethrough   =   0   'False
+         Name            =   "Arial"
+         Size            =   9.75
+         Charset         =   0
+         Weight          =   700
+         Underline       =   0   'False
+         Italic          =   -1  'True
+         Strikethrough   =   0   'False
       EndProperty
       Height          =   975
       Left            =   120
@@ -718,13 +788,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "To Last"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -738,13 +808,13 @@ Begin VB.Form frmMapToolbar
          BackColor       =   &H80000005&
          Caption         =   "To First"
          BeginProperty Font 
-            name            =   "MS Sans Serif"
-            charset         =   0
-            weight          =   400
-            size            =   8.25
-            underline       =   0   'False
-            italic          =   0   'False
-            strikethrough   =   0   'False
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   255
          Left            =   120
@@ -756,7 +826,9 @@ Begin VB.Form frmMapToolbar
    End
 End
 Attribute VB_Name = "frmMapToolbar"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 

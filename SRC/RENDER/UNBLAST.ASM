@@ -1503,7 +1503,7 @@ ENDM
 ALIGN 16
 PUBLIC TMI_MipDataTable
 TMI_MipDataTable LABEL DWORD
-FOR Mip,<0,1,2,3,4,5,6,7>
+FOR Mip,<0,1,2,3,4,5,6,7,8,9,10,11>
 	@catstr(TMI_,TexBase1,Mip) DD ?
 	@catstr(TMI_,TexBase2,Mip) DD ?
 ENDM
@@ -1517,7 +1517,7 @@ ENDM
 ;-------------------------------------;
 SELF_MOD_SEG
 FOR Variety,<8P,16P,32P>
-	FOR Mip,<0,1,2,3,4,5,6,7>
+	FOR Mip,<0,1,2,3,4,5,6,7,8,9,10,11>
 		FOR Trilerp,<0,1,2,3>
 			FOR Line,<0,1,2,3>
 				@catstr(TMI_Define,Variety) Mip,Line,(Line MOD 2),Trilerp
@@ -1533,7 +1533,7 @@ END_SELF_MOD_SEG
 .CODE
 ALIGN 16
 FOR Variety,<8P,16P,32P>
-	FOR Mip,<0,1,2,3,4,5,6,7>
+	FOR Mip,<0,1,2,3,4,5,6,7,8,9,10,11>
 		FOR Line,<0,1,2,3>
 			;
 			@CatStr(TMI_Mod,Variety,Mip,Line):
@@ -1563,7 +1563,7 @@ ALIGN 16
 FOR Variety,<8P,16P,32P>
 	PUBLIC @catstr(TMI_ProcTable,Variety)
 	@catstr(TMI_ProcTable,Variety) DD 0,0
-	FOR Mip, <0,1,2,3,4,5,6,7>
+	FOR Mip, <0,1,2,3,4,5,6,7,8,9,10,11>
 		FOR Trilerp,<0,1,2,3>
 			FOR Line,<0,1,2,3>
 				DD @CatStr(TMI_Proc,Variety,Mip,Line,Trilerp)
@@ -1581,7 +1581,7 @@ ALIGN 16
 FOR Variety,<8P,16P,32P>
 	PUBLIC @catstr(TMI_ModTable,Variety)
 	@catstr(TMI_ModTable,Variety) DD 0
-	FOR Mip, <0,1,2,3,4,5,6,7>
+	FOR Mip, <0,1,2,3,4,5,6,7,8,9,10,11>
 		FOR Line,<0,1,2,3>
 			DD @CatStr(TMI_Mod,Variety,Mip,Line)
 		ENDM
@@ -1716,7 +1716,7 @@ DD_Global	TRL_BaseU
 DD_Global	TRL_BaseV
 
 Public TRL_MipPtr
-TRL_MipPtr	 DD ?,?,?,?,?,?,?,?,?
+TRL_MipPtr	 DD ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
 
 DB_Global	TRL_LightMeshShift
 DB_Global	TRL_LightMeshUShift
@@ -1764,7 +1764,7 @@ SELF_MOD_SEG
 		shr esi,21							; Get mipmap magnitude + 2 bits of fractional mantissa
 		xor edx,edx							; Prepare to compute trilerp
 		;
-		mov ebp,[TRL_MipRef]				; Get GBlit pointer
+		mov ebp,[TRL_MipRef]				; Get mip reference pointer
 		xor ecx,ecx							; Prepare to compute mip
 		;
 		mov dl,[ebx+esi*2+1]				; Now edx = RoutineOfs
@@ -1785,8 +1785,8 @@ SELF_MOD_SEG
 		mov [eax].FTexLattice.RoutineOfs,edx ; Store RoutineOfs
 		xor edx,edx							; Prepare to load UBits
 		;
-		mov dl, [esi].FBlitMipInfo.UBits	; U bits in mipmap
-		mov edi,[esi].FBlitMipInfo.VMask	; Get texture V mask
+		mov dl, [esi].IMip.UBits			; U bits in mipmap
+		mov edi,[esi].IMip.VMask			; Get texture V mask
 		;
 		mov [UBits],edx						; Store U bits
 		mov [VMask],edi						; Remember V mask
@@ -2290,6 +2290,7 @@ DD_GLOBAL	TRO_ThisLightBase
 DD_GLOBAL	TRO_SubRectEndY
 DD_GLOBAL	TRO_SpanIndex
 DD_GLOBAL	TRO_OuterProc
+DD_GLOBAL	TRO_DitherMask
 SpanStart	DD ?
 SpanEnd		DD ?
 SpanNext	DD ?
@@ -2314,7 +2315,7 @@ TRO_OuterMacro MACRO Variety:req
 	;
 	SubYLoop:
 	;
-	mov		ebx,3						; ebx = 3
+	mov		ebx,[TRO_DitherMask]		; ebx = TMAPPER_DITHER_LINES-1
 	mov		esi,[TMI_ProcBase]			; esi = TMI_ProcBase
 	;
 	and		ebx,eax						; ebx = Y & 3
@@ -2323,10 +2324,10 @@ TRO_OuterMacro MACRO Variety:req
 	mov		ecx,[TRO_ThisLightBase]		; ecx = ThisLightBase
 	mov		[TRO_Y],eax					; Store Y+1
 	;
-	lea		edx,[esi + ebx*8]			; edx = &TMI_ProcBase[(Y&3)*2]
+	lea		edx,[esi + ebx*8]			; edx = &TMI_ProcBase[(Y&TMAPPER_DITHER_LINES-1)*2]
 	mov		esi,[TMO_DestOrDestBitsPtr] ; esi = TMO_DestOrDestBitsPtr
 	;
-	mov		[TMI_LineProcBase],edx		; TMI_LineProcBase = &TMI_ProcBase[(Y&3)*2]
+	mov		[TMI_LineProcBase],edx		; TMI_LineProcBase = &TMI_ProcBase[(Y&(TMAPPER_DITHER_LINES-1))*2]
 	mov		edx,[TMO_Dest]				; edx = TMO_Dest
 	;
 	mov		[esi],edx					; *TMO_DestOrDestBitsPtr = TMO_Dest

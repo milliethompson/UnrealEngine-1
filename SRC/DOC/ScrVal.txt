@@ -1,0 +1,923 @@
+class Tester expands Pawn;
+//=============================================================================
+// UnrealScript validation code.
+// This torture tests the features of UnrealScript.
+//=============================================================================
+
+var vector original;
+
+// Uncomment for compile time error checking.
+//var string[255] ss1,ss2,ss3,ss4,ss5,ss6,ss7,ss8,ss9,ss10,ss11,ss12,ss13,ss14,ss15,ss16,ss17,ss18,ss19,ss20;
+
+//-----------------------------------------------------------------------------
+// Operators.
+
+// Boolean operators.
+final function TestBoolOperators()
+{
+	local bool a,b,c,d,e;
+	a=false; b=true; c=false; d=true; e=false;
+
+	assert !True  == False;
+	assert !False == True;
+	assert True   == True;
+	assert False  == False;
+	assert True   != False;
+	assert False  != True;
+	assert (True  && True )==True;
+	assert (True  && False)==False;
+	assert (False && True )==False;
+	assert (False && False)==False;
+	assert (True  ^^ True )==False;
+	assert (True  ^^ False)==True;
+	assert (False ^^ True )==True;
+	assert (False ^^ False)==False;
+	assert (True  || True )==True;
+	assert (True  || False)==True;
+	assert (False || True )==True;
+	assert (False || False)==False;
+
+	assert a==false;
+	assert b==true;
+	assert c==false;
+	assert d==true;
+	assert e==false;
+
+	c=true;
+
+	assert a==false;
+	assert b==true;
+	assert c==true;
+	assert d==true;
+	assert e==false;
+}
+
+// Byte operators.
+final function TestByteOperators()
+{
+	local byte a,b,c;
+	a=3; b=30; c=100;
+
+	assert a==3;
+	assert b==30;
+	assert c==100;
+
+	a*=2; // 0??
+	assert a==6;
+
+	a/=2;
+	assert a==3;
+
+	assert (a*=2) == 6;
+	assert a==6;
+
+	assert (a+=4) == 10;
+	assert (a-=4) == 6;
+	assert a==6;
+
+	assert a++ == 6;
+	assert ++a == 8;
+	assert a-- == 8;
+	assert --a == 6;
+}
+
+// Int operators.
+final function TestIntOperators()
+{
+	local int a,b,c;
+	a=10; b=1000; c=-64;
+
+	assert (10 + ~10 + 1)==0;
+	assert -a == -10;
+	assert 10*-40 == -400;
+	assert a*c == -640;
+	assert 100/4 == 25;
+	assert 100/0 != 123;
+	assert 1+2+3+4==10;
+	assert b-a == 990;
+	assert 256 >> 4 == 16;
+	assert 16 << 4 == 256;
+	assert 1<2;
+	assert -2<-1;
+	assert !(100<10);
+	assert 400>40;
+	assert !(10>1000);
+	assert !(10>10);
+	assert !(10<10);
+	assert 10<=10;
+	assert 10<=200;
+	assert !(10<=9);
+	assert 10>=10;
+	assert 11110>=200;
+	assert !(10>=900);
+	assert b==1000;
+	assert !(b==50);
+	assert c != 64;
+	assert !(c!=-64);
+	assert (3&6) == 2;
+	assert (3^6) == 5;
+	assert (3|6) == 7;
+	
+	assert(a==10);
+	assert((a *= 2) == 20);
+	assert(a==20);
+
+	assert((a/=2) == 10);
+	assert(a==10);
+
+	assert (b+=a)==1010;
+	assert (b-=a)==1000;
+	assert b==1000;
+	assert a==10;
+
+	assert c++ == -64;
+	assert ++c == -62;
+	assert c-- == -62;
+	assert --c == -64;
+
+	a=rand(10000);
+	b=rand(10000);
+
+	assert min(2,3)==2;
+	assert min(3,2)==2;
+	assert max(2,3)==3;
+	assert max(3,2)==3;
+	assert clamp(1,2,4)==2;
+	assert clamp(3,2,4)==3;
+	assert clamp(999,2,4)==4;
+}
+
+final function TestFloatOperators()
+{
+	local float a,b,c;
+	a=100.0; b=0.5; c=PI;
+	assert(a==100.0);
+	assert(b==0.5);
+	assert(c==PI);
+
+	assert(-a==-100.0);
+	assert(a*b==50.0);
+	assert(a/b==200.0);
+	assert(a%60==40);
+	assert(a+b==100.5);
+	assert(a-b==99.5);
+	assert(100.0<500.0);
+	assert(!(100.0<50.0));
+	assert !(100.0<100.0);
+	assert(10.0>5.0);
+	assert!(10.0>10.0);
+	assert!(10.0>20.0);
+	assert(10.0<=100.0);
+	assert(100.0<=100.0);
+	assert!(10.0<=5.0);
+	assert(100.0>=50.0);
+	assert(100.0>=100.0);
+	assert!(100.0>500.0);
+	assert(a==100.0);
+	assert(C==PI);
+	assert(a!=b);
+	assert!(a!=100.0);
+
+	assert(a*=2.5)==250.0;
+	assert(a==250.0);
+	assert(a/=2.5)==100.0;
+	assert(a==100.0);
+	assert((a+=5)==105.0);
+	assert(a==105.0);
+	assert((a-=5)==100.0);
+	assert(a==100.0);
+
+	assert 10**2 ~= 100.0;
+
+	assert abs(100.0)==100.0;
+	assert abs(-100.0)==100.0;
+
+	assert sin(0)~=0.0;
+	assert sin(PI/2)~=1.0;
+	assert sin(PI)~=0.0;
+	assert sin(PI*3.0/2.0)~=-1.0;
+	assert sin(2*PI)~=0.0;
+
+	assert cos(0)~=1.0;
+	assert cos(PI/2)~=0.0;
+	assert cos(PI)~=-1.0;
+	assert cos(PI*3.0/2.0)~=0.0;
+	assert cos(2*PI)~=1.0;
+
+	assert tan(0)~=0.0;
+
+	assert PI~=4*atan(1);
+
+	assert exp(loge(2.0)) ~= 2.0;
+
+	assert sqrt(4.0)~=2.0;
+	assert square(2.0)~=4.0;
+
+	assert fmin(2.0,3.0)==2.0;
+	assert fmin(3.0,2.0)==2.0;
+	assert fmax(2.0,3.0)==3.0;
+	assert fmax(3.0,2.0)==3.0;
+	assert fclamp(1.0,2.0,3.0)==2.0;
+	assert fclamp(2.5,2.0,3.0)==2.5;
+	assert fclamp(9.0,2.0,3.0)==3.0;
+	assert lerp(0.0,1.0,2.0)==1.0;
+	assert lerp(0.5,1.0,2.0)==1.5;
+	assert lerp(1.0,1.0,2.0)==2.0;
+	assert smerp(0.0,1.0,2.0)==1.0;
+	assert smerp(0.5,1.0,2.0)==1.5;
+	assert smerp(1.0,1.0,2.0)==2.0;
+}
+
+// Test vector operators.
+final function TestVectorOperators()
+{
+	local vector a,b,c;
+	a=vect(1,2,3); c=vect(10,10,10);
+
+	assert a==a;
+	assert a!=b;
+	assert a!=vect(1,2,9);
+	assert a==vect(1,2,3);
+
+	assert a+a==vect(2,4,6);
+	assert -a==vect(-1,-2,-3);
+	assert a*2==vect(2,4,6);
+	assert 2*a==vect(2,4,6);
+	assert a/2==vect(0.5,1.0,1.5);
+	assert a+b+c==vect(11,12,13);
+	assert a dot c == 60;
+	assert a cross c == vect(-10,20,-10);
+
+	assert (a*=2) == vect(2,4,6);
+	assert a==vect(2,4,6);
+	
+	assert (a/=2) == vect(1,2,3);
+	assert a==vect(1,2,3);
+
+	assert (a+=c)==vect(11,12,13);
+	assert a==vect(11,12,13);
+	
+	assert (a-=c)==vect(1,2,3);
+	assert a==vect(1,2,3);
+
+	assert size(vect(3,4,0)) ~= 5;
+	assert size(vect(3,0,4)) ~= 5;
+	assert size(vect(0,0,0)) ~= 0;
+
+	assert size(normal(a)) ~= 1.0;
+	assert normal(vect(1,0,0)) == vect(1,0,0);
+
+	assert size(vrand()) ~= 1.0;
+
+	assert dist(vect(1,0,0),vect(2,0,0)) ~= 1.0;
+	assert dist(vect(0,1,0),vect(0,2,0)) ~= 1.0;
+	assert dist(vect(0,0,1),vect(0,0,2)) ~= 1.0;
+}
+
+// Test the rotation operators.
+function TestRotationOperators()
+{
+	local rotation a;
+	a = rot(10,20,30);
+	a = a * 2;
+	assert(a.Pitch==20);
+	assert(a.Yaw==40);
+	assert(a.Roll==60);
+	a = a / 2;
+	assert(a.Pitch==10);
+	assert(a.Yaw==20);
+	assert(a.Roll==30);
+	a = 3*a;
+	assert(a.Pitch==30);
+	assert(a.Yaw==60);
+	assert(a.Roll==90);
+	a /= 3;
+	assert(a.Pitch==10);
+	assert(a.Yaw==20);
+	assert(a.Roll==30);
+	a *= 2;
+	assert(a.Pitch==20);
+	assert(a.Yaw==40);
+	assert(a.Roll==60);
+}
+
+// Test all operators.
+final function TestOperators()
+{
+	TestBoolOperators();
+	TestByteOperators();
+	TestIntOperators();
+	TestFloatOperators();
+	TestVectorOperators();
+	TestRotationOperators();
+}
+
+//-----------------------------------------------------------------------------
+// Conversion tests.
+
+final function TestConversions()
+{
+	assert byte(123)==123;
+	assert byte(257)==1;
+	assert byte(123.0)==123;
+	assert byte(true)==1;
+	assert byte(false)==0;
+	assert int(123.0)==123;
+	assert float(123)==123.0;
+	assert byte("123")==123;
+	assert int("123")==123;
+	assert bool("true")==true;
+	assert bool("false")==false;
+	assert bool("1")==true;
+	assert bool("whatever")==false;
+	assert float("123.5")==123.5;
+	assert vector("1,2,3")==vect(1,2,3);
+}
+
+//-----------------------------------------------------------------------------
+// Branch tests.
+
+// Test for.
+final function TestFor()
+{
+	local int a,b;
+	for( a=0; a<100; a++ )
+		b+=a;
+	assert a==100;
+	assert b==99*(99+1)/2;
+}
+
+// Test break.
+final function TestBreak()
+{
+	local int a,b;
+	for( a=0; a<100; a++ )
+	{
+		if( a >= 50 ) break;
+		b += a;
+	}
+	assert a==50;
+	assert b==49*(49+1)/2;
+}
+
+// Test while.
+final function TestWhile()
+{
+	local int a,b;
+	while( a++<100 )
+		b++;
+	assert(a==101);
+	assert(b==100);
+}
+
+// Test do.
+final function TestDo()
+{
+	local int a,b;
+	do
+		b++;
+	until( ++a == 100 );
+	assert(a==100);
+	assert(b==100);
+}
+
+// Test all branches.
+final function TestBranches()
+{
+	TestFor();
+	TestBreak();
+	TestWhile();
+	TestDo();
+}
+
+//-----------------------------------------------------------------------------
+// Test strings.
+
+final function TestStringMinion( out string[10] test )
+{
+	assert test == "Test12345";
+	test = "Xyzzy";
+	assert test == "Xyzzy";
+}
+
+// Test strings.
+final function TestStrings()
+{
+	local string[10]  a;
+	local string[20]  b;
+	local string[255] c;
+	a="Tim Sweeney";
+	b="Is K00L";
+
+	assert a=="Tim Sween";
+	assert b=="Is K00L";
+
+	// Concat.
+	c = a $ b;
+	assert c=="Tim SweenIs K00L";
+
+	a = b$b$b$b;
+	assert a=="Is K00LIs";
+
+	// Normal ops.
+	c="This is a big string that will overflow";
+	a=c;
+	assert a=="This is a";
+	assert len(a)==9;
+	assert len("")==0;
+	assert len("1234567890")==10;
+
+	a="Test123";
+	assert a=="Test123";
+	assert !(a=="XYZZY");
+
+	assert  ("B" <  "C");
+	assert !("B" <  "B");
+	assert !("B" <  "A");
+
+	assert !("B" >  "C");
+	assert !("B" >  "B");
+	assert  ("B" >  "A");
+
+	assert  ("B" <= "C");
+	assert  ("B" <= "B");
+	assert !("B" <= "A");
+
+	assert !("B" >= "C");
+	assert  ("B" >= "B");
+	assert  ("B" >= "A");
+
+	assert "A"!="C";
+	assert !("A"!="A");
+
+	assert "ABC" != "Abc";
+	assert "ABC" ~= "Abc";
+	assert !("ABC" ~= "ABX");
+
+	// String functions.
+	assert Left("Dochtermann",4)=="Doch";
+	assert Left("Dochtermann",-2)=="";
+	assert Right("Romero",2)=="ro";
+	assert Right("Romero",-2)=="";
+	assert Mid("Miller",2,3)=="lle";
+	assert Mid("Miller",-2,3)=="M";
+	assert Mid("Miller",2,-2)=="";
+	assert Mid("Carmack",1,65535)=="armack";
+	assert Mid("Broussard",2)=="oussard";
+	assert Caps("sCary")=="SCARY";
+	assert InStr("Eidos","do")==2;
+	assert InStr("Eidos","dox")==-1;
+
+	// String function calling.
+	a="Test12345---ExtraJunk";
+	TestStringMinion(a);
+	assert a=="Xyzzy";
+
+	// Preservation of types through string conversions.
+	assert int(string(12345))==12345;
+	assert byte(string(byte(123)))==123;
+	assert vector(string(vect(1,2,3)))==vect(1,2,3);
+	assert rotation(string(rot(1,2,3)))==rot(1,2,3);
+	assert float(string(123.5))==123.5;
+
+	// Test $ coersion.
+	assert
+		"Num:" $ 123 $ " Vect:" $ Vect(1,2,3) $ " Rot:" $ Rot(1,2,3)
+	==	"Num:123 Vect:1.000000,2.000000,3.000000 Rot:1,2,3";
+}
+
+//-----------------------------------------------------------------------------
+// Test basic logic.
+
+// Test short circuit logic.
+final function bool TestShort( bool a, bool NeverCall )
+{
+	// If NeverCall, then we shouldn't be called due to short-circuiting.
+	if( NeverCall )
+		assert False;
+	return a;
+}
+
+final function TestParms( bool a, float f, vector v )
+{
+	assert a==true;
+	assert f==123.0;
+	assert v==vect(1,2,3);
+}
+
+final function TestOutParms( bool a, out float f, out vector v )
+{
+	assert a==true;
+	assert f==123.0;
+	assert v==vect(1,2,3);
+	a=false;
+	f=456.0;
+	v=vect(3,4,5);
+	assert a==false;
+	assert v==vect(3,4,5);
+}
+
+final function TestLogic()
+{
+	local bool   a;
+	local float  f;
+	local vector v;
+	a=true; f=123.0; v=vect(1,2,3);
+
+	// Test parm passing.
+	TestParms(true,123.0,vect(1,2,3));
+	TestOutParms(a,f,v);
+	assert a==true;
+	assert f==456.0;
+	assert v==vect(3,4,5);
+
+	// Test our function.
+	assert TestShort(true,false)==true;
+	assert TestShort(false,false)==false;
+
+	// Test logic.
+	assert (TestShort(false,false) && TestShort(true, false) ) == false;
+	assert (TestShort(true,false)  || TestShort(false,false) ) == true;
+
+	// Test short circuit logic.
+	assert (TestShort(false,false) && TestShort(true, true) ) == false;
+	assert (TestShort(true,false)  || TestShort(false,true) ) == true;
+}
+
+//-----------------------------------------------------------------------------
+// Test actor casts.
+
+final function TestActorCasts()
+{
+	local Info Key;
+
+	assert Zone == Zone;
+	assert Owner == None;
+	assert Zone != None;
+	assert Level != None;
+	assert LevelInfo(Zone) != None;
+	assert Level==Zone;
+	assert Bool(Zone)==True;
+	assert Bool(Self)==True;
+	assert Bool(Owner)==False;
+
+	Key=Zone;
+	assert ZoneInfo(Key)!=None;
+	assert LevelInfo(Key)!=None;
+	assert StatusInfo(Key)==None;
+
+	assert Int(Self) != -1;
+	assert Int(Owner) == -1;
+	assert Int(Level) != -1;
+	assert Int(Zone) != -1;
+	assert Int(Level) != Int(Self);
+	assert Int(Level) == Int(Zone);
+
+	// Test accessing properties in a null context.
+	assert Owner.Location == Vect(0,0,0);
+	assert Owner.Self == None;
+	assert Target.DrawType == DT_None;
+}
+
+//-----------------------------------------------------------------------------
+// Recursion test.
+
+final function int Recurse( int a )
+{
+	if( a > 0 )
+		return a + Recurse( a-1 );
+	else
+		return 0;
+}
+
+final function TestRecursion()
+{
+	assert Recurse(20) == 20*(20+1)/2;
+}
+
+//-----------------------------------------------------------------------------
+// Test optional function parms.
+
+final function TestOptional1( optional int a, optional int b,
+	optional int c, optional int d, optional int e )
+{
+	assert a==1;
+	assert b==2;
+	assert c==3;
+	assert d==0;
+	assert e==0;
+}
+
+final function TestOptionals()
+{
+	TestOptional1(1,2,3);
+}
+
+//-----------------------------------------------------------------------------
+// Select-case test.
+
+final function int CaseTest( int V )
+{
+	switch( V )
+	{
+		case 0:
+			return 100;
+		case 1:
+			return 200;
+		case 2:
+			return 300;
+		case 3:
+		case 4:
+			return 400;
+		default:
+			return 500;
+	}
+}
+
+final function string[16] CaseTest2( string[16] St )
+{
+	switch( St )
+	{
+		case "Tim":
+			return "Jill";
+		case "James":
+			return "Pinball";
+		case "Cliff":
+		case "Arjan":
+			return "Jazz";
+		default:
+			return "Nothing";
+	}
+}
+
+final function TestCase()
+{
+	assert CaseTest(0)==100;
+	assert CaseTest(1)==200;
+	assert CaseTest(2)==300;
+	assert CaseTest(3)==400;
+	assert CaseTest(4)==400;
+	assert CaseTest(123)==500;
+
+	assert CaseTest2("Tim")  =="Jill";
+	assert CaseTest2("James")=="Pinball";
+	assert CaseTest2("Cliff")=="Jazz";
+	assert CaseTest2("Arjan")=="Jazz";
+	assert CaseTest2("Xyzzy")=="Nothing";
+}
+
+//-----------------------------------------------------------------------------
+// Test enum and resource tags.
+
+final function EnumTagTest( EDrawType DT, EButton BUT )
+{
+	assert DT==DT_Sprite;
+	assert DT!=DT_None;
+	assert DT!=123;
+	assert BUT==BUT_Run;
+	assert BUT!=DT;
+}
+
+final function TestTags()
+{
+	assert string(texture 'default')=="Default";
+	assert string('bOOl')=="Bool";
+	EnumTagTest(DT_Sprite,BUT_Run);
+}
+
+//-----------------------------------------------------------------------------
+// Test intrinsic functions.
+
+final function TestIntrinsics()
+{
+	// GotoState.
+	GotoState(NoName);
+
+	// ClassIsA.
+	assert ClassIsChildOf(Human,Actor);
+	assert ClassIsChildOf(Human,Pawn);
+	assert ClassIsChildOf(Human,Actor);
+	assert !ClassIsChildOf(Pawn,Human);
+	assert !ClassIsChildOf(Actor,Human);
+
+	// IsProbing.
+	assert IsProbing(PlayerTick);
+	assert !IsProbing(MoverBump);
+	disable(PlayerTick);
+	assert !IsProbing(PlayerTick);
+	enable(PlayerTick);
+	assert IsProbing(PlayerTick);
+	enable(MoverBump);
+	assert !IsProbing(MoverBump);
+	disable(MoverBump);
+	assert !IsProbing(MoverBump);
+
+	// IsState.
+	assert IsState('TestState1');
+	assert IsState(TestState2);
+	assert !IsState('NotAState1');
+	assert !IsState('NotAState2');
+
+	assert IsState(TestState1,'Label1InState1');
+	assert IsState(TestState1,'Label2InState1');
+	assert !IsState(TestState1,'Label1InState2');
+	assert !IsState(TestState1,'Label2InState2');
+
+}
+
+//-----------------------------------------------------------------------------
+// Test state scoping.
+
+// Test state scoping of labels.
+final function TestStateLabelScoping()
+{
+	// Global scope.
+	GotoState(NoName);
+	assert State==NoName;
+	assert !IsLabel('Label1InState1');
+	assert !IsLabel('Label1InState2');
+
+	// TestState1.
+	GotoState(TestState1);
+	assert State=='TestState1';
+	assert IsLabel('Label1InState1');
+	assert !IsLabel('Label1InState2');
+	
+	// TestState2.
+	GotoState(TestState2);
+	assert State=='TestState2';
+	assert IsLabel(Label1InState2);
+	assert !IsLabel(Label1InState1);
+
+	// Invalid state.
+	GotoState('BadState');
+	assert State==NoName;
+}
+
+function int TestVF()  {return 1;}
+
+function int TestVF1()  {return 1;}
+function int TestVF2()  {return 1;}
+function int TestVF3()  {return 1;}
+function int TestVF4()  {return 1;}
+
+// Test state scoping of virtual functions.
+// Here we test twice to assure that cache code works.
+final function TestStateFunctionScoping()
+{
+	GotoState(NoName);
+	assert TestVF()==1;
+	assert TestVF()==1;
+
+	GotoState(TestState1);
+	assert TestVF()==2;
+	assert TestVF()==2;
+
+	GotoState(TestState2);
+	assert TestVF()==1;
+	assert TestVF()==1;
+
+	GotoState(TestState);
+	assert TestVF()==3;
+
+	// Undefined engine function.
+//	Touch( Me );
+}
+
+// Test virtual function caching.
+final function TestFunctionCaching()
+{
+	local int i;
+	for( i=0; i<10; i++ )
+	{
+		TestVF1();
+		TestVF2();
+		TestVF3();
+		TestVF4();
+	}
+}
+
+// Test all state scoping.
+final function TestStateScoping()
+{
+	TestStateLabelScoping();
+	TestStateFunctionScoping();
+	TestFunctionCaching();
+}
+
+//-----------------------------------------------------------------------------
+// Perform all tests.
+
+// BeginPlay.
+engine function BeginPlay()
+{
+	original = location;
+}
+
+// MovePlayer.
+final function MovePlayer( float DeltaTime )
+{
+	location.x = original.x + 50.0*sin(0.5 * level.timeseconds);
+	location.y = original.y + 50.0*cos(0.5 * level.timeseconds);
+	viewrotation = rotation(original-location);
+	viewrotation.pitch = 2048 * sin(1.5 * level.timeseconds);
+}
+
+// Speed test.
+final function TestMips()
+{
+	local int i, j;
+	log(Level.Second);
+	for( i=0; i<3333333; i++ )
+		j++;
+}
+
+// Null context test.
+function TestNullContexts()
+{
+	local pawn Test;
+	Test.Misc1++;
+	Test.bCollideWorld=True;
+	Test.DrawScale *= 2.0;
+	Test.LightBrightness++;
+	Test.Group = 'Mojo';
+	Test.Target = Self;
+	Test.Velocity *= 2.0;
+	Test.Rotation = Test.Rotation;
+	Test.Texture = Self.Texture;
+	Log( "Null contexts A-OK" );
+}
+
+//-----------------------------------------------------------------------------
+// Test states and probes.
+
+function PlayerTick( float DeltaTime )
+{
+}
+
+state TestState1
+{
+	function int TestVF()
+	{
+		return 2;
+	}
+Begin:
+Label1InState1:
+Label2InState1:
+}
+
+state TestState2
+{
+Begin:
+Label1InState2:
+Label2InState2:
+}
+
+state TestState
+{
+	function int TestVF()
+	{
+		return 3;
+	}
+Begin:
+	Log("Label: Human.TestState1.Begin");
+	Stop;
+}
+
+//-----------------------------------------------------------------------------
+// Main test code.
+
+function TestEverything()
+{
+	log("Testing everything...");
+	TestOperators();
+	TestConversions();
+	TestBranches();
+	TestStrings();
+	TestActorCasts();
+	TestLogic();
+	TestRecursion();
+	TestOptionals();
+	TestCase();
+	TestTags();
+	TestIntrinsics();
+	TestStateScoping();
+	TestNullContexts();
+
+	log("Tests succeeded!");
+
+	GotoState('TestEverything', 'Sleepy');
+}
+
+//-----------------------------------------------------------------------------
+// Test initiator.
+
+auto state TestEverything
+{
+Begin:
+	TestEverything();
+
+Sleepy:
+	Sleep(1.0);
+	goto Begin;
+}

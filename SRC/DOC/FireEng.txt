@@ -1,0 +1,396 @@
+ ===========================================================================
+ Unreal Dynamic Texture Engine 32-bit
+
+ version 0.6       11-04-96
+ ===========================================================================
+ Erik de Neve       alife@compuserve.com
+
+ - notes
+ - water code implementation / function summary
+ - fire  code implementation / function summary
+
+
+ ===========================
+ Notes            11-04-96
+ ===========================
+
+ Added preliminary caustics by adding together pixels using a
+ warping vector function on each line simulating reflection/refraction
+ by a curved surface, in one dimension only.
+
+ Time frame:  2-4 weeks ( end April / early May ) for final code.
+
+ Task list:
+
+  Caustics:
+  - tileable
+  - create cooler irregular input warp function
+  - smoother pixel plotting
+  - optimize
+
+  Effects:
+  - 'Alien computer screen' displaying nonrepeating random info,
+    investigate useful parameters / editing options.
+  - Plasma texture using the bumpmap trick
+  - The blood/fluid running down a surface (simple extension of fire algo)
+  - Alien tech-texture using the cheap water-bumpmap lighting
+  - Investigate different water 'ocean' schemes for outdoors
+    terrain/ocean (streched out & interpolated in Unreal)
+
+  Misc:
+  - Final cleanup fire and water source - throw out nonsense options
+    and create more useful interactive functions for water.
+  - Make effects mip-mappable _if_ possible & useful
+  - Do more VTune runs & optimizations on time-expensive fx
+  - If cool: (random) palette animation applied to any fx that benefit
+  - Investigate mmx instructions for speeding some fx
+  - If time, brainstorm misc. animation suggestions from
+    Inoxx (Unreal mapper) and Daniel Cook (the Circle)
+        - More basic stuff for machines
+        - Simple patterns with glowing trails like on oscilloscopes
+        - Bugs/whatever moving on/affecting existing textures
+        - Veins / vines ,, ,,
+
+
+
+
+ ===========================
+ Notes  version 0.5       20-07-96
+ ===========================
+
+ NEW:
+  - Plasma effect in C++ - using a simple pixcol=f(x,y) method via tables.
+  - Added fire type 9, which uses double-speed sparks. This should be
+    the first of a number of more 'zesty' spark types.
+  - Made the SetWavelight() water light formula more realistic, and
+    the (random) palettes in the demo app are now properly linear.
+  - Minor speed gained for water in ASM by reshuffling instructions for
+    pairing.
+  - Permanent wave sources in water by drawing with right mouse button.
+
+ TO-DO:
+  - Try different f(x,y) functions for less boring plasma fx.
+  - Optimize water & fire inner loops closer to theoretical maximum.
+  - Decide what direction to take with the effects that drive the
+    water - e.g. various types of 'drops' just like sparks, or
+    use only global parameters (to be script-driven)
+  - Try out some dynamic bump-mapped texture effects using tricks
+    like the 256-surface-normals set ( as opposed to the 1-D water, but
+    still keeping lightsources at infinity ).
+  - Assess the need for MMX-Pentium specific assembly code
+     -> just eliminate the dummy cache-priming reads ?
+    and need for Pentium-Pro specific code.
+     -> eliminate dummy reads + accommodate 8<->32 bit P6 peculiarities
+  - Clean up messy C++ and ASM sources & add more sensible comments
+
+
+
+ ===========================
+ Notes  - version 0.4       20-06-96
+ ===========================
+
+ * Water Implementation
+
+ The code parallels that of fire, but water textures have a
+ different 'WaterParams' parameter structure associated with
+ each water texture.
+ In addition, for each texture a source bitmap is needed, which
+ holds the actual wave height field. The size for this map is
+ (X*Y)/2, exactly half the size of the output bitmap.
+ The code requires the output bitmap size to always be a multiple
+ of 8 horizontally and 4 vertically, due to its unrolled loops and
+ interpolation.
+
+ In the current code the internal wave map is dynamically allocated
+ in the WaterInit routine, without any pointer checking/deallocation;
+ when implementing in Unreal this needs to be modified.
+
+ Because of the different memory use, the water routine
+ initially tested very poorly on the Pentium; this was because
+ the Pentium doesn't cache writes to memory unless that memory was
+ already cached on previous reads.
+ Including dummy reads speeded up the routine immensely, it is now
+ down to about 6 pentium cycles per pixel, versus 5 for the fire
+ routine (ignoring fire's spark-refresh time).
+ I expect to push it to about 5 cyc/pix with some additional
+ tuning.
+
+
+ For now I've only included global effects, i.e. though
+ you can stir the waves with the mouse in the demo, no
+ interactive editing takes place as with fire; the
+ only things to edit are the rain parameters.
+ Nevertheless, there is an array of 'drops' in the parameter
+ structure, to be used for new effects that span multiple
+ frames, like waves suggestive of 'swimming fish' or permanent
+ disturbances.
+
+ The current code is optimized only for the Pentium.
+ Both the fire and water routines make heavy use of loading bytes
+ into 32-bit registers with partial register loads, which can slow
+ down the Pentium Pro immensely; If needed I'll write alternative
+ core routines using MOVZX and other P6-friendly methods.
+
+ Internally, for every wave-map pixel calculated, 4 output pixels
+ are made using a fast (yet phong-ish) interpolation scheme.
+ When the water code proves too slow for 486-s and slow Pentiums,
+ a simple speed-up could be to cut short the interpolation step
+ and render (blockier) 2x2-pixel-squares with the same color.
+
+
+
+
+
+#############################################################################
+
+ == Water code summary ==
+
+
+* Most of the functions are called with only a pointer to
+  a WaterParams structure; the bitmap that they refer
+  to is assumed to have been linked to it with WaterInit:
+
+void WaterInit( int Xdim,
+                int Ydim,
+                BYTE* OutputBitmap,
+                WaterParams* Pool);
+
+ Pool must point to a valid WaterParams structure, and
+ OutputBitmap must point to a rectangle with dimensions Xdim,Ydim.
+ The OutputBitmap address gets liked inside the Pool structure.
+ This routine also initializes the lookup table, and levels
+ the wave field.
+ Allocation of the actual bitmap and parameter structures has to
+ be done by the caller.
+ All other routines below assume that WaterInit has been called first.
+
+  For each water texture a source bitmap is needed,
+  which holds the actual wave height field.  The size for this
+  map is (X*Y)/2, exactly half the size of the output bitmap.
+  In the current code this map is dynamically allocated in the
+  WaterInit routine, without any pointer checking/deallocation;
+  When implementing in Unreal you'll probably want to take
+  care of this externally anyway.
+
+ When only the output bitmap has to change, for a parameter
+ structure which has already been initialized, use:
+
+void WaterOutputLink( BYTE* OutputBitmap,
+                      WaterParams* Pool);
+
+
+
+*  WaterSplash is a simple routine to start a circular wave at
+   game-run-time. Only sizes 1-4 look good ( bigger ones give ugly
+   rectangular impressions).
+   This could for example be used for monster footprints, eg. you
+   could know someone has been in a room because the waves haven't
+   died out yet.
+   Currently all waves die out pretty quickly, but if required,
+   some tweaking of the algorithm might change that.
+
+
+void WaterSplash(int Xpos,
+                 int Ypos,
+                 int DropSize,
+                 WaterParams* Pool);
+
+
+
+* This main routine updates the water every frame and handles
+  all the wave-making effects (just the rain currently):
+
+void WaterUpdate(WaterParams* Pool);
+
+
+
+
+* This is the routine to be called from UnrealEd; it will automatically
+  put some splashes when 'drawing' with the mouse, but these
+  are just for testing and not stored in the parameter structure.
+
+void WaterPaint( int MouseX,
+                 int MouseY,
+                 int LeftButton,
+                 int RightButton,
+                 WaterParams* Pool);
+
+
+
+
+* Quite cool, but probably of limited use is
+  the ability to go back in time:
+
+void WaterReverse(WaterParams* Pool);
+
+
+
+* To level the waves:
+
+void WaterClean(WaterParams* Pool);
+
+
+
+* Interactive lighting is easy to mimic because waves are
+  rendered with simple 1-D direction bump-mapping.
+  Since this uses a lookup table, setting up both diffuse
+  and specular lighting  only takes recalculation of 1024
+  byte values no matter how big the wave texture.
+
+  SetWaveLight is a very preliminary (slow!) routine for this,
+  in which angles from 0-1023 correspond to 0-180 degrees or 0-Pi.
+  The angles are all in a plane which lies along the bump mapping
+  direction, normal to the wave surface.
+
+  When filling the rendering table it assumes that the eventual output
+  bitmap has values in the full range [0..255]  which map to linearly
+  increasing palette colors; but this is not a fixed requirement.
+  It is easy to write an alternative setup so lookup tables will
+  output bytes of arbitrary values/colors instead of simply [0-255].
+  This might be useful to avoid an extra translation step in Unreal.
+
+void SetWaveLight( int ViewerAngle,
+                   int LightAngle,
+                   WaterParams* Pool);
+
+
+* The fast random generator (same as used for fire) must get initialized
+  once. Currently done from WaterInit, but should really be part of
+  an overall one-time initialization.
+
+void InitSpeedRand()
+
+
+
+#############################################################################
+
+
+ ==========================
+ Fire implementation notes
+ ==========================
+
+
+ == Fire code summary ==
+
+
+
+* Most of the functions are called with only a pointer to
+  a FireEngineParams structure; the bitmap that they refer
+  to is assumed to have been linked to it with EngineTileInit:
+
+void EngineTileInit(int Xdim,          // X size of tile
+                    int Ydim,          // Y size of tile
+                    BYTE* FireBitmap,  // pointer to the actual bitmap
+                    FireEngineParams* ThisTile); // pointer to the param.struct
+
+
+ ThisTile must point to a valid FireEngineParams structure, and
+ FireBitmap must points to a rectangle with dimensions Xdim,Ydim.
+ The FireBitmap address gets stored inside *ThisTile.
+ This routine also initializes the lookup table, sets the number
+ of sparks to zero, etc.
+ Allocation of the actual bitmap and parameter structures has to
+ be done by the caller.
+
+ All other routines below assume that EngineTileInit has been called
+ before any sparks are manipulated or bitmaps are calculated.
+
+* This is the central update routine, which draws the sparks and
+  generates the next bitmap.
+
+void FireUpdate ( FireEngineParams *Params);
+
+* This is the routine that can be called from UnrealEd, e.g. on
+  relevant mouse moves/clicks. It will automatically draw or erase
+  sparks, with the current spark type.
+
+void FirePaint( int MouseX,
+                int MouseY,
+                int LeftButton,
+                int RightButton,
+                FireEngineParams* Params);
+
+
+The above functions are all you need to call from Unreal
+or UnrealEd, except that UnrealEd also needs to directly manipulate
+the variables in the FireEngineParams structure which affect painting
+and rendering, using buttons that are part of UnrealEd, much like
+the buttons in the Win95 test app.
+
+The only (six) variables that make any sense in a toolbar for now are:
+
+ BYTE DrawSparkType; The spark type you draw with. Range: [0-..]
+
+ int  RenderHeat;    Influences the fire algorithm; Range [0..100]
+                     Becomes effective only after a call to
+                     FireTableFill().
+
+ BYTE JitterSize;    Amplitude for the jittering sparks (type 1)
+                     (recommended) range: [0..100]
+                     Becomes effective only after a call to
+                     JitterTableFill().
+
+ BYTE HeatPhaseDev1  Gets added to the heat of phased sparks
+                     every cycle. range: [0..255]
+
+
+ BYTE HeatPulseDev1  The same, gets added to the heat of pulsed sparks.
+                     (The difference is that pulsed sparks all have
+                     the same phase at the same time, so they don't
+                     'snake' around like the phased sparks)
+
+ BYTE EmitFreq       The chance an emitter-spark (types 4,5,6,7)
+                     spits out a visible spark each cycle;
+                     range [0..255], 0 means never, 255 gets
+                     one every update.
+                     [ currently ineffective ]
+
+
+
+
+* These functions draw non-permanent sparks (e.g. the flames on
+  the tip of the mouse pointer, or maybe when a bullet hits a
+  fire tile in the game ) :
+
+void TempSpark(int SparkX,
+               int SparkY,
+               BYTE intensity,
+               FireEngineParams* Params);
+
+
+
+* These draw/edit the real sparks. Called from inside FirePaint.
+
+void AddSpark(int SparkX,int SparkY,FireEngineParams* Params);
+void DelSparks(int SparkX,int SparkY,int AreaWidth,FireEngineParams* Params);
+void ClearSparks(FireEngineParams* Params);
+
+
+* Redrawing of the sparks, called every frame from inside FireUpdate.
+
+void RedrawSparks( FireEngineParams *Params);
+
+
+
+* Misc init routines automatically called from EngineTileInit.
+
+void FireTableFill   ( FireEngineParams* ThisTile);
+void JitterTableFill (FireEngineParams* ThisTile)
+
+
+
+* The fast random generator must get initialized once. Currently
+  done from EngineTileInit, but should really be part of an
+  overall one-time initialization.
+
+void InitSpeedRand()
+
+
+* This is a tiny but very fast 32/16/8-bit random number
+  generator ( with a theoretical period much bigger than 2^32 )
+  needed several times for just about any spark.
+
+inline BYTE SpeedRand()
+
+
+#############################################################################

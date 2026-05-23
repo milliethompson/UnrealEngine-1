@@ -1,20 +1,20 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{BDC217C8-ED16-11CD-956C-0000C04E4C0A}#1.1#0"; "tabctl32.ocx"
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "comctl32.ocx"
+Object = "{A8B3B723-0B5A-101B-B22E-00AA0037B2FC}#1.0#0"; "GRID32.OCX"
 Begin VB.Form Main 
    Caption         =   "Unreal Gatekeeper"
    ClientHeight    =   5655
    ClientLeft      =   1950
    ClientTop       =   2055
    ClientWidth     =   7710
-   Height          =   6015
    Icon            =   "Main.frx":0000
    KeyPreview      =   -1  'True
-   Left            =   1890
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   5655
    ScaleWidth      =   7710
-   Top             =   1755
-   Width           =   7830
    Begin VB.CommandButton Command1 
       Caption         =   "&Stop"
       Height          =   255
@@ -38,61 +38,87 @@ Begin VB.Form Main
       Tag             =   "LEVELLIST"
       Top             =   60
       Width           =   7635
-      _Version        =   65536
       _ExtentX        =   13467
       _ExtentY        =   8070
-      _StockProps     =   15
-      Caption         =   "Users "
-      TabsPerRow      =   5
-      Tab             =   3
-      TabOrientation  =   0
-      Tabs            =   5
+      _Version        =   327680
       Style           =   1
-      TabMaxWidth     =   0
+      Tabs            =   5
+      TabsPerRow      =   5
       TabHeight       =   529
       ShowFocusRect   =   0   'False
       TabCaption(0)   =   "Levels "
+      TabPicture(0)   =   "Main.frx":030A
       Tab(0).ControlCount=   7
-      Tab(0).ControlEnabled=   0   'False
+      Tab(0).ControlEnabled=   -1  'True
       Tab(0).Control(0)=   "LevelsHolder"
+      Tab(0).Control(0).Enabled=   0   'False
       Tab(0).Control(1)=   "LevelsAdd"
+      Tab(0).Control(1).Enabled=   0   'False
       Tab(0).Control(2)=   "LevelsDelete"
+      Tab(0).Control(2).Enabled=   0   'False
       Tab(0).Control(3)=   "LevelsProperties"
+      Tab(0).Control(3).Enabled=   0   'False
       Tab(0).Control(4)=   "LevelsUpIt"
+      Tab(0).Control(4).Enabled=   0   'False
       Tab(0).Control(5)=   "LevelsDownIt"
+      Tab(0).Control(5).Enabled=   0   'False
       Tab(0).Control(6)=   "LevelsMessage"
+      Tab(0).Control(6).Enabled=   0   'False
       TabCaption(1)   =   "Gatekeeper "
+      TabPicture(1)   =   "Main.frx":0326
       Tab(1).ControlCount=   4
       Tab(1).ControlEnabled=   0   'False
       Tab(1).Control(0)=   "UplinkFrame"
+      Tab(1).Control(0).Enabled=   0   'False
       Tab(1).Control(1)=   "GatekeeperMachineFrame"
+      Tab(1).Control(1).Enabled=   0   'False
       Tab(1).Control(2)=   "ServerDirectoriesFrame"
+      Tab(1).Control(2).Enabled=   0   'False
       Tab(1).Control(3)=   "Frame2"
+      Tab(1).Control(3).Enabled=   0   'False
       TabCaption(2)   =   "Properties "
+      TabPicture(2)   =   "Main.frx":0342
       Tab(2).ControlCount=   9
       Tab(2).ControlEnabled=   0   'False
       Tab(2).Control(0)=   "Label21"
+      Tab(2).Control(0).Enabled=   0   'False
       Tab(2).Control(1)=   "KeyValidGridCaption"
+      Tab(2).Control(1).Enabled=   0   'False
       Tab(2).Control(2)=   "ValueEntryCaption"
+      Tab(2).Control(2).Enabled=   0   'False
       Tab(2).Control(3)=   "ValueEntryMsg"
+      Tab(2).Control(3).Enabled=   0   'False
       Tab(2).Control(4)=   "TopicList"
+      Tab(2).Control(4).Enabled=   -1  'True
       Tab(2).Control(5)=   "ValueEntry"
+      Tab(2).Control(5).Enabled=   -1  'True
       Tab(2).Control(6)=   "ValueModify"
+      Tab(2).Control(6).Enabled=   -1  'True
       Tab(2).Control(7)=   "TopicKeys"
+      Tab(2).Control(7).Enabled=   -1  'True
       Tab(2).Control(8)=   "SaveConfig"
+      Tab(2).Control(8).Enabled=   -1  'True
       TabCaption(3)   =   "Users "
+      TabPicture(3)   =   "Main.frx":035E
       Tab(3).ControlCount=   6
-      Tab(3).ControlEnabled=   -1  'True
-      Tab(3).Control(0)=   "Label6"
-      Tab(3).Control(1)=   "UserName"
-      Tab(3).Control(2)=   "UsersHolder"
-      Tab(3).Control(3)=   "UserBanish"
-      Tab(3).Control(4)=   "UserMessage"
-      Tab(3).Control(5)=   "UserBroadcast"
+      Tab(3).ControlEnabled=   0   'False
+      Tab(3).Control(0)=   "UserBroadcast"
+      Tab(3).Control(0).Enabled=   -1  'True
+      Tab(3).Control(1)=   "UserMessage"
+      Tab(3).Control(1).Enabled=   -1  'True
+      Tab(3).Control(2)=   "UserBanish"
+      Tab(3).Control(2).Enabled=   -1  'True
+      Tab(3).Control(3)=   "UsersHolder"
+      Tab(3).Control(3).Enabled=   -1  'True
+      Tab(3).Control(4)=   "UserName"
+      Tab(3).Control(4).Enabled=   0   'False
+      Tab(3).Control(5)=   "Label6"
+      Tab(3).Control(5).Enabled=   0   'False
       TabCaption(4)   =   "About "
       Tab(4).ControlCount=   1
       Tab(4).ControlEnabled=   0   'False
       Tab(4).Control(0)=   "AboutHolder"
+      Tab(4).Control(0).Enabled=   -1  'True
       Begin VB.CommandButton SaveConfig 
          Caption         =   "&Save Config"
          Height          =   315
@@ -104,7 +130,7 @@ Begin VB.Form Main
       Begin VB.CommandButton LevelsMessage 
          Caption         =   "&Message"
          Height          =   315
-         Left            =   -73260
+         Left            =   1740
          TabIndex        =   62
          Top             =   4140
          Width           =   915
@@ -112,7 +138,7 @@ Begin VB.Form Main
       Begin VB.CommandButton UserBroadcast 
          Caption         =   "&Broadcast"
          Height          =   315
-         Left            =   1200
+         Left            =   -73800
          TabIndex        =   61
          Top             =   4140
          Width           =   1035
@@ -120,7 +146,7 @@ Begin VB.Form Main
       Begin VB.CommandButton UserMessage 
          Caption         =   "&Message"
          Height          =   315
-         Left            =   180
+         Left            =   -74820
          TabIndex        =   60
          Top             =   4140
          Width           =   975
@@ -128,14 +154,14 @@ Begin VB.Form Main
       Begin VB.CommandButton UserBanish 
          Caption         =   "Banish"
          Height          =   315
-         Left            =   6600
+         Left            =   -68400
          TabIndex        =   59
          Top             =   4140
          Width           =   855
       End
       Begin VB.PictureBox UsersHolder 
          Height          =   3555
-         Left            =   180
+         Left            =   -74820
          ScaleHeight     =   3495
          ScaleWidth      =   7215
          TabIndex        =   57
@@ -153,6 +179,15 @@ Begin VB.Form Main
             _ExtentY        =   6165
             _StockProps     =   77
             BackColor       =   16777215
+            BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
+            EndProperty
             Enabled         =   0   'False
             BorderStyle     =   0
             Cols            =   7
@@ -213,13 +248,13 @@ Begin VB.Form Main
             Alignment       =   2  'Center
             Caption         =   "Gatekeeper"
             BeginProperty Font 
-               name            =   "Arial"
-               charset         =   0
-               weight          =   700
-               size            =   18
-               underline       =   0   'False
-               italic          =   -1  'True
-               strikethrough   =   0   'False
+               Name            =   "Arial"
+               Size            =   18
+               Charset         =   0
+               Weight          =   700
+               Underline       =   0   'False
+               Italic          =   -1  'True
+               Strikethrough   =   0   'False
             EndProperty
             Height          =   435
             Left            =   840
@@ -263,7 +298,7 @@ Begin VB.Form Main
             Width           =   3135
          End
          Begin VB.Label Label4 
-            Caption         =   $"Main.frx":030A
+            Caption         =   $"Main.frx":037A
             Height          =   795
             Left            =   240
             TabIndex        =   47
@@ -273,9 +308,9 @@ Begin VB.Form Main
       End
       Begin VB.ListBox TopicKeys 
          Height          =   2400
-         ItemData        =   "Main.frx":0414
+         ItemData        =   "Main.frx":0484
          Left            =   -71220
-         List            =   "Main.frx":0416
+         List            =   "Main.frx":0486
          Sorted          =   -1  'True
          TabIndex        =   43
          Top             =   780
@@ -312,13 +347,13 @@ Begin VB.Form Main
       Begin VB.Frame Frame2 
          Caption         =   "Contact information"
          BeginProperty Font 
-            name            =   "Arial"
-            charset         =   0
-            weight          =   700
-            size            =   11.25
-            underline       =   0   'False
-            italic          =   -1  'True
-            strikethrough   =   0   'False
+            Name            =   "Arial"
+            Size            =   11.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   -1  'True
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1575
          Left            =   -71100
@@ -397,7 +432,7 @@ Begin VB.Form Main
       Begin VB.CommandButton LevelsDownIt 
          Caption         =   "&Down It"
          Height          =   315
-         Left            =   -71040
+         Left            =   3960
          TabIndex        =   21
          Top             =   4140
          Width           =   795
@@ -405,7 +440,7 @@ Begin VB.Form Main
       Begin VB.CommandButton LevelsUpIt 
          Caption         =   "&Up It"
          Height          =   315
-         Left            =   -71760
+         Left            =   3240
          TabIndex        =   20
          Top             =   4140
          Width           =   675
@@ -413,7 +448,7 @@ Begin VB.Form Main
       Begin VB.CommandButton LevelsProperties 
          Caption         =   "&Level Properties..."
          Height          =   315
-         Left            =   -74820
+         Left            =   180
          TabIndex        =   19
          Top             =   4140
          Width           =   1515
@@ -421,13 +456,13 @@ Begin VB.Form Main
       Begin VB.Frame ServerDirectoriesFrame 
          Caption         =   "Server's Level Directories"
          BeginProperty Font 
-            name            =   "Arial"
-            charset         =   0
-            weight          =   700
-            size            =   11.25
-            underline       =   0   'False
-            italic          =   -1  'True
-            strikethrough   =   0   'False
+            Name            =   "Arial"
+            Size            =   11.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   -1  'True
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   2355
          Left            =   -71100
@@ -479,13 +514,13 @@ Begin VB.Form Main
       Begin VB.Frame GatekeeperMachineFrame 
          Caption         =   "Gatekeeper Information"
          BeginProperty Font 
-            name            =   "Arial"
-            charset         =   0
-            weight          =   700
-            size            =   11.25
-            underline       =   0   'False
-            italic          =   -1  'True
-            strikethrough   =   0   'False
+            Name            =   "Arial"
+            Size            =   11.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   -1  'True
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   1755
          Left            =   -74880
@@ -539,13 +574,13 @@ Begin VB.Form Main
       Begin VB.Frame UplinkFrame 
          Caption         =   "Uplink search order"
          BeginProperty Font 
-            name            =   "Arial"
-            charset         =   0
-            weight          =   700
-            size            =   11.25
-            underline       =   0   'False
-            italic          =   -1  'True
-            strikethrough   =   0   'False
+            Name            =   "Arial"
+            Size            =   11.25
+            Charset         =   0
+            Weight          =   700
+            Underline       =   0   'False
+            Italic          =   -1  'True
+            Strikethrough   =   0   'False
          EndProperty
          Height          =   2175
          Left            =   -74880
@@ -578,9 +613,9 @@ Begin VB.Form Main
          End
          Begin VB.ListBox UplinkList 
             Height          =   1230
-            ItemData        =   "Main.frx":0418
+            ItemData        =   "Main.frx":0488
             Left            =   120
-            List            =   "Main.frx":041F
+            List            =   "Main.frx":048F
             TabIndex        =   2
             Tag             =   "Gate:UplinkList"
             Top             =   540
@@ -614,7 +649,7 @@ Begin VB.Form Main
       Begin VB.CommandButton LevelsDelete 
          Caption         =   "Delete Level"
          Height          =   315
-         Left            =   -68760
+         Left            =   6240
          TabIndex        =   1
          Top             =   4140
          Width           =   1215
@@ -622,14 +657,14 @@ Begin VB.Form Main
       Begin VB.CommandButton LevelsAdd 
          Caption         =   "&Add Level"
          Height          =   315
-         Left            =   -69840
+         Left            =   5160
          TabIndex        =   0
          Top             =   4140
          Width           =   1035
       End
       Begin VB.PictureBox LevelsHolder 
          Height          =   3555
-         Left            =   -74820
+         Left            =   180
          ScaleHeight     =   3495
          ScaleWidth      =   7215
          TabIndex        =   12
@@ -648,6 +683,15 @@ Begin VB.Form Main
             _ExtentY        =   6165
             _StockProps     =   77
             BackColor       =   16777215
+            BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+               Name            =   "MS Sans Serif"
+               Size            =   8.25
+               Charset         =   0
+               Weight          =   400
+               Underline       =   0   'False
+               Italic          =   0   'False
+               Strikethrough   =   0   'False
+            EndProperty
             Enabled         =   0   'False
             BorderStyle     =   0
             Cols            =   8
@@ -658,7 +702,7 @@ Begin VB.Form Main
       Begin VB.Label UserName 
          Caption         =   "Unknown"
          Height          =   195
-         Left            =   3120
+         Left            =   -71880
          TabIndex        =   67
          Top             =   4200
          Width           =   2295
@@ -667,7 +711,7 @@ Begin VB.Form Main
          Alignment       =   1  'Right Justify
          Caption         =   "You are:"
          Height          =   195
-         Left            =   2220
+         Left            =   -72780
          TabIndex        =   66
          Top             =   4200
          Width           =   795
@@ -714,12 +758,11 @@ Begin VB.Form Main
       Top             =   5400
       Visible         =   0   'False
       Width           =   1950
-      _Version        =   65536
       _ExtentX        =   3440
       _ExtentY        =   476
-      _StockProps     =   192
-      Appearance      =   1
+      _Version        =   327680
       BorderStyle     =   1
+      Appearance      =   1
    End
    Begin ComctlLib.StatusBar StatusBar1 
       Align           =   2  'Align Bottom
@@ -729,20 +772,39 @@ Begin VB.Form Main
       Top             =   5385
       Visible         =   0   'False
       Width           =   7710
-      _Version        =   65536
       _ExtentX        =   13600
       _ExtentY        =   476
-      _StockProps     =   68
-      AlignSet        =   -1  'True
       SimpleText      =   ""
-      NumPanels       =   3
-      i1              =   "Main.frx":042F
-      i2              =   "Main.frx":0553
-      i3              =   "Main.frx":065F
+      _Version        =   327680
+      BeginProperty Panels {0713E89E-850A-101B-AFC0-4210102A8DA7} 
+         NumPanels       =   3
+         BeginProperty Panel1 {0713E89F-850A-101B-AFC0-4210102A8DA7} 
+            Object.Width           =   3528
+            MinWidth        =   3528
+            Text            =   "Not Connected"
+            TextSave        =   "Not Connected"
+            Object.Tag             =   ""
+         EndProperty
+         BeginProperty Panel2 {0713E89F-850A-101B-AFC0-4210102A8DA7} 
+            Object.Width           =   6174
+            MinWidth        =   6174
+            TextSave        =   ""
+            Object.Tag             =   ""
+         EndProperty
+         BeginProperty Panel3 {0713E89F-850A-101B-AFC0-4210102A8DA7} 
+            AutoSize        =   1
+            Object.Width           =   3352
+            MinWidth        =   1764
+            TextSave        =   ""
+            Object.Tag             =   ""
+         EndProperty
+      EndProperty
    End
 End
 Attribute VB_Name = "Main"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' Main.frm: GateClient main user interface.

@@ -31,9 +31,12 @@ public:
 	enum { IDD = IDD_AUDIO };
 	CSliderCtrl	SoundVolume;
 	CSliderCtrl	MusicVolume;
-//	int		SampleRate;
+	int		SampleRate;
 	BOOL	UseDirectSound;
 	BOOL	EnableFilter;
+	BOOL	Enable16Bit;
+	BOOL	MuteSound;
+	BOOL	MuteMusic;
 	//}}AFX_DATA
 
 

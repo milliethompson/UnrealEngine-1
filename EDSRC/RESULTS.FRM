@@ -1,32 +1,30 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmResults 
    BorderStyle     =   5  'Sizable ToolWindow
    Caption         =   "Results Window"
    ClientHeight    =   2160
-   ClientLeft      =   3870
-   ClientTop       =   5370
+   ClientLeft      =   3735
+   ClientTop       =   7635
    ClientWidth     =   8190
-   Height          =   2520
    Icon            =   "Results.frx":0000
-   Left            =   3810
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   2160
    ScaleWidth      =   8190
    ShowInTaskbar   =   0   'False
-   Top             =   5070
-   Width           =   8310
    Begin VB.ListBox Results 
       BackColor       =   &H00000000&
       BeginProperty Font 
-         name            =   "Courier New"
-         charset         =   0
-         weight          =   400
-         size            =   9
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
+         Name            =   "Courier New"
+         Size            =   9
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H0000FFFF&
       Height          =   1860
@@ -38,7 +36,9 @@ Begin VB.Form frmResults
    End
 End
 Attribute VB_Name = "frmResults"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 
@@ -51,20 +51,21 @@ Option Explicit
 ' script error property from the server
 '
 Sub UpdateResults()
+    
     Dim S As String, L As String
     S = Ed.Server.GetProp("Text", "Results")
-    '
+    
     Results.Clear
     L = GrabLine(S)
     While L <> "" Or S <> ""
         Results.AddItem L
         L = GrabLine(S)
     Wend
-    '
+    
     If (Results.ListCount > 1) Then
         Results.ListIndex = Results.ListCount - 2
     End If
-    '
+    
     Show
 End Sub
 
@@ -98,13 +99,11 @@ End Sub
 '
 
 Private Sub Form_Load()
-    '
     Call Ed.SetOnTop(Me, "CompileResults", TOP_PANEL)
-    '
-    Left = frmMain.Left + frmMain.CX
-    Width = frmMain.CXL
-    Top = frmMain.Top + frmMain.Height - Height
-    '
+    
+    Left = 0
+    Width = frmMain.ScaleWidth
+    Top = frmMain.ScaleHeight - Height
 End Sub
 
 Private Sub Form_Resize()
@@ -117,7 +116,7 @@ Private Sub Form_Unload(Cancel As Integer)
 End Sub
 
 Public Sub Results_DblClick()
-    Dim S As String, T As String, i As Integer, Line As Integer
+    Dim S As String, T As String, i As Long, Line As Long
     If Results.ListIndex >= 0 Then
         S = Results.List(Results.ListIndex)
         '

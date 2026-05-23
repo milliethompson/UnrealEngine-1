@@ -2,7 +2,7 @@
 UnParse.h: General string parsing
 Used by: Whoever needs general string parsing.
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0.
 
 Description:
@@ -24,7 +24,7 @@ Revision history:
 
 #include "Unreal.h"
 
-struct UNREAL_API FParse
+struct UNENGINE_API FParse
 {
     //              Skip white space
     // Skip over any leading whitespace in Text, and

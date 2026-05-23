@@ -3,8 +3,10 @@ BEGIN
   MultiUse = 0   'False
 END
 Attribute VB_Name = "UnrealEdApp"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = True
-Attribute VB_Exposed = True
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
 '---------------------------------------------
 '    Ed OLE automation object
 '---------------------------------------------
@@ -44,8 +46,6 @@ Public EditorAppName As String ' "UnrealEd"
 '
 ' Filenames
 '
-Public MacroFname As String
-Public MacroRecording As Integer
 Public MapFname As String ' Map filename
 Public BrushFname As String ' Brush filename
 Public Startup As Integer ' 1 when loading
@@ -82,7 +82,6 @@ Public AutoSaveTime As Integer ' Minutes
 Public AutoUnique As Integer
 Public AutoCounter As Integer
 Public InitialFiles As String
-Public InitialMacro As String
 
 Public CameraVertRatio As Single
 Public CameraLeftRatio As Single
@@ -102,7 +101,6 @@ Public BrushDir    As String ' 3D Solids
 Public ModelDir    As String ' 3D Model animations
 Public SoundDir    As String ' Sounds
 Public MusicDir    As String ' Music
-Public MacroDir    As String ' Macros
 
 '-----------------
 ' Private
@@ -172,18 +170,15 @@ Private Sub Class_Initialize()
     GridX = 10
     GridY = 10
     GridZ = 10
-    '
 End Sub
 
 '
 ' Launch the UnrealServer
 '
 Public Sub LaunchServer(hWndMain As Long)
-    '
     Set Server = New UnrealEdServer
     Server.Exec "APP SET HWND=" & Trim(Str(hWndMain))
     hWndEditor = hWndMain
-    '
 End Sub
 
 '
@@ -232,7 +227,7 @@ Public Sub OpenCamera(Reopen As Boolean, _
     '
     Cmd = "CAMERA OPEN"
     '
-    Cmd = Cmd & " HWND=" & Trim(Str(frmMain.CameraHolder.hwnd))
+    Cmd = Cmd & " HWND=" & Trim(Str(frmCameraHolder.hwnd))
     Cmd = Cmd & " X=" & Trim(Str(X))
     Cmd = Cmd & " Y=" & Trim(Str(Y))
     Cmd = Cmd & " XR=" & Trim(Str(XR))
@@ -408,7 +403,6 @@ Public Sub SaveProfile()
     Call SetUserInfo("AutoUnique", Str(AutoUnique))
     Call SetUserInfo("AutoCounter", Str(AutoCounter))
     Call SetUserInfo("InitialFiles060", InitialFiles)
-    Call SetUserInfo("InitialMacro", InitialMacro)
     Call SetUserInfo("ToolbarPos", Str(ToolbarPos))
     Call SetUserInfo("BrowserPos", Str(BrowserPos))
     Call SetUserInfo("PanelButton", Str(PanelButton))
@@ -478,7 +472,6 @@ Public Sub GetProfile()
     ModelDir = GetUserInfo("Models", "Models")
     SoundDir = GetUserInfo("Sounds", "Sounds")
     MusicDir = GetUserInfo("Music", "Music")
-    MacroDir = GetUserInfo("Macros", "Macros")
     '
     SetUserHeading ("Preferences")
     AutoSaveTime = Val(GetUserInfo("AutoSaveTime", "10"))
@@ -486,7 +479,6 @@ Public Sub GetProfile()
     AutoCounter = Val(GetUserInfo("AutoCounter", "0"))
     InitialFiles = GetUserInfo("InitialFiles075", "")
     'InitialFiles = GetUserInfo("InitialFiles075", BaseDir + "Textures\Wood.utx")
-    InitialMacro = GetUserInfo("InitialMacro", "")
     ToolbarPos = Val(GetUserInfo("ToolbarPos", "0"))
     BrowserPos = Val(GetUserInfo("BrowserPos", "0"))
     PanelButton = Val(GetUserInfo("PanelButton", "2"))
@@ -541,7 +533,6 @@ DoneSettings:
     '
     frmDialogs.ExportBrush.InitDir = Ed.BaseDir + Ed.BrushDir
     frmDialogs.ImportBrush.InitDir = Ed.BaseDir + Ed.BrushDir
-    frmDialogs.MacroPick.InitDir = Ed.BaseDir + Ed.MacroDir
     frmDialogs.ClassLoad.InitDir = Ed.BaseDir + Ed.ClassDir
     frmDialogs.ClassSave.InitDir = Ed.BaseDir + Ed.ClassDir
     frmDialogs.TexFamLoad.InitDir = Ed.BaseDir + Ed.TextureDir
@@ -551,8 +542,6 @@ DoneSettings:
     frmDialogs.BrushOpen.InitDir = Ed.BaseDir + Ed.BrushDir
     frmDialogs.ExportMap.InitDir = Ed.BaseDir + Ed.MapDir
     frmDialogs.ImportMap.InitDir = Ed.BaseDir + Ed.MapDir
-    frmDialogs.MacroLoad.InitDir = Ed.BaseDir + Ed.MacroDir
-    frmDialogs.MacroSaveAs.InitDir = Ed.BaseDir + Ed.MacroDir
     frmDialogs.MapOpen.InitDir = Ed.BaseDir + Ed.MapDir
     frmDialogs.MapSaveAs.InitDir = Ed.BaseDir + Ed.MapDir
     frmDialogs.BrushSave.InitDir = Ed.BaseDir + Ed.BrushDir
@@ -563,6 +552,10 @@ DoneSettings:
     frmDialogs.SoundExportDlg.InitDir = Ed.BaseDir + Ed.SoundDir
     frmDialogs.SoundSaveFamilyDlg.InitDir = Ed.BaseDir + Ed.SoundDir
     frmDialogs.SoundLoadFamilyDlg.InitDir = Ed.BaseDir + Ed.SoundDir
+    frmDialogs.MusicImportDlg.InitDir = Ed.BaseDir + Ed.MusicDir
+    frmDialogs.MusicExportDlg.InitDir = Ed.BaseDir + Ed.MusicDir
+    frmDialogs.MusicSaveDlg.InitDir = Ed.BaseDir + Ed.MusicDir
+    frmDialogs.MusicLoadDlg.InitDir = Ed.BaseDir + Ed.MusicDir
 End Sub
 
 Public Sub StatusText(S As String)
@@ -619,6 +612,9 @@ Public Sub SetOnTop(F As Variant, Name As String, Pos As Integer)
     ' Make it fit:
     '
 MakeItFit:
+    If F.Left + F.Width > Screen.Width Then F.Left = Screen.Width - F.Width
+    If F.Left < 0 Then F.Left = 0
+    '
     F.Tag = Name
     WindowRecs(i).Name = Name
     Set WindowRecs(i).TheForm = F
@@ -630,20 +626,30 @@ End Sub
 
 Public Sub ToppenFormWindow(F As Variant)
     Dim Temp As Long
-    '
     Call MakeFormFit(F)
     '
     ' Put it on top:
     '
-    'Temp = GetWindowLong(F.hwnd, -16) 'MsgBox (Hex(Temp))
+    If F.MDIChild Then
+        F.ZOrder
+    Else
+        Call SetWindowLong(F.hwnd, -8, frmMain.hwnd)
+    End If
+    ' This seems to work for everyone, but it causes
+    ' problems with window positions on NT 4.0.
+    'Temp = GetWindowLong(F.hwnd, -16)
     'Temp = SetWindowLong(F.hwnd, -16, Temp Or WS_OVERLAPPED Or WS_POPUP)
-    'Temp = GetWindowLong(F.hwnd, -20) 'MsgBox (Hex(Temp))
-    'Temp = SetWindowLong(F.hwnd, -20, Temp Or WS_EX_NOPARENTNOTIFY)
     'Call SetParent(F.hwnd, frmMain.hwnd)
     '
-    ' This works in Windows 95 only:
+    'Call SetWindowPos(F.hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOSIZE Or SWP_NOMOVE Or SWP_NOOWNERZORDER)
+    F.ZOrder
+    ' This is the most recent one!
+    'Call SetWindowPos(F.hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE Or SWP_NOMOVE Or SWP_NOOWNERZORDER)
     '
-    Call SetWindowLong(F.hwnd, -8, frmMain.hwnd)
+    ' This works in Windows 95/NT 4.0 but fails in earlier versions of NT.
+    ' However, on NT 4.0, it causes the first click on some
+    ' UI elements to go unnoticed.
+    'Call SetWindowLong(F.hwnd, -8, frmMain.hwnd)
     '
 End Sub
 
@@ -675,9 +681,7 @@ End Sub
 
 Public Sub NoteResize()
    Dim i As Integer
-    '
-    ' See if we've recorded a position for it:
-    '
+    ' See if we've recorded a position for it.
     For i = 1 To NumWindowRecs
         If WindowRecs(i).Loaded = 1 Then
             Call ToppenFormWindow(WindowRecs(i).TheForm)
@@ -716,19 +720,25 @@ End Sub
 
 Public Sub EndOnTop(F As Variant) ' F = form
     Dim i As Integer
+    Dim R As RECT
     '
     ' See if we've recorded a position for it:
     '
     For i = 1 To NumWindowRecs
         If F.Tag = WindowRecs(i).Name Then
             If WindowRecs(i).Loaded = 1 Then
+                '
                 WindowRecs(i).TheForm.Hide
                 Call SetParent(F.hwnd, 0)
-                WindowRecs(i).Left = F.Left
-                WindowRecs(i).Top = F.Top
-                WindowRecs(i).Height = F.Height
-                WindowRecs(i).Width = F.Width
+                Call GetWindowRect(F.hwnd, R)
+                '
+                WindowRecs(i).Left = R.Left * Screen.TwipsPerPixelX
+                WindowRecs(i).Top = R.Top * Screen.TwipsPerPixelY
+                WindowRecs(i).Height = (R.Bottom - R.Top) * Screen.TwipsPerPixelY
+                WindowRecs(i).Width = (R.Right - R.Left) * Screen.TwipsPerPixelX
+                '
                 Set WindowRecs(i).TheForm = Nothing
+                '
                 WindowRecs(i).Loaded = 0
             End If
             Exit Sub

@@ -1,4 +1,4 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmPolyFlags 
    BorderStyle     =   0  'None
    Caption         =   "frmPolyFlags"
@@ -6,17 +6,15 @@ Begin VB.Form frmPolyFlags
    ClientLeft      =   3135
    ClientTop       =   4500
    ClientWidth     =   4980
-   Height          =   2325
    Icon            =   "PolyFlgs.frx":0000
-   Left            =   3075
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
    MinButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1965
    ScaleWidth      =   4980
    ShowInTaskbar   =   0   'False
-   Top             =   4200
-   Width           =   5100
    Begin VB.CheckBox PolyFlag 
       Caption         =   "Gouraud"
       Height          =   255
@@ -292,7 +290,9 @@ Begin VB.Form frmPolyFlags
    End
 End
 Attribute VB_Name = "frmPolyFlags"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 Const NumFlags = 25
@@ -365,7 +365,7 @@ Private Sub Form_Unload(Cancel As Integer)
     Set HolderForm = Nothing
 End Sub
 
-Private Sub PolyFlag_Click(index As Integer)
+Private Sub PolyFlag_Click(Index As Integer)
     If Updating = 0 Then
         PolyFlagsUpdate
     End If

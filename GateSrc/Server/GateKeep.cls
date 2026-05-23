@@ -3,7 +3,9 @@ BEGIN
   MultiUse = -1  'True
 END
 Attribute VB_Name = "Gatekeeper"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' Gatekeep.cls: Gatekeeper class implementation.
@@ -330,6 +332,7 @@ Public Function Exec(CmdLine As String, Connection As Object) As Boolean
             ' Login name is already logged in.
             Call Connection.Respond(GK_Failure_LoginDuplicate, "", "Name is already logged in.")
             Log.Log "Duplicate login attempt by " & Connection.GetHost & ": " & User
+            Exit Function
         End If
         
         ' Check password.
@@ -604,6 +607,9 @@ Public Sub Tick()
 
     ' Tick the level manager.
     LevelMan.Tick
+    
+    ' Tick each connection.
+    ConnectionList.Tick
 End Sub
 
 '/////////////////////////////////////////////////////////

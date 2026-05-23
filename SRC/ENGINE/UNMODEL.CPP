@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnModel.cpp: Unreal model functions
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -11,802 +11,477 @@
 #include "Unreal.h"
 
 /*---------------------------------------------------------------------------------------
-	UBspNodes resource implementation.
+	UPrimitive object implementation.
 ---------------------------------------------------------------------------------------*/
 
-void UBspNodes::Register(FResourceType *Type)
-{
-	GUARD;
-	Type->HeaderSize = sizeof (UBspNodes);
-	Type->RecordSize = sizeof (FBspNode);
-	Type->Version    = 1;
-	strcpy (Type->Descr,"BspNodes");
-	UNGUARD("UBspNodes::Register");
-}
+IMPLEMENT_CLASS(UPrimitive);
+
+/*---------------------------------------------------------------------------------------
+	UBspNodes object implementation.
+---------------------------------------------------------------------------------------*/
+
 void UBspNodes::InitHeader()
 {
-	GUARD;
-	Num				= 0;
-	Max				= 0;
-	NumZones		= 0;
-	NumUniquePlanes	= 0;
-	for (int i=0; i<64; i++) Zones[i].Connectivity=((QWORD)1)<<i;
-	UNGUARD("UBspNodes::InitHeader");
-}
-void UBspNodes::InitData()
-{
-	GUARD;
-	Num  = 0;
-	for (int i=0; i<64; i++) Zones[i].Connectivity=((QWORD)1)<<i;
-	UNGUARD("UBspNodes::InitData");
-}
-void UBspNodes::Flip()
-{
-	GUARD;
+	guard(UBspNodes::InitHeader);
 
-	UDatabase::Flip();
-	//todo:
+	// Call parent.
+	UDatabase::InitHeader();
 
-	UNGUARD("UBspNodes::Flip");
-}
-AUTOREGISTER_RESOURCE(RES_BspNodes,UBspNodes,0xB2D90860,0xCCD211cf,0x91360000,0xC028B992);
-
-/*---------------------------------------------------------------------------------------
-	UBspSurfs resource implementation.
----------------------------------------------------------------------------------------*/
-
-//
-// Resource functions.
-//
-void UBspSurfs::Register(FResourceType *Type)
+	// Init zone info.
+	NumZones = 0;	
+	for (int i=0; i<MAX_ZONES; i++)
 	{
-	GUARD;
-	Type->HeaderSize = sizeof (UBspSurfs);
-	Type->RecordSize = sizeof (FBspSurf);
-	Type->Version    = 1;
-	strcpy (Type->Descr,"BspSurfs");
-	UNGUARD("UBspSurfs::Register");
-	};
-void UBspSurfs::QueryDataReferences(FResourceCallback &Callback)
-	{
-	GUARD;
-	for (INDEX i=0; i < Num; i++)
-		{
-		Callback.Resource (this,(UResource **)&Element(i).Texture,0);
-		Callback.Resource (this,(UResource **)&Element(i).Brush  ,0);
-		};
-	UNGUARD("UBspSurfs::QueryDataReferences");
-	};
-void UBspSurfs::Flip()
-	{
-	GUARD;
-	//
-	UDatabase::Flip();
-	//todo:
-	//
-	UNGUARD("UBspSurfs::Flip");
-	};
-AUTOREGISTER_RESOURCE(RES_BspSurfs,UBspSurfs,0xB2D90861,0xCCD211cf,0x91360000,0xC028B992);
+		Zones[i].ZoneActor    = NULL;
+		Zones[i].Connectivity = ((QWORD)1)<<i;
+		Zones[i].Visibility   = ~(QWORD)0;
+	}
+	
+	unguard;
+}
+void UBspNodes::PostLoadItem( int Index, DWORD PostFlags )
+{
+	guard(UBspNodes::PostLoadItem);
+
+	// Reset Bsp flags.
+	Element(Index).NodeFlags   &= ~(NF_IsNew | NF_TagForEmpty);
+	Element(Index).iDynamic[0]  = Element(Index).iDynamic[1] = INDEX_NONE;
+
+	unguard;
+}
+IMPLEMENT_DB_CLASS(UBspNodes);
 
 /*---------------------------------------------------------------------------------------
-	ULightMesh implementation.
+	UBspSurfs object implementation.
 ---------------------------------------------------------------------------------------*/
 
-void ULightMesh::Register(FResourceType *Type)
+void UBspSurfs::ModifyItem(int Index, int UpdateMaster)
 {
-	GUARD;
-	Type->HeaderSize = sizeof (ULightMesh);
-	Type->RecordSize = 0;
-	Type->Version    = 1;
-	strcpy (Type->Descr,"LightMesh");
-	UNGUARD("ULightMesh::Register");
-}
-void ULightMesh::InitHeader()
-{
-	GUARD;
-	NumIndices   = 0;
-	NumDataBytes = 0;
-	UNGUARD("ULightMesh::InitHeader");
-}
-void ULightMesh::InitData()
-{
-	GUARD;
-	NumIndices   = 0;
-	NumDataBytes = 0;
-	UNGUARD("ULightMesh::InitData");
-}
-int ULightMesh::QuerySize()
-{
-	GUARD;
-	return NumDataBytes;
-	UNGUARD("ULightMesh::QuerySize");
-}
-int ULightMesh::QueryMinSize()
-{
-	GUARD;
-	return QuerySize();
-	UNGUARD("ULightMesh::QueryMinSize");
-}
-void ULightMesh::Flip()
-{
-	GUARD;
+	guard(UBspSurfs::Modify);
 
-	UResource::Flip();
-	//todo:
+	UDatabase::ModifyItem(Index);
 
-	UNGUARD("ULightMesh::Flip");
+	if( UpdateMaster && Element(Index).Brush )
+		Element(Index).Brush->Polys->ModifyItem(Element(Index).iBrushPoly);
+
+	unguard;
 }
-AUTOREGISTER_RESOURCE(RES_LightMesh,ULightMesh,0xB2D90862,0xCCD211cf,0x91360000,0xC028B992);
+void UBspSurfs::ModifyAllItems(int UpdateMaster)
+{
+	guard(UBspSurfs::ModifyAllItems);
+
+	for( int i=0; i<Num; i++ )
+		ModifyItem(i,UpdateMaster);
+
+	unguard;
+}
+void UBspSurfs::ModifySelected(int UpdateMaster)
+{
+	guard(UBspSurfs::ModifySelected);
+
+	for( int i=0; i<Num; i++ )
+		if( Element(i).PolyFlags & PF_Selected )
+			ModifyItem(i,UpdateMaster);
+
+	unguard;
+}
+IMPLEMENT_DB_CLASS(UBspSurfs);
 
 /*---------------------------------------------------------------------------------------
-	UVectors implementation.
+	ULightMesh object implementation.
 ---------------------------------------------------------------------------------------*/
 
-void UVectors::Register(FResourceType *Type)
-{
-	GUARD;
-	Type->HeaderSize = sizeof (UVectors);
-	Type->RecordSize = sizeof (FVector);
-	Type->Version    = 1;
-	strcpy (Type->Descr,"Vectors");
-	UNGUARD("UVectors::Register");
-}
-void UVectors::Flip()
-{
-	GUARD;
-	//
-	UDatabase::Flip();
-	//todo:
-	//
-	UNGUARD("UVectors::Flip");
-}
-AUTOREGISTER_RESOURCE(RES_Vectors,UVectors,0xB2D90863,0xCCD211cf,0x91360000,0xC028B992);
+IMPLEMENT_DB_CLASS(ULightMesh);
 
 /*---------------------------------------------------------------------------------------
-	UVertPool implementation.
+	UVectors object implementation.
 ---------------------------------------------------------------------------------------*/
 
-void UVertPool::Register(FResourceType *Type)
+IMPLEMENT_DB_CLASS(UVectors);
+
+/*---------------------------------------------------------------------------------------
+	UFloats object implementation.
+---------------------------------------------------------------------------------------*/
+
+IMPLEMENT_DB_CLASS(UFloats);
+
+/*---------------------------------------------------------------------------------------
+	UVerts object implementation.
+---------------------------------------------------------------------------------------*/
+
+void UVerts::InitHeader()
 {
-	GUARD;
-	Type->HeaderSize = sizeof (UVertPool);
-	Type->RecordSize = sizeof (FVertPool);
-	Type->Version    = 1;
-	strcpy (Type->Descr,"VertPool");
-	UNGUARD("UVertPool::Register");
-}
-void UVertPool::InitHeader()
-{
-	GUARD;
-	Max				= 0;
-	Num				= 0;
+	guard(UVerts::InitHeader);
+
+	// Init parent.
+	UDatabase::InitHeader();
+
+	// Init UVerts info.
 	NumSharedSides  = 4; // First 4 shared sides are view frustrum sides.
-	UNGUARD("UVertPool::InitHeader");
-}
-void UVertPool::InitData()
-{
-	GUARD;
-	Num				= 0;
-	NumSharedSides  = 4;
-	UNGUARD("UVertPool::InitData");
-}
-void UVertPool::Flip()
-{
-	GUARD;
 
-	UDatabase::Flip();
-	//todo:
-
-	UNGUARD("UVertPool::Flip");
+	unguard;
 }
-AUTOREGISTER_RESOURCE(RES_VertPool,UVertPool,0xB2D90864,0xCCD211cf,0x91360000,0xC028B992);
+IMPLEMENT_DB_CLASS(UVerts);
 
 /*---------------------------------------------------------------------------------------
-	UBound implementation.
+	UBound object implementation.
 ---------------------------------------------------------------------------------------*/
 
-void UBounds::Register(FResourceType *Type)
-{
-	GUARD;
-	Type->HeaderSize = sizeof (UBounds);
-	Type->RecordSize = sizeof (FBoundingRect);
-	Type->Version    = 1;
-	strcpy (Type->Descr,"Bound");
-	UNGUARD("UBound::Register");
-}
-void UBounds::Flip()
-{
-	GUARD;
-	//
-	UDatabase::Flip();
-	//todo:
-	//
-	UNGUARD("UBounds::Flip");
-}
-AUTOREGISTER_RESOURCE(RES_Bounds,UBounds,0xB2D90865,0xCCD211cf,0x91360000,0xC028B992);
+IMPLEMENT_DB_CLASS(UBounds);
 
 /*---------------------------------------------------------------------------------------
-	UTerrain implementation.
+	UModel object implementation.
 ---------------------------------------------------------------------------------------*/
 
-void UTerrain::Register(FResourceType *Type)
-{
-	GUARD;
-	Type->HeaderSize = sizeof (UTerrain);
-	Type->RecordSize = sizeof (FTerrainIndex);
-	Type->Version    = 1;
-	strcpy (Type->Descr,"Terrain");
-	UNGUARD("UTerrain::Register");
-}
-void UTerrain::InitHeader()
-{
-	GUARD;
-	Max = 0;
-	Num = 0;
-	for (int i=0; i<MAX_TERRAIN_LAYERS; i++)
-		{
-		LayerFlags[i] = 0;
-		HeightMaps[i] = NULL;
-		TileMaps  [i] = NULL;
-		};
-	for (i=0; i<MAX_TILE_REFERENCES; i++)
-		{
-		TileRefs  [i] = NULL;
-		};
-	UNGUARD("UTerrain::InitHeader");
-}
-void UTerrain::QueryHeaderReferences(FResourceCallback &Callback)
-{
-	GUARD;
-	for( int i=0; i<MAX_TERRAIN_LAYERS; i++ )
-	{
-		Callback.Resource (this,(UResource **)&LayerFlags[i],0);
-		Callback.Resource (this,(UResource **)&HeightMaps[i],0);
-		Callback.Resource (this,(UResource **)&TileMaps  [i],0);
-	}
-	for( i=0; i<MAX_TILE_REFERENCES; i++ )
-	{
-		Callback.Resource (this,(UResource **)&TileRefs  [i],0);
-	}
-	UNGUARD("UTerrain::QueryHeaderReferences");
-};
-void UTerrain::Flip()
-{
-	GUARD;
-	//todo:
-	UNGUARD("UTerrain::Flip");
-}
-AUTOREGISTER_RESOURCE(RES_Terrain,UTerrain,0xB2D90867,0xCCD211cf,0x91360000,0xC028B992);
-
-/*---------------------------------------------------------------------------------------
-	UModel resource implementation.
----------------------------------------------------------------------------------------*/
-
-void UModel::Register(FResourceType *Type)
-	{
-	GUARD;
-	Type->HeaderSize = sizeof (UModel);
-	Type->RecordSize = 0;
-	Type->Version    = 1;
-	Type->TypeFlags  = RTF_ScriptReferencable;
-	strcpy (Type->Descr,"Model");
-	UNGUARD("UModel::Register");
-	};
 void UModel::InitHeader()
-	{
-	GUARD;
-	//
-	// Init resource header to defaults:
-	//
-	Vectors    		= NULL;
-	Points     		= NULL;
-	BspNodes    	= NULL;
-	BspSurfs		= NULL;
-	VertPool		= NULL;
-	Polys	     	= NULL;
-	LightMesh   	= NULL;
-	Terrain			= NULL;
-	Bounds			= NULL;
-	//
-	LockType		= LOCK_None;
-	//
+{
+	guard(UModel::InitHeader);
+
+	// Init parent class.
+	UPrimitive::InitHeader();
+	bCheckCollision = 1;
+
+	// Init object header to defaults.
+	Vectors    		= (UVectors  *)NULL;
+	Points     		= (UVectors  *)NULL;
+	Nodes    		= (UBspNodes *)NULL;
+	Surfs			= (UBspSurfs *)NULL;
+	Verts			= (UVerts    *)NULL;
+	Polys	     	= (UPolys    *)NULL;
+	Bounds			= (UBounds   *)NULL;
+	LeafHulls		= (UInts     *)NULL;
+	LightMesh   	= (ULightMesh*)NULL;
 	Location      	= GMath.ZeroVector;
 	Rotation		= GMath.ZeroRotation;
 	PrePivot		= GMath.ZeroVector;
 	PostPivot		= GMath.ZeroVector;
 	Scale			= GMath.UnitScale;
+	PostScale		= GMath.UnitScale;
 	CsgOper			= CSG_Active;
 	ModelFlags		= 0;
-	//
-	Bound[0].Init();
-	Bound[1].Init();
-	//
-	UNGUARD("UModel::InitHeader");
-	};
+
+	TransformedBound.Init();
+
+	unguard;
+}
 const char *UModel::Import(const char *Buffer, const char *BufferEnd,const char *FileType)
-	{
-	GUARD;
+{
+	guard(UModel::Import);
 	const char		*StrPtr;
 	char			StrLine[256];
-	//
+
 	Init(1);
-	//
-	while (GetLINE (&Buffer,StrLine,256)==0)
-		{
+
+	while( GetLINE (&Buffer,StrLine,256)==0 )
+	{
 		StrPtr = StrLine;
-		//
-		if (GetEND(&StrPtr,"BRUSH"))
-			{
-			break; // End of brush polys
-			}
-		else if (GetBEGIN (&StrPtr,"POLYLIST"))
-			{
-			if (Polys==NULL) Polys = new(Name,CREATE_Replace)UPolys;
+
+		if( GetEND(&StrPtr,"BRUSH") )
+		{
+			// End of brush polys.
+			break;
+		}
+		else if( GetBEGIN (&StrPtr,"POLYLIST") )
+		{
+			if (Polys==NULL)
+				Polys = new(GetName(),CREATE_Replace,GetContextFlags())UPolys;
+			
 			Buffer = Polys->Import(Buffer,BufferEnd,FileType);
-			if (!Buffer) return NULL;
-			}
-		else if (GetCMD(&StrPtr,"SETTINGS"))
-			{
+			
+			if (!Buffer)
+				return NULL;
+		}
+		else if( GetCMD(&StrPtr,"SETTINGS") )
+		{
 			GetDWORD(StrPtr,"CSG=",			(DWORD *)&CsgOper);
 			GetDWORD(StrPtr,"FLAGS=",		&ModelFlags);
 			GetDWORD(StrPtr,"POLYFLAGS=",	&PolyFlags);
 			GetDWORD(StrPtr,"COLOR=",		&Color);
-			//
+
 			ModelFlags &= ~(MF_NoImport);
-			}
+		}
 		else if (GetCMD(&StrPtr,"LOCATION"))		GetFVECTOR 	(StrPtr,&Location);
 		else if (GetCMD(&StrPtr,"PREPIVOT"))		GetFVECTOR 	(StrPtr,&PrePivot);
 		else if (GetCMD(&StrPtr,"POSTPIVOT"))		GetFVECTOR 	(StrPtr,&PostPivot);
 		else if (GetCMD(&StrPtr,"SCALE"))			GetFSCALE 	(StrPtr,&Scale);
 		else if (GetCMD(&StrPtr,"POSTSCALE"))		GetFSCALE 	(StrPtr,&PostScale);
 		else if (GetCMD(&StrPtr,"ROTATION"))		GetFROTATION(StrPtr,&Rotation,1);
-		};
-	if (GEditor) GEditor->bspValidateBrush(this,0,0);
-	//
+	}
+	
+	if (GEditor)
+		GEditor->bspValidateBrush(this,0,0);
+
 	return Buffer;
-	UNGUARD("UModel::Import");
-	};
-char *UModel::Export(char *Buffer,const char *FileType,int Indent)
-	{
-	GUARD;
+	unguard;
+}
+void UModel::Export( FOutputDevice &Out, const char *FileType, int Indent )
+{
+	guard(UModel::Export);
 	char TempStr[256];
-	//
-	Buffer += sprintf (Buffer,"%sBegin Brush Name=%s\r\n",spc(Indent),Name);
-	//
-	// Save all brush properties:
-	//
-	Buffer += sprintf(Buffer,"%s   Settings  CSG=%i Flags=%u PolyFlags=%u Color=%i\r\n",spc(Indent),CsgOper,ModelFlags,PolyFlags,Color);
-	Buffer += sprintf(Buffer,"%s   Location  %s\r\n",spc(Indent),SetFVECTOR   (TempStr,&Location));
-	Buffer += sprintf(Buffer,"%s   PrePivot  %s\r\n",spc(Indent),SetFVECTOR   (TempStr,&PrePivot));
-	Buffer += sprintf(Buffer,"%s   PostPivot %s\r\n",spc(Indent),SetFVECTOR   (TempStr,&PostPivot));
-	Buffer += sprintf(Buffer,"%s   Scale     %s\r\n",spc(Indent),SetFSCALE    (TempStr,&Scale));
-	Buffer += sprintf(Buffer,"%s   PostScale %s\r\n",spc(Indent),SetFSCALE    (TempStr,&PostScale));
-	Buffer += sprintf(Buffer,"%s   Rotation  %s\r\n",spc(Indent),SetROTATION  (TempStr,&Rotation));
-	//
-	// Export edpolys:
-	//
-	Buffer = Polys->Export(Buffer,FileType,Indent+3);
-	if (!Buffer) return NULL;
-	//
-	Buffer += sprintf (Buffer,"%sEnd Brush\r\n",spc(Indent));
-	return Buffer;
-	//
-	UNGUARD("UModel::Export");
-	};
-int UModel::QuerySize()
+
+	Out.Logf("%sBegin Brush Name=%s\r\n",spc(Indent),GetName());
+
+	// Save all brush properties.
+	Out.Logf("%s   Settings  CSG=%i Flags=%u PolyFlags=%u Color=%i\r\n",spc(Indent),CsgOper,ModelFlags,PolyFlags,Color);
+	Out.Logf("%s   Location  %s\r\n",spc(Indent),SetFVECTOR   (TempStr,&Location));
+	Out.Logf("%s   PrePivot  %s\r\n",spc(Indent),SetFVECTOR   (TempStr,&PrePivot));
+	Out.Logf("%s   PostPivot %s\r\n",spc(Indent),SetFVECTOR   (TempStr,&PostPivot));
+	Out.Logf("%s   Scale     %s\r\n",spc(Indent),SetFSCALE    (TempStr,&Scale));
+	Out.Logf("%s   PostScale %s\r\n",spc(Indent),SetFSCALE    (TempStr,&PostScale));
+	Out.Logf("%s   Rotation  %s\r\n",spc(Indent),SetROTATION  (TempStr,&Rotation));
+
+	// Export FPolys.
+	Polys->Export(Out,FileType,Indent+3);
+
+	Out.Logf("%sEnd Brush\r\n",spc(Indent));
+
+	unguard;
+}
+void UModel::PostLoadHeader( DWORD PostFlags )
+{
+	guard(UModel::PostLoadHeader);
+
+	// Postload parent.
+	UPrimitive::PostLoadHeader( PostFlags );
+
+	// Regenerate bounds if transacting.
+	if( PostFlags & POSTLOAD_Trans )
 	{
-	GUARD;
-	return 0;
-	UNGUARD("UModel::QuerySize");
-	};
-int UModel::QueryMinSize()
-	{
-	GUARD;
-	return 0;
-	UNGUARD("UModel::QueryMinSize");
-	};
-void UModel::QueryHeaderReferences(FResourceCallback &Callback)
-	{
-	GUARD;
-	Callback.Resource (this,(UResource **)&Vectors  ,0);
-	Callback.Resource (this,(UResource **)&Points   ,0);
-	Callback.Resource (this,(UResource **)&BspNodes ,0);
-	Callback.Resource (this,(UResource **)&BspSurfs ,0);
-	Callback.Resource (this,(UResource **)&VertPool ,0);
-	Callback.Resource (this,(UResource **)&LightMesh,0);
-	Callback.Resource (this,(UResource **)&Polys    ,0);
-	Callback.Resource (this,(UResource **)&Terrain  ,0);
-	Callback.Resource (this,(UResource **)&Bounds   ,0);
-	UNGUARD("UModel::QueryHeaderReferences");
-	};
-void UModel::Flip()
-	{
-	GUARD;
-	//
-	UResource::Flip();
-	//todo:
-	//
-	UNGUARD("UModel::Flip");
-	};
-AUTOREGISTER_RESOURCE(RES_Model,UModel,0xB2D90868,0xCCD211cf,0x91360000,0xC028B992);
+		if
+		(	Nodes && Surfs
+		&&	((Nodes->GetFlags() & RF_TransData) || Surfs->GetFlags() & RF_TransData) )
+		{
+			Lock(LOCK_ReadWrite);
+			GEditor->bspBuildBounds(this);
+			Unlock(LOCK_ReadWrite);
+		}
+	}
+
+	unguard;
+}
+IMPLEMENT_CLASS(UModel);
 
 /*---------------------------------------------------------------------------------------
-	UModel custom implementation.
+	UModel implementation.
 ---------------------------------------------------------------------------------------*/
 
 //
-// Lock a model and obtain a ModelInfo structure for accessing it.
-// This prevents the model from being swapped.  It also makes the
-// model resource unstable (possibly invalid) until you unlock it.
-// Return 0 if success, nonzero if problem.
+// Lock a model.
 //
-void UModel::Lock( IModel *ModelInfo,int NewLockType )
+INT UModel::Lock( DWORD NewLockType )
 {
 	guard(UModel::Lock);
 
-	if( LockType != LOCK_None )
-		appError ("Already locked!");
+	// Lock all child objects.
+	if( Nodes     ) Nodes    ->Lock(NewLockType);
+	if( Surfs     ) Surfs    ->Lock(NewLockType);
+	if( Polys     ) Polys    ->Lock(NewLockType);
+	if( Points    ) Points   ->Lock(NewLockType);
+	if( Vectors   ) Vectors  ->Lock(NewLockType);
+	if( Verts     ) Verts    ->Lock(NewLockType);
+	if( LightMesh ) LightMesh->Lock(NewLockType);
 
-	// Save all headers for transactional undo/redo.
-	if( GTrans && (NewLockType == LOCK_Trans) )
+	return UPrimitive::Lock(NewLockType);
+	unguard;
+}
+
+//
+// Unlock a model.
+//
+void UModel::Unlock( DWORD OldLockType )
+{
+	guard(UModel::Unlock);
+
+	if( Nodes     ) Nodes    ->Unlock(OldLockType);
+	if( Surfs     ) Surfs    ->Unlock(OldLockType);
+	if( Polys     ) Polys    ->Unlock(OldLockType);
+	if( Points    ) Points   ->Unlock(OldLockType);
+	if( Vectors   ) Vectors  ->Unlock(OldLockType);
+	if( Verts     ) Verts    ->Unlock(OldLockType);
+	if( LightMesh ) LightMesh->Unlock(OldLockType);
+
+	UPrimitive::Unlock(OldLockType);
+	unguard;
+}
+
+//
+// Init a model's parameters to defaults without affecting what's in it
+//
+void UModel::Init( int InitPositionRotScale )
+{
+	guard(UModel::Init);
+
+	// Init basic info.
+	CsgOper	    = CSG_Active;
+	PolyFlags	= 0;
+	Color		= 0;
+
+	if( InitPositionRotScale )
 	{
-		GTrans->NoteResHeader (this);
-		GTrans->NoteResHeader (BspNodes);
-		GTrans->NoteResHeader (BspSurfs);
-		GTrans->NoteResHeader (Polys);
-		ModelInfo->Trans = 1;
-	}
-	else ModelInfo->Trans = 0;
-
-	// Lock the model after headers are saved transactionally.
-	LockType=NewLockType;
-
-	ModelInfo->Model				= this;
-	ModelInfo->BspNodesResource		= BspNodes;
-	ModelInfo->BspSurfsResource		= BspSurfs;
-	ModelInfo->PolysResource		= Polys;
-	ModelInfo->LightMesh		 	= LightMesh;
-	ModelInfo->TerrainResource		= Terrain;
-	ModelInfo->BoundsResource		= Bounds;
-
-	// Set main info.
-	if( Vectors )
-	{
-		ModelInfo->FVectors    = Vectors->GetData();
-		ModelInfo->MaxVectors  = Vectors->Max;
-		ModelInfo->NumVectors  = Vectors->Num;
-	}
-	else ModelInfo->FVectors = NULL;
-
-	if( Points )
-	{
-		ModelInfo->FPoints     = Points->GetData();
-		ModelInfo->NumPoints   = Points->Num;
-		ModelInfo->MaxPoints   = Points->Max;
-	}
-	else ModelInfo->FPoints = NULL;
-
-	if( BspNodes )
-	{
-		ModelInfo->NumBspNodes		= BspNodes->Num;
-		ModelInfo->MaxBspNodes		= BspNodes->Max;
-		ModelInfo->NumZones			= BspNodes->NumZones;
-		ModelInfo->NumUniquePlanes	= BspNodes->NumUniquePlanes;
-		ModelInfo->BspNodes			= BspNodes->GetData();
+		// Init position, rotation, and scale only.
+		Scale		= GMath.UnitScale;
+		PostScale	= GMath.UnitScale;
+		Location	= GMath.ZeroVector;
+		Rotation	= GMath.ZeroRotation;
 	}
 	else
 	{
-		ModelInfo->NumBspNodes		= 0;
-		ModelInfo->MaxBspNodes		= 0;
-		ModelInfo->NumZones			= 0;
-		ModelInfo->NumUniquePlanes	= 0;
-		ModelInfo->BspNodes			= NULL;
-	}
+		// Just update.
+		if( GEditor )
+			GEditor->constraintApply(NULL,NULL,&Location,&Rotation,&GEditor->Constraints);
+		
+		FModelCoords TempCoords;
+		BuildCoords( &TempCoords, NULL );
 
-	if( BspSurfs )
-	{
-		ModelInfo->NumBspSurfs = BspSurfs->Num;
-		ModelInfo->MaxBspSurfs = BspSurfs->Max;
-		ModelInfo->BspSurfs    = BspSurfs->GetData();
+		Location += PostPivot - PrePivot.TransformVectorBy(TempCoords.PointXform);
 	}
-	else
-	{
-		ModelInfo->NumBspSurfs = 0;
-		ModelInfo->MaxBspSurfs = 0;
-		ModelInfo->BspSurfs    = NULL;
-	}
+	PrePivot	= GMath.ZeroVector;
+	PostPivot	= GMath.ZeroVector;
+	unguard;
+}
 
-	if( VertPool )
-	{
-		ModelInfo->NumVertPool		= VertPool->Num;
-		ModelInfo->MaxVertPool		= VertPool->Max;
-		ModelInfo->NumSharedSides	= VertPool->NumSharedSides;
-		ModelInfo->VertPool			= VertPool->GetData();
-	}
-	else
-	{
-		ModelInfo->NumVertPool		= 0;
-		ModelInfo->MaxVertPool		= 0;
-		ModelInfo->NumSharedSides	= 4;
-		ModelInfo->VertPool			= NULL;
-	}
+//
+// Allocate subobjects for a model.
+//
+void UModel::AllocDatabases( BOOL AllocPolys )
+{
+	guard(UModel::AllocDatabases);
 
-	if( Polys )
-	{
-		ModelInfo->NumFPolys   = Polys->Num;
-		ModelInfo->MaxFPolys   = Polys->Max;
-		ModelInfo->FPolys      = Polys->GetData();
-	}
-	else
-	{
-		ModelInfo->NumFPolys   = 0;
-		ModelInfo->MaxFPolys   = 0;
-		ModelInfo->FPolys      = NULL;
-	}
+	// Make vector table name.
+	char VName[NAME_SIZE]="V";
+	mystrncat( VName, GetName(), NAME_SIZE );
 
-	if( Terrain )
-	{
-		ModelInfo->TerrainIndex = Terrain->GetData();
-		ModelInfo->NumTerrain   = Terrain->Num;
-		ModelInfo->MaxTerrain   = Terrain->Max;
-	}
-	else
-	{
-		ModelInfo->TerrainIndex = NULL;
-		ModelInfo->NumTerrain   = 0;
-		ModelInfo->MaxTerrain   = 0;
-	}
+	// Make point table name.
+	char PName[NAME_SIZE]="P";
+	mystrncat( PName, GetName(), NAME_SIZE );
 
-	if( Bounds )
-	{
-		ModelInfo->Bounds    = Bounds->GetData();
-		ModelInfo->NumBounds = Bounds->Num;
-		ModelInfo->MaxBounds = Bounds->Max;
-	}
-	else
-	{
-		ModelInfo->Bounds    = NULL;
-		ModelInfo->NumBounds = 0;
-		ModelInfo->MaxBounds = 0;
-	}
-	
-	// Set other info.
-	ModelInfo->Location		= Location;
-	ModelInfo->Rotation		= Rotation;
-	ModelInfo->Scale		= Scale;
-	ModelInfo->PostScale	= PostScale;
-	ModelInfo->TempScale	= TempScale;
-	ModelInfo->PrePivot		= PrePivot;
-	ModelInfo->PostPivot	= PostPivot;
-	ModelInfo->CsgOper		= CsgOper;
-	ModelInfo->ModelFlags	= ModelFlags;
-	ModelInfo->PolyFlags	= PolyFlags;
+	// Allocate all objects for model (indentation shows hierarchy).
+	// Doesn't allocate light mesh; that's allocated when built.
+	Nodes		= new(GetName(), CREATE_Replace, GetContextFlags())UBspNodes(0);
+	Surfs		= new(GetName(), CREATE_Replace, GetContextFlags())UBspSurfs(0);
+	Verts   	= new(GetName(), CREATE_Replace, GetContextFlags())UVerts(0);
+	Bounds	    = new(GetName(), CREATE_Replace, GetContextFlags())UBounds(0);
+	LeafHulls   = new(GetName(), CREATE_Replace, GetContextFlags())UInts(0);
+	Vectors		= new(VName,     CREATE_Replace, GetContextFlags())UVectors(0);
+	Points		= new(PName,     CREATE_Replace, GetContextFlags())UVectors(0);
+
+	if( AllocPolys )
+		Polys	= new(GetName(), CREATE_Replace, GetContextFlags())UPolys(0);
 
 	unguard;
 }
 
 //
-// Unlock a model.  Updates the necessary info, i.e. number of Bsp
-// nodes, number of SPoints and FPoints.
-//
-void UModel::Unlock (IModel *ModelInfo)
-	{
-	GUARD;
-	if (LockType==LOCK_None) appError ("modelUnlock: Not locked");
-	LockType=LOCK_None;
-	//
-	if (Vectors)	Vectors	->Num				= ModelInfo->NumVectors;
-	if (Points)		Points	->Num				= ModelInfo->NumPoints;
-	if (BspNodes)	BspNodes->Num				= ModelInfo->NumBspNodes;
-	if (BspNodes)	BspNodes->NumZones			= ModelInfo->NumZones;
-	if (BspNodes)	BspNodes->NumUniquePlanes	= ModelInfo->NumUniquePlanes;
-	if (BspSurfs)	BspSurfs->Num				= ModelInfo->NumBspSurfs;
-	if (Polys)		Polys	->Num				= ModelInfo->NumFPolys;
-	if (VertPool)	VertPool->Num				= ModelInfo->NumVertPool;
-	if (VertPool)	VertPool->NumSharedSides	= ModelInfo->NumSharedSides;
-	if (Bounds)		Bounds  ->Num				= ModelInfo->NumBounds;
-	if (Terrain)	Terrain	->Num				= ModelInfo->NumTerrain;
-	//
-	Bounds		= ModelInfo->BoundsResource;
-	Terrain     = ModelInfo->TerrainResource;
-	LightMesh   = ModelInfo->LightMesh;
-	Location	= ModelInfo->Location;
-	Rotation	= ModelInfo->Rotation;
-	Scale		= ModelInfo->Scale;
-	PostScale	= ModelInfo->PostScale;
-	TempScale	= ModelInfo->TempScale;
-	PrePivot	= ModelInfo->PrePivot;
-	PostPivot	= ModelInfo->PostPivot;
-	CsgOper		= (ECsgOper)ModelInfo->CsgOper;
-	ModelFlags	= ModelInfo->ModelFlags;
-	PolyFlags	= ModelInfo->PolyFlags;
-	//
-	UNGUARD("UModel::Unlock");
-	};
-
-//
-// Init a model's parameters to defaults without affecting what's in it
-//
-void UModel::Init(int InitPositionRotScale)
-	{
-	GUARD;
-	FModelCoords	TempCoords;
-	FVector			Temp;
-	//
-	CsgOper	    = CSG_Active;
-	ModelFlags	= MF_PostScale;
-	PolyFlags	= 0;
-	Color		= 0;
-	//
-	if (InitPositionRotScale)
-		{
-		Scale		= GMath.UnitScale;
-		PostScale	= GMath.UnitScale;
-		Location	= GMath.ZeroVector;
-		Rotation	= GMath.ZeroRotation;
-		}
-	else
-		{
-		if (GEditor) GEditor->constraintApply(NULL,NULL,&Location,&Rotation,&GEditor->Constraints);
-		BuildCoords (&TempCoords,NULL);
-		//
-		Temp = GMath.ZeroVector - PrePivot;
-		Temp.TransformVector(TempCoords.PointXform);
-		Location += Temp + PostPivot;
-		};
-	PrePivot	= GMath.ZeroVector;
-	PostPivot	= GMath.ZeroVector;
-	UNGUARD("UModel::Init");
-	};
-
-//
-// Create a new model and allocate all resources needed for it.
+// Create a new model and allocate all objects needed for it.
 // Call with Editor=1 to allocate editor structures for it, also.  Returns
 // model's ID if ok, NULL if error.
 //
-UModel::UModel(int Editable)
-	{
-	GUARD;
-	char	VName[NAME_SIZE],PName[NAME_SIZE];
-	//
-	// Figure out how much stuff we need:
-	//
-	int MaxEdPolys  = 20000;
-	int MaxBspNodes = 20000;
-	int MaxBspSurfs = 12000;
-	int MaxVectors  = 8192;
-	int MaxPoints   = 65530;
-	int MaxVertPool = 65535*2;
-	int MaxBounds   = MaxBspNodes/2;
-	int MaxTerrain  = 4095;
-	//
-	strcpy (VName,"V"); mystrncat (VName,Name,NAME_SIZE); // Vector table name
-	strcpy (PName,"P"); mystrncat (PName,Name,NAME_SIZE); // Point table name
-	//
-	// Allocate all resources for model (indentation shows hierarchy):
-	// [doesn't allocate light mesh; that's allocated when built]
-	//
-	BspNodes	= new(Name, CREATE_Replace)UBspNodes	(MaxBspNodes);
-	BspSurfs	= new(Name, CREATE_Replace)UBspSurfs	(MaxBspSurfs);
-	VertPool	= new(Name, CREATE_Replace)UVertPool	(MaxVertPool);
-	Polys		= new(Name, CREATE_Replace)UPolys		(MaxEdPolys);
-	Terrain		= new(Name, CREATE_Replace)UTerrain		(MaxEdPolys);
-	Bounds	    = new(Name, CREATE_Replace)UBounds		(MaxEdPolys);
-	Vectors		= new(VName,CREATE_Replace)UVectors		(MaxVectors);
-	Points		= new(PName,CREATE_Replace)UVectors		(MaxPoints);
-	//
-	Init(1);
-	UNGUARD("UModel::UModel");
-	};
+UModel::UModel( int InEditable, int InRootOutside )
+:	RootOutside( InRootOutside )
+{
+	guard(UModel::UModel);
 
-//
-// Kill a model and all stuff it relies on:
-//
-void UModel::Kill()
-	{
-	GUARD;
-	UNGUARD("UModel::Kill");
-	};
+	// Allocate tables.
+	AllocDatabases(1);
+
+	Init(1);
+	unguard;
+}
 
 //
 // Build an optional coordinate system and anticoordinate system
 // for a model.  Returns orientation, 1.0 if scaling is normal,
 // -1.0 if scaling mirrors the brush.
 //
-FLOAT UModel::BuildCoords (FModelCoords *Coords,FModelCoords *Uncoords)
+FLOAT UModel::BuildCoords( FModelCoords *Coords, FModelCoords *Uncoords )
+{
+	guard(UModel::BuildCoords);
+	if( Coords )
 	{
-	GUARD;
-	if (Coords!=NULL)
-		{
-		Coords->PointXform = GMath.UnitCoords;
-		if (ModelFlags & MF_PostScale) Coords->PointXform.TransformByScale(PostScale);
-		Coords->PointXform.TransformByRotation (Rotation);
-		Coords->PointXform.TransformByScale    (Scale);
-		//
-		Coords->VectorXform = GMath.UnitCoords;
-		Coords->VectorXform.DeTransformByScale (Scale);
-		Coords->VectorXform.DeTransformByRotation(Rotation);
-		if (ModelFlags&MF_PostScale) Coords->VectorXform.DeTransformByScale (PostScale);
-		Coords->VectorXform = Coords->VectorXform.Transposition();
-		//
-		// Note: The NormalCoords system is orthogonal but not orthonormal.
-		//
-		};
-	if (Uncoords!=NULL)
-		{
-		Uncoords->PointXform = GMath.UnitCoords;
-		Uncoords->PointXform.DeTransformByScale (Scale);
-		Uncoords->PointXform.DeTransformByRotation(Rotation);
-		if (ModelFlags&MF_PostScale) Uncoords->PointXform.DeTransformByScale (PostScale);
-		//
-		Uncoords->VectorXform = GMath.UnitCoords;
-		if (ModelFlags&MF_PostScale) Uncoords->VectorXform.TransformByScale (PostScale);
-		Uncoords->VectorXform.TransformByRotation (Rotation);
-		Uncoords->VectorXform.TransformByScale	  (Scale);
-		Uncoords->VectorXform = Uncoords->VectorXform.Transposition();
-		};
+		Coords->PointXform    = (GMath.UnitCoords * PostScale * Rotation * Scale);
+		Coords->VectorXform   = (GMath.UnitCoords / Scale / Rotation / PostScale).Transpose();
+	}
+	if( Uncoords )
+	{
+		Uncoords->PointXform  = (GMath.UnitCoords / Scale / Rotation / PostScale);
+		Uncoords->VectorXform = (GMath.UnitCoords * PostScale * Rotation * Scale).Transpose();
+	}
 	return Scale.Orientation();
-	UNGUARD("UModel::BuildCoords");
-	};
+	unguard;
+}
 
 //
 // Build the model's bounds (min and max):
 //
-void UModel::BuildBound(int Transformed)
-	{
-	GUARD;
-	//
-	if ((!Polys) || (Polys->Num==0))
-		{
-		Bound[Transformed].Init();
-		return;
-		};
-	FModelCoords Coords;
-	FVector *FirstPt	= (FVector *)GMem.Get(0);
-	FPoly	*Poly		= &Polys->Element(0);
-	FLOAT   Orientation = 0.0;
-	int		NumPts		= 0;
-	//
-	if (Transformed) Orientation = BuildCoords(&Coords,NULL);
-	//
-	for (int i=0; i<Polys->Num; i++)
-		{
-		FPoly Temp = *Poly;
-		if (Transformed) Temp.Transform(Coords,&PrePivot,&Location,Orientation);
-		//
-		for (int j=0; j<Temp.NumVertices; j++)
-			{
-			*(FVector *)GMem.GetFast(sizeof(FVector)) = Temp.Vertex[j];
-			};
-		NumPts += Temp.NumVertices;
-		Poly++;
-		};
-	Bound[Transformed].Init(FirstPt,NumPts);
-	GMem.Release(FirstPt);
-	//
-	UNGUARD("UModel::BuildBound");
-	};
+void UModel::BuildBound( int Transformed )
+{
+	guard(UModel::BuildBound);
+	Lock(LOCK_ReadWrite);
 
-void UModel::Transform()
+	if( Polys && Polys->Num>0 )
 	{
-	GUARD;
-	IModel			ModelInfo;
+		int Total=0;
+		for( int i=0; i<Polys->Num; i++ )
+			Total += Polys(i).NumVertices;
+
+		FModelCoords Coords;
+		FMemMark	Mark(GMem);
+		FVector		*Points = new(GMem,Total)FVector;
+		FLOAT		Orientation = 0.0;
+
+		if( Transformed )
+			Orientation = BuildCoords(&Coords,NULL);
+
+		int Count = 0;
+		for( i=0; i<Polys->Num; i++ )
+		{
+			FPoly Temp = Polys(i);
+			
+			if( Transformed )
+				Temp.Transform( Coords, &PrePivot, &Location, Orientation );
+
+			for( int j=0; j<Temp.NumVertices; j++ )
+				Points[Count++] = Temp.Vertex[j];
+		}
+		checkLogic(Count==Total);
+		if( Transformed )
+			TransformedBound.Init(Points,Total);
+		else
+			LocalBound.Init(Points,Total);
+		Mark.Pop();
+	}
+	else
+	{
+		if( Transformed )
+			TransformedBound.Init();
+		else
+			LocalBound.Init();
+	}
+
+	Unlock(LOCK_ReadWrite);
+	unguard;
+}
+
+//
+// Transform this model by its coordinate system.
+//
+void UModel::Transform()
+{
+	guard(UModel::Transform);
+	Lock(LOCK_Trans);
+
 	FModelCoords	Coords,Uncoords;
 	FLOAT			Orientation;
-	//
-	Lock(&ModelInfo,LOCK_Trans);
+
 	Orientation = BuildCoords(&Coords,&Uncoords);
-	//
-	ModelInfo.Location += ModelInfo.PostPivot;
-	for (INDEX i=0; i<ModelInfo.NumFPolys; i++)
-		{
-		ModelInfo.FPolys[i].Transform(Coords,&ModelInfo.PrePivot,&ModelInfo.Location,Orientation);
-		};
-	ModelInfo.Location -= ModelInfo.PostPivot;
-	//
-	Unlock(&ModelInfo);
-	UNGUARD("UModel::Transform");
-	};
+
+	Location += PostPivot;
+	for( INDEX i=0; i<Polys->Num; i++ )
+		Polys(i).Transform( Coords, &PrePivot, &Location, Orientation	);
+
+	Location -= PostPivot;
+	Unlock(LOCK_Trans);
+	unguard;
+}
 
 //
 // Set a brush's absolute pivot location, without affecting the brush's
@@ -816,68 +491,100 @@ void UModel::Transform()
 // Assumes that brush location and rotation are in their desired positions
 // and that any desired snaps have already been applied to it.
 //
-void UModel::SetPivotPoint (FVector *PivotLocation,int SnapPivotToGrid)
-	{
-	GUARD;
-	FModelCoords	Coords,Uncoords;
-	FVector			NewPrePivot;
-	//
-	GTrans->NoteResHeader (this);
-	//
-	BuildCoords(&Coords,&Uncoords);
-	//
-	NewPrePivot  = *PivotLocation - (Location + PostPivot);
-	NewPrePivot.TransformVector (Uncoords.PointXform);
-	PrePivot += NewPrePivot;
-	//
-	Location = *PivotLocation;
-	if (GEditor) GEditor->constraintApply(NULL,NULL,&Location,&Rotation,&GEditor->Constraints);
-	//
-	if (SnapPivotToGrid) PostPivot = GMath.ZeroVector;
-	else PostPivot = *PivotLocation - Location;
-	UNGUARD("UModel::SetPivotPoint");
-	};
+void UModel::SetPivotPoint( FVector *PivotLocation, int SnapPivotToGrid )
+{
+	guard(UModel::SetPivotPoint);
 
-void UModel::CopyPosRotScaleFrom(UModel *OtherModel)
-	{
-	GUARD;
-	//
+	FModelCoords Coords,Uncoords;
+	BuildCoords(&Coords,&Uncoords);
+
+	if( GTrans )
+		GTrans->NoteResHeader (this);
+
+	PrePivot += (*PivotLocation - Location - PostPivot).TransformVectorBy(Uncoords.PointXform);
+	Location  = *PivotLocation;
+
+	if( GEditor )
+		GEditor->constraintApply(NULL,NULL,&Location,&Rotation,&GEditor->Constraints);
+
+	if( SnapPivotToGrid )
+		PostPivot = GMath.ZeroVector;
+	else
+		PostPivot = *PivotLocation - Location;
+	
+	unguard;
+}
+
+//
+// Copy position, rotation, and scale from another model.
+//
+void UModel::CopyPosRotScaleFrom( UModel *OtherModel )
+{
+	guard(UModel::CopyPosRotScaleFrom);
+
 	Location	= OtherModel->Location;
 	Rotation	= OtherModel->Rotation;
 	PrePivot	= OtherModel->PrePivot;
 	Scale		= OtherModel->Scale;
 	PostPivot	= OtherModel->PostPivot;
 	PostScale	= OtherModel->PostScale;
-	//
+
 	BuildBound(0);
 	BuildBound(1);
-	//
-	UNGUARD("UModel::CopyPosRotScaleFrom");
-	};
+
+	unguard;
+}
 
 /*---------------------------------------------------------------------------------------
-	IModel basic implementation (not including physics).
+	UModel basic implementation (not including physics).
 ---------------------------------------------------------------------------------------*/
 
 //
-// Empty the contents of a model
+// Empty the contents of a model.
 //
-void IModel::Empty(int EmptyPolyInfo)
+void UModel::EmptyModel( int EmptySurfInfo, int EmptyPolys )
+{
+	guard(UModel::Empty);
+
+	Nodes->Empty();
+	Nodes->NumZones	= 0;
+	
+	Verts->Empty(); // First 4 shared sides are view frustrum edges.
+	Verts->NumSharedSides = 4;
+
+	Bounds->Empty();
+	LeafHulls->Empty();
+
+	if( EmptyPolys )
+		Polys->Empty();
+
+	if( EmptySurfInfo )
 	{
-	NumBspNodes		= 0;
-	NumVertPool		= 0;
-	NumBounds		= 0;
-	NumZones		= 0;
-	NumSharedSides	= 4; // First 4 shared sides are view frustrum edges
-	NumUniquePlanes	= 0;
-	//
-	if (EmptyPolyInfo)
-		{
-		NumVectors		= 0;
-		NumPoints		= 0;
-		NumBspSurfs		= 0;
-		};
-	};
+		Vectors->Empty();
+		Points->Empty();
+		Surfs->Empty();
+	}
+	unguard;
+}
+
+//
+// Shrink all stuff to its minimum size.
+//
+void UModel::ShrinkModel()
+{
+	guard(UModel::ShrinkModel);
+
+	if( Vectors   ) Vectors  ->Shrink();
+	if( Points    ) Points   ->Shrink();
+	if( Nodes     ) Nodes    ->Shrink();
+	if( Surfs     ) Surfs    ->Shrink();
+	if( Verts     ) Verts    ->Shrink();
+	if( Polys     ) Polys    ->Shrink();
+	if( Bounds    ) Bounds   ->Shrink();
+	if( LeafHulls ) LeafHulls->Shrink();
+
+	unguard;
+}
 
 /*---------------------------------------------------------------------------------------
 	The End.

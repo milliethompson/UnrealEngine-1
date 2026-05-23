@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnCamMgr.cpp: Unreal camera manager, generic implementation
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -11,24 +11,26 @@
 #include "Unreal.h"
 
 /*-----------------------------------------------------------------------------
-	FCameraManager generic implementation.
+	FCameraManagerBase generic implementation.
 -----------------------------------------------------------------------------*/
 
 //
 // Redraw all cameras looking at the level.
 //
-void FCameraManager::RedrawLevel(ULevel *Level)
+void FCameraManagerBase::RedrawLevel( ULevel *Level )
 {
-	guard(FCameraManager::RedrawLevel);
+	guard(FCameraManagerBase::RedrawLevel);
 
 	for( int i=0; i<CameraArray->Num; i++ )
 	{
 		UCamera *Camera = CameraArray->Element(i);
-	    if( (Camera->Level == Level) &&
-	     	(!Camera->OnHold) &&
-			Camera->SXR && Camera->SYR )
+	    if
+		(	(Camera->Level == Level)
+	    &&	(!Camera->OnHold)
+		&&	(Camera->X)
+		&&	(Camera->Y) )
 		{
-			Camera->Draw(0);
+			Camera->Draw( 0 );
 		}
 	}
 	unguard;
@@ -37,15 +39,15 @@ void FCameraManager::RedrawLevel(ULevel *Level)
 //
 // Close all cameras that are child windows of a specified window.
 //
-void FCameraManager::CloseWindowChildren(DWORD ParentWindow)
+void FCameraManagerBase::CloseWindowChildren( DWORD ParentWindow )
 {
-	guard(FCameraManager::CloseWindowChildren);
+	guard(FCameraManagerBase::CloseWindowChildren);
 
 	char TempName[NAME_SIZE];
 	for( int i=CameraArray->Num-1; i>=0; i-- )
 	{
 		UCamera *Camera = CameraArray->Element(i);
-		strcpy (TempName,Camera->Name); strupr(TempName);
+		strcpy (TempName,Camera->GetName()); strupr(TempName);
 
 		if( (ParentWindow==0) ||
 			(Camera->ParentWindow==ParentWindow) ||
@@ -59,37 +61,32 @@ void FCameraManager::CloseWindowChildren(DWORD ParentWindow)
 }
 
 /*-----------------------------------------------------------------------------
-	Globals to reconcile actors and cameras after loading or 
-	creating a new level.
+	Reconciling actors and cameras after loading or creating a new level.
 -----------------------------------------------------------------------------*/
 
 //
 // Update all actor Camera references in the world based on the Cameras
 // controlling them.
 //
-void FCameraManager::UpdateActorUsers()
+void FCameraManagerBase::UpdateActorUsers()
 {
-	guard(FCameraManager::UpdateActorUsers);
+	guard(FCameraManagerBase::UpdateActorUsers);
 	int i;
 
 	// Dissociate all Cameras and cameras from all actors.
-	for (i=0; i<GServer.Levels->Num; i++)
-	{
-		GServer.Levels->Element(i)->DissociateActors();
-	}
+	if( GServer.GetLevel() )
+		GServer.GetLevel()->DissociateActors();
 
 	// Hook all cameras up to their corresponding actors.
-	for (i=0; i<GCameraManager->CameraArray->Num; i++)
+	for( i=0; i<GCameraManager->CameraArray->Num; i++ )
 	{
-		UCamera *Camera = GCameraManager->CameraArray->Element(i);
-		APawn	*Actor  = (APawn *)&Camera->Level->ActorList->Element(Camera->iActor);
-		
-		if( !Actor->Class || !Actor->IsKindOf("Pawn"))
+		UCamera *Camera = GCameraManager->CameraArray->Element(i);		
+		if( !Camera->Actor || !Camera->Actor->GetClass() || !Camera->Actor->IsA("Pawn") )
 		{
-			debugf (LOG_Ed,"Bad actor association");
+			debugf( LOG_Problem, "Bad actor association" );
 			Camera->Kill();
 		}
-		else Actor->Camera = Camera;
+		else Camera->Actor->Camera = Camera;
 	}
 	unguard;
 }

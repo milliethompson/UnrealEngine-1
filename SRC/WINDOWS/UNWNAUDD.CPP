@@ -29,35 +29,49 @@ static char THIS_FILE[] = __FILE__;
 
 /********************************* VARIABLES ****************************/
 
-	/* NONE */
-
 /********************************* FUNCTIONS ****************************/
 
 /////////////////////////////////////////////////////////////////////////////
 // CDialogAudio dialog
 
-
 CDialogAudio::CDialogAudio(CWnd* pParent /*=NULL*/)
 	: CDialog(CDialogAudio::IDD, pParent)
 {
 	//{{AFX_DATA_INIT(CDialogAudio)
-//	SampleRate = -1;
+	SampleRate = 22050;
 	UseDirectSound = FALSE;
 	EnableFilter = FALSE;
+	Enable16Bit = TRUE;
+	MuteSound = FALSE;
+	MuteMusic = FALSE;
 	//}}AFX_DATA_INIT
 }
 
-
 void CDialogAudio::DoDataExchange(CDataExchange* pDX)
 {
+	BOOL	rate11, rate22, rate44;
+
+	if (SampleRate == 11025)	rate11 = TRUE;
+	if (SampleRate == 22050)	rate22 = TRUE;
+	if (SampleRate == 44100)	rate44 = TRUE;
+
 	CDialog::DoDataExchange(pDX);
 	//{{AFX_DATA_MAP(CDialogAudio)
 	DDX_Control(pDX, IDC_SOUND_VOLUME, SoundVolume);
 	DDX_Control(pDX, IDC_MUSIC_VOLUME, MusicVolume);
-//	DDX_CBIndex(pDX, IDC_SAMPLE_RATE_LIST, SampleRate);
+	DDX_Check(pDX, IDC_SFX_DISABLE, MuteSound);
+	DDX_Check(pDX, IDC_MUSIC_DISABLE, MuteMusic);
+	DDX_Check(pDX, IDC_RATE11KHZ, rate11);
+	DDX_Check(pDX, IDC_RATE22KHZ, rate22);
+	DDX_Check(pDX, IDC_RATE44KHZ, rate44);
 	DDX_Check(pDX, IDC_USE_DIRECT_SOUND, UseDirectSound);
 	DDX_Check(pDX, IDC_ENABLE_FILTER, EnableFilter);
+	DDX_Check(pDX, IDC_ENABLE_16BIT, Enable16Bit);
 	//}}AFX_DATA_MAP
+
+	if (rate11)	SampleRate = 11025;
+	if (rate22)	SampleRate = 22050;
+	if (rate44)	SampleRate = 44100;
 }
 
 
@@ -81,12 +95,16 @@ BOOL CDialogAudio::OnInitDialog()
     SoundVolume.SetPos( GAudio.SfxVolumeGet() );
     MusicVolume.SetRange(0,MAX_MUSIC_VOLUME);
     MusicVolume.SetPos( GAudio.MusicVolumeGet() );
+    MuteMusic = FALSE;
+    if (GAudio.MusicVolumeGet() < 1)
+		MuteMusic = TRUE;
+    MuteSound = FALSE;
+    if (GAudio.SfxVolumeGet() < 1)
+		MuteSound = TRUE;
     UseDirectSound = GAudio.DirectSoundFlagGet() != 0 ? TRUE : FALSE;
     EnableFilter = GAudio.FilterFlagGet() != 0 ? TRUE : FALSE;
-
-//todo: Set sampling rate
-//  SamplingRate.??? GAudio.MixingRateGet()
-
+    Enable16Bit = GAudio.Use16BitFlagGet() != 0 ? TRUE : FALSE;
+    SampleRate = GAudio.MixingRateGet();
     UpdateData(FALSE);
     return FALSE; // FALSE tells Windows not to set the input focus. 
                   // We do this because the dialog is expected to be part
@@ -114,17 +132,22 @@ BOOL CDialogAudio::Accept()
 {
     BOOL Accepted = TRUE; // We always accept the input (it cannot be wrong).
     UpdateData(TRUE);
-    GAudio.MusicVolumeSet( MusicVolume.GetPos() );
     GAudio.SfxVolumeSet( SoundVolume.GetPos() );
+    if (MuteSound)
+		GAudio.SfxVolumeSet(0);
+    GAudio.MusicVolumeSet( MusicVolume.GetPos() );
+    if (MuteMusic)
+		GAudio.MusicVolumeSet(0);
     GAudio.DirectSoundFlagSet( UseDirectSound );
     GAudio.FilterFlagSet( EnableFilter );
+    GAudio.Use16BitFlagSet( Enable16Bit );
+    GAudio.MixingRateSet (SampleRate);
 
-// todo:  Set mixing rate
-//    GAudio.MixingRateSet( SampleRate );
+    /* Restart the audio system. */
+    GAudio.Restart();
 
     return Accepted;
 }
-
 
 void CDialogAudio::PostNcDestroy() 
 {

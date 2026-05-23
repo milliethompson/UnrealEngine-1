@@ -1,0 +1,200 @@
+'
+' Mover.
+'
+
+DeclareClass Name=Brush
+DeclareClass Name=Mover
+
+Begin Class Name=Brush
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// The brush class.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class Brush expands Actor
+	intrinsic
+	package(UnEngine);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Brush
+   End DefaultProperties
+End Class
+
+Begin Class Name=Mover
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// The moving brush class.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class Mover expands Brush
+	intrinsic
+	package(UnGame);
+
+// How the mover should react when it bumps into an actor.
+var() enum EMoverBumpType
+{
+	MB_StopWhenBump,		// Stop when we hit an actor.
+	MB_ReturnWhenBump,		// Return to previous position when we hit an actor.
+   	MB_CrushWhenBump		// Crush the poor helpless actor.
+} MoverBumpType;
+
+// How the mover should respond to Trigger/UnTrigger/Touch/UnTouch.
+var() enum EMoverTriggerType
+{
+	MT_None,				// No automatic control.
+	MT_TriggerOpenTimed,	// Open then close when triggered.
+	MT_TriggerToggle,		// Toggle when triggered.
+	MT_TriggerControl,		// Trigger=open, UnTrigger=close.
+	MT_TriggerCycleOn,		// ??
+	MT_TriggerCycleOff,		// ??
+	MT_TriggerInstant,		// ??
+	MT_ProximityOpenTimed,	// Open timed when player gets near.
+	MT_ProximityControl,	// Open when player gets near, close when far.
+	MT_StandOpenTimed,		// Open when player stands on it.
+} MoverTriggerType;
+
+// How the mover moves from one position to the other.
+var() enum EMoverGlideType
+{
+	MV_MoveByTime,			// Move linearly.
+	MV_GlideByTime,			// Move with smooth acceleration.
+	MV_Sinusoid				// Move in sinusoid pattern.
+} MoverGlideType;
+
+//-----------------------------------------------------------------------------
+// Keyframes.
+var const byte   PrevKeyNum;       // If moving, the previous keyframe.
+var() const byte KeyNum;           // Current or destination keyframe.
+var() const byte WorldRaytraceKey; // Raytrace the world with the brush here.
+var() const byte BrushRaytraceKey; // Raytrace the brush here.
+
+//-----------------------------------------------------------------------------
+// Movement parameters.
+var() float      MoveTime;         // Time to spend moving between keyframes.
+var() float      StayOpenTime;     // How long to remain open before closing.
+var() float      BumpPlayerDamage; // How much to damage player if we bump him.
+var() rotation   FreeRotation;     // For freely rotating brushes.
+
+//-----------------------------------------------------------------------------
+// Mover flags.
+var() bool       bInterruptable;   // Do multiple triggers interrupt movement?
+var() bool       bSlave;           // This brush is a slave to its event.
+var() bool       bTrigger;         // This brush acts as a trigger.
+var bool         bMoving;          // Currently moving.
+var bool         bReverseWhenDone; // Reverse when finished moving.
+var bool         bTriggerOnceOnly; // Go dormant after first trigger.
+
+//-----------------------------------------------------------------------------
+// Audio.
+var() sound      OpenSound;        // When hit full-open position.
+var() sound      ClosedSound;      // When hit full-closed position.
+var() sound      MoveAmbientSound; // Ambient sound when moving.
+
+//-----------------------------------------------------------------------------
+// Array of 4 keyframe position offsets.
+var vector       KeyPos[4];
+var rotation     KeyRot[4];
+
+//-----------------------------------------------------------------------------
+// Base absolute location and rotation.
+var const Actor    Slaves[16];        // List of actors standing on this brush.
+var const vector   BasePos, OldPos;   // For interpolating movement.
+var const rotation BaseRot, OldRot;   // For interpolating movement.
+var const float    CurTime, HoldTime; // Internal.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Mover
+		Begin Brush Name=MoverDefaultBrush
+		 Settings  CSG=0 Flags=64 PolyFlags=0 Color=0
+		 Location  +00208.000000,-00384.000000,+00000.000000
+		 PrePivot  +00000.000000,+00000.000000,+00000.000000
+		 PostPivot +00000.000000,+00000.000000,+00000.000000
+		 Scale     X=+00001.000000 Y=+00001.000000 Z=+00001.000000 S=+00000.000000 AXIS=5
+		 PostScale X=+00001.000000 Y=+00001.000000 Z=+00001.000000 S=+00000.000000 AXIS=5
+		 Rotation  0,0,0
+		 Begin PolyList Num=6 Max=6
+			Begin Polygon Group=RECT Item=OUTSIDE Link=0
+			   Origin   -00016.000000,-00064.000000,+00128.000000
+			   Normal   +00000.000000,+00000.000000,+00001.000000
+			   TextureU +00000.000000,+00001.000000,+00000.000000
+			   TextureV -00001.000000,+00000.000000,+00000.000000
+			   Vertex   -00016.000000,-00064.000000,+00128.000000
+			   Vertex   +00016.000000,-00064.000000,+00128.000000
+			   Vertex   +00016.000000,+00064.000000,+00128.000000
+			   Vertex   -00016.000000,+00064.000000,+00128.000000
+			End Polygon
+			Begin Polygon Group=RECT Item=OUTSIDE Link=1
+			   Origin   -00016.000000,+00064.000000,-00128.000000
+			   Normal   +00000.000000,+00000.000000,-00001.000000
+			   TextureU +00000.000000,-00001.000000,+00000.000000
+			   TextureV -00001.000000,+00000.000000,+00000.000000
+			   Vertex   -00016.000000,+00064.000000,-00128.000000
+			   Vertex   +00016.000000,+00064.000000,-00128.000000
+			   Vertex   +00016.000000,-00064.000000,-00128.000000
+			   Vertex   -00016.000000,-00064.000000,-00128.000000
+			End Polygon
+			Begin Polygon Group=RECT Item=OUTSIDE Link=2
+			   Origin   -00016.000000,+00064.000000,-00128.000000
+			   Normal   +00000.000000,+00001.000000,+00000.000000
+			   TextureU +00001.000000,+00000.000000,+00000.000000
+			   TextureV +00000.000000,+00000.000000,-00001.000000
+			   Vertex   -00016.000000,+00064.000000,-00128.000000
+			   Vertex   -00016.000000,+00064.000000,+00128.000000
+			   Vertex   +00016.000000,+00064.000000,+00128.000000
+			   Vertex   +00016.000000,+00064.000000,-00128.000000
+			End Polygon
+			Begin Polygon Group=RECT Item=OUTSIDE Link=3
+			   Origin   +00016.000000,-00064.000000,-00128.000000
+			   Normal   +00000.000000,-00001.000000,+00000.000000
+			   TextureU -00001.000000,+00000.000000,+00000.000000
+			   TextureV +00000.000000,+00000.000000,-00001.000000
+			   Vertex   +00016.000000,-00064.000000,-00128.000000
+			   Vertex   +00016.000000,-00064.000000,+00128.000000
+			   Vertex   -00016.000000,-00064.000000,+00128.000000
+			   Vertex   -00016.000000,-00064.000000,-00128.000000
+			End Polygon
+			Begin Polygon Group=RECT Item=OUTSIDE Link=4
+			   Origin   +00016.000000,+00064.000000,-00128.000000
+			   Normal   +00001.000000,+00000.000000,+00000.000000
+			   TextureU +00000.000000,-00001.000000,+00000.000000
+			   TextureV +00000.000000,+00000.000000,-00001.000000
+			   Vertex   +00016.000000,+00064.000000,-00128.000000
+			   Vertex   +00016.000000,+00064.000000,+00128.000000
+			   Vertex   +00016.000000,-00064.000000,+00128.000000
+			   Vertex   +00016.000000,-00064.000000,-00128.000000
+			End Polygon
+			Begin Polygon Group=RECT Item=OUTSIDE Link=5
+			   Origin   -00016.000000,-00064.000000,-00128.000000
+			   Normal   -00001.000000,+00000.000000,+00000.000000
+			   TextureU +00000.000000,+00001.000000,+00000.000000
+			   TextureV +00000.000000,+00000.000000,-00001.000000
+			   Vertex   -00016.000000,-00064.000000,-00128.000000
+			   Vertex   -00016.000000,-00064.000000,+00128.000000
+			   Vertex   -00016.000000,+00064.000000,+00128.000000
+			   Vertex   -00016.000000,+00064.000000,-00128.000000
+			End Polygon
+		 End PolyList
+		End Brush
+	  Brush=MoverDefaultBrush
+      CollisionRadius=+000160.000000
+      CollisionHeight=+000160.000000
+      bCollideActors=True
+	  bCanInterruptMove=True
+	  MoveTime=1.0
+	  DrawType=3
+	  StayOpenTime=4.0
+	  MoverBumpType=1
+	  MoverTriggerType=7
+	  MoverGlideType=1
+      KeyName(0)=None
+      KeyName(1)=None
+      KeyName(2)=None
+      KeyName(3)=None
+	  DefaultEdCategory=Mover
+	  Physics=PHYS_Interpolating
+   End DefaultProperties
+End Class

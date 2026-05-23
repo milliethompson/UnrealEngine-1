@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnEdCnst.cpp: Functions related to movement constraints
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	What's happening: When the Visual Basic level editor is being used,
@@ -32,113 +32,122 @@
 // Returns 1 if snapped to a vertex.
 // Returns -1 if brush location is invalid, i.e. partially off map. Not implemented.
 //
-int FGlobalEditor::constraintApply(IModel *LevelModelInfo, IModel *BrushInfo,
-	FVector *Location, FRotation *Rotation,FConstraints *Constraints)
-	{
+int FGlobalEditor::constraintApply
+(
+	UModel			*LevelModel, 
+	UModel			*Brush,
+	FVector			*Location, 
+	FRotation		*Rotation,
+	FConstraints	*Constraints
+)
+{
+	guard(FGlobalEditor::constraintApply);
+
 	FVector  SourcePoint;
 	FVector	 DestPoint;
 	INDEX	 Temp;
-	int		 Snapped	= 0;
-	//
-	GUARD;
-	if ((Constraints->RotGridEnabled) && Rotation)
-		{
+	int		 Snapped = 0;
+
+	if( Constraints->RotGridEnabled && Rotation )
+	{
 		*Rotation = Rotation->GridSnap(Constraints->RotGrid);
-		};
-	if ((LevelModelInfo != NULL) && (BrushInfo != NULL) && (Constraints->SnapVertex))
+	}
+	if( LevelModel && Brush && Constraints->SnapVertex )
+	{
+		SourcePoint = *Location + Brush->PostPivot;
+		if( LevelModel->FindNearestVertex
+			(SourcePoint,DestPoint,Constraints->SnapDist,Temp) >= 0.0)
 		{
-		SourcePoint = *Location + BrushInfo->PostPivot;
-		if (LevelModelInfo->FindNearestVertex (SourcePoint,DestPoint,Constraints->SnapDist,Temp) >= 0.0)
-			{
-			*Location = DestPoint - BrushInfo->PostPivot;
+			*Location = DestPoint - Brush->PostPivot;
 			Snapped   = 1;
-			};
-		};
-	if ((Constraints->GridEnabled) && (!Snapped))
-		{
+		}
+	}
+	if( Constraints->GridEnabled && !Snapped )
+	{
 		*Location = Location->GridSnap(Constraints->Grid);
-		};
+	}
 	return Snapped;
-	UNGUARD("FGlobalEditor::constraintApply");
-	};
-
-void constrainSimplePoint(FVector *Location,FConstraints *Constraints)
-	{
-	GUARD;
-	if (Constraints->GridEnabled) *Location = Location->GridSnap(Constraints->Grid);
-	UNGUARD("constrainSimplePoint");
-	};
+	unguard;
+}
 
 //
-// Finish snapping a brush
+// Constrain to grid only.
 //
-void FGlobalEditor::constraintFinishSnap(ILevel *LevelInfo,UModel *Brush)
+void constrainSimplePoint
+(
+	FVector			*Location,
+	FConstraints	*Constraints 
+)
+{
+	guard(constrainSimplePoint);
+
+	if( Constraints->GridEnabled )
+		*Location = Location->GridSnap(Constraints->Grid);
+
+	unguard;
+}
+
+//
+// Finish snapping a brush.
+//
+void FGlobalEditor::constraintFinishSnap(ULevel *Level,UModel *Brush)
+{
+	guard(FGlobalEditor::constraintFinishSnap);
+	if( Brush->ModelFlags & MF_ShouldSnap )
 	{
-	GUARD;
-	IModel BrushInfo;
-	//
-	if (Brush->ModelFlags & MF_ShouldSnap) // Snap it
-		{
-		Brush->Lock(&BrushInfo,LOCK_Trans);
-		constraintApply (&LevelInfo->ModelInfo,&BrushInfo,&BrushInfo.Location,&BrushInfo.Rotation,&Constraints);
-		Brush->Unlock(&BrushInfo);
+		Brush->Lock(LOCK_Trans);
+		constraintApply(Level->Model,Brush,&Brush->Location,&Brush->Rotation,&Constraints);
+		Brush->Unlock(LOCK_Trans);
 		Brush->ModelFlags &= ~MF_ShouldSnap;
-		};
-	UNGUARD("FGlobalEditor::constraintFinishSnap");
-	};
+	}
+	unguard;
+}
 
 //
 // Finish snapping all brushes in a level
 //
-void FGlobalEditor::constraintFinishAllSnaps(ULevel *Level)
+void FGlobalEditor::constraintFinishAllSnaps( ULevel *Level )
+{
+	guard(FGlobalEditor::constraintFinishAllSnaps);
+
+	Level->Lock(LOCK_Trans);
+
+	//	Constrain active brush.
+	UModel *Brush = Level->BrushArray->Element(0);
+
+	Brush->Lock   		(LOCK_Trans);
+	constraintApply 	(Level->Model,Brush,&Brush->Location,&Brush->Rotation,&Constraints);
+	Brush->Unlock 		(LOCK_Trans);
+
+	// Constrain level brushes.
+	if( MapEdit )
 	{
-	GUARD;
-	//
-	IModel		BrushInfo;
-	ILevel		LevelInfo;
-	UModel			*Brush;
-	int 			i,n;
-	//
-	Level->Lock (&LevelInfo,LOCK_Trans);
-	//
-	//	Constrain active brush:
-	// 
-	Brush = LevelInfo.BrushArray->Element(0);
-	//
-	Brush->Lock   		(&BrushInfo,LOCK_Trans);
-	constraintApply 	(&LevelInfo.ModelInfo,&BrushInfo,&BrushInfo.Location,&BrushInfo.Rotation,&Constraints);
-	Brush->Unlock 		(&BrushInfo);
-	//
-	// Constrain level brushes:
-	//
-	if (MapEdit)
+		int n = Level->BrushArray->Num;
+		for( int i=1; i<n; i++ )
 		{
-		n = LevelInfo.BrushArray->Num;
-		for (i=1; i<n; i++)
-			{
-			constraintFinishSnap(&LevelInfo,LevelInfo.BrushArray->Element(i));
-			};
-		};
-	Level->Unlock(&LevelInfo);
-	UNGUARD("FGlobalEditor::constraintFinishAllSnaps");
-	};
+			constraintFinishSnap(Level,Level->BrushArray->Element(i));
+		}
+	}
+	Level->Unlock(LOCK_Trans);
+	unguard;
+}
 
 void FGlobalEditor::constraintInit(FConstraints *Const)
-	{
-	GUARD;
-	mymemset (Const,0,sizeof (FConstraints));
-	//
+{
+	guard(FGlobalEditor::constraintInit);
+	memset (Const,0,sizeof (FConstraints));
+
 	Const->Grid					= GMath.ZeroVector;
 	Const->GridBase				= GMath.ZeroVector;
 	Const->RotGrid				= GMath.ZeroRotation;
 	Const->SnapDist				= 0.0;
-	//
+
 	Const->Flags				= 0;
 	Const->GridEnabled			= 0;
 	Const->RotGridEnabled		= 0;
 	Const->SnapVertex			= 1;
-	UNGUARD("FGlobalEditor::constraintInit");
-	};
+	unguard;
+}
 
 /*------------------------------------------------------------------------------
 	The end

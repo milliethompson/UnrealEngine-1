@@ -1,4 +1,5 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{248DD890-BB45-11CF-9ABC-0080C7E7B78D}#1.0#0"; "MSWINSCK.OCX"
 Begin VB.Form GateListener 
    BorderStyle     =   4  'Fixed ToolWindow
    Caption         =   "GateServer Listener"
@@ -6,34 +7,30 @@ Begin VB.Form GateListener
    ClientLeft      =   1740
    ClientTop       =   930
    ClientWidth     =   4845
-   Height          =   2010
    Icon            =   "GateLstn.frx":0000
-   Left            =   1680
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1650
    ScaleWidth      =   4845
    ShowInTaskbar   =   0   'False
-   Top             =   630
-   Width           =   4965
+   Begin MSWinsockLib.Winsock TcpListener 
+      Left            =   1560
+      Top             =   840
+      _ExtentX        =   741
+      _ExtentY        =   741
+   End
    Begin VB.Timer Timer 
       Enabled         =   0   'False
       Interval        =   1000
       Left            =   900
       Top             =   60
    End
-   Begin WINSOCKLib.TCP TcpListener 
-      Left            =   60
-      Top             =   60
-      _ExtentX        =   635
-      _ExtentY        =   635
-      RemoteHost      =   ""
-      RemotePort      =   0
-      LocalPort       =   0
-   End
 End
 Attribute VB_Name = "GateListener"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' GateLstn.frm: Gatekeeper server TCP listener socket
@@ -138,7 +135,7 @@ End Sub
 '
 ' TCP error event.  Indicates that WinSock returned an error.
 '
-Private Sub TcpListener_Error(Number As Integer, Description As String, Scode As Long, Source As String, HelpFile As String, HelpContext As Long, CancelDisplay As Boolean)
+Private Sub TcpListener_Error(ByVal Number As Integer, Description As String, ByVal Scode As Long, ByVal Source As String, ByVal HelpFile As String, ByVal HelpContext As Long, CancelDisplay As Boolean)
     Log.Log "CRITICAL: TcpListener_Error: " & Description
 End Sub
 

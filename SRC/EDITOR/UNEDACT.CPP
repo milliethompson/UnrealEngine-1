@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnEdAct.cpp: Unreal editor actor-related functions
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -13,212 +13,192 @@
 #pragma DISABLE_OPTIMIZATION /* Not performance-critical */
 
 /*-----------------------------------------------------------------------------
-   Editor actor movement functions
+   Editor actor movement functions.
 -----------------------------------------------------------------------------*/
 
 //
-// Move all selected actors *except* cameras.  No transaction tracking.
+// Move all selected actors except cameras.  
+// No transaction tracking.
 //
-void FGlobalEditor::edactMoveSelected (ILevel *Level, FVector *Delta, FFloatRotation *Rotation)
+void FGlobalEditor::edactMoveSelected
+(
+	ULevel		*Level, 
+	FVector		&Delta, 
+	FRotation	&Rotation
+)
+{
+	guard(FGlobalEditor::edactMoveSelected);
+	for( INDEX i=0; i<Level->Num; i++ )
 	{
-	GUARD;
-	AActor *Actor = &Level->Actors->Element(0);
-	for (INDEX i=0; i<Level->Actors->Max; i++)
+		AActor *Actor = Level->Element(i);
+		if( Actor && Actor->bSelected )
 		{
-		if (Actor->bSelected)
+			// Update actor's temporary dynamic lighting flags.
+			if( Delta != GMath.ZeroVector )
+				Actor->bDynamicLight = 1;
+			else
+				Actor->bLightChanged = 1;
+
+			// Update actor's location and rotation.
+			Actor->Location.AddBounded( Delta );
+			Actor->Rotation += Rotation;
+
+			if( Actor->IsMovingBrush() )
 			{
-			if( *Delta != GMath.ZeroVector ) Actor->bTempDynamicLight = 1;
-			else Actor->bTempLightChanged = 1;
-			//
-			Actor->Location.MoveBounded(*Delta);
-			Actor->DrawRot.Add(Rotation->Pitch,Rotation->Yaw,Rotation->Roll);
-			//
-			if (Actor->IsMovingBrush())	
-				{
-				//
 				// Update the moving brush.  Handles grid and rotgrid snapping of
 				// the brush as well as updating keyframe position info.
-				//
-				Actor->UpdateBrushPosition(Level,i,1);
-				};
-			};
-		Actor++;
-		};
-	UNGUARD("edactMoveSelected");
-	};
+				Actor->UpdateBrushPosition(Level,1);
+			}
+		}
+	}
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-   Actor adding/deleting functions
+   Actor adding/deleting functions.
 -----------------------------------------------------------------------------*/
 
 //
-// Delete all selected actors.  Transaction-tracked.
+// Delete all selected actors.
 //
-void FGlobalEditor::edactDeleteSelected (ILevel *Level)
+void FGlobalEditor::edactDeleteSelected( ULevel *Level )
+{
+	guard(FGlobalEditor::edactDeleteSelected);
+
+	for( INDEX i=0; i<Level->Num; i++ )
 	{
-	GUARD;
-	AActor *Actor = &Level->Actors->Element(0);
-	for (INDEX i=0; i<Level->Actors->Max; i++)
-		{
-		if (Actor->Class && Actor->bSelected)
-			{
-			Level->DestroyActor(i);
-			};
-		Actor++;
-		};
-	UNGUARD("edactDeleteSelected");
-	};
+		AActor *Actor = Level->Element(i);
+		if( Actor && Actor->bSelected )
+			Level->DestroyActor( Actor );
+	}
+	unguard;
+}
 
 //
 // Duplicate all selected actors and select just the duplicated set.
-// Transaction-tracked.
 //
-void FGlobalEditor::edactDuplicateSelected (ILevel *Level)
+void FGlobalEditor::edactDuplicateSelected( ULevel *Level )
+{
+	guard(FGlobalEditor::edactDuplicateSelected);
+	FVector Delta(32.0, 32.0, 0.0);
+
+	// Untag all actors.
+	for( int i=0; i<Level->Num; i++ )
+		if( Level->Element(i) )
+			Level->Element(i)->bTempEditor = 0;
+
+	// Duplicate and deselect all actors.
+	for( i=0; i<Level->Num; i++ )
 	{
-	GUARD;
-	AActor		*Actor,*NewActor;
-	FVector		Delta = {32.0,32.0,0.0};
-	INDEX		i,n;
-	//
-	// Tag all actors as non-current, no need to transaction track:
-	//
-	Actor = &Level->Actors->Element(0);
-	for (i=0; i<Level->Actors->Max; i++) (Actor++)->bTempEditor=0;
-	//
-	// Duplicate and deselect all actors:
-	//
-	Actor = &Level->Actors->Element(0);
-	for (i=0; i<Level->Actors->Max; i++)
+		AActor *Actor = Level->Element(i);
+		if( Actor && Actor->bSelected && !Actor->bTempEditor )
 		{
-		if (Actor->bSelected)
-			{
-			GTrans->NoteActor (Level->Actors,i);
-			Actor->bSelected = 0;
-			//
 			FVector NewLocation = Actor->Location + Delta;
-			n 					= Level->SpawnActor(Actor->Class,Actor->Name,&NewLocation);
-			NewActor			= &Level->Actors->Element(n);
-			//
-			*NewActor = *Actor;
-			NewActor->Location    = NewLocation;
-			NewActor->bTempEditor = 1;
-			NewActor->iMe		  = n;
-			//
-			Level->UnlinkActor(n);
-			//
-			if (Actor->Brush)
-				{
-				NewActor->Brush = csgDuplicateBrush(Level->Level,Actor->Brush,0,0);
-				NewActor->UpdateBrushPosition(Level,i,1);
-				};
-			};
-		Actor++;
-		};
-	//
-	// Select all duplicated actors:
-	//
-	Actor = &Level->Actors->Element(0);
-	for (i=0; i<Level->Actors->Max; i++)
-		{
-		if (Actor->bTempEditor)
+			AActor *NewActor = Level->SpawnActor
+			(
+				Actor->GetClass(),
+				NULL,
+				Actor->GetFName(),
+				&NewLocation,
+				&Actor->Rotation,
+				Actor
+			);
+			if( NewActor )
 			{
-			GTrans->NoteActor (Level->Actors,i);
-			Actor->bTempEditor = 0;
-			Actor->bSelected   = 1;
-			};
-		Actor++;
-		};
-	UNGUARD("edactDuplicateSelected");
-	};
+				NewActor->Lock(LOCK_Trans);
+				if( NewActor->Brush )
+				{
+					NewActor->Brush = csgDuplicateBrush(Level,Actor->Brush,0,0,0,Actor->IsMovingBrush());
+					NewActor->UpdateBrushPosition(Level,1);
+				}
+				NewActor->bTempEditor = 1;
+				NewActor->Unlock(LOCK_Trans);
+			}
+			Actor->Lock(LOCK_Trans);
+			Actor->bSelected = 0;
+			Actor->Unlock(LOCK_Trans);
+		}
+	}
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-   Actor selection functions
+   Actor selection functions.
 -----------------------------------------------------------------------------*/
 
 //
-// Select all actors except cameras. Transaction-tracked.
+// Select all actors except cameras and hidden actors.
 //
-void FGlobalEditor::edactSelectAll (ILevel *Level)
+void FGlobalEditor::edactSelectAll( ULevel *Level )
+{
+	guard(FGlobalEditor::edactSelectAll);
+	for( INDEX i=0; i<Level->Num; i++ )
 	{
-	GUARD;
-	AActor *Actor = &Level->Actors->Element(0);
-	for (INDEX i=0; i<Level->Actors->Max; i++)
+		AActor *Actor = Level->Element(i);
+		if( Actor && !Actor->IsA("View") && !Actor->bSelected && !Actor->bHiddenEd )
 		{
-		if (!Actor->IsKindOf("Camera") && !Actor->bSelected && !Actor->bHiddenEd)
-			{
-			GTrans->NoteActor (Level->Actors,i);
+			Actor->Lock(LOCK_Trans);
 			Actor->bSelected=1;
-			};
-		Actor++;
-		};
-	UNGUARD("edactSelectAll");
-	};
+			Actor->Unlock(LOCK_Trans);
+		}
+	}
+	unguard;
+}
 
 //
-// Select all actors in a particular class. Transaction-tracked.
+// Select all actors in a particular class.
 //
-void FGlobalEditor::edactSelectOfClass (ILevel *Level,UClass *Class)
+void FGlobalEditor::edactSelectOfClass( ULevel *Level, UClass *Class )
+{
+	guard(FGlobalEditor::edactSelectOfClass);
+	for( INDEX i=0; i<Level->Num; i++ )
 	{
-	GUARD;
-	AActor *Actor = &Level->Actors->Element(0);
-	for (INDEX i=0; i<Level->Actors->Max; i++)
+		AActor *Actor = Level->Element(i);
+		if( Actor && Actor->GetClass()==Class && !Actor->IsA("View") && !Actor->bSelected )
 		{
-		if (Actor->Class==Class && !Actor->IsKindOf("Camera") && !Actor->bSelected)
-			{
-			GTrans->NoteActor (Level->Actors,i);
+			Actor->Lock(LOCK_Trans);
 			Actor->bSelected=1;
-			};
-		Actor++;
-		};
-	UNGUARD("edactSelectAll");
-	};
+			Actor->Unlock(LOCK_Trans);
+		}
+	}
+	unguard;
+}
 
 //
-// Select no actors. Transaction-tracked.
+// Select no actors.
 //
-void FGlobalEditor::edactSelectNone (ILevel *Level)
+void FGlobalEditor::edactSelectNone( ULevel *Level )
+{
+	guard(FGlobalEditor::edactSelectNone);
+	for( INDEX i=0; i<Level->Num; i++ )
 	{
-	AActor		*Actor;
-	//
-	GUARD;
-	Actor = &Level->Actors->Element(0);
-	for (INDEX i=0; i<Level->Actors->Max; i++)
+		AActor *Actor = Level->Element(i);
+		if( Actor && Actor->bSelected )
 		{
-		if (Actor->bSelected)
-			{
-			GTrans->NoteActor (Level->Actors,i);
+			Actor->Lock(LOCK_Trans);
 			Actor->bSelected = 0;
-			};
-		Actor++;
-		};
-	UNGUARD("edactSelectNone");
-	};
+			Actor->Unlock(LOCK_Trans);
+		}
+	}
+	unguard;
+}
 
 //
 // Delete all actors that are descendents of a class.
 //
-void FGlobalEditor::edactDeleteDependentsOf (ILevel *Level,UClass *Class)
+void FGlobalEditor::edactDeleteDependentsOf( ULevel *Level, UClass *Class )
+{
+	guard(FGlobalEditor::edactDeleteDependentsOf);
+
+	for( INDEX i=0; i<Level->Num; i++ )
 	{
-	AActor *Actor;
-	UClass *TestClass;
-	//
-	Actor = &Level->Actors->Element(0);
-	for (INDEX i=0; i<Level->Actors->Max; i++)
-		{
-		TestClass = Actor->Class;
-		while (TestClass)
-			{
-			if (Class==TestClass)
-				{
-				Level->DestroyActor(i);
-				break;
-				};
-			TestClass = TestClass->ParentClass;
-			};
-		Actor++;
-		};
-	};
+		AActor *Actor = Level->Element(i);
+		if( Actor && Actor->IsA(Class) )
+			Level->DestroyActor( Actor );
+	}
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-   Actor selection functions
+   The End.
 -----------------------------------------------------------------------------*/

@@ -1,7 +1,7 @@
 /*=============================================================================
-	UnLevel.h: Standard Unreal resource definitions
+	UnLevel.h: ULevel definition.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -15,217 +15,221 @@
 #define _INC_UNLEVEL
 
 /*-----------------------------------------------------------------------------
-	ELevelState.
+	ULevel object.
 -----------------------------------------------------------------------------*/
 
 //
-// What's happening with a level.
+// The level object.  Contains the level's actor list, Bsp information, and brush list.
 //
-enum ELevelState
+class UNENGINE_API ULevel : public UDatabase, public FOutputDevice
 {
-	LEVEL_Down    		= 0, 		// Level is down and unloaded, no players.
-	LEVEL_UpPlay 		= 1, 		// Level is up and running.
-	LEVEL_UpEdit 		= 2, 		// Level is up for one-player editing.
-	LEVEL_UpDemo		= 3,		// Up for demo.
-	LEVEL_MAX			= 4,
-};
+	DECLARE_DB_CLASS(ULevel,UDatabase,AActor*,NAME_Level,NAME_UnEngine)
 
-/*-----------------------------------------------------------------------------
-	ULevel resource.
------------------------------------------------------------------------------*/
+	// Identification.
+	enum {BaseFlags = CLASS_Intrinsic};
+	enum {GUID1=0,GUID2=0,GUID3=0,GUID4=0};
 
-//
-// The level resource.  Contains the level's actor list, Bsp information, and brush list.
-//
-class UNREAL_API ULevel : public UResource
-{
-	RESOURCE_CLASS(ULevel,BYTE,RES_Level)
+	// Number of blocks of descriptive text to allocate with levels.
+	enum {NUM_LEVEL_TEXT_BLOCKS=16};
+
+	// Main variables, always valid.
+	UModel*					Model;
+	TArray<UModel*>::Ptr	BrushArray;
+	TArray<UObject*>::Ptr	Misc;
+	UReachSpecs::Ptr		ReachSpecs;
+	UTextBuffer::Ptr		TextBlocks[NUM_LEVEL_TEXT_BLOCKS];
+
+	// Only valid in memory.
+	FCollisionHash			Hash;
+	AActor					*FirstDeleted;
+	ALevelInfo				*Info;
+
+	// UObject interface.
+	const char *Import      (const char *Buffer, const char *BufferEnd,const char *FileType);
+	const char *ImportActors(const char *Buffer, const char *BufferEnd,const char *FileType);
+	void Export      (FOutputDevice &Out,const char *FileType,int Indent);
+	void ExportActors(FOutputDevice &Out,const char *FileType,int Indent);
+	void PreKill();
+	void PostLoadHeader(DWORD PostFlags)
+	{
+		guard(ULevel::PostLoadHeader);
+
+		// Postload parent.
+		UDatabase::PostLoadHeader( PostFlags );
+
+		// Init level state if loading.
+		if( PostFlags & POSTLOAD_File )
+			State = LEVEL_Down;
+
+		// Init collision.
+		Hash.CollisionInitialized = 0;
+
+		unguard;
+	}
+	void InitHeader()
+	{
+		guard(ULevel::InitHeader);
+
+		// Init parent.
+		UDatabase::InitHeader();
+
+		// Init object header to defaults.
+		State			= LEVEL_Down;
+		BrushArray		= (TArray<UModel*>   *)NULL;
+		Model           = (UModel            *)NULL;
+		Misc			= (TArray<UObject*>  *)NULL;
+		ReachSpecs		= (UReachSpecs       *)NULL;
+
+		// Clear all text blocks.
+		for( int i=0; i<NUM_LEVEL_TEXT_BLOCKS; i++ )
+			TextBlocks[i]=(UTextBuffer *)NULL;
+
+		// Init in-memory info.
+		Hash.CollisionInitialized = 0;
+		FirstDeleted              = NULL;
+
+		unguard;
+	}
+	void SerializeHeader(FArchive &Ar)
+	{
+		guard(ULevel::SerializeHeader);
+
+		// UDatabase.
+		UDatabase::SerializeHeader(Ar);
+
+		// ULevel.
+		Ar << AR_OBJECT(Model) << AR_OBJECT(BrushArray) << AR_OBJECT(Misc);
+		Ar << ReachSpecs;
+
+		for( int i=0; i<NUM_LEVEL_TEXT_BLOCKS; i++ )
+			Ar << TextBlocks[i];
+
+		unguard;
+	}
+	void PostLoadData(DWORD PostFlags)
+	{
+		guard(ULevel::PostLoadData);
+		UDatabase::PostLoadData(PostFlags);
+		for( int i=Num; i<Max; i++ )
+			Element(i)=NULL;
+		unguard;
+	}
+	void SerializeData( FArchive &Ar )
+	{
+		int i=-1;
+		guard(ULevel::SerializeData);
+		UDatabase::Lock(LOCK_ReadWrite);
+		for( i=0; i<Num; i++ )
+			Ar << Element(i);
+		UDatabase::Unlock(LOCK_ReadWrite);
+		unguardf(("(%s %s: %i/%i)",this?GetClassName():"NULL",this?GetName():"NULL",i,Num));
+	}
+
+	// FOutputDevice interface.
+	void Write(const void *Data, int Length, ELogType MsgType=LOG_None);
+
+	// ULevel interface, always valid.
+	ULevel						(int InMax, int Editable, int RootOutside);
+	int     Lock 				(DWORD LockType);
+	void	Unlock 				(DWORD OldLockType);
+	void	EmptyLevel			();
+	void	SetState			(ELevelState State);
+	void	Tick				(int CamerasOnly, AActor *ActiveActor,FLOAT DeltaSeconds);
+	ELevelState GetState		() {return State;}
+	void	ReconcileActors		(int Remembered);
+	void	RememberActors		();
+	void	DissociateActors	();
+	int		Exec				(const char *Cmd,FOutputDevice *Out=GApp);
+	void	PlayerExec			(AActor *Actor,const char *Cmd,FOutputDevice *Out=GApp);
+	void	ShrinkLevel			();
+	void	ModifyAllItems		();
+
+	// Actor-related functions, valid only when locked.
+	void	SendEx				(FName Message, PMessageParms *Parms, AActor *Actor=NULL, FName TagName=NAME_None, UClass *Class=NULL);
+	int		TestMoveActor		(AActor *Actor, FVector &Start, FVector &End);
+	int		RotateActor			(AActor *Actor, FRotation &DestRotation, int Test=0);
+	int		MoveActor			(AActor *Actor, FVector *Delta, FCheckResult &Hit, int Test=0);
+	int		FarMoveActor		(AActor *Actor, FVector *DestLocation, int Test=0);
+	int		DropToFloor			(AActor *Actor);
+	int     DestroyActor		(AActor *Actor);
+	void    CleanupDestroyed    ();
+	int		PossessActor		(APawn *Actor, UCamera *Camera);
+	UCamera*UnpossessActor		(APawn *Actor);
+	AActor* SpawnActor			(UClass *Class, AActor *Owner=NULL, FName ActorName=NAME_None, const FVector *Location=NULL, const FRotation *Rotation=NULL, AActor *Template=NULL);
+	AView*  SpawnViewActor      (UCamera *Camera,FName MatchName,AActor *Template);
+	int		SpawnPlayActor		(UCamera *Camera);
+	void    SetActorZone        (AActor *Actor, BOOL bForceRefresh=0);
+	void	Trace               (FCheckResult &Hit, AActor *SourceActor, const FVector &End, const FVector &Start, BOOL TraceActors);
+
+	// Collision.
+	void InitCollision()
+	{
+		guard(ULevel::InitCollision);
+		checkState(!IsLocked());
+
+		// Init the hash table.
+		Hash.Init();
+
+		// Init all actor collision pointers.
+		for( int i=0; i<Num; i++ )
+			if( Element(i) )
+				Element(i)->Hash = NULL;
+
+		// Add all actors.
+		for( i=0; i<Num; i++ )
+			if( Element(i) && Element(i)->bCollideActors )
+				Hash.AddActor( Element(i) );
+		
+		unguard;
+	}
+
+	// Accessors.
+	UModel *Brush()
+	{
+		guardSlow(ULevel::Brush);
+		return BrushArray->Element(0);
+		unguardSlow;
+	}
+
+	INDEX GetActorIndex( AActor *Actor )
+	{
+		guard(ULevel::GetActorIndex);
+		for( int i=0; i<Num; i++ )
+			if( Element(i) == Actor )
+				return i;
+		appErrorf( "Actor not found: %s %s", Actor->GetClassName(), Actor->GetName() );
+		return INDEX_NONE;
+		unguard;
+	}
+	ALevelInfo *GetLevelInfo()
+	{
+		guardSlow(ULevel::GetLevelInfo);
+		checkState(Element(0)!=NULL);
+		checkState(Element(0)->IsA("LevelInfo"));
+		return (ALevelInfo*)Element(0);
+		unguardSlow;
+	}
+	AZoneInfo *GetZoneActor( INT iZone )
+	{
+		guardSlow(ULevel::GetZoneActor);
+		return Model->Nodes->Zones[iZone].ZoneActor ? Model->Nodes->Zones[iZone].ZoneActor : GetLevelInfo();
+		unguardSlow;
+	}
 
 private:
-	ELevelState		State;
-
-public:
-	enum {NUM_LEVEL_TEXT_BLOCKS=16}; // Number of blocks of descriptive text to allocate with levels.
-
-	PBeginPlay			PlayInfo;
-	UModel				*Model;
-	UActorList			*ActorList;
-	TArray<UPlayer>		*PlayerList;
-	TArray<UModel>		*BrushArray;
-	TArray<UResource>	*Misc;
-	UTextBuffer			*TextBlocks[NUM_LEVEL_TEXT_BLOCKS];
-
-	// UResource interface.
-	void Register				(FResourceType *Type);
-	void InitHeader				();
-	const char *Import			(const char *Buffer, const char *BufferEnd,const char *FileType);
-	char *Export				(char *Buffer,const char *FileType,int Indent);
-	void QueryHeaderReferences	(FResourceCallback &Callback);
-	void QueryDataReferences	(FResourceCallback &Callback);
-	void Flip					();
-
-	// ULevel interface.
-	ULevel			(int Editable);
-	void	Lock 	(class ILevel *LevelInfo, int LockType);
-	void	Unlock 	(class ILevel *LevelInfo);
-	void	Empty 	();
-	void	KillAll	();
-	void	SetState(ELevelState State,class PBeginPlay *PlayInfo);
-	void	Tick	(int CamerasOnly, INDEX iActiveActor);
-	void	PreReconcileActors();
-	ELevelState GetState();
-	void	ReconcileActors (int Remembered);
-	void	RememberActors();
-	void	DissociateActors();
-	int		Exec(const char *Cmd,FOutputDevice *Out=GApp);
+	// Private.
+	ELevelState				State;
+	int PlaceActor(AActor *Actor, FVector *DestLocation);
+	int		MyBoxPointCheck
+								(
+								FCheckResult	&Result,
+								AActor			*Owner,
+								const FVector   &Point,
+								FLOAT           Radius,
+								FLOAT           Height,
+								DWORD           ExtraNodeFlags
+								); //FIXME - temporary, remove
 };
-
-/*-----------------------------------------------------------------------------
-	Level dynamics
------------------------------------------------------------------------------*/
-
-//
-// A generic dynamic item that can be added to the Bsp.  Subclassed
-// by dynamic actor item and dynamic rendering item structures.
-//
-class UNREAL_API FBspDynamicItem
-{
-public:
-	INDEX iNext;
-};
-
-//
-// An actor reference stored at a Bsp node.  Used for actor-to-actor 
-// collision during server level processing.
-//
-class UNREAL_API FBspDynamicActor : public FBspDynamicItem
-{
-public:
-	INDEX iActor;
-};
-
-//
-// Generic class for handling dynamic items added to the Bsp.  Subclassed by 
-// the server for actor-actor collision, and by the rendering engine for 
-// dynamic objects.
-//
-class UNREAL_API FBspDynamicsTracker
-{
-public:
-
-	// Variables; only valid when locked.
-	INT				Locked;			// =1 if locked.
-	INT				Overflowed;		// =1 if overflowed during Lock session.
-	FMemPool		*Mem;			// Memory pool used for adding dynamics references.
-	IModel			*Model;			// Model being worked on.
-	ILevel			*Level;			// Level being worked on.
-	DWORD			*AlteredNodes;	// One bit for each Bsp node indicating that it was altered.
-	INDEX			NumDynamics;	// Number of dynamics already active.
-	INDEX			MaxDynamics;	// How many dynamics objects can be active at a time.
-	FBspDynamicItem	**Dynamics;		// Pointers to all dynamics, up to MaxDynamics.
-	FBspDynamicItem	*TempItem;		// Used for callbacks.
-	INT				TempItemSize;	// Size of TempItem (may be a child class).
-	INT				AlterSize;		// Number of DWORD's in AlteredNodes.
-	VOID			*MemStart;		// Start of memory at Lock() time.
-
-	// Functions.
-	void Lock		(FMemPool *MemPool, ILevel *Level,int MaxDynamics);
-	void Unlock		();
-	void Add		(INDEX iNode,FBspDynamicItem *Item, int AddToBack);
-	void AddSphere	(FBspDynamicItem *ItemTemplate, int ItemSize, FVector &Location, FLOAT Radius);
-};
-
-//
-// Class for tracking all actors stored dynamically in a Bsp.
-//
-class UNREAL_API FBspActorTracker : public FBspDynamicsTracker
-{
-public:
-	enum {MAX_COLLISION_ACTORS=512};
-	INDEX TempActors[MAX_COLLISION_ACTORS];
-	int	TempNum;
-
-	void AddAllActors(ILevel *Level);
-	void AddActorSphere(INDEX iActor);
-	int CheckActorTouch(FVector &Location, FLOAT Radius, INDEX *TouchedActors, int MaxTouchedActors);
-};
-
-/*-----------------------------------------------------------------------------
-	ILevel.
------------------------------------------------------------------------------*/
-
-//
-// Information structure for a locked level.  This contains essentially the
-// same information as the ULevel resource, but in a format that's easier and
-// faster to manipulate.
-//
-class UNREAL_API ILevel
-{
-public:
-
-	// Variables.
-	ELevelState		State;
-	ULevel			*Level;
-	UModel			*Model;
-	UActorList		*Actors;
-	UModel			*Brush;
-	TArray<UModel>	*BrushArray;
-	TArray<UPlayer>	*PlayerList;
-
-	IModel				ModelInfo;
-	FBspActorTracker	Dynamics;
-	ALevelDescriptor	*Descriptor;
-
-	// Actor-related functions.
-	int		SendMessage			(INDEX iActor,FName Message,void *Params,UClass *Class=NULL);
-	int		SendMessageDirect	(INDEX iActor,FName Message,void *Params);
-	int		SendMessageEx		(FName Message,void *Params,INDEX iActor=INDEX_NONE,FName TagName=NAME_NONE,UClass *Class=NULL);
-	int		SendMessageReverse	(INDEX iActor,FName Message,void *Params,UClass *Class=NULL);
-	int		BroadcastMessage	(FName Message,void *Params);
-	int		MoveActor			(INDEX iActor,FVector *Delta);
-	int		FarMoveActor		(INDEX iActor, FVector *DestLocation);
-	void	DestroyActor		(INDEX iActor);
-	void	UnlinkActor			(INDEX iActor);
-	int		PossessActor		(INDEX iActor, UCamera *Camera);
-	UCamera *UnpossessActor		(INDEX iActor);
-	INDEX	SpawnActor			(UClass *Class, FName ActorName,const FVector *Location=NULL,AActor *Template=NULL);
-	INDEX	SpawnCameraActor	(UCamera *Camera,FName MatchName);
-	INDEX	SpawnPlayActor		(UCamera *Camera);
-
-	void	BeginTouch(INDEX iActor,INDEX iTouchActor);
-	void	EndTouch(INDEX iActor,INDEX iTouchActor);
-
-	int		RayHit(INDEX iActorSource, const FVector *Location, const FVector *Direction,
-				FLOAT Momentum, FLOAT ConeRadiusFactor, class PHit *HitMessageTemplate,int Notify,
-				FVector *HitLocation, FVector *HitNormal, INDEX *iHitNode);
-	void	RadialHit(INDEX iActorSource, FVector *Location, FLOAT Radius, FLOAT Momentum,
-				class PHit *HitMessageTemplate, int Notify);
-	AZoneDescriptor *GetZoneDescriptor(int iZone);
-	int		GetActorZone(INDEX iActor);
-	void	SetActorZone(INDEX iActor);
-	FVector GetZoneVelocity(INDEX iActor);
-	FVector GetZoneGravityAcceleration(INDEX iActor);
-
-	// Private. Do not call for normal actor AI.
-	int		PrivateTestMoveActor(INDEX iActor,FVector *NewLocation,FVector *Delta,FVector *Adjustment,DWORD *BumpMask);
-	int		PrivateNearMoveActor(INDEX iActor,FVector *Delta,DWORD *BumpMask);
-};
-
-/*-----------------------------------------------------------------------------
-	Globals.
------------------------------------------------------------------------------*/
-
-// Texture level state descriptions.
-UNREAL_API extern const char *GLevelStateDescr[LEVEL_MAX];
-
-// Set TRUE to cause level to be restarted at next end of "tick" processing.
-UNREAL_API extern BOOL GRestartLevelAfterTick;
-
-// Set to a level name to go to at next end of "tick" processing.
-UNREAL_API extern char GJumpToLevelAfterTick[64];
-
-// Global level pointer, available during level Tick processing.
-extern UNREAL_API ILevel * GLevel;
 
 /*-----------------------------------------------------------------------------
 	The End.

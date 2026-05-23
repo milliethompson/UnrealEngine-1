@@ -1,0 +1,283 @@
+'
+' Triggers
+'
+DeclareClass Name=Triggers
+DeclareClass Name=Trigger
+DeclareClass Name=Counter
+DeclareClass Name=Dispatcher
+
+Begin Class Name=Triggers
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// The parent class of all triggers and built-in event generators.
+//=============================================================================
+class Triggers expands Actor
+	abstract
+	package(UnEngine);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Triggers
+      CollisionRadius=+0040.000000
+      CollisionHeight=+0040.000000
+	  bEventSource=True
+      bHidden=True
+      bCollideActors=True
+	  DefaultEdCategory=Trigger
+	  Physics=PHYS_None
+   End DefaultProperties
+End Class
+
+Begin Class Name=Trigger
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Trigger: senses things happening in its proximity and generates 
+// sends Trigger/UnTrigger to actors whose names match 'EventName'.
+//=============================================================================
+class Trigger expands Triggers
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// Trigger variables.
+
+// Trigger type.
+var() enum ETriggerType
+{
+	TT_PlayerProximity,	// Trigger is activated by player proximity.
+	TT_AnyProximity,    // Trigger is activated by any actor in proximity.
+	TT_Shoot,		    // Trigger is activated by player shooting it.
+} TriggerType;
+
+// Human readable triggering message.
+var() string[80] Message;
+
+// Only trigger once and then go dormant.
+var() bool bTriggerOnceOnly;
+
+//=============================================================================
+// Trigger logic.
+
+//
+// See whether the other actor is relevant to this trigger.
+//
+final function bool IsRelevant( actor Other )
+{
+	switch( TriggerType )
+	{
+		case TT_PlayerProximity:
+			return Pawn(Other)!=None && Pawn(Other).bIsPlayer;
+		case TT_AnyProximity:
+			return true;
+		case TT_Shoot:
+			return Projectile(Other)!=None;
+	}
+}
+
+//
+// Called when something touches the trigger.
+//
+function Touch( actor Other )
+{
+	if( IsRelevant( Other ) )
+	{
+		if( Event != NoName )
+			// Broadcast the Trigger message to all matching actors.
+			Broadcast( Event ).Trigger( Other );
+
+		if( Message != "" )
+			// Send a string message to the toucher.
+			Other.Instigator.Message( Message );
+
+		if( bTriggerOnceOnly )
+			// Ignore future touches.
+			SetCollision(False);
+	}
+}
+
+//
+// When something untouches the trigger.
+//
+function UnTouch( actor Other )
+{
+	if( IsRelevant( Other ) )
+	{
+		if( Event != NoName )
+			// Untrigger all matching actors.
+			Broadcast( Event ).UnTrigger( Other );
+	}
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Trigger
+      CollisionRadius=+0040.000000
+      CollisionHeight=+0040.000000
+	  bEventSource=True
+      bHidden=True
+      bCollideActors=True
+	  bTriggerOnceOnly=False
+   End DefaultProperties
+End Class
+
+Begin Class Name=Counter
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Counter: waits until it has been triggered 'NumToCount' times, and then
+// it sends Trigger/UnTrigger events to actors whose names match 'EventName'.
+//=============================================================================
+class Counter expands Triggers
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// Counter variables.
+
+var() byte       NumToCount;       // Number to count down from.
+var() bool       bShowMessage;     // Display count message?
+var() string[80] CountMessage;     // Human readable count message.
+var() string[80] CompleteMessage;  // Completion message.
+var   byte       OriginalNum;      // Number to count at startup time.
+
+//-----------------------------------------------------------------------------
+// Counter functions.
+
+//
+// Init for play.
+//
+function BeginPlay()
+{
+	OriginalNum = NumToCount;
+}
+
+//
+// Reset the counter.
+//
+function Reset()
+{
+	NumToCount = OriginalNum;
+}
+
+//
+// Counter was triggered.
+//
+function Trigger( actor Other )
+{
+	local string[255] S;
+	local string[8] Num;
+	local int i;
+
+	log("Counter triggered " $ NumToCount);	
+
+	if( NumToCount > 0 )
+	{
+		if( --NumToCount == 0 )
+		{
+			// Trigger all matching actors.
+			if( bShowMessage && CompleteMessage != "" )
+				Other.Instigator.Message(CompleteMessage);
+			if( Event != NoName )
+				Broadcast( Event ).UnTrigger( Other );
+		}
+		else if( bShowMessage && CountMessage != "" )
+		{
+			// Still counting down.
+			switch( NumToCount )
+			{
+				case 1:  Num="one"; break;
+				case 2:  Num="two"; break;
+				case 3:  Num="three"; break;
+				case 4:  Num="four"; break;
+				case 5:  Num="five"; break;
+				case 6:  Num="six"; break;
+				default: Num=string(NumToCount); break;
+			}
+			S = CountMessage;
+			while( InStr(S, "%i") >= 0 )
+			{
+				i = InStr(S, "%i");
+				S = Left(S,i) $ Num $ Mid(S,i+2);
+			}
+			Other.Instigator.Message(S);
+		}
+	}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Counter
+      CollisionRadius=+0040.000000
+      CollisionHeight=+0040.000000
+	  bEventSource=True
+      bHidden=True
+      bCollideActors=True
+	  NumToCount=2
+	  DefaultEdCategory=Counter
+	  CountMessage="Only %i more to go..."
+	  CompleteMessage="Completed!"
+	  bShowMessage=True
+   End DefaultProperties
+End Class
+
+Begin Class Name=Dispatcher
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Dispatcher: receives one trigger (corresponding to its name) as input, 
+// then triggers a set of specifid events with optional delays.
+//=============================================================================
+class Dispatcher expands Triggers
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// Dispatcher variables.
+var() name  OutEvents[8]; // Events to generate.
+var() float OutDelays[8]; // Relative delays before generating events.
+
+var int i;       // Internal counter.
+var actor Other; // Actor who activated this dispatcher.
+
+//=============================================================================
+// Dispatcher logic.
+
+//
+// When dispatcher is triggered...
+//
+function Trigger( actor InOther )
+{
+	Other = InOther;
+	gotostate(Dispatch);
+}
+
+//
+// Dispatch events.
+//
+state Dispatch
+{
+Begin:
+	disable(Trigger);
+	for( i=0; i<ArrayCount(OutEvents); i++ )
+	{
+		if( OutEvents[i] != NoName )
+		{
+			Broadcast(OutEvents[i]).Trigger(Other);
+			Sleep(OutDelays[i]);
+		}
+	}
+	enable(Trigger);
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Dispatcher
+      CollisionRadius=+0040.000000
+      CollisionHeight=+0040.000000
+	  bEventSource=True
+      bHidden=True
+      bCollideActors=True
+	  DefaultEdCategory=Dispatcher
+   End DefaultProperties
+End Class

@@ -1,97 +1,54 @@
 /*=============================================================================
 	UnActors.cpp: Main actor DLL file
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
 		* Created by Tim Sweeney
 =============================================================================*/
 
-#define  _COMPILING_UNGAME	/* Read UnActDll.h for explanation */
+#include "Unreal.h"
 #include "UnGame.h"
 #include "UnCon.h"
-#include "UnRandom.h"
-#include "UnFActor.h"
-
-//
-// The global game object:
-//
-UNGAME_API FGame GGame;
-UNGAME_API FGameBase *GGamePtr=&GGame;
 
 /*-----------------------------------------------------------------------------
-	Game init and exit
+	Game init and exit.
 -----------------------------------------------------------------------------*/
 
 //
 // Initialized all global game info.  Called once per run.
 //
 void FGame::Init()
-	{
-	GUARD;
-	//
-	/////////////////////////////
-	// Required initialization //
-	/////////////////////////////
-	//
-	// Register all built-in messages as global names
-	//
-	ActorMessages = new("ActorMessages",CREATE_Unique)UEnum(1024);
-	GRes.AddToRoot(ActorMessages);
-	//
-	FName Name;
-	#define  REGISTER_MESSAGE(num,msg) \
-		Name.AddHardcoded(num,#msg); \
-		ActorMessages->Add(ACTOR_##msg);
-	#include "UnMsgs.h"
-	#undef   REGISTER_MSG
-	//
-	debug(LOG_Init,GAME_DLL " initialized");
-	//
-	//////////////////////////////////
-	// Game-specific initialization //
-	//////////////////////////////////
-	//
-	// (None is needed here)
-	//
-	UNGUARD("FGame::Init");
-	};
+{
+	guard(FGame::Init);
+	debug( LOG_Init, "Game DLL initialized" );
+	unguard;
+}
 
 //
 // Check state of game info.
 // Called between Init() and Exit().
 //
 void FGame::CheckState()
-	{
-	//
-	// Make sure built-in and generated structures match up properly:
-	//
-    if( sizeof(AActor) != sizeof(FActor) )
-        {
-        appError( "Size mismatch: AActor and FActor" );
-        }
-	};
+{
+	guard(FGame::CheckState);
+	// Insert state checks here.
+	unguard;
+}
 
 //
-// Shut down and deallocate all game-specific stuff
+// Shut down and deallocate all game-specific stuff.
 //
 void FGame::Exit()
-	{
-	GUARD;
-	//
-	// Delete all actor messages:
-	//
-	GRes.RemoveFromRoot(ActorMessages);
-	ActorMessages->Kill();
-	//
-	debug(LOG_Exit,GAME_DLL " shut down");
-	//
-	UNGUARD("FGame::Exit");
-	};
+{
+	guard(FGame::Exit);
+	debug( LOG_Exit, "Game DLL shut down" );
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Creating and destroying camera consoles
+	Creating and destroying camera consoles.
 -----------------------------------------------------------------------------*/
 
 //
@@ -99,40 +56,49 @@ void FGame::Exit()
 // includes a status bar, text console, and whatever other stuff is desired.
 //
 class FCameraConsoleBase *FGame::CreateCameraConsole(UCamera *Camera)
-	{
-	GUARD;
-	//
+{
+	guard(FGame::CreateCameraConsole);
+
 	FCameraConsole *Result = new FCameraConsole;
 	Result->Old = new FCameraConsole;
 	return Result;
-	//
-	UNGUARD("FGame::CreateCameraConsole");
-	};
+
+	unguard;
+}
 
 //
 // Destroy a camera console.
 //
 void FGame::DestroyCameraConsole(class FCameraConsoleBase *Console)
-	{
-	GUARD;
-	//
+{
+	guard(FGame::DestroyCameraConsole);
+
 	delete ((FCameraConsole *)Console)->Old;
 	delete Console;
-	//
-	UNGUARD("FGame::DestroyCameraConsole");
-	};
+
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Game command line
+	Game command line.
 -----------------------------------------------------------------------------*/
 
 int FGame::Exec(const char *Cmd,FOutputDevice *Out)
-	{
-	GUARD;
-	return 0; // Not executed
-	UNGUARD("FGame::Exec");
-	};
+{
+	guard(FGame::Exec);
+	
+	// Place any command line execution code here.
+	return 0;
+	unguard;
+};
 
 /*-----------------------------------------------------------------------------
-	The End
+	Instantiation.
+-----------------------------------------------------------------------------*/
+
+UNGAME_API FGame		GGame;
+UNGAME_API FGameBase	*GGamePtr = &GGame;
+
+/*-----------------------------------------------------------------------------
+	The End.
 -----------------------------------------------------------------------------*/

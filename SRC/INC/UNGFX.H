@@ -1,5 +1,5 @@
 /*=============================================================================
-	UnGfx.h: Graphics functions
+	UnGfx.h: Graphics functions.
 
 	Copyright 1995 Epic MegaGames, Inc.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
@@ -8,7 +8,7 @@
 		* Created by Tim Sweeney
 =============================================================================*/
 
-#ifndef _INC_UNGFX // Prevent header from being included multiple times
+#ifndef _INC_UNGFX // Prevent header from being included multiple times.
 #define _INC_UNGFX
 
 /*------------------------------------------------------------------------------------
@@ -46,7 +46,6 @@ enum {MAX_COLORS=64};
 #define SelectBorderColor		GGfx.Colors[27]
 #define SemiSolidWireColor		GGfx.Colors[28]
 #define NonSolidWireColor       GGfx.Colors[30]
-#define NormalFontColor         GGfx.Colors[31]
 #define WireBackground			GGfx.Colors[32]
 #define WireGridAxis			GGfx.Colors[35]
 #define ActorArrowColor			GGfx.Colors[36]
@@ -54,6 +53,7 @@ enum {MAX_COLORS=64};
 #define ScaleBoxHiColor			GGfx.Colors[38]
 #define ZoneWireColor			GGfx.Colors[39]
 #define MoverColor				GGfx.Colors[40]
+#define OrthoBackground			GGfx.Colors[41]
 
 //
 // Standard colors.
@@ -83,10 +83,9 @@ enum EStandardColors
 //
 // Graphics globals.
 //
-class UNREAL_API FGlobalGfx
+class UNENGINE_API FGlobalGfx
 {
 public:
-
 	// Parameters.
 	DWORD	DefaultCameraFlags;	// Camera-show flags when opening a new camera.
 	DWORD	DefaultRendMap;		// Camera map rendering flags when opening a new camera.
@@ -94,77 +93,56 @@ public:
 	// Standard colors.
 	BYTE Colors[MAX_COLORS];
 
-	// Resources.
-	UArray		*Graphics;			// Graphics array resource.
-	UArray		*Tables;			// Stored/regenerated tables of textures & things.
-	UArray		*Luts;				// Lookup tables.
-	UTexture	*DefaultTexture;	// Default texture for untextured polygons.
-	UTexture	*BkgndTexture;		// Background texture for viewers.
-	UTexture	*BadTexture;		// Invalid texture picture.
-	UTexture	*Logo;				// Game logo.
-	UPalette	*DefaultPalette;	// Palette to use at startup.
-	UPalette	*GammaPalette;		// Gamma-corrected version of current palette.
-	UModel		*ArrowBrush;		// Brush that shows actor directions.
-	UModel		*RootHullBrush;		// Brush that encloses the world.
+	// Objects.
+	UArray*			Graphics;			// Graphics array object.
+	UArray*			Tables;				// Stored/regenerated tables of textures & things.
+	UArray*			Luts;				// Lookup tables.
 
-	UBuffer		*ShadeTable;		// 64K shade table.
-	UBuffer		*BlendTable;		// 64K blend table.
-	UBuffer		*HueTable;			// 24-bit color 256-entry hue table.
-	UBuffer		*SincTable;			// Pseudo 2D sinc interpolation table.
+	UTexture		*DefaultTexture;	// Default texture for untextured polygons.
+	UTexture		*BkgndTexture;		// Background texture for viewers.
+	UTexture		*BadTexture;		// Invalid texture picture.
 
-	UFont		*HugeFont;
-	UFont		*LargeFont;
-	UFont		*MedFont;
-	UFont		*SmallFont;
+	UModel			*ArrowBrush;		// Brush that shows actor directions.
+	UModel			*RootHullBrush;		// Brush that encloses the world.
 
-	UTexture	*MenuUp,*MenuDn;
-	UTexture	*CollOn,*CollOff;
-	UTexture	*PlyrOn,*PlyrOff;
-	UTexture	*LiteOn,*LiteOff;
+	UPalette::Ptr	DefaultPalette;		// Palette to use at startup.
+
+	UBuffer::Ptr	RemapTable;			// 64K shade table.
+	UBuffer::Ptr	BlendTable;			// 64K blend table.
+	UVectors::Ptr	HueTable;			// 24-bit color 256-entry hue table.
+	UFloats::Ptr	SincTable;			// Pseudo 2D sinc interpolation table.
+
+	UFont			*HugeFont;
+	UFont			*LargeFont;
+	UFont			*MedFont;
+	UFont			*SmallFont;
+
+	UTexture		*MenuUp,*MenuDn;
+	UTexture		*CollOn,*CollOff;
+	UTexture		*PlyrOn,*PlyrOff;
+	UTexture		*LiteOn,*LiteOff;
 
 	// Gamma correction parameters.
 	WORD	NumGammaLevels;
 	WORD	GammaLevel;
 
-	// Data.
-	BYTE	*ShadeData;				// 64K shade table.
-	BYTE	*Blender;				// 64K table for blending two colors.
-	FLOAT	*SincData;				// 2*4*256 byte pseudo 2D sinc interpolation table.
-	FVector	*HueData;				// 24-bit color hue table (floating point XYZ=RGB).
-
-	FColor *DefaultColors;
-	FColor *GammaColors;
-
 	// Effects/Postprocessing.
 	int Smooth;
 	int Stretch;
 
-	// Functions.
+	// Inlines.
+	BYTE Blend256(BYTE A, BYTE B) {return BlendTable(A+((INT)B<<8));}
+
+	// FGlobalGfx interface.
 	void Init();
 	void Exit();
-	void Cout(UTexture *DestTexture,int X, int Y, int XSpace, UFont *Font, int Color, char C,RAINBOW_PTR Palette);
+	void PreRender(UCamera *Camera);
+	void PostRender(UCamera *Camera);
 
-	void BurnRect(UTexture *Texture,int X1,int X2,int Y1,int Y2,int Bright);
-	void Clearscreen(ICamera *Camera,BYTE DefaultPalColor);
-	void GammaCorrectPalette (UPalette *DestPalette, UPalette *SourcePalette);
-	void SetPalette();
-	void FixPalette(UPalette *Palette);
-	UFont *MakeFontFromTexture (UTexture *Texture);
-
-	void StrLen(int *XL, int *YL, int XSpace, int YSpace, UFont *Font, const char *Text);
-	void WrappedStrLen(int *XL, int *YL, int XSpace, int YSpace, UFont *Font, int Width, const char *Text);
-	void VARARGS Printf(UTexture *DestTexture,int X, int Y, int XSpace, UFont *Font, int Color, const char *Fmt,...);
-	void VARARGS WrappedPrintf(UTexture *DestTexture,int X, int Y, int XSpace, int YSpace, UFont *Font, int Color, int Width, int Center, const char *Fmt,...);
-
-	void PreRender(ICamera *Camera);
-	void PostRender(ICamera *Camera);
-
-	void RGBtoHSV(FVector &Result,BYTE H,BYTE S,BYTE V,int CameraColorBytes);
-
+	// Private functions.
 private:
 	void LookupAllTables();
 	void LookupAllLuts();
-	int FGlobalGfx::ScanFontBox (UTexture *Texture,int X,int Y,int *XL,int *YL);
 };
 
 /*------------------------------------------------------------------------------------

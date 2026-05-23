@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnEdTran.h: Unreal transaction tracking system
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -16,11 +16,15 @@
 	UTransBuffer
 -----------------------------------------------------------------------------*/
 
-class UNEDITOR_API UTransBuffer : public UResource
+class UNEDITOR_API UTransBuffer : public UObject, public FTransactionTracker
 {
-	RESOURCE_CLASS(UTransBuffer,BYTE,RES_TransBuffer)
+	DECLARE_CLASS(UTransBuffer,UObject,NAME_TransBuffer,NAME_UnEditor)
 
-	INT		Locked;			// 1=locked.
+	// Identification.
+	enum {BaseFlags = CLASS_Intrinsic | CLASS_Transient};
+	enum {GUID1=0,GUID2=0,GUID3=0,GUID4=0};
+
+	// Variables.
 	INT		Overflow;		// 1 if active transaction overflowed data buffer.
 	INT		TransCount;		// Ever-increasing counter of maximum transaction.
 	INT		UndoTransCount; // Transaction count in undo/redo cycle.
@@ -36,42 +40,36 @@ class UNEDITOR_API UTransBuffer : public UResource
 	class FTransChangeLog	*ChangeLog;		// List of all modifications made in a transaction.
 	BYTE					*Buffer;		// Big raw data buffer.
 
-	// Resource functions.
-	void Register				(FResourceType *Type);
-	void InitHeader				();
-	void InitData				();
-	int  QuerySize				();
-	int  QueryMinSize			();
-	void QueryDataReferences	(FResourceCallback &Callback);
-	void Flip					();
+	// Constructor.
+	UTransBuffer(int MaxTrans,int MaxChanges,int MaxData);
 
-	// Custom functions.
-	virtual void Lock();
-	virtual void Unlock();
+	// UObject interface.
+	void InitHeader();
+	int  QuerySize();
+	int  QueryMinSize();
+	int  Lock(DWORD NewLockType);
+	void Unlock(DWORD OldLockType);
+	void SerializeData(FArchive &Ar);
+
+	// UTransBuffer interface.
 	virtual void Reset(const char *Action);
 	virtual void Begin(ULevel *Level, const char *SessionName);
 	virtual void End();
 	virtual void Rollback(ULevel *Level);
 	virtual void ForceOverflow(const char *Reason);
-	virtual int  CanUndo (char *Str);
-	virtual int  CanRedo (char *Str);
-	virtual int  Undo (ULevel *Level);
-	virtual int  Redo (ULevel *Level);
+	virtual int  CanUndo(char *Str);
+	virtual int  CanRedo(char *Str);
+	virtual int  Undo(ULevel *Level);
+	virtual int  Redo(ULevel *Level);
 	virtual void Continue();
-	virtual void NoteSingleChange (UResource *Res, int Index);
-	virtual void NoteBrushArray (TArray<UModel> *BrushArray);
-	virtual void NoteBspNode (IModel *ModelInfo,INDEX iNode);
-	virtual void NoteBspSurf (IModel *ModelInfo,INDEX iSurf,int UpdateMaster);
-	virtual void NoteSelectedBspSurfs (IModel *ModelInfo,int UpdateMasters);
-	virtual void NoteFPoly (IModel *ModelInfo,INDEX iSurf);
-	virtual void NoteActor (UActorList *Actors,INDEX iActor);
-	virtual void NoteResHeader (UResource *Res);
+	virtual void NoteResHeader(UObject *Res);
+	virtual void NoteSingleChange(UObject *Res, int Index);
 
 private:
 	void DeleteFirstTransaction();
 	void BeginChanges (class FTransaction *Trans);
 	void EndChanges (class FTransaction *Trans);
-	void RecursiveTransBspNode (IModel *ModelInfo,INDEX iNode);
+	void RecursiveTransBspNode (UModel *Model,INDEX iNode);
 	void ApplyChange (class FTransChangeLog *Change, BYTE *SourcePtr, DWORD DataSize);
 };
 
@@ -80,4 +78,3 @@ private:
 ----------------------------------------------------------------------------*/
 #endif // EDITOR
 #endif // _INC_UNEDTRAN
-

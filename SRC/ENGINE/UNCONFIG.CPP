@@ -1,7 +1,7 @@
 /*==============================================================================
 UnConfig.cpp: Unreal configuration processing
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0.
 
 Description:
@@ -25,8 +25,6 @@ Revision history:
 #include "UnConfig.h"
 #include "UnParse.h"
 #include "UnKeyVal.h"
-#include "UnInput.h"
-#include "UnAction.h"
 #include "UnPrefer.h"
 #include "UnChecks.h"
 #include "UnFGAud.h"
@@ -58,9 +56,9 @@ static inline void CDECL Debug(const char * Message, ...)
 //----------------------------------------------------------------------------
 void FConfiguration::Initialize() //tbd! this function!
 {
-    GUARD;
+    guard(FConfiguration::Initialize);
     InterpretValuesFromFile(FConfiguration::NoSection);
-    UNGUARD( "FConfiguration::Initialize" );
+    unguard;
 }
 
 //----------------------------------------------------------------------------
@@ -231,7 +229,7 @@ void FConfiguration::InterpretValue
 ,   const char *    Pair        // Text should be in this form: Key = Value
 )
 {
-    GUARD;
+    guard(FConfiguration::InterpretValue);
     const char * Text = Pair;
     if( FParse::StartsWith(Text,';') )
     {
@@ -256,7 +254,7 @@ void FConfiguration::InterpretValue
             debugf( LOG_Critical, "Error: %s", Pair );
         }
     }
-    UNGUARD( "FConfiguration::InterpretValue" );
+    unguard;
 }
 
 
@@ -270,7 +268,7 @@ void FConfiguration::InterpretValue
 ,   const char *    Value
 )
 {
-    GUARD;
+    guard(FConfiguration::InterpretValue);
     Debug( "InterpretValue(%s,%s,%s)", SectionName(Section), Key, Value );
     BOOL IsOkay = TRUE; // Set to false if unsuccessful.
     switch(Section)
@@ -305,7 +303,7 @@ void FConfiguration::InterpretValue
         }
         debugf( LOG_Critical, "Error: %s = %s", Key, Value );
     }
-    UNGUARD( "FConfiguration::InterpretValue" );
+    unguard;
 }
 
 //----------------------------------------------------------------------------
@@ -317,7 +315,7 @@ void FConfiguration::InterpretValuesFromFile
 ,   const char *    FileName        // 0 means use the default file name
 )
 {
-    GUARD;
+    guard(FConfiguration::InterpretValuesFromFile);
     CurrentFileName = FileName==0 ? GApp->DefaultProfileFileName() : FileName;
     CurrentLineNumber = 0;
     if( Section == 0 ) // Do all sections?
@@ -351,7 +349,7 @@ void FConfiguration::InterpretValuesFromFile
     }
     CurrentFileName   = 0;
     CurrentLineNumber = 0;
-    UNGUARD( "FConfiguration::InterpretValuesFromFile" );
+    unguard;
 }
 
 //----------------------------------------------------------------------------
@@ -380,7 +378,7 @@ void FConfiguration::WriteValuesToFile
 ,   const char *    FileName        // Write values into this file.
 )
 {
-    GUARD;
+    guard(FConfiguration::WriteValuesToFile);
     CurrentFileName = FileName==0 ? GApp->DefaultProfileFileName() : FileName;
     CurrentLineNumber = 0;
     if( Section == 0 ) // Do all sections?
@@ -405,5 +403,5 @@ void FConfiguration::WriteValuesToFile
     }
     CurrentFileName   = 0;
     CurrentLineNumber = 0;
-    UNGUARD( "FConfiguration::WriteValuesToFile" );
+    unguard;
 }

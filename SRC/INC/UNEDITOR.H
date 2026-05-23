@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnEditor.h: Main classes used by the Unreal editor
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -32,7 +32,7 @@ enum EEdScan
 	EDSCAN_BrushPoly,		// Index = Brush ID, A = poly index.
 	EDSCAN_BrushSide,       // Index = Brush ID, A = poly index, B = side index.
 	EDSCAN_BrushVertex,     // Index = Brush ID, A = poly index, B = vertex index.
-	EDSCAN_Actor,			// Index = actor index.
+	EDSCAN_Actor,			// Index = actor pointer.
 	EDSCAN_UIElement,		// Misc user interface elements, Index=element number.
 	EDSCAN_BrowserTex,		// Texture in texture browser.
 	EDSCAN_BrowserMesh,		// Mesh in mesh browser.
@@ -55,22 +55,22 @@ enum {EDSCAN_IGNORE=254}; // Ignores color 254 while scanning.
 class UNEDITOR_API FScan
 {
 public:
-	ICamera	*Camera;	// Remembered camera
-	int		Active;  	// 1 = actively scanning, 0=we are not scanning
-	int		X;			// Scan X location in screenspace (mouse click location)
-	int		Y;			// Scan Y location in screenspace
-	int		Type;		// Type of most recent hit, or SCAN_NONE if nothing found yet
-	int  	Index;		// Index of most recent hit
-	int  	A;			// PostScan A value of most recent hit
-	int  	B;			// PostScan B value of most recent hit
-	FVector	V;			// Any floating point vector that you want
-	DWORD	Pixels [1 + 2 * EDSCAN_RADIUS][1 + 2 * EDSCAN_RADIUS];  // PreScan pixel values
+	UCamera	*Camera;	// Remembered camera.
+	int		Active;  	// 1 = actively scanning, 0=we are not scanning.
+	int		X;			// Scan X location in screenspace (mouse click location).
+	int		Y;			// Scan Y location in screenspace.
+	int		Type;		// Type of most recent hit, or SCAN_NONE if nothing found yet.
+	int  	Index;		// Index of most recent hit.
+	int  	A;			// PostScan A value of most recent hit.
+	int  	B;			// PostScan B value of most recent hit.
+	FVector	V;			// Any floating point vector that you want.
+	DWORD	Pixels [1 + 2 * EDSCAN_RADIUS][1 + 2 * EDSCAN_RADIUS];  // PreScan pixel values.
 
 	// Functions.
-	virtual void Init		(ICamera *NewCamera);
+	virtual void Init		(UCamera *NewCamera);
 	virtual void Exit		();
 	virtual void PreScan  	();
-	virtual void PostScan 	(EEdScan ScanType, int Index, int A, int B, FVector *V);
+	virtual void PostScan 	(EEdScan ScanType, int Index, int A, int B, const FVector *V);
 };
 
 /*-----------------------------------------------------------------------------
@@ -188,32 +188,38 @@ enum EMapSetBrushFlags
 //
 enum ENodePlace 
 {
-	NODE_Back		= 0, // Node is in back of parent              -> Bsp[iParent].iBack
-	NODE_Front		= 1, // Node is in front of parent             -> Bsp[iParent].iFront
-	NODE_Plane		= 2, // Node is coplanar with parent           -> Bsp[iParent].iPlane
-	NODE_Root		= 3, // Node is the Bsp root and has no parent -> Bsp[0]
+	NODE_Back		= 0, // Node is in back of parent              -> Bsp[iParent].iBack.
+	NODE_Front		= 1, // Node is in front of parent             -> Bsp[iParent].iFront.
+	NODE_Plane		= 2, // Node is coplanar with parent           -> Bsp[iParent].iPlane.
+	NODE_Root		= 3, // Node is the Bsp root and has no parent -> Bsp[0].
 };
 
 /*-----------------------------------------------------------------------------
 	FGlobalEditor definition.
 -----------------------------------------------------------------------------*/
 
-typedef void (*POLY_CALLBACK)(IModel *ModelInfo, INDEX iSurf);
+typedef void (*POLY_CALLBACK)(UModel *Model, INDEX iSurf);
 
 //
-// The global Unreal editor
+// The global Unreal editor.
 //
 class UNEDITOR_API FGlobalEditor
 {
 public:
 
-	enum {MACRO_TEXT_REC_SIZE=80000}; // Default macro record-buffer size.
+	// Default macro record-buffer size.
+	enum {MACRO_TEXT_REC_SIZE=20000};
 
-	// Resources.
-	UArray			*EditorArray;
-	UModel			*TempModel;
-	UTexture		*CurrentTexture;
-	UClass			*AddClass;
+	// Object array, containing held texture 
+	// sets, classes, and meshmaps.
+	UArray::Ptr			EditorArray;
+
+	// Objects.
+	UModel				*TempModel;
+	UTexture			*CurrentTexture;
+	UClass				*CurrentClass;
+	TArray<UTextureSet*>*TextureSets;
+	ULinkerLoad			*ClassLinker;
 
 	// Toggles.
 	int 			Mode;
@@ -222,6 +228,8 @@ public:
 	int 			Show2DGrid;
 	int			    Show3DGrid;
 	int				FastRebuild;
+	int				Bootstrapping;
+	int				Pad[4];
 
 	FLOAT			MovementSpeed;
 	FConstraints	Constraints;
@@ -235,6 +243,8 @@ public:
 	virtual void	Exit();
 	virtual int		Exec(const char *Cmd,FOutputDevice *Out=GApp);
 	virtual void	NoteMacroCommand(const char *Cmd);
+	virtual void	LoadClasses();
+	virtual void	Cleanse(FOutputDevice& Out,int Redraw,const char *TransReset=NULL);
 
 	// Editor mode virtuals from UnEdCam.cpp.
 	virtual void	edcamSetMode			(int Mode);
@@ -242,48 +252,48 @@ public:
 	virtual int		edcamModeClass			(int Mode);
 
 	// Editor CSG virtuals from UnEdCsg.cpp.
-	virtual UModel	*csgDuplicateBrush		(ULevel *Level,UModel *Brush, DWORD PolyFlags, BYTE ModelFlags);
+	virtual void    csgPrepMovingBrush      (UModel *Brush);
+	virtual UModel	*csgDuplicateBrush		(ULevel *Level,UModel *Brush, DWORD PolyFlags, DWORD ModelFlags, DWORD ResFlags, BOOL IsMovingBrush);
 	virtual UModel	*csgAddOperation		(UModel *Brush,ULevel *Level, DWORD PolyFlags, ECsgOper CSG, BYTE BrushFlags);
 	virtual void	csgRebuild		 		(ULevel *Level);
 	virtual void	csgInvalidateBsp		(ULevel *Level);
 	virtual char	*csgGetName 			(ECsgOper CsgOper);
 
 	// Editor EdPoly/BspSurf assocation virtuals from UnEdCsg.cpp.
-	virtual FPoly	*polyFindMaster			(IModel *ModelInfo, INDEX iSurf);
-	virtual void    polyUpdateMaster		(IModel *ModelInfo, INDEX iSurf,int UpdateTexCoords,int UpdateBase);
+	virtual int		polyFindMaster			(UModel *Model, INDEX iSurf, FPoly &Poly);
+	virtual void    polyUpdateMaster		(UModel *Model, INDEX iSurf,int UpdateTexCoords,int UpdateBase);
 
 	// Bsp Poly search virtuals from UnEdCsg.cpp.
-	virtual void	polyFindByFlags 		(IModel *ModelInfo,DWORD SetBits, DWORD ClearBits, POLY_CALLBACK Callback);
-	virtual void	polyFindByBrush 		(IModel *ModelInfo,UModel *Brush, INDEX BrushPoly, POLY_CALLBACK Callback);
-	virtual void	polyFindByBrushGroupItem(IModel *ModelInfo,UModel *Brush, INDEX BrushPoly,FName Group, FName Item,POLY_CALLBACK Callback);
-	virtual void	polySetAndClearPolyFlags(IModel *ModelInfo,DWORD SetBits, DWORD ClearBits,int SelectedOnly,int UpdateMaster);
-	virtual void	polySetAndClearNodeFlags(IModel *ModelInfo,DWORD SetBits, DWORD ClearBits);
-	virtual void	polySetItemNames		(IModel *ModelInfo,FName Item);
+	virtual void	polyFindByFlags 		(UModel *Model,DWORD SetBits, DWORD ClearBits, POLY_CALLBACK Callback);
+	virtual void	polyFindByBrush 		(UModel *Model,UModel *Brush, INDEX BrushPoly, POLY_CALLBACK Callback);
+	virtual void	polyFindByBrushGroupItem(UModel *Model,UModel *Brush, INDEX BrushPoly,FName Group, FName Item,POLY_CALLBACK Callback);
+	virtual void	polySetAndClearPolyFlags(UModel *Model,DWORD SetBits, DWORD ClearBits,int SelectedOnly,int UpdateMaster);
+	virtual void	polySetAndClearNodeFlags(UModel *Model,DWORD SetBits, DWORD ClearBits);
 
 	// Bsp Poly selection virtuals from UnEdCsg.cpp.
-	virtual void	polyResetSelection 		(IModel *ModelInfo);
-	virtual void	polySelectAll 			(IModel *ModelInfo);
-	virtual void	polySelectNone 			(IModel *ModelInfo);
-	virtual void	polySelectMatchingGroups(IModel *ModelInfo);
-	virtual void	polySelectMatchingItems	(IModel *ModelInfo);
-	virtual void	polySelectCoplanars		(IModel *ModelInfo);
-	virtual void	polySelectAdjacents		(IModel *ModelInfo);
-	virtual void	polySelectAdjacentWalls	(IModel *ModelInfo);
-	virtual void	polySelectAdjacentFloors(IModel *ModelInfo);
-	virtual void	polySelectAdjacentSlants(IModel *ModelInfo);
-	virtual void	polySelectMatchingBrush	(IModel *ModelInfo);
-	virtual void	polySelectMatchingTexture(IModel *ModelInfo);
-	virtual void	polySelectReverse 		(IModel *ModelInfo);
-	virtual void	polyMemorizeSet 		(IModel *ModelInfo);
-	virtual void	polyRememberSet 		(IModel *ModelInfo);
-	virtual void	polyXorSet 				(IModel *ModelInfo);
-	virtual void	polyUnionSet			(IModel *ModelInfo);
-	virtual void	polyIntersectSet		(IModel *ModelInfo);
+	virtual void	polyResetSelection 		(UModel *Model);
+	virtual void	polySelectAll 			(UModel *Model);
+	virtual void	polySelectNone 			(UModel *Model);
+	virtual void	polySelectMatchingGroups(UModel *Model);
+	virtual void	polySelectMatchingItems	(UModel *Model);
+	virtual void	polySelectCoplanars		(UModel *Model);
+	virtual void	polySelectAdjacents		(UModel *Model);
+	virtual void	polySelectAdjacentWalls	(UModel *Model);
+	virtual void	polySelectAdjacentFloors(UModel *Model);
+	virtual void	polySelectAdjacentSlants(UModel *Model);
+	virtual void	polySelectMatchingBrush	(UModel *Model);
+	virtual void	polySelectMatchingTexture(UModel *Model);
+	virtual void	polySelectReverse 		(UModel *Model);
+	virtual void	polyMemorizeSet 		(UModel *Model);
+	virtual void	polyRememberSet 		(UModel *Model);
+	virtual void	polyXorSet 				(UModel *Model);
+	virtual void	polyUnionSet			(UModel *Model);
+	virtual void	polyIntersectSet		(UModel *Model);
 
 	// Poly texturing virtuals from UnEdCsg.cpp.
-	virtual void	polyTexPan 				(IModel *ModelInfo,int PanU,int PanV,int Absolute);
-	virtual void	polyTexScale			(IModel *ModelInfo,FLOAT UU,FLOAT UV, FLOAT VU, FLOAT VV,int Absolute);
-	virtual void	polyTexAlign			(IModel *ModelInfo,ETexAlign TexAlignType,DWORD Texels);
+	virtual void	polyTexPan 				(UModel *Model,int PanU,int PanV,int Absolute);
+	virtual void	polyTexScale			(UModel *Model,FLOAT UU,FLOAT UV, FLOAT VU, FLOAT VV,int Absolute);
+	virtual void	polyTexAlign			(UModel *Model,ETexAlign TexAlignType,DWORD Texels);
 
 	// Map brush selection virtuals from UnEdCsg.cpp.
 	virtual void	mapSelectAll			(ULevel *Level);
@@ -304,46 +314,59 @@ public:
 		FName Group,DWORD SetPolyFlags,DWORD ClearPolyFlags);
 
 	// Editor actor virtuals from UnEdAct.cpp.
-	virtual void	edactMoveSelected 		(ILevel *Level, FVector *Delta, FFloatRotation *DeltaRot);
-	virtual void	edactSelectAll 			(ILevel *Level);
-	virtual void	edactSelectNone 		(ILevel *Level);
-	virtual void	edactSelectOfClass		(ILevel *Level,UClass *Class);
-	virtual void	edactDeleteSelected 	(ILevel *Level);
-	virtual void	edactDuplicateSelected 	(ILevel *Level);
-	virtual void	edactDeleteDependentsOf	(ILevel *Level,UClass *Class);
+	virtual void	edactMoveSelected 		(ULevel *Level, FVector &Delta, FRotation &DeltaRot);
+	virtual void	edactSelectAll 			(ULevel *Level);
+	virtual void	edactSelectNone 		(ULevel *Level);
+	virtual void	edactSelectOfClass		(ULevel *Level,UClass *Class);
+	virtual void	edactDeleteSelected 	(ULevel *Level);
+	virtual void	edactDuplicateSelected 	(ULevel *Level);
+	virtual void	edactDeleteDependentsOf	(ULevel *Level,UClass *Class);
 
 	// Bsp virtuals from UnBsp.cpp.
-	virtual INDEX	bspAddVector		(IModel *ModelInfo, FVector *V, int Exact);
-	virtual INDEX	bspAddPoint			(IModel *ModelInfo, FVector *V, int Exact);
-	virtual int		bspNodeToFPoly		(IModel *ModelInfo, INDEX iNode, FPoly *EdPoly);
+	virtual INDEX	bspAddVector		(UModel *Model, FVector *V, int Exact);
+	virtual INDEX	bspAddPoint			(UModel *Model, FVector *V, int Exact);
+	virtual int		bspNodeToFPoly		(UModel *Model, INDEX iNode, FPoly *EdPoly);
 	virtual void	bspBuild			(UModel *Model, EBspOptimization Opt, int Balance, int RebuildSimplePolys);
-	virtual void	bspRefresh			(IModel *ModelInfo,int ForceRefresh);
-	virtual void	bspCleanup 			(IModel *ModelInfo);
-	virtual void	bspBuildBounds		(IModel *ModelInfo);
+	virtual void	bspRefresh			(UModel *Model,int NoRemapSurfs);
+	virtual void	bspCleanup 			(UModel *Model);
+	virtual void	bspBuildBounds		(UModel *Model);
 	virtual void	bspBuildFPolys		(UModel *Model,int iSurfLinks);
 	virtual void	bspMergeCoplanars	(UModel *Model,int RemapLinks,int MergeDisparateTextures);
 	virtual int		bspBrushCSG 		(UModel *Brush, UModel *Model, DWORD PolyFlags, ECsgOper CSGOper,int RebuildBounds);
 	virtual void	bspOptGeom			(UModel *Model);
 	virtual void	bspValidateBrush	(UModel *Brush,int ForceValidate,int DoStatusUpdate);
-	virtual INDEX	bspAddNode			(IModel *ModelInfo, INDEX iParent, ENodePlace ENodePlace, DWORD NodeFlags, FPoly *EdPoly);
+	virtual INDEX	bspAddNode			(UModel *Model, INDEX iParent, ENodePlace ENodePlace, DWORD NodeFlags, FPoly *EdPoly);
 
 	// Zone virtuals (UnZone.cpp).
-	virtual void	visBuild(ULevel *Level);
+	virtual void	zoneBuild(ULevel *Level);
 
 	// Shadow virtuals (UnShadow.cpp).
 	virtual void	shadowIlluminateBsp (ULevel *Level, int Selected);
 
 	// Constraints (UnEdCnst.cpp).
 	virtual void	constraintInit				(FConstraints *Constraints);
-	virtual int		constraintApply 			(IModel *LevelModelInfo, IModel *BrushInfo, FVector *Location, FRotation *Rotation,FConstraints *Constraints);
-	virtual void	constraintFinishSnap 		(ILevel *LevelInfo,UModel *Brush);
+	virtual int		constraintApply 			(UModel *LevelModel, UModel *BrushInfo, FVector *Location, FRotation *Rotation,FConstraints *Constraints);
+	virtual void	constraintFinishSnap 		(ULevel *Level,UModel *Brush);
 	virtual void	constraintFinishAllSnaps	(ULevel *Level);
 
 	// Camera functions (UnEdCam.cpp).
 	virtual void	edcamDraw		(UCamera *Camera, int Scan);
-	virtual void	edcamMove		(UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl);
+	virtual void	edcamMove		(UCamera *Camera, BYTE Buttons, FLOAT MouseX, FLOAT MouseY, int Shift, int Ctrl);
 	virtual int		edcamKey		(UCamera *Camera, int Key);
 	virtual void	edcamClick		(UCamera *Camera, BYTE Buttons, SWORD MouseX, SWORD MouseY,int Shift, int Ctrl);
+	
+	// Mesh functions (UnMeshEd.cpp).
+	virtual void meshImport(const char *MeshName, const char *AnivFname, const char *DataFname);
+	virtual void meshBuildBounds(UMesh *Mesh);
+
+	// Visibility.
+	virtual void TestVisibility(UModel *Model,int A, int B);
+
+	// Scripts.
+	virtual int MakeScripts(int MakeAll);
+	virtual int CheckScripts(UClass *Class,FOutputDevice &Out);
+	virtual int CompileScript(UClass *Class,BOOL ObjectPropertiesAreValid,BOOL Booting);
+	virtual void DecompileScript(UClass *Class,FOutputDevice &Out,int ParentLinks);
 };
 
 /*-----------------------------------------------------------------------------

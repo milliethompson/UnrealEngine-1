@@ -1,3147 +1,4563 @@
 /*=============================================================================
-	UnScript.cpp: UnrealScript compiler
+	UnScript.cpp: UnrealScript execution and support code.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
-	Revision history:
-		* Created by Tim Sweeney
+Description:
+	UnrealScript execution and support code.
+
+Revision history:
+	* Created by Tim Sweeney 
+
 =============================================================================*/
 
 #include "Unreal.h"
-#include "UnScrEng.h"
-
-#define PROPERTIES_DATA_SIZE	2048
-#define MAX_CODE_SIZE			50000
 
 /*-----------------------------------------------------------------------------
-	Utility functions.
+	Globals.
 -----------------------------------------------------------------------------*/
 
-//
-// Throw a string exception with a message.
-//
-void VARARGS throwf(char *Fmt,...)
-{
-	char		TempStr[4096];
-	va_list		ArgPtr;
-	va_start	(ArgPtr,Fmt);
-	vsprintf	(TempStr,Fmt,ArgPtr);
-	va_end		(ArgPtr);
-	throw		(TempStr);
-}
-
-//
-// Convert identified to its intrinsic C form.
-//
-void IdentifierToC(const char *Src,char *Dest)
-{
-	static const char *IdentifierToCRemap[96] =
-	{
-		"Space","Not","Quote","Pound","Dollars","Mod","BitAnd",
-		"LeftParen","RightParen","Times","Plus","Minus","Comma","Dash","Dot","Divide",
-		"0","1","2","3","4","5","6","7",
-		"8","9","Colon","Semicolon","Less","Equals","Greater","Question",
-		"At","A","B","C","D","E","F","G",
-		"H","I","J","K","L","M","N","O",
-		"P","Q","R","S","T","U","V","W",
-		"X","Y","Z","LeftBracket","Backslash","RightBracket","BitXor","Underscore",
-		"Doink","a","b","c","d","e","f","g",
-		"h","i","j","k","l","m","n","o",
-		"p","q","r","s","t","u","v","w",
-		"x","y","z","LeftBrace","BitOr","RightBrace","Squiggle","Del"
-	};
-	for( ; *Src; Dest += sprintf(Dest,IdentifierToCRemap[*Src++] ));
-}
+UNENGINE_API void (*GIntrinsics[EX_Max])( FExecStack &Stack, UObject *Context, BYTE *&Result );
+int GIntrinsicDuplicate=0;
 
 /*-----------------------------------------------------------------------------
-	FToken implementation.
+	Script warning.
 -----------------------------------------------------------------------------*/
 
-char *FToken::Descr()
+void ScriptWarn( FExecStack &Stack, char *Fmt, ... )
 {
-	static char Result[80];
-	switch (Type)
-	{
-		case TOKEN_End:
-			strcpy(Result,"<end of line>");
-			break;
-		case TOKEN_Identifier:
-			strcpy(Result,Identifier);
-			break;
-		case TOKEN_Symbol:
-			strcpy(Result,Identifier);
-			break;
-		case TOKEN_IntegerConst:
-			sprintf(Result,"%i",Integer);
-			break;
-		case TOKEN_FloatConst:
-			sprintf(Result,"%f",Float);
-			break;
-		case TOKEN_StringConst:
-			sprintf(Result,"string \"%s\"",String);
-			break;
-		case TOKEN_NameConst:
-			sprintf(Result,"Name(%s)",Name.Name());
-			break;
-		case TOKEN_VectorConst:
-			sprintf(Result,"Vector(%f,%f,%f)",Vector.X,Vector.Y,Vector.Z);
-			break;
-		case TOKEN_RotationConst:
-			sprintf(Result,"Rotation(%i,%i,%i)",Rotation.Pitch,Rotation.Yaw,Rotation.Roll);
-			break;
-		case TOKEN_ResourceConst:
-			sprintf(Result,"%s(%s)",GRes.GetTypeName(ResType),Res->Name);
-			break;
-		case TOKEN_Variable:
-			sprintf(Result,"%s",Float);
-			break;
-		default:
-			strcpy(Result,"<unknown token>");
-			break;
-	}
-	return Result;
-}
-
-//
-// See if this token can represent a constant integer value. Returns 1 if this
-// is the case (i.e. the number is an integer constant, a floating point constant,
-// "True", "False", or an enumeration constant). Otherwise returns 0.
-//
-int FToken::GetInteger(int *i)
-{
-	if( Type==TOKEN_IntegerConst )
-	{
-		*i=Integer; 
-		return 1;
-	}
-	else if( Type==TOKEN_FloatConst )
-	{
-		*i=(int)Float;
-		return 1;
-	}
-	else if( Type==TOKEN_Identifier )
-	{
-		// See if this is a 'True' or 'False' constant.
-		if( Matches("True") )
-		{
-			*i = 1;
-			return 1;
-		}
-		if( Matches("False") )
-		{
-			*i = 0; 
-			return 1;
-		}
-
-		// See if this is an enum constant.
-		UEnum *Enum;
-		FOR_ALL_TYPED_RES(Enum,RES_Enum,UEnum)
-		{
-			for (int n=0;n<Enum->Num; n++)
-			{
-				if(Matches(Enum->Element(n).Name()))
-				{
-					*i=n; 
-					return 1;
-				}
-			}
-		}
-		END_FOR_ALL_TYPED_RES;
-	}
-	return 0;
-}
-
-//
-// See if this token matches an existing global name.  If it does, returns 1 and sets
-// the token's Name member to the name's ID (which is guaranteed not to be NAME_NONE).
-// Otherwise, returns 0 and leaves the Name property unaffected, so it should remain
-// NAME_NONE as it was set in GetToken.
-//
-// Since this may be called several times for a given token, it uses the LookedUpName
-// member to indicate whether the lookup has already been performed.
-//
-int FToken::LookupName()
-{
-	if( !LookedUpName )
-	{
-		LookedUpName = 1;
-		if( (Type==TOKEN_Identifier)||(Type==TOKEN_Symbol) )
-		{
-			Name.Find(Identifier);
-		}
-	}
-	return (Name!=NAME_NONE);
-}
-
-/*-----------------------------------------------------------------------------
-	Single-character processing.
------------------------------------------------------------------------------*/
-
-//
-// Get a single character from the input stream and return it, or 0=end.
-//
-char inline FScriptCompiler::GetChar()
-{
-	PrevPos  = InputPos;
-	PrevLine = InputLine;
-	if( InputPos < InputSize )
-	{
-		char c = Input[InputPos++];
-		if(c==0x0a) InputLine++;
-		return c;
-	}
-	else
-	{
-		// So that UngetChar() works properly.
-		InputPos++; 
-		return 0;
-	}
-}
-
-//
-// Unget the previous character retrieved with GetChar().
-//
-void inline FScriptCompiler::UngetChar()
-{
-	InputPos  = PrevPos;
-	InputLine = PrevLine;
-}
-
-//
-// Skip past all spaces and tabs in the input stream.
-//
-char inline FScriptCompiler::GetLeadingChar()
-{
-	char c;
-	do c=GetChar(); while ((c==0x20)||(c==0x09));
-	if(c=='_') // Line continuation character
-	{
-		SkipBlanks();
-		return GetChar();
-	}
-	return c;
-}
-
-//
-// Skip past all spaces, tabs, cr's, linefeeds, and comments in 
-// the input stream.
-//
-void inline FScriptCompiler::SkipBlanks()
-{
-	char c;
-
-	Skip1: do c=GetChar(); while( (c==0x20)||(c==0x09)||(c==0x0d)||(c==0x0a) );
-	if( c=='\'' ) // Comment
-	{
-		do c=GetChar(); while( (c!=0x0d)&&(c!=0x0a)&&(c!=0x00) );
-		goto Skip1;
-	}
-	UngetChar();
-}
-
-//
-// Return 1 if input as a valid end-of-line character, or 0 if not.
-// EOL characters are: Comment, CR, linefeed, 0 (end-of-file mark)
-//
-int inline FScriptCompiler::IsEOL( char c )
-{
-	return (c=='\'') || (c==0x0d) || (c==0x0a) || (c==0);
-}
-
-/*-----------------------------------------------------------------------------
-	Code emitting.
------------------------------------------------------------------------------*/
-
-//
-// Emit a constant expression into an expression residing in code.
-//
-void FScriptCompiler::EmitConstant(FToken &Token)
-{
-	switch (Token.Type)
-	{
-		case TOKEN_IntegerConst:
-			EmitB(EX_IntegerConst);
-			EmitD(Token.Integer);
-			break;
-		case TOKEN_FloatConst:
-			EmitB(EX_RealConst);
-			EmitF(Token.Float);
-			break;
-		case TOKEN_StringConst:
-			EmitB(EX_StringConst);
-			EmitS(Token.String);
-			break;
-		case TOKEN_ResourceConst:
-			EmitB(EX_ResourceConst);
-			EmitB(Token.ResType);
-			EmitD((DWORD)Token.Res);
-			break;
-		case TOKEN_NameConst:
-			EmitB(EX_NameConst);
-			EmitW(Token.Name.Index);
-			break;
-		case TOKEN_RotationConst:
-			EmitB(EX_RotationConst);
-			EmitW(Token.Rotation.Pitch);
-			EmitW(Token.Rotation.Yaw);
-			EmitW(Token.Rotation.Roll);
-			break;
-		case TOKEN_VectorConst:
-			EmitB(EX_VectorConst);
-			EmitF(Token.Vector.X);
-			EmitF(Token.Vector.Y);
-			EmitF(Token.Vector.Z);
-			break;
-		default:
-			throwf("Internal EmitConstant token type error");
-			break;
-	}
-}
-
-/*-----------------------------------------------------------------------------
-	Tokenizing.
------------------------------------------------------------------------------*/
-
-//
-// Get the next token from the input stream, set *Token to it.
-// Returns 1 if processed a token, 0 if end of line.
-//
-int FScriptCompiler::GetToken(FToken &Token)
-{
-	Token.StartPos		= InputPos;
-	Token.StartLine		= InputLine;
-	Token.Name			= NAME_NONE;
-	Token.LookedUpName	= 0;
-
-	char c=GetLeadingChar();
-	if( IsEOL(c) )
-	{
-		UngetChar();
-		Token.Type = TOKEN_End;
-		return 0;
-	}
-	else if( ((c>='A')&&(c<='Z')) || ((c>='a')&&(c<='z')) )
-	{
-		// Alphanumeric token.
-		int Length=0;
-		do	{
-			Token.Identifier[Length++] = c;
-			if(Length > MAX_IDENTIFIER_SIZE) throwf("Identifer length exceeds maximum of %i",MAX_IDENTIFIER_SIZE);
-			c = GetChar();
-		} while( ((c>='A')&&(c<='Z')) || ((c>='a')&&(c<='z')) || ((c>='0')&&(c<='9')) || (c=='_') );
-
-		UngetChar();
-		Token.Identifier[Length]=0;
-
-		// See if the idenfitifier is part of a name, vector, rotation, 
-		// or resource constant.
-		if( (!stricmp(Token.Identifier,"Name")) && MatchSymbol("(") )
-		{
-			// This is a name constant.
-			FToken NameToken;
-			if(!GetToken(NameToken)) throwf("Missing name");
-			if(!MatchSymbol(")")) throwf("Missing ')' after name");
-
-			if		(NameToken.Type==TOKEN_Identifier)	Token.Name.Add(NameToken.Identifier);
-			else if(NameToken.Type==TOKEN_StringConst)	Token.Name.Add(NameToken.String);
-			else										throwf("Bad name");
-
-			Token.Type			= TOKEN_NameConst;
-			Token.LookedUpName	= 1;
-			return 1;
-		}
-		if((!stricmp(Token.Identifier,"Vector")) && MatchSymbol("("))
-		{
-			// This is a vector constant.
-			if(!GetFloatConst(&Token.Vector.X)) throwf("Missing X component of vector");
-			if(!MatchSymbol(","))               throwf("Missing ',' in vector");
-			if(!GetFloatConst(&Token.Vector.Y)) throwf("Missing Y component of vector");
-			if(!MatchSymbol(","))               throwf("Missing ',' in vector");
-			if(!GetFloatConst(&Token.Vector.Z)) throwf("Missing Z component of vector");
-			if(!MatchSymbol(")"))               throwf("Missing ')' in vector");
-			Token.Type = TOKEN_VectorConst;
-			return 1;
-		}
-		if((!stricmp(Token.Identifier,"Rotation")) && MatchSymbol("("))
-		{
-			// This is a rotation constant.
-			int Pitch=0,Yaw=0,Roll=0;
-			if(!GetIntegerConst(&Pitch))          throwf("Missing Pitch component of rotation");
-			if(!MatchSymbol(","))                 throwf("Missing ',' in rotation");
-			if(!GetIntegerConst(&Yaw))            throwf("Missing Yaw component of rotation");
-			if(!MatchSymbol(","))                 throwf("Missing ',' in vector");
-			if(!GetIntegerConst(&Roll))           throwf("Missing Roll component of rotation");
-			if(!MatchSymbol(")"))                 throwf("Missing ')' in vector");
-			Token.Rotation.Pitch = Pitch;
-			Token.Rotation.Yaw   = Yaw;
-			Token.Rotation.Roll  = Roll;
-			Token.Type           = TOKEN_RotationConst;
-			return 1;
-		}
-
-		// See if this is a resource constant.
-		EResourceType ResType = GRes.LookupType(Token.Identifier);
-		if((ResType!=RES_None) && (GRes.GetType(ResType).TypeFlags & RTF_ScriptReferencable) &&
-			MatchSymbol("("))
-		{
-			// This is a resource constant.
-			FToken NameToken;
-			if(!GetIdentifier(NameToken)) throwf("Missing %s name",GRes.GetTypeName(ResType));
-			UResource *Res = GRes.PrivateLookup(NameToken.Identifier,ResType,FIND_Optional);
-			if(Res==NULL) throwf("Can't find %s '%s'",GRes.GetTypeName(ResType),NameToken.Identifier);
-			if(!MatchSymbol(")")) throwf("Missing ')' after %s name",GRes.GetTypeName(ResType));
-			Token.Res     = Res;
-			Token.ResType = ResType;
-			Token.Type    = TOKEN_ResourceConst;
-			return 1;
-		}
-
-		// This is a plain old identifier.
-		Token.Type = TOKEN_Identifier;
-		return 1;
-	}
-	else if((c>='0') && (c<='9'))
-	{
-		// Integer or floating point constant.
-		char TempNum[MAX_IDENTIFIER_SIZE]="";
-		int  IsFloat=0;
-		int  Length=0;
-		do  {
-			if(c=='.') IsFloat=1;
-			TempNum[Length++] = c;
-			if(Length>=MAX_IDENTIFIER_SIZE) throwf("Number length exceeds maximum of %i ",MAX_IDENTIFIER_SIZE);
-			c = GetChar();
-		} while (((c>='0') && (c<='9')) || (c=='.'));
-
-		TempNum[Length]=0;
-		if(IsFloat)
-		{
-			Token.Float		= atof(TempNum);
-			Token.Type		= TOKEN_FloatConst;
-		}
-		else
-		{
-			Token.Integer	= atoi(TempNum);
-			Token.Type		= TOKEN_IntegerConst;
-		}
-		UngetChar();
-		return 1;
-	}
-	else if( c=='"' )
-	{
-		// String constant.
-		int Length=0;
-		c=GetChar();
-		while( (c!='"') && !IsEOL(c) )
-		{
-			if(c=='\\')
-			{
-				c=GetChar();
-				if(IsEOL(c)) 
-					break;
-			}
-			Token.Identifier[Length++] = c;
-			if(Length>=MAX_STRING_CONST_SIZE) 
-				throwf("String constant exceeds maximum of %i characters",MAX_IDENTIFIER_SIZE);
-			c=GetChar();
-		}
-		if( c!='"' ) 
-			throwf("Unterminated string constant");
-
-		Token.Identifier[Length]=0;
-		Token.Type = TOKEN_StringConst;
-		return 1;
-	}
-	else
-	{
-		// Symbol.
-		int Length=0;
-		Token.Identifier[Length++] = c;
-
-		// Handle special 2-character symbols.
-		#define PAIR(cc,dd) ((c==cc)&&(d==dd)) /* Comparison macro for convenience */
-		char d=GetChar();
-		if
-		(
-			PAIR('<','<') ||
-			PAIR('>','>') ||
-			PAIR('!','=') ||
-			PAIR('<','>') ||
-			PAIR('<','=') ||
-			PAIR('>','=') ||
-			PAIR(':',':') ||
-			PAIR('+','+') ||
-			PAIR('-','-') ||
-			PAIR('+','=') ||
-			PAIR('-','=') ||
-			PAIR('*','=') ||
-			PAIR('/','=')
-		)
-		{
-			Token.Identifier[Length++] = d;
-		}
-		else UngetChar();
-		#undef PAIR
-
-		Token.Identifier[Length]=0;
-		Token.Type = TOKEN_Symbol;
-		return 1;
-	}
-	return 0;
-}
-
-//
-// Get an identifier token, return 1 if gotten, 0 if not.
-//
-int	FScriptCompiler::GetIdentifier(FToken &Token)
-{
-	if(!GetToken(Token)) 
-		return 0;
-
-	if(Token.Type==TOKEN_Identifier) 
-		return 1;
-
-	UngetToken(Token);
-
-	return 0;
-}
-
-//
-// Get a symbol token, return 1 if gotten, 0 if not.
-//
-int	FScriptCompiler::GetSymbol(FToken &Token)
-{
-	if(!GetToken(Token)) 
-		return 0;
-
-	if(Token.Type==TOKEN_Symbol) 
-		return 1;
-
-	UngetToken(Token);
-
-	return 0;
-}
-
-//
-// Get an integer constant, return 1 if gotten, 0 if not.
-//
-int FScriptCompiler::GetIntegerConst(int *Result)
-{
-	FToken Token;
-
-	if(!GetToken(Token)) 
-		return 0;
-	if(Token.Type==TOKEN_IntegerConst)
-	{
-		*Result = Token.Integer;
-		return 1;
-	}
-	UngetToken(Token);
-	return 0;
-}
-
-//
-// Get a real number, return 1 if gotten, 0 if not.
-//
-int FScriptCompiler::GetFloatConst(FLOAT *Result)
-{
-	FToken Token;
-
-	if( !GetToken(Token)) 
-		return 0;
-	if( Token.Type==TOKEN_IntegerConst )
-	{
-		*Result = (FLOAT)Token.Integer;
-		return 1;
-	}
-	else if( Token.Type==TOKEN_FloatConst )
-	{
-		*Result = Token.Float;
-		return 1;
-	}
-	UngetToken(Token);
-	return 0;
-}
-
-//
-// Get a constant expression of any type.  Returns type if gotten,
-// CPT_None (==0) if not.
-//
-int FScriptCompiler::GetConstExpr(FToken &Token, EClassPropertyType *Type)
-{
-	// See if a token is available.
-	if(!GetToken(Token)) 
-		return 0;
-
-	// Handle regular constants.
-	if( Token.Type == TOKEN_IntegerConst )	{*Type = CPT_Integer;	return 1;};
-	if( Token.Type == TOKEN_FloatConst )	{*Type = CPT_Real;		return 1;};
-	if( Token.Type == TOKEN_StringConst )	{*Type = CPT_String;	return 1;};
-	if( Token.Type == TOKEN_ResourceConst )	{*Type = CPT_Resource;	return 1;};
-	if( Token.Type == TOKEN_NameConst )		{*Type = CPT_Name;		return 1;};
-	if( Token.Type == TOKEN_VectorConst )	{*Type = CPT_Vector;	return 1;};
-	if( Token.Type == TOKEN_RotationConst )	{*Type = CPT_Rotation;	return 1;};
-
-	// See if this is a special integer constant (true, false, or enum).
-	if(Token.Type==TOKEN_Identifier)
-	{
-		int i;
-		if(Token.GetInteger(&i))
-		{
-			Token.Type    = TOKEN_IntegerConst;
-			Token.Integer = i;
-
-			*Type = CPT_Integer;
-			return 1;
-		}
-	}
-	UngetToken(Token);
-	return 0;
-}
-
-//
-// Get a specific identifier and return 1 if gotten, 0 if not.
-// This is used primarily for checking for required symbols during compilation.
-//
-int	FScriptCompiler::MatchIdentifier(char *Match)
-{
-	FToken Token;
-
-	if(!GetToken(Token)) 
-		return 0;
-
-	if((Token.Type==TOKEN_Identifier) && !stricmp(Token.Identifier,Match)) 
-		return 1;
-
-	UngetToken(Token);
-	return 0;
-}
-
-int	FScriptCompiler::MatchSymbol(char *Match)
-{
-	FToken Token;
-
-	if(!GetToken(Token))
-		return 0;
-
-	if((Token.Type==TOKEN_Symbol) && !stricmp(Token.Identifier,Match)) 
-		return 1;
-
-	UngetToken(Token);
-	return 0;
-}
-
-//
-// Unget the most recently gotten token.
-//
-void inline FScriptCompiler::UngetToken(FToken &Token)
-{
-	InputPos	= Token.StartPos;
-	InputLine	= Token.StartLine;
-}
-
-/*-----------------------------------------------------------------------------
-	State & Scope.
------------------------------------------------------------------------------*/
-
-//
-// Find a stack node residing in the specified script, at the specified node
-// number.  Handles the special cases of a NULL script and of a script that
-// is currently being compiled.
-//
-FStackNode *FScriptCompiler::FindStackNode(UScript *SrcScript,INT iNode)
-{
-	if		(SrcScript==NULL)	return NULL;
-	else if(SrcScript==Script)	return &StackTree[iNode];
-	else						return &((FStackNode *)SrcScript->GetData())[iNode];
-}
-
-//
-// Find a stack node specified by a stack node link.
-//
-FStackNode *FScriptCompiler::FindStackNode(FStackNodeLink *Link)
-{
-	return FindStackNode(Link->Script,Link->iNode);
-}
-
-//
-// Find the parameters structure corresponding to a particular stack node.  Sets Props
-// to a pointer to the first property, and iNumProps to the number of parameter and return
-// value properties (which will be less than the total number of properties if the function or
-// when declares local variables). 
-//
-// If the number of properties is zero, the Props pointer is not meaningful.  Handles the special
-// cases of a null script, the current stack node of the script currently being compiled,
-// and a non-current stack node of the script currently being compiled.
-//
-void FScriptCompiler::FindParams(UScript *SrcScript,INT iNode,FClassProperty **Props,INT *NumProps)
-{
-	if(SrcScript==NULL)
-	{
-		// Null script.
-		*Props     = NULL;
-		*NumProps = 0;
-		//AddResultText(" -> Null script\r\n");
-	}
-	else if( (SrcScript==Script) && (&StackTree[iNode]==TopNest->Node) )
-	{
-		*Props		= TopNest->Properties;
-		*NumProps	= TopNest->Node->NumProperties;
-		//AddResultText(" -> This node\r\n");
-	}
-	else if(SrcScript==Script)
-	{
-		//AddResultText(" -> This script\r\n");
-		FStackNode *Node = FindStackNode(SrcScript,iNode);
-
-		*Props      = &LocalProperties[Node->PropertiesOffset];
-		*NumProps   = Node->NumProperties;
-	}
-	else
-	{
-		//AddResultText(" -> Other script\r\n");
-		FStackNode *Node = FindStackNode(SrcScript,iNode);
-
-		*Props      = (FClassProperty *)(&SrcScript->GetData()[Node->PropertiesOffset]);
-		*NumProps   = Node->NumProperties;
-	}
-	while( (*NumProps>0) && !((*Props)[*NumProps-1].Flags & (CPF_Param | CPF_ReturnValue)) )
-	{
-		(*NumProps)--;
-	}
-}
-
-void FScriptCompiler::FindParams(FStackNodeLink *Link,FClassProperty **Props,INT *NumProps)
-{
-	FindParams(Link->Script,Link->iNode,Props,NumProps);
-}
-
-/*-----------------------------------------------------------------------------
-	Variable getting.
------------------------------------------------------------------------------*/
-
-//
-// See if Token is a local or global variable.  Returns 1 if it is, or 0 if it's
-// not a recognized variable.  If successful, sets iVar to the index of the variable
-// in its property frame, IsGlobal to 1 if global, 0 if local, and VarProperty to a
-// pointer to the variable's property description.
-//
-int FScriptCompiler::GetVariable(FToken &Token, INT *iVar, INT *IsGlobal,
-	FClassProperty **VarProperty, EClassPropertyType *Type)
-{
-
-	// No name means this is not a variable.
-	if(!Token.LookupName()) 
-		return 0;
-
-	// Check locals.
-	FClassProperty *Property = &TopNest->Properties[0];
-	for( int i=0; i<TopNest->Node->NumProperties; i++ )
-	{
-		if( Token.Name==Property->Name )
-		{
-			*iVar			= i;
-			*IsGlobal		= 0;
-			*VarProperty	= Property;
-			*Type			= (EClassPropertyType)Property->Type;
-			return 1;
-		}
-		Property++;
-	}
-
-	// Check globals.
-	Property = &Class->Element(0);
-	for( i=0; i<Class->Num; i++ )
-	{
-		if( Token.Name==Property->Name )
-		{
-			*iVar			= i;
-			*IsGlobal		= 1;
-			*VarProperty	= Property;
-			*Type			= (EClassPropertyType)Property->Type;
-			return 1;
-		}
-		Property++;
-	}
-	return 0;
-}
-
-/*-----------------------------------------------------------------------------
-	Retry management.
------------------------------------------------------------------------------*/
-
-//
-// Remember the current compilation points, both in the source being
-// compiled and the object code being emitted.
-//
-void FScriptCompiler::InitRetry(FRetryPoint *Retry)
-{
-	Retry->InputPos		= InputPos;
-	Retry->InputLine	= InputLine;
-	Retry->CodeTop		= CodeTop;
-}
-
-//
-// Return to a previously-saved retry point.
-//
-void FScriptCompiler::PerformRetry(FRetryPoint *Retry)
-{
-	InputPos	= Retry->InputPos;
-	InputLine	= Retry->InputLine;
-	CodeTop		= Retry->CodeTop;
-}
-
-/*-----------------------------------------------------------------------------
-	Expression parser.
------------------------------------------------------------------------------*/
-
-//
-// Try to parse a complete function call with a name matching Token.  Returns
-// 1 if a function call was successfully parsed, or 0 if no matching function
-// was found.  Handles the error condition where the function was called but the
-// specified parameters didn't match, or there was an error in a parameter 
-// expression.
-//
-// The function to call must be accessible within the current scope.
-//
-// This also handles unary operators identically to functions, but not binary
-// operators.
-//
-int FScriptCompiler::GetFunctionExpr(FToken &Token, EClassPropertyType *Type)
-{
-	FRetryPoint Retry;
-	InitRetry(&Retry);
-
-	// All possible causes of errors in the function call which don't cause an
-	// immediate compiler response.  These are set when a particular function override 
-	// is determined to be unacceptable.  If a correct override is later found, these error
-	// causes are ignored.  If no override is found, the error causes are analyzed so that
-	// a useful error message can be displayed.
-
-	int ErrTypeMismatch=0,ErrMissingParameter=0,ErrTooManyParameters=0,iErrParameter=0;
-	EClassPropertyType MismatchExpecting=CPT_None;
-
-	int i,MatchedName=0,MatchedSomething=0;
-
-	// No name means this is not a function.
-	if( !Token.LookupName() )
-		return 0;
-
-	for( i=NestLevel-1; i>=0; i-- )
-	{
-		if( Nest[i].Node )
-		{
-			FStackNodeLink *Link = &Nest[i].Node->ChildFunctions;
-			while (Link->Script)
-			{
-				FStackNode *Node = FindStackNode(Link);
-
-				// If the other function's name matches this one's, process it.
-				if(Node->Name==Token.Name)
-				{
-					int				NumParams;
-					FClassProperty	*Params;
-					FindParams(Link->Script,Link->iNode,&Params,&NumParams);
-					// /* Debugging: */ AddResultText("Checking %s (%i props)\r\n",Node->Name.Name(),Node->NumProperties);
-
-					// Prevent mismatch of underlying type (Function, Operator, Event).
-					if(Node->NestType==NEST_Function)
-					{
-						if(!MatchSymbol("(")) 
-							goto NotFound;
-					}
-					else if(Node->NestType==NEST_Operator)
-						{
-						if(NumParams>2) 
-							// Not a unary operator.
-							goto NextLink;
-					}
-					else
-						throwf("'%s' is an event and it doesn't return a value",Token.Identifier);
-
-					if(NumParams<=0) 
-						throwf("Function '%s' has no return type - can't call it",Token.Identifier);
-
-					MatchedName = 1;
-
-					// Emit the function call now on the assumption that the parameters are
-					// correct.  If we're wrong, Retry() will back this out.
-
-					if(Node->StackNodeFlags & SNODE_Fast)
-					{
-						// Prebound, non-overridable function.
-						EmitB(EX_FastFunction);
-						EmitW(Link->iNode);
-						EmitD((DWORD)Link->Script);
-					}
-					else
-					{
-						// Regular function.
-						EmitB(EX_Function);
-						EmitW(Token.Name.Index);
-					}
-
-					// Parse all parameters except for return type; the parameters are emitted to 
-					// code as a series of non-empty expressions terminated by an EX_Nothing expression.
-					// If the parameters aren't in agreement, skip this function and it will either be 
-					// picked up by an override somewhere along the way, or the "Mismatched parameter" 
-					// message will be thrown after we've checked them all.  Handles the case of optional 
-					// parameters not specified.
-
-					FClassProperty		*Param = &Params[0];
-					EClassPropertyType	FoundType;
-					int					SkippingOptional=0, First=1;
-
-					for( int j=0; j<NumParams; j++ )
-					{
-						// Done with list of parameters?
-						if( !(Param->Flags & CPF_Param) )
-							break;
-
-						if(!SkippingOptional)
-						{
-							// Get comma parameter delimiter.
-							if( (!First) && !MatchSymbol(",") )
-							{
-								// Failed to get a comma.
-								if(Param->Flags & CPF_OptionalParam)
-								{
-									// Ok, it was optional.
-									EmitB(EX_Nothing);
-									SkippingOptional = 1;
-								}
-								else
-								{
-									// This parameter was required but not specified.
-									ErrMissingParameter++;
-									iErrParameter = j;
-									goto NextLink;
-								}
-							}
-							if(GetExpr(CPT_None,&FoundType))
-							{
-								// Got expression, now verify its type.
-								if(FoundType != (EClassPropertyType)Param->Type)
-								{
-									// Type mismatch.
-									ErrTypeMismatch++;
-									iErrParameter = j;
-									MismatchExpecting = Param->Type;
-									goto NextLink;
-								}
-							}
-							else
-							{
-								// Failed to get an expression.
-								if(Param->Flags & CPF_OptionalParam) 
-								{
-									// Ok.
-									SkippingOptional = 1;
-								}
-								else
-								{
-									ErrMissingParameter++;
-									iErrParameter = j;
-									goto NextLink;
-								}
-							}
-							// Here, we successfully got an expression, matching Param.
-						}
-						Param++;
-						First=0;
-					}
-					if( !SkippingOptional )
-						EmitB(EX_Nothing);
-
-					if((Node->NestType==NEST_Function) && !MatchSymbol(")"))
-					{
-						ErrTooManyParameters++;
-						goto NextLink;
-					}
-
-					// Make sure return value is valid.
-					if((j>=NumParams) || !(Param->Flags & CPF_ReturnValue))
-					{
-						throwf("Function '%s' has no return type - can't call it",Token.Identifier);
-					}
-					*Type = (EClassPropertyType)Param->Type;
-
-					// Success.
-					return 1;
-				}
-
-				// Here we know that the function we checked at *Link isn't an acceptable
-				// match, so we go on to the next one.
-
-				NextLink:
-				PerformRetry(&Retry);
-				MatchSymbol("(");
-				Link = &Node->Next;
-			}
-		}
-	}
-	NotFound:
-	PerformRetry(&Retry);
-	if(MatchedName)
-	{
-		// Handle error cause.
-		if((ErrTypeMismatch+ErrMissingParameter)>1)
-		{
-			// Several errors; can't easily figure out what's what.
-			throwf("Call to '%s': Mismatched parameters",Token.Identifier);
-		}
-		else if(ErrTypeMismatch)		throwf("Call to '%s': type mismatch in parameter %i (need '%s')",Token.Identifier,iErrParameter+1,GetPropertyTypeName(MismatchExpecting));
-		else if(ErrMissingParameter)	throwf("Call to '%s': missing required parameter %i",Token.Identifier,iErrParameter+1);
-		else if(ErrTooManyParameters)	throwf("Call to '%s': Too many parameters or missing ')'",Token.Identifier);
-		else							throwf("Internal GetFunctionExpr inconsistency");
-	}
-	return 0;
-}
-
-//
-// Parse an expression.  Call with:
-//
-// RequiredType = the mandatory type of the expression, or CPT_None = any allowable type.
-// Optional     = 1 if the expression is optional, 0 if required.
-//
-// Returns the exact type of the expression parsed (which must match RequiredType if 
-// specified), or CPT_None if no expression was parsed.  The parsed expression has
-// been emitted to the code stream and begins with one of the EExprToken tokens which
-// will be EX_None if no expression was parsed.
-//
-int FScriptCompiler::GetExpr(EClassPropertyType RequiredType, EClassPropertyType *Type)
-{
-	FToken				Token;
-	FClassProperty		*VarProperty;
-	EClassPropertyType	ThisType = CPT_None;
-	INT					iVar,IsGlobal;
-
-	if(GetConstExpr(Token,&ThisType))
-	{
-		// This is some kind of constant.
-		EmitConstant(Token);
-	}
-	else if(!GetToken(Token))
-	{
-		// This is an empty expression.
-		ThisType = CPT_None;
-		EmitB(EX_Nothing);
-	}
-	else if(Token.Matches("("))
-	{
-		// Parenthesis.
-		if(!GetExpr(CPT_None,&ThisType))	throwf("Missing expression after '('");
-		if(!MatchSymbol(")"))				throwf("Missing ')'");
-	}
-	else if(GetVariable(Token,&iVar,&IsGlobal,&VarProperty,&ThisType))
-	{
-		int IsArrayElement=0;
-
-		// This is a variable.
-		if( VarProperty->Flags & CPF_Array )
-		{
-			if(MatchSymbol("("))
-			{
-				IsArrayElement=1;
-				EmitB(EX_ArrayElement);
-			}
-			throwf("%s is an array; expecting '('",Token.Identifier);
-		}
-		if	 (IsGlobal)	EmitB(EX_GlobalVariable);
-		else			EmitB(EX_LocalVariable);
-
-		EmitB(ThisType);
-		EmitW(VarProperty->Offset);
-
-		if(IsArrayElement)
-		{
-			EClassPropertyType SubscriptType;
-
-			if(!GetExpr(CPT_Integer,&SubscriptType))
-				throwf("Missing or invalid array index");
-
-			if(!MatchSymbol(")")) 
-				throwf("%s is an array; expecting '('",Token.Identifier);
-		}
-	}
-	else if(GetFunctionExpr(Token,&ThisType))
-	{
-		// We successfully parsed a function-call expression.
-	}
-	else
-	{
-		// This doesn't match an expression, so put it back.  It might be some kind of
-		// delimiter like a comma, but whatever routine called this will error out if it's
-		// not valid in its particular context.
-		EmitB(EX_Nothing);
-		UngetToken(Token);
-	}
-
-	// See if a binary operator follows the expression we just got.
-	if((ThisType!=CPT_None) && (0))
-	{
-		// We have found a valid type followed by a binary operator.
-	}
-
-	// Verify that what we got is what we want.
-	if(RequiredType && ThisType)
-	{
-		if(ThisType!=RequiredType)
-			throwf("Expecting %s, found %s",GetPropertyTypeName(RequiredType),GetPropertyTypeName(ThisType));
-	}
-	if(ThisType)
-	{
-		if(Type) *Type = ThisType;
-		return 1;
-	}
-	else
-	{
-		return 0;
-	}
-}
-
-/*-----------------------------------------------------------------------------
-	Make.
------------------------------------------------------------------------------*/
-
-void FScriptCompiler::InitMake()
-{
-	guard(FScriptCompiler::InitMake);
-
-	StatementsCompiled	= 0;
-	LinesCompiled		= 0;
-
-	ErrorText			= new("Results",CREATE_Replace)UTextBuffer(16384);
-	*ErrorText->GetData()=0;
-
-	unguard;
-}
-
-void FScriptCompiler::ExitMake(int Success)
-{
-	guard(FScriptCompiler::ExitMake);
-
-	if(Success)
-	{
-		if(LinesCompiled) AddResultText("Success: Compiled %i line(s), %i statement(s).\r\n",LinesCompiled,StatementsCompiled);
-		else AddResultText("Success: Everything is up to date");
-	}
-	else
-	{
-		AddResultText("Script compilation failed.\r\n");
-	}
-	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	Nest management.
------------------------------------------------------------------------------*/
-
-char *FScriptCompiler::NestTypeName(ENestType NestType)
-{
-	switch (NestType)
-	{
-		case NEST_None:		return "Global Scope";
-		case NEST_Class:	return "Class";
-		case NEST_State:	return "State";
-		case NEST_When:		return "When";
-		case NEST_Function:	return "Function";
-		case NEST_Operator:	return "Operator";
-		case NEST_If:		return "If";
-		case NEST_Loop:		return "Loop";
-		case NEST_Select:	return "Select";
-		case NEST_Case:		return "Case";
-		case NEST_For:		return "For";
-		default:			return "Unknown";
-	}
-}
-
-//
-// Make sure that a particular kind of command is allowed on this nesting level.
-// If it's not, issues a compiler error referring to the token and the current
-// nesting level.
-//
-void FScriptCompiler::CheckAllow( FToken &Token,int AllowFlags )
-	{
-	if( (TopNest->Allow & AllowFlags) != AllowFlags )
-		{
-		if( TopNest->NestType==NEST_None )
-		{
-			throwf("'%s' is not allowed before the Class or Module definition",Token.Identifier);
-		}
-		else if(TopNest->DenyIntrinsic & AllowFlags)
-		{
-			throwf("'%s' is not allowed within this intrinsic '%s'",Token.Identifier,NestTypeName(TopNest->NestType));
-		}
-		else
-		{
-			throwf("'%s' is not allowed in this '%s' block",Token.Identifier,NestTypeName(TopNest->NestType));
-		}
-	}
-	if( AllowFlags & ALLOW_Cmd )
-	{
-		TopNest->Allow &= ~(ALLOW_VarDecl); // Don't allow variable declarations after commands
-	}
-}
-
-//
-// Increase the nesting level, setting the new top nesting level to
-// the one specified.  If pushing a function or state and it overrides a similar
-// thing declared on a 
-//
-void FScriptCompiler::PushNest( ENestType NestType,const char *Name )
-{
-	INT iNode;
-	FStackNode *PrevNode;
-	FName ThisName;
-	ThisName.Add(Name);
-
-	DWORD PrevAllow;
-	TopNest					= &Nest[NestLevel++];
-	TopNest->NestType		= NestType;
-	TopNest->StartCodeTop	= CodeTop;
-
-	if(NestLevel >= MAX_NEST_LEVELS)
-		throwf("Maximum nesting limit exceeded");
-
-	// Set up pointers.
-	if(NestLevel>1)
-	{
-		iNode					= Script->NumStackTree++;
-		PrevAllow				= TopNest->Allow;
-		TopNest->DenyIntrinsic	= TopNest[-1].DenyIntrinsic;
-		TopNest->Node			= &StackTree[iNode];
-		TopNest->Node->Init(NestType,ThisName);
-		PrevNode				= TopNest[-1].Node;
-	}
-	else
-	{
-		iNode					= 0;
-		PrevAllow				= 0;
-		TopNest->DenyIntrinsic	= 0;
-		TopNest->Node			= NULL;
-		PrevNode			= NULL;
-	}
-
-	// If this item has a name associated with it, see if(1) it's an override of an existing
-	// item declared on a lower scope, and (2) it's a duplicate of an existing item 
-	// on this scope.
-
-	if(PrevNode && (ThisName!=NAME_NONE) && (NestType!=NEST_Operator))
-	{
-		if( (NestType==NEST_Function) || (NestType==NEST_When)||
-			(NestType==NEST_State)    || (NestType==NEST_Operator) )
-		{
-			FStackNodeLink *Link;
-
-			if(NestType==NEST_State)	Link = &PrevNode->ChildStates;
-			else						Link = &PrevNode->ChildFunctions;
-
-			while (Link->Script)
-			{
-				FStackNode *Node = FindStackNode(Link);
-				if(Node->Name==ThisName)
-				{
-					if(Link->Script==Script)
-					{
-						// This is a duplicate on this scope level.
-						throwf("Duplicate %s '%s'",NestTypeName(NestType),Name);
-					}
-					else 
-					{
-						// This is an override of a lower scope level (allowed).
-
-						// We are overriding a state or a function from a parent class's script
-						// at this same nesting level.  Copy the overridden stack node's child,
-						// next, and state links to this node.
-
-						if(!TopNest->Node) throwf("Internal PushNest node inconsistency");
-						TopNest->Node->ChildFunctions = Node->ChildFunctions;
-						TopNest->Node->ChildStates    = Node->ChildStates;
-					}
-				}
-				Link = &Node->Next;			
-			}
-		}
-	}
-
-	// NestType specific logic.
-	switch (NestType)
-	{
-		case NEST_None:
-			if(PrevNode) throwf("Internal error in PushNest None");
-			TopNest->Allow = ALLOW_Class;
-			break;
-		case NEST_Class:
-			if(ThisName==NAME_NONE) throwf("Missing Class name");
-			if(PrevNode) throwf("Internal error in PushNest Class");
-			TopNest->Allow = ALLOW_VarDecl + ALLOW_Function + ALLOW_State;
-			break;
-		case NEST_State:
-			if(ThisName==NAME_NONE) throwf("Missing State name");
-			if(!PrevNode) throwf("Internal error in PushNest State");
-			TopNest->Allow					= ALLOW_Function + ALLOW_When + ALLOW_State + ALLOW_SlowCmd + ALLOW_Cmd;
-			TopNest->Node->Next		= PrevNode->ChildStates;
-			PrevNode->ChildStates.Set(Script,iNode);
-			break;
-		case NEST_When:
-			if(ThisName==NAME_NONE) throwf("Missing When name");
-			if(!PrevNode) throwf("Internal error in PushNest When");
-			TopNest->Allow					= ALLOW_VarDecl + ALLOW_SlowCmd + ALLOW_Cmd;
-			TopNest->Node->Next		= PrevNode->ChildFunctions;
-			PrevNode->ChildFunctions.Set(Script,iNode);
-			break;
-		case NEST_Function:
-			if(ThisName==NAME_NONE) throwf("Missing Function name");
-			if(!PrevNode) throwf("Internal error in PushNest Function");
-			TopNest->Allow					= ALLOW_VarDecl + ALLOW_Cmd + ALLOW_Return;
-			TopNest->Node->Next		= PrevNode->ChildFunctions;
-			PrevNode->ChildFunctions.Set(Script,iNode);
-			break;
-		case NEST_Operator:
-			if(ThisName==NAME_NONE) throwf("Missing Operator name");
-			if(!PrevNode) throwf("Internal error in PushNest Operator");
-			TopNest->Allow					= ALLOW_VarDecl + ALLOW_Cmd + ALLOW_Return;
-			TopNest->Node->Next		= PrevNode->ChildFunctions;
-			PrevNode->ChildFunctions.Set(Script,iNode);
-			break;
-		case NEST_If:
-			if(ThisName!=NAME_NONE) throwf("Internal name error in PushNest If");
-			if(!PrevNode) throwf("Internal error in PushNest If");
-			TopNest->Allow = ALLOW_Cmd + (PrevAllow & (ALLOW_SlowCmd|ALLOW_Return));
-			break;
-		case NEST_Loop:
-			if(ThisName!=NAME_NONE) throwf("Internal name error in PushNest While");
-			if(!PrevNode) throwf("Internal error in PushNest While");
-			TopNest->Allow = ALLOW_Cmd + ALLOW_Until + (PrevAllow & (ALLOW_SlowCmd|ALLOW_Return));
-			break;
-		case NEST_Select:
-			if(ThisName!=NAME_NONE) throwf("Internal name error in PushNest Select");
-			if(!PrevNode) throwf("Internal error in PushNest Select");
-			TopNest->Allow = ALLOW_Case + ALLOW_Default + (PrevAllow & (ALLOW_SlowCmd|ALLOW_Return));
-			break;
-		case NEST_For:
-			if(ThisName!=NAME_NONE) throwf("Internal name error in PushNest For");
-			if(!PrevNode) throwf("Internal error in PushNest For");
-			TopNest->Allow = ALLOW_Cmd + (PrevAllow & (ALLOW_SlowCmd|ALLOW_Return));
-			break;
-		case NEST_Case:
-			if(ThisName!=NAME_NONE) throwf("Internal name error in PushNest Case");
-			if(!PrevNode) throwf("Internal error in PushNest Case");
-			TopNest->Allow = ALLOW_Cmd + (PrevAllow & (ALLOW_SlowCmd||ALLOW_Return));
-			break;
-		default:
-			throwf("Internal error in PushNest, type %i",NestType);
-			break;
-	}
-	if( TopNest->Node )
-	{
-		// If local variable declarations are allowed here, allocate them.
-		TopNest->Node->NumProperties = 0;
-
-		if((TopNest->Allow & ALLOW_VarDecl) && (NestType != NEST_Class))
-		{
-			TopNest->Properties	= (FClassProperty *)Mem->Get(UClass::MAX_CLASS_PROPERTIES * sizeof(FClassProperty));
-			TopNest->Data   	= (BYTE           *)Mem->Get(PROPERTIES_DATA_SIZE         * sizeof (BYTE));
-		}
-		else
-		{
-			TopNest->Properties = NULL;
-			TopNest->Data       = NULL;
-		}
-
-		// If code is allowed here, allocate space for it.
-		if(TopNest->Allow & ALLOW_Cmd)
-		{
-			TopNest->Node->CodeStart = (int)(CodeTop-CodeStart);
-		}
-	}
-}
-
-//
-// Decrease the nesting level and handle any errors that result.
-//
-void FScriptCompiler::PopNest(ENestType NestType,const char *Descr)
-{
-	if(NestLevel<=0)
-		throwf("Unexpected '%s' at global scope",Descr,NestTypeName(NestType));
-
-	if(TopNest->NestType!=NestType)
-	{
-		throwf("Unexpected '%s' in '%s' block",Descr,NestTypeName(TopNest->NestType));
-	}
-	if(TopNest->Properties)
-	{
-		// Move all of this nesting level's properties and data to the script's properties
-		// and data bins.
-
-		TopNest->Node->PropertiesOffset = TotalLocalProperties;
-		TopNest->Node->DataOffset       = TotalLocalDataSize;
-
-		int NumProperties    = TopNest->Node->NumProperties;
-		int NumPropertyBytes = NumProperties * sizeof(FClassProperty);
-
-		if(NumProperties>0)
-		{
-			TopNest->Node->DataLength =
-				TopNest->Properties[NumProperties-1].Offset + 
-				TopNest->Properties[NumProperties-1].PropertySize();
-		}
-		else TopNest->Node->DataLength = 0;
-
-		memcpy(&LocalProperties[TotalLocalProperties],TopNest->Properties,TopNest->Node->NumProperties * sizeof(FClassProperty));
-		memcpy(&LocalData      [TotalLocalDataSize  ],TopNest->Data,      TopNest->Node->DataLength);
-
-		TotalLocalProperties += TopNest->Node->NumProperties;
-		TotalLocalDataSize   += TopNest->Node->DataLength;
-
-		Mem->Release(TopNest->Properties);
-	}
-	if(TopNest->Allow & ALLOW_Cmd)
-	{
-		// End of code block.
-		EmitB(SC_End);
-	}
-	else if( CodeTop != TopNest->StartCodeTop ) 
-		throwf("Internal nest code bytes inconsistency");
-
-	NestLevel--;
-	TopNest--;
-}
-
-/*-----------------------------------------------------------------------------
-	Compiler directives.
------------------------------------------------------------------------------*/
-
-//
-// Process a compiler directive.
-//
-void FScriptCompiler::ProcessCompilerDirective()
-{
-	FToken Directive;
-
-	if(!GetIdentifier(Directive)) 
-		throwf("Missing compiler directive after '#'");
-
-	if		(Directive.Matches("DumpNest"))		DebugDumpNest();
-	else if	(Directive.Matches("Error"))		throwf("#Error directive encountered");
-	else if	(Directive.Matches("Decompile"))	Decompile = 1;
-	else if	(Directive.Matches("DecompileAll"))	Decompile = 2;
-	else throwf("Unrecognized compiler directive %s",Directive.Identifier);
-}
-
-/*-----------------------------------------------------------------------------
-	Variable declaration parser.
------------------------------------------------------------------------------*/
-
-//
-// Parse one variable declaration and set up its properties in VarProperty.
-// Returns pointer to the class property if success, or NULL if there was no variable 
-// declaration to parse. Called during variable 'Dim' declaration and function 
-// parameter declaration.
-//
-// If you specify a hard-coded name, that name will be used as the variable name (this
-// is used for function return values, which are automatically called "ReturnValue"), and
-// a default value is not allowed.
-//
-FClassProperty *FScriptCompiler::GetVarDecl
-	(
-	int				*NumPropertiesPtr, 
-	FClassProperty	*PropertiesPtr, 
-	BYTE			*Data,
-	int				NoOverrides,
-	int				NoArrays,
-	int				NoDefault,
-	char			*HardcodedName
-	)
-{
-	FClassProperty VarProperty,*Result;
-	int ArraySize  = 1;
-	int StringSize = 0;
-	VarProperty.Init();
-
-	// Get varible name.
-	FToken VarToken;
-	if( HardcodedName )
-	{
-		// Hard-coded variable name, such as with return value.
-		VarToken.Type = TOKEN_Identifier;
-		strcpy(VarToken.Identifier,HardcodedName);
-	}
-	else if( !GetIdentifier(VarToken) ) 
-		return NULL;
-
-	VarProperty.Name.Add(VarToken.Identifier);
-	if( VarProperty.Name.IsNone() ) 
-		throwf("Dim: '%s' is illegal",VarToken.Identifier);
-
-	// Verify that the variable is unique within this scope.
-	for( int i=0; i<*NumPropertiesPtr; i++ )
-	{
-		if( PropertiesPtr[i].Name==VarProperty.Name )
-		{
-			if( (NumPropertiesPtr==&Class->Num) 
-				&& Class->ParentClass && (i<Class->ParentClass->Num) )
-			{
-				throwf("Dim: Variable '%s' is defined in parent class '%s'",VarToken.Identifier,Class->ParentClass->Name);
-			}
-			else
-			{
-				throwf("Dim: Variable '%s' already defined",VarToken.Identifier);
-			}
-		}
-	}
-
-	// Get optional dimension immediately after name.
-	if( MatchSymbol("(") )
-	{
-		if(NoArrays) throwf("Arrays aren't allowed in this context");
-		if(!GetIntegerConst(&ArraySize)) throwf("Dim %s: Missing array size",VarToken.Identifier);
-		if(ArraySize<=0) throwf("Dim %s: Illegal array size %i",VarToken.Identifier,ArraySize);
-		if(!MatchSymbol(")")) throwf("Dim %s: Missing ')'",VarToken.Identifier);
-		VarProperty.Flags |= CPF_Array;
-	}
-
-	// Get property flag overrides.
-	if(!MatchIdentifier("As")) 
-		throwf("Dim %s: missing 'As'",VarToken.Identifier);
-
-	FToken PropToken;
-	while( GetToken(PropToken) && VarProperty.SetFlags(PropToken.Identifier) )
-	{
-		if( PropToken.Matches("Editable") && MatchSymbol("(") )
-		{
-			// Get optional property editing category.
-			FToken Category;
-			if(!GetIdentifier(Category)) throwf("Missing editable category");
-			VarProperty.Category.Add(Category.Identifier);
-			if(!MatchSymbol(")")) throwf("Missing ')' after editable category");
-		}
-	}
-	UngetToken(PropToken);
-
-	if( (VarProperty.Flags & CPF_Edit) && (VarProperty.Category==NAME_NONE) )
-	{
-		// If editable but no category was specified, the category name is our class name.
-		VarProperty.Category.Add( Class->Name );
-	}
-	if( NoOverrides && (VarProperty.Flags & ~CPF_Array))
-	{
-		throwf ("Variable type modifiers (Const, Static, Editable, etc) are not allowed here");
-	}
-
-	// Get variable type.
-	FToken VarType;
-	if( !GetIdentifier(VarType) )
-		throwf("Dim %s: Missing variable type",VarToken.Identifier);
-
-	// Get optional string size immediately after type.
-	if( MatchSymbol("(") )
-	{
-		if(!VarType.Matches("String")) throwf("Arrays dimension belongs after name, not type");
-		if(!GetIntegerConst(&StringSize)) throwf("Dim %s: Missing string size",VarToken.Identifier);
-		if(StringSize<=0) throwf("Dim %s: Illegal string size %i",VarToken.Identifier,StringSize);
-		if(!MatchSymbol(")")) throwf("Dim %s: Missing ')'",VarToken.Identifier);
-	}
-
-	// Parse variable type and dimension.
-	char Error[80];
-	if( !VarProperty.SetType(VarType.Identifier,ArraySize,StringSize,Error) )
-		throwf("Dim %s: %s",VarToken.Identifier,Error);
-
-	// Get default value.
-	FToken *ConstValue=NULL;
-	if( MatchSymbol("=") )
-	{
-		if(NoDefault) 
-			throwf ("You don't need an '=' here");
-
-		if( VarProperty.Flags & CPF_Edit )
-			throwf("Dim %s: Can't specify default value for editable properties",VarToken.Identifier);
-
-		FToken TempConstValue;
-		EClassPropertyType Type;
-		if( !GetConstExpr(TempConstValue,&Type) )
-			throwf("Dim %s: No default value or bad default value",VarToken.Identifier);
-
-		ConstValue = &TempConstValue;
-		VarProperty.Flags |= CPF_Initialized;
-	}
-	else if( (VarProperty.Flags & (CPF_Const|CPF_Edit))==CPF_Const )
-	{
-		throwf("Dim %s: You must specify a value for Const properties",VarToken.Identifier);
-	}
-
-	// Add to properties bin.
-	if( *NumPropertiesPtr >= UClass::MAX_CLASS_PROPERTIES )
-	{
-		throwf("Dim %s: Too many variables are declared here",VarToken.Identifier);
-	}
-	Result = VarProperty.AddToFrame(NumPropertiesPtr,PropertiesPtr);
-	if( !Result )
-	{
-		throwf("Dim %s: illegal variable declaration",VarToken.Identifier);
-	}
-	if( !VarProperty.InitPropertyData(Data,ConstValue) )
-	{
-		throwf("Dim %s: Illegal constant value",VarToken.Identifier);
-	}
-	return Result;
-}
-
-/*-----------------------------------------------------------------------------
-	Statement compiler.
------------------------------------------------------------------------------*/
-
-//
-// Compile one line of the script.  Returns 1 if successful, or 0 if either
-// at end of file, or an error occured.
-//
-int FScriptCompiler::CompileStatement()
-{
-	FToken Token;
-
-	SkipBlanks();
-	if(!GetToken(Token))
-		return 0; // End of file.
-
-	switch (Token.Type)
-	{
-		case TOKEN_Identifier:
-		case TOKEN_Symbol:
-			// Process this below.
-			break;
-
-		case TOKEN_IntegerConst:
-			throwf("Unexpected integer constant %i at start of line",Token.Integer);
-			return 0;
-
-		case TOKEN_FloatConst:
-			throwf("Unexpected floating point constant %f at start of line",Token.Float);
-			return 0;
-
-		case TOKEN_StringConst:
-			throwf("Unexpected string constant \"%s\" at start of line",Token.String);
-			return 0;
-
-		case TOKEN_ResourceConst:
-			throwf("Unexpected resource constant at start of line");
-			return 0;
-
-		case TOKEN_VectorConst:
-			throwf("Unexpected vector constant at start of line");
-			return 0;
-
-		case TOKEN_RotationConst:
-			throwf("Unexpected rotation constant at start of line");
-			return 0;
-
-		case TOKEN_NameConst:
-			throwf("Unexpected name constant at start of line");
-			return 0;
-
-		default:
-			throwf("Internal compiler error, unknown token type %i",Token.Type);
-			return 0;
-	}
-	if( Token.Matches("Class") )
-	{
-		// Start of a class block.
-		CheckAllow(Token,ALLOW_Class);
-
-		// Class name.
-		if(!GetToken(Token))
-			throwf("Missing class name");
-
-		if(!Token.Matches(Class->Name))
-			throwf("Class must be named %s, not %s",Class->Name,Token.Identifier);
-
-		PushNest(NEST_Class,Class->Name);
-
-		// Class attributes.
-		int GotParent=0;
-		while (GetToken(Token))
-		{
-			if( Token.Matches("Intrinsic") )
-				{
-				Class->Intrinsic=1;
-
-				// Don't allow any scripting logic in this script, just definitions.
-				TopNest->DenyIntrinsic  = ALLOW_SlowCmd|ALLOW_Cmd|ALLOW_When|ALLOW_State;
-				TopNest->Allow         &= ~TopNest->DenyIntrinsic;
-			}
-			else if( Token.Matches("Expands") )
-			{
-				if(!GetIdentifier(Token)) 
-					throwf("Missing parent class name");
-
-				UClass *TempClass = new(Token.Identifier,FIND_Optional)UClass;
-
-				if(!TempClass)
-					throwf("Parent class %s not found",Token.Identifier);
-
-				if( Class->ParentClass==NULL )
-					Class->ParentClass = TempClass;
-				else if( Class->ParentClass!=TempClass )
-					throwf("%s's parent class must be %s, not %s",Class->Name,Class->ParentClass->Name,TempClass->Name);
-
-				// Copy parent's stack node links if parent is scripted.
-				UScript *ParentScript = Class->ParentClass->Script;
-				if( ParentScript )
-				{
-					FStackNode *ParentNode = FindStackNode(ParentScript,0);
-
-					TopNest->Node->ChildFunctions = ParentNode->ChildFunctions;
-					TopNest->Node->ChildStates    = ParentNode->ChildStates;
-				}
-				GotParent = 1;
-			}
-			else
-			{
-				throwf("Class: bad definition");
-			}
-		}
-
-		if(Class->ParentClass && !GotParent)
-		{
-			throwf("Class: 'Expands %s' missing",Class->ParentClass->Name);
-		}
-
-		// Copy stack tree and all properties from parent class.
-		if(Class->ParentClass)
-		{
-			Class->AddParentProperties();
-		}
-	}
-	else if( Token.Matches("Function") || Token.Matches("When") || Token.Matches("Operator") )
-	{
-		ENestType NestType;
-		FToken Function;
-		int NoDefaults;
-
-		if( !Token.Matches("Operator") )
-		{
-			// Get function name.
-			if(!GetIdentifier(Function))
-				throwf("Missing function name");
-		}
-		else
-		{
-			// Get operator name or symbol.
-			if((!GetIdentifier(Function)) && (!GetSymbol(Function)))
-				throwf("Missing operator name");
-		}
-
-		// Make sure this is allowable here.
-		if( Token.Matches("Function") )
-		{
-			NestType		= NEST_Function;
-			NoDefaults		= 0;
-			CheckAllow(Token,ALLOW_Function);
-		}
-		else if( Token.Matches("Operator") )
-		{
-			NestType		= NEST_Operator;
-			NoDefaults		= 1;
-			CheckAllow(Token,ALLOW_Function);
-		}
-		else if( Token.Matches("When") )
-		{
-			NestType		= NEST_When;
-			NoDefaults		= 0;
-			CheckAllow(Token,ALLOW_When);
-		}
-		else
-		{
-			throwf("Function/Operator/When inconsistency");
-			NestType=NEST_When; NoDefaults=0; // Avoid C2220.
-		}
-
-		// Allocate local property frame, push nesting level and verify 
-		// uniqueness at this scope level.
-		PushNest( NestType,Function.Identifier );
-
-		// Get parameter list.
-		if(MatchSymbol("("))
-		{
-			int First=1,Optional=0;
-			do
-			{
-				FClassProperty *Property = GetVarDecl
-				(
-					&TopNest->Node->NumProperties,
-					TopNest->Properties,
-					TopNest->Data,
-					1,0,NoDefaults,NULL
-				);
-				if( !Property )
-				{
-					if(First)
-						break;
-					else
-						throwf("Bad parameter variable declaration");
-				}
-				Property->Flags |= CPF_Param;
-
-				if( Property->Flags & CPF_Initialized )
-				{
-					Property->Flags |= CPF_OptionalParam;
-					Optional=1;
-				}
-				else if( Optional ) 
-					throwf("After an optional parameters, all other parmeters must be optional");
-
-				First=0;
-			} while (MatchSymbol(","));
-
-			if(!MatchSymbol(")"))
-				throwf("Missing ')' after parameter list",Token.Identifier);
-		}
-		else if( NestType == NEST_Function ) 
-			throwf("Missing '(' after function name");
-		else if( NestType == NEST_Operator ) 
-			throwf("Missing '(' after operator name");
-
-		// Get return type, if any.
-		FToken Temp;
-		if( GetIdentifier(Temp) )
-		{
-			UngetToken(Temp);
-			if( Temp.Matches("As") )
-			{
-				if(NestType == NEST_When)
-					throwf("'When' handlers can't return values");
-
-				FClassProperty *Property = GetVarDecl
-				(
-					&TopNest->Node->NumProperties,
-					TopNest->Properties,
-					TopNest->Data,
-					1,1,1,"ReturnValue"
-				);
-				if(!Property)
-					throwf("Bad function return type");
-
-				Property->Flags |= CPF_ReturnValue;
-			}
-		}
-
-		// For operators, verify that: the operator is either binary or unary, there is
-		// a return value, and all parameters have the same type as the return value.
-		if(Token.Matches("Operator"))
-		{
-			int n = TopNest->Node->NumProperties;
-			if((n<2)||(n>3))
-				throwf("Operator must have one or two parameters");
-
-			if(!(TopNest->Properties[n-1].Flags&CPF_ReturnValue))
-				throwf("Operator must have a return value");
-
-			if( (n==3) && (TopNest->Properties[0].Type!=TopNest->Properties[1].Type) )
-				throwf("All operator parameters must be of the same type");
-		}
-		int				NumParams1,NumParams2;
-		FClassProperty	*Params1,*Params2;
-		FindParams(Script,Script->NumStackTree-1,&Params1,&NumParams1);
-
-		// Handle operator information.
-		if( NestType==NEST_Operator )
-		{
-			TopNest->Node->OperParams		= NumParams1;
-			TopNest->Node->OperType			= Params1[0].Type;
-			TopNest->Node->OperPrecedence	= 0;
-		}
-
-		// Verify parameter list and return type compatibility within the 
-		// function or event, if any, that it overrides.
-		for( int i=NestLevel-1; i>=0; i-- )
-		{
-			if(Nest[i].Node)
-			{
-				FStackNodeLink *Link = &Nest[i].Node->ChildFunctions;
-
-				while (Link->Script)
-				{
-					FStackNode *Node = FindStackNode(Link);
-
-					// If the other function's name matches this one's, process it.
-					if( (Node->Name==TopNest->Node->Name) && (Node!=TopNest->Node))
-					{
-						// Skip function we're defining now.
-
-						FindParams(Link->Script,Link->iNode,&Params2,&NumParams2);
-
-						// Prevent mismatch of underlying type (Function, Operator, Event).
-						if(Node->NestType!=TopNest->Node->NestType)
-						{
-							throwf("Redefinition of '%s' mismatches '%s' with '%s'",
-								Function.Identifier,NestTypeName(Node->NestType),NestTypeName(TopNest->Node->NestType));
-						}
-
-						// Assure parameter and return value compatibility for functions and events.
-						if( (Node->NestType==NEST_Function) || (Node->NestType==NEST_When) )
-						{
-							// See if this is a valid function/operator/when override, or an illegal 
-							// mismatched override.
-
-							if( NumParams1!=NumParams2 )
-							{
-								Mismatch:
-
-								if( Link->Script==Script )
-									throwf("Redefinition of %s '%s' differs from original",
-										Token.Identifier,Function.Identifier);
-								else 
-									throwf( "Redefinition of %s '%s' differs from original in script '%s'",
-										Token.Identifier,Function.Identifier,Link->Script->Name);
-								}
-							for( int i=0; i<NumParams1; i++ )
-							{
-								const DWORD MatchFlags = CPF_Param | CPF_ReturnValue;
-
-								// Make sure that param types and vital flags match.  
-								// Don't care about parameter names, etc.
-								if(Params1[i].Type!=Params2[i].Type) 
-									goto Mismatch;
-
-								if((Params1[i].Flags ^ Params2[i].Flags) & MatchFlags) 
-									goto Mismatch;
-							}
-						}
-						// For debugging:
-						//AddResultText("%s::%s\r\n",OtherScript->Name,Node->Name.Name());
-					}
-					Link = &Node->Next;
-				}
-			}
-		}
-
-		// See if this is intrinsic.
-		if(MatchIdentifier("Intrinsic"))
-		{
-			if(!Class->Intrinsic) 
-				throwf("Scripted classes may not contain intrinsic functions");
-			
-			if(NestType==NEST_When) 
-				throwf ("Only intrinsic Functions are allowed, not Events");
-
-			TopNest->Node->StackNodeFlags |= SNODE_Intrinsic;
-		}
-		else if( Class->Intrinsic )
-		{
-			throwf("Intrinsic classes may only contain intrinsic functions");
-		}
-
-		// Check for special overrides.
-		if(MatchIdentifier("Fast"))
-		{
-			// This is a fast (prebinding, non-overridable) function, event, or operator.
-			TopNest->Node->StackNodeFlags |= SNODE_Fast;
-		}
-		else if(TopNest->Node->NestType==NEST_Operator)
-		{
-			throwf("Operators must be declared as 'Fast'");
-		}
-		if(MatchIdentifier("AutoConversion"))
-		{
-			if((TopNest->Node->NestType!=NEST_Operator) ||
-				(TopNest->Node->NumProperties != 2))
-			{
-				throwf("AutoConversion is only allowed for unary operators");
-			}
-			TopNest->Node->StackNodeFlags |= SNODE_AutoConversion;
-		}
-		if(Class->Intrinsic)
-		{
-			// If intrinsic, no function body is allowed.
-			char PopMsg[80];
-			sprintf(PopMsg,"Intrinsic function %s",Token.Identifier);
-			PopNest(NestType,PopMsg);
-		}
-		else
-		{
-			// Handle single-line command form with implied "EndWhen/EndFunction".
-			FToken NewToken;
-			if( GetToken(NewToken) )
-			{
-				UngetToken(NewToken);
-
-				if(!CompileStatement()) 
-					throwf("Illegal commands following %s '%s'",Token.Identifier,Function.Identifier);
-
-				char PopMsg[80];
-				sprintf(PopMsg,"Single-line %s",Token.Identifier);
-
-				PopNest(NestType,PopMsg);
-			}
-		}
-	}
-	else if( Token.Matches("EndOperator") )
-	{
-		PopNest( NEST_Operator,"EndOperator" );
-	}
-	else if( Token.Matches("EndFunction") )
-	{
-		PopNest( NEST_Function,"EndFunction" );
-	}
-	else if( Token.Matches("EndWhen") )
-	{
-		PopNest( NEST_When,"EndWhen" );
-	}
-	else if( Token.Matches("Return") )
-	{
-		CheckAllow( Token,ALLOW_Return );
-	}
-	else if( Token.Matches("Dim") || Token.Matches("Static") )
-	{
-		// Variable definition.
-
-		int				*NumPropertiesPtr,NoOverrides;
-		FClassProperty	*PropertiesPtr;
-		BYTE			*Data;
-		AActor::EPropertyBin Bin;
-
-		CheckAllow(Token,ALLOW_VarDecl);
-		if( !TopNest->Node )
-			throwf("Internal stack node error on Dim");
-
-		if( Token.Matches("Static") )
-		{
-			// Declaring static variables.
-			NumPropertiesPtr	= &Class->Num;
-			PropertiesPtr	    = &Class->Element(0);
-			Data				= (BYTE *)&Class->DefaultActor;
-			NoOverrides			= 0;
-			Bin					= AActor::PROPBIN_Static;
-		}
-		else if( !TopNest->Properties )
-		{
-			// Declaring global variables.
-			NumPropertiesPtr	= &Class->Num;
-			PropertiesPtr	    = &Class->Element(0);
-			Data				= (BYTE *)&Class->DefaultActor;
-			NoOverrides			= 0;
-			Bin					= AActor::PROPBIN_Global;
-		}
-		else
-		{
-			// Declaring local variables.
-			NumPropertiesPtr	= &TopNest->Node->NumProperties;
-			PropertiesPtr		= TopNest->Properties;
-			Data				= TopNest->Data;
-			NoOverrides			= 1;
-			Bin					= AActor::PROPBIN_Local;
-		}
-		do
-		{
-			if( !GetVarDecl(NumPropertiesPtr,PropertiesPtr,Data,NoOverrides,0,0,NULL) )
-			{
-				throwf( "Dim: Missing variable declaration" );
-			}
-		} while (MatchSymbol(","));
-	}
-	else if( Token.Matches("Retract") )
-	{
-		// Retract editable properties.
-
-		if(!MatchIdentifier("All")) 
-			throwf("Must use 'Retract All'");
-
-		if(!Class->ParentClass) 
-			throwf("Can only retract editable categories in child classes");
-		
-		for (int i=0; i<Class->ParentClass->Num; i++)
-		{
-			Class->Element(i).Flags &= ~CPF_Edit;
-		}
-	}
-	else if(Token.Matches("EnumDef"))
-	{
-		// Enumeration definition.
-		CheckAllow(Token,ALLOW_VarDecl);
-
-		FToken EnumToken;
-		
-		if( !GetIdentifier(EnumToken) )
-			throwf( "Missing enumeration name" );
-
-		if( !MatchSymbol  ("=") )
-			throwf( "Missing '=' in enumeration" );
-		
-		// Parse all enums.
-		int   NumEnums=0;
-		FToken TagTokens[255]; // Maximum enumerations allowed.
-
-		while( GetIdentifier(TagTokens[NumEnums]) )
-		{
-			for( int i=0; i<NumEnums; i++ )
-			{
-				if( !stricmp(TagTokens[i].Identifier,TagTokens[NumEnums].Identifier) )
-					throwf("Duplicate enumerator %s",TagTokens[NumEnums].Identifier);
-			}
-
-			if(++NumEnums>255)
-				throwf("Exceeded maximum of 255 enumerators");
-
-			if(!MatchSymbol(","))
-				break;
-		}
-
-		if( !NumEnums )
-			throwf("Enumeration must contain at least one enumerator");
-		
-		if( GetToken(Token) )
-			throwf("Bad '%s' in enumeration",Token.Descr());
-
-		// Create enumeration resource.
-		FName TempName;
-		UEnum *TempEnum = new(EnumToken.Identifier,CREATE_Replace)UEnum(NumEnums);
-		for (int i=0; i<NumEnums; i++)
-		{
-			TempName.Add(TagTokens[i].Identifier);
-			TempEnum->Add(TempName);
-		}
-	}
-	else if(Token.Matches("State"))
-	{
-		// State block.
-		CheckAllow(Token,ALLOW_State);
-
-		FToken NameToken;
-		if( !GetIdentifier(NameToken) )
-			throwf("Missing state name");
-
-		PushNest(NEST_State,NameToken.Identifier);
-
-		if( MatchSymbol(",") )
-		{
-			FToken StateOverride;
-			while( GetIdentifier(StateOverride) )
-			{
-				if(StateOverride.Matches("Auto"))
-				{
-					TopNest->Node->StackNodeFlags |= SNODE_Auto;
-				}
-				else if(StateOverride.Matches("Editable"))
-				{
-					TopNest->Node->StackNodeFlags |= SNODE_Editable;
-				}
-				else
-				{
-					throwf("Bad state override '%s'",StateOverride.Identifier);
-				}
-			}
-		}
-	}
-	else if( Token.Matches("EndState") )
-	{
-		// End of State block.
-		PopNest(NEST_State,"EndState");
-	}
-	else if( Token.Matches("#") )
-	{
-		// Compiler directive.
-		ProcessCompilerDirective();
-	}
-	else if( Token.Matches("Select") )
-	{
-		// Select Case.
-		CheckAllow(Token,ALLOW_Cmd);
-
-		if(!MatchIdentifier("Case"))
-			throwf("Correct syntax is 'Select Case <expression>'");
-
-		PushNest(NEST_Select,"");
-	}
-	else if( Token.Matches("EndSelect") )
-	{
-		// EndSelect.
-		if(TopNest->NestType==NEST_Case)
-			PopNest(NEST_Case,"Case");
-		
-		PopNest(NEST_Select,"EndSelect");
-	}
-	else if(Token.Matches("Case"))
-	{
-		if(TopNest->NestType==NEST_Case)
-			PopNest(NEST_Case,"Case");
-		
-		CheckAllow(Token,ALLOW_Case);
-		PushNest(NEST_Case,"");
-	}
-	else if(Token.Matches("Default"))
-	{
-		if(TopNest->NestType==NEST_Case)
-			PopNest(NEST_Case,"Case");
-		
-		CheckAllow(Token,ALLOW_Case);
-
-		// Don't allow additional Cases after Default.
-		TopNest->Allow &= ~(ALLOW_Case);
-		
-		PushNest(NEST_Case,"");
-	}
-	else if(Token.Matches("Test"))
-	{
-		// Test.
-		CheckAllow( Token,ALLOW_Cmd );
-		EmitB( SC_Test );
-	}
-	else if(Token.Matches("TestEval"))
-	{
-		// TestEval.
-		CheckAllow( Token,ALLOW_Cmd );
-		EmitB( SC_TestEval );
-		GetExpr( CPT_None,NULL );
-	}
-	else if(Token.Matches("If"))
-	{
-		// If.
-		CheckAllow	(Token,ALLOW_Cmd);
-		PushNest	(NEST_If,"");
-		TopNest->Allow |= ALLOW_ElseIf;
-	}
-	else if(Token.Matches("ElseIf"))
-	{
-		// ElseIf.
-		CheckAllow	(Token,ALLOW_ElseIf);
-		PopNest		(NEST_If,"ElseIf");
-		PushNest	(NEST_If,"");
-		TopNest->Allow |= ALLOW_ElseIf;
-	}
-	else if( Token.Matches("Else") )
-	{
-		CheckAllow(Token,ALLOW_ElseIf);
-		PopNest(NEST_If,"Else");
-		PushNest(NEST_If,"");
-		// Don't allow ElseIf here!!
-	}
-	else if( Token.Matches("EndIf") )
-	{
-		PopNest(NEST_If,"EndIf");
-	}
-	else if( Token.Matches("While") )
-	{
-		CheckAllow(Token,ALLOW_Cmd);
-		PushNest(NEST_Loop,"");
-	}
-	else if(Token.Matches("Do"))
-	{
-		CheckAllow(Token,ALLOW_Cmd);
-		PushNest(NEST_Loop,"");
-	}
-	else if(Token.Matches("Until"))
-	{
-		PopNest(NEST_Loop,"Until");
-	}
-	else if( Token.Matches("EndWhile") || Token.Matches("EndDo") || Token.Matches("Loop") || Token.Matches("WEnd") )
-	{
-		PopNest(NEST_Loop,Token.Identifier);
-	}
-	else if(Token.Matches("For"))
-	{
-		CheckAllow(Token,ALLOW_Cmd);
-		PushNest(NEST_For,"");
-	}
-	else if(Token.Matches("Next"))
-	{
-		PopNest(NEST_For,"Next");
-	}
-	else if(Token.Matches("Goto"))
-	{
-		CheckAllow(Token,ALLOW_Cmd);
-	}
-	else
-	{
-		throwf("Bad command %s",Token.Identifier);
-	}
-
-	// Make sure no junk is left over.
-	if(GetToken(Token))
-		throwf("Misplaced '%s'",Token.Descr());
-	
-	return 1;
-}
-
-/*-----------------------------------------------------------------------------
-	FStackNode.
------------------------------------------------------------------------------*/
-
-//
-// Init a regular node.
-//
-void FStackNode::Init(ENestType ThisNestType,FName ThisName)
-{
-	ChildFunctions.Init();
-	ChildStates.Init();
-	Next.Init();
-
-	PropertiesOffset		= 0;
-	DataOffset				= 0;
-	DataLength				= 0;
-	NumProperties			= 0;
-
-	CodeStart				= 0;
-	NestType				= ThisNestType;
-	Name					= ThisName;
-
-	StackNodeFlags			= 0;
-	OperParams				= 0;
-	OperType				= CPT_None;
-	OperPrecedence			= 0;
-
-	switch (ThisNestType)
-	{
-		case NEST_None:
-			throwf("Internal: Illegal stack tree");
-			break;
-
-		case NEST_Class:
-			if(ThisName==NAME_NONE) throwf("Internal: Missing name");
-			break;
-
-		case NEST_State:
-			Name = ThisName;
-			if(ThisName==NAME_NONE) throwf("Internal: Missing name");
-			break;
-
-		case NEST_When:
-		case NEST_Function:
-		case NEST_Operator:
-			if(ThisName==NAME_NONE) throwf("Internal: Missing name");
-			break;
-
-		case NEST_If:
-		case NEST_Loop:
-		case NEST_Select:
-		case NEST_Case:
-		case NEST_For:
-			//throwf("Not supported");
-			break;
-	}
-}
-
-//
-// Return all resource and name references in a stack tree node.
-//
-void FStackNode::QueryReferences(UResource *Res,FResourceCallback &Callback, DWORD ResourceContextFlags)
-{
-	Callback.Name(Res,&Name,ResourceContextFlags);
-}
-
-/*-----------------------------------------------------------------------------
-	Main script compiling routine.
------------------------------------------------------------------------------*/
-
-//
-// Compile the script associated with the specified class.
-// Returns 1 if compilation was a success, 0 if any errors occured.
-//
-int FScriptCompiler::Compile(UClass *CompileClass,FMemPool *MemPool,int ActorPropertiesAreValid)
-	{
-	guard(FScriptCompiler::Compile);
-
-	Mem = MemPool;
-	void *MemTop = Mem->Get(0);
-	char *ActorPropertiesText=NULL;
-	void *SavedClassData,*SavedClass;
-	int  ClassDataSize,Success = 0;
-
-	// Set up.
-	Class			= CompileClass;
-	Script			= new(Class->Name,CREATE_Replace)UScript;
-	Class->Script	= Script;
-	Script->Class	= Class;
-
-	// Save stuff for later recall.
-	ClassDataSize  = Class->QueryMinSize();
-	SavedClass	   = Mem->Get(sizeof(UClass));	memcpy(SavedClass,    Class,          sizeof(UClass));
-	SavedClassData = Mem->Get(ClassDataSize);	memcpy(SavedClassData,Class->GetData(),ClassDataSize);
-	
-	// Declare as non-intrinsic until declared otherwise.
-	Class->Intrinsic = 0;
-
-	// If the actor has valid properties, save them.
-	if(ActorPropertiesAreValid)
-	{
-		ActorPropertiesText = (char *)Mem->Get(65536);
-		int Len=ExportActor(&Class->DefaultActor,ActorPropertiesText,NAME_NONE,0,0,CPF_Edit,NULL,0,-1,NAME_NONE);
-	}
-
-	// Init stack tree.
-	StackTree			 = (FStackNode *)Mem->Get(MAX_STACK_TREE * sizeof(FStackNode));
-	Script->NumStackTree = 0;
-
-	// Init compiler variables.
-	Input				= Class->ScriptText->GetData();
-	InputSize			= Class->ScriptText->Num;
-	InputPos			= 0;
-	InputLine			= 1;
-	PrevPos				= 0;
-	PrevLine			= 1;
-	Decompile			= 0;
-
-	// Init nesting.
-	NestLevel			= 0;
-	TopNest				= &Nest[-1];
-	PushNest(NEST_None,"");
-
-	// Init code.
-	CodeStart			= (BYTE *)Mem->Get(MAX_CODE_SIZE);
-	CodeTop				= CodeStart+8; // 8-byte padding
-
-	// Init global properties.
-	Class->Num			= 0;
-
-	// Init local properties.
-	TotalLocalProperties	= 0;
-	TotalLocalDataSize		= 0;
-	LocalProperties			= (FClassProperty *)Mem->Get(16 * UClass::MAX_CLASS_PROPERTIES * sizeof(FClassProperty));
-	LocalData				= (BYTE           *)Mem->Get(16 * PROPERTIES_DATA_SIZE         * sizeof(BYTE));;
-
-	// Begin.
- 	AddResultText("Compiling %s...\r\n",Class->Name);
-	GApp->StatusUpdatef("Compiling %s",0,0,Class->Name);
-	try
-	{
-		// Compile until we get an error
-		if(Class->ParentClass && !Class->ParentClass->Script)
-		{
-			throwf("'%s' can't be compiled: Parent script '%s' has errors",Class->Name,Class->ParentClass->Name);
-		}
-		while (CompileStatement()) 
-		{
-			StatementsCompiled++;
-		}
-		if(NestLevel==0) throwf("Internal nest inconsistency");
-		if(NestLevel==1) throwf("Missing 'Class' or 'Module' definition");
-		if(NestLevel>2)  throwf("Unexpected end of script in '%s' block",NestTypeName(TopNest->NestType));
-
-		// Must set class before calling ImportActorProperties.
-		Class->DefaultActor.Class = Class; 
-
-		// Update the default actor.
-		if(ActorPropertiesAreValid) ImportActorProperties(&Class->DefaultActor,ActorPropertiesText);
-		Success = 1;
-
-		// Allocate the script's data, and move the state tree, property list, property data, and
-		// code pool into the script's data while relocating their various offsets.
-		int StackTreeSize		= Script->NumStackTree * sizeof(FStackNode);
-		int LocalPropertySize	= TotalLocalProperties * sizeof(FClassProperty);
-		int CodeSize			= (int)(CodeTop-CodeStart);
-
-		int StackTreeOffset     = 0;
-		int LocalPropertyOffset = StackTreeSize;
-		int LocalDataOffset     = StackTreeSize + LocalPropertySize;
-		int CodeOffset          = StackTreeSize + LocalPropertySize + TotalLocalDataSize;
-
-		Script->Length			= StackTreeSize + LocalPropertySize + TotalLocalDataSize + CodeSize;
-		Script->CodeOffset		= CodeOffset;
-		Script->AllocData(1);
-		BYTE *Data				= Script->GetData();
-
-		//AddResultText("Props=%i, Data=%i -> %i\r\n",TotalLocalProperties,TotalLocalDataSize,Class->Script->Length);
-
-		for (int i=0; i<Script->NumStackTree; i++)
-		{
-			FStackNode *Node = &StackTree[i];
-			int iFirstProperty = Node->PropertiesOffset;
-			int iFirstData     = Node->DataOffset;
-
-			// Update and copy ith stack tree.
-			Node->PropertiesOffset = LocalPropertyOffset;
-			Node->DataOffset       = LocalDataOffset;
-
-			memcpy(Data+StackTreeOffset,Node,sizeof(FStackNode));
-			StackTreeOffset += sizeof(FStackNode);
-
-			if(Node->NumProperties)
-			{
-
-				// Copy local properties from ith stack tree.
-				memcpy
-				(
-					Data + LocalPropertyOffset,
-					&LocalProperties[iFirstProperty],
-					Node->NumProperties * sizeof(FClassProperty)
-				);
-				LocalPropertyOffset += Node->NumProperties * sizeof(FClassProperty);
-
-				// Copy local data from the ith stack tree.
-				memcpy
-				(
-					Data + LocalDataOffset,
-					&LocalData[iFirstData],
-					Node->DataLength
-				);
-				LocalDataOffset += Node->DataLength;
-			}
-		}
-		memcpy(Data+CodeOffset,CodeStart,CodeSize);
-
-		// Update "make" info.
-		Class->ScriptTextCRC  = Class->ScriptText->DataCRC();
-
-		if(Class->ParentClass && Class->ParentClass->ScriptText) Class->ParentTextCRC = Class->ParentClass->ScriptText->DataCRC();
-		else Class->ParentTextCRC = 0;
-
-		if(Decompile)
-		{
-			AddResultText("Script decompilation:\r\n");
-			UTextBuffer *Text = new("Decompile",CREATE_Replace)UTextBuffer(65536);
-			Class->Script->Decompile(Text->GetData(),Decompile==2);
-			AddResultText(Text->GetData());
-			Text->Kill();
-		}
-	}
-	catch (char *ErrorMsg)
-	{
-		// Handle compiler error.
-		AddResultText("Error in %s, Line %i: %s\r\n",Class->Name,InputLine,ErrorMsg);
-
-		Class->Script->Kill();
-
-		// Restore the class to its precompiled state.
-		memcpy(Class,           SavedClass,    sizeof(UClass));
-		memcpy(Class->GetData(),SavedClassData,ClassDataSize);
-
-		// Kill compiled script resource, preventing incomplete code from being executed.
-		Class->Script             = NULL;
-		Class->DefaultActor.Class = Class;
-
-		// Mark as bad.
-		Class->ScriptTextCRC  = 0;
-		Class->ParentTextCRC  = 0;
-	}
-	LinesCompiled += InputLine;
-	Mem->Release(MemTop);
-	return Success;
-	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	FScriptCompiler error handling.
------------------------------------------------------------------------------*/
-
-//
-// Print a formatted debugging message (same format as printf)
-//
-void VARARGS FScriptCompiler::AddResultText(char *Fmt,...)
-{
-	char 	 TempStr[4096];
+	char TempStr[4096];
 	va_list  ArgPtr;
 
 	va_start (ArgPtr,Fmt);
 	vsprintf (TempStr,Fmt,ArgPtr);
 	va_end   (ArgPtr);
 
-	debugf(LOG_Script,TempStr);
-	strcat(ErrorText->GetData(),TempStr);
+	guard(ScriptWarn);
+#if 0 /* Use this to cause a critical error for any script warnings */
+	appErrorf
+	(
+		"%s %s (%s) Warning: %s",
+		Stack.Object->GetClassName(),
+		Stack.Object->GetName(),
+		Stack.Link.Node().Name(),
+		TempStr
+	);
+#else /* Use this to displace a log message for any script warnings */
+	debugf
+	(
+		LOG_ScriptWarn,
+		"%s %s (%s) Warning: %s",
+		Stack.Object->GetClassName(),
+		Stack.Object->GetName(),
+		Stack.Link.Node().Name(),
+		TempStr
+	);
+#endif
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	Unaligned code reading routines.
+-----------------------------------------------------------------------------*/
+
+//warning: Byte order dependencies.
+
+static union
+{
+	struct			{BYTE B0,B1,B2,B3;};
+	struct			{WORD W0,W1;};
+	INT				I0;
+	DWORD			D0;
+	FLOAT			F0;
+} scriptTemp;
+
+inline INT scriptReadInt( BYTE *&Code )
+{
+	scriptTemp.B0 = Code[0];
+	scriptTemp.B1 = Code[1];
+	scriptTemp.B2 = Code[2];
+	scriptTemp.B3 = Code[3];
+	Code += sizeof(INT);
+	return scriptTemp.I0;
+}
+
+inline FLOAT scriptReadFloat( BYTE *&Code )
+{
+	scriptTemp.B0 = Code[0];
+	scriptTemp.B1 = Code[1];
+	scriptTemp.B2 = Code[2];
+	scriptTemp.B3 = Code[3];
+	Code += sizeof(FLOAT);
+	return scriptTemp.F0;
+}
+
+inline INT scriptReadWord( BYTE *&Code )
+{
+	scriptTemp.I0 = 0;
+	scriptTemp.B0 = Code[0];
+	scriptTemp.B1 = Code[1];
+	Code += sizeof(WORD);
+	return scriptTemp.I0;
+}
+
+inline FName scriptReadName( BYTE *&Code )
+{
+	scriptTemp.B0 = Code[0];
+	scriptTemp.B1 = Code[1];
+	Code += sizeof(FName);
+	return *(FName*)&scriptTemp.W0;
+}
+
+inline FStackNodeLink scriptReadStackNodeLink( BYTE *&Code )
+{
+	FStackNodeLink Temp = *(FStackNodeLink*)Code;
+	Code += sizeof(FStackNodeLink);
+	return Temp;
+}
+
+/*-----------------------------------------------------------------------------
+	Global script execution functions.
+-----------------------------------------------------------------------------*/
+
+//
+// Information remembered about an OutParm.
+//
+struct FOutParmRec
+{
+	BYTE *Dest;
+	BYTE *Src;
+	INT  Size;
 };
 
-/*-----------------------------------------------------------------------------
-	FScriptCompiler debugging.
------------------------------------------------------------------------------*/
+//
+// Find a label within a stack node link.
+// If found, sets DestLink and returns 1.
+// If not found, returns 0.
+//
+static int FindLabelLink( UScript *&DestScript, BYTE *&DestCode, FStackNodeLink *SourceLink, FName FindLabel )
+{
+	guard(FindLabelLink);
+	//debugf("FindLabelLink '%s' in state '%s'",FindLabel(),SourceLink->Node().Name());
 
-//
-// Display the compiler's complete internal nesting state:
-//
-void FScriptCompiler::DebugDumpNest()
+	if( FindLabel != NAME_None )
 	{
-	AddResultText("Compiler nesting levels:\r\n");
-	//
-	FNestInfo *NestInfo = &Nest[1];
-	for (int i=1; i<NestLevel; i++)
+		// Check this state and all its parent states for the label.
+		while( SourceLink->Class )
 		{
-		AddResultText("   Level %i: %s, Allow=%i\r\n",i,NestTypeName(NestInfo->NestType),NestInfo->Allow);
-		NestInfo++;
-		};
-	};
+			FStackNode &Node = SourceLink->Node();
+			if( Node.CodeLabelOffset != MAXWORD )
+			{
+				FLabelEntry *Label = (FLabelEntry *)&SourceLink->Class->Script->Element(Node.CodeLabelOffset);
+				while( Label->Name != NAME_None )
+				{
+					if( Label->Name == FindLabel )
+					{
+						// Found it.
+						DestScript = SourceLink->Class->Script;
+						DestCode   = &DestScript->Element(Label->iCode);
+						return 1;
+					}
+					Label++;
+				}
+			}
 
-void FClassProperty::DebugDump(char *Str)
-	{
-	sprintf(Str,"%s",Name.Name());
-	};
+			// Check parent state for this label.
+			SourceLink = &Node.Parent;
+		}
+	}
+
+	// Didn't find it.
+	DestCode = NULL;
+	return 0;
+	unguard;
+}
 
 //
-// Display the contents of a token structure:
+// Have an object go to a named state, and idle at no label.
+// If state is NAME_None or was not found, goes to no state.
+// Returns 1 if we went to a state, 0 if went to no state.
 //
-void FScriptCompiler::DebugDumpToken(FToken &Token)
+int AActor::GotoState( FName NewState )
+{
+	guard(AActor::GotoState);
+	debugState(GetClass()!=NULL);
+	debugState(GetClass()->Script!=NULL);
+	debugState(GetClass()->StackTree!=NULL);
+	debugState(GetClass()->StackTree->Num>0);
+
+	FStackNodeLink Link(NULL,0);
+	if( NewState != NAME_Auto )
 	{
-	switch (Token.Type)
+		// Find regular state.
+		for( Link = GetClass()->StackTree->Element(0).ChildStates; Link.Class; Link=Link.Node().Next )
+			if( Link.Node().Name == NewState )
+				break;
+	}
+	else
+	{
+		// Find auto state.
+		for( Link = GetClass()->StackTree->Element(0).ChildStates; Link.Class; Link=Link.Node().Next )
+			if( Link.Node().StackNodeFlags & SNODE_AutoState )
+				break;
+	}
+
+	if( !Link.Class )
+	{
+		// Going nowhere.
+		NewState = NAME_None;
+		Link	 = FStackNodeLink( GetClass(), 0 );
+	}
+
+	// Go there.
+	State			 = NewState;
+	MainStack.Link	 = Link;
+	MainStack.Script = Link.Class->Script;
+	MainStack.Code	 = NULL;
+	MainStack.InitVfCache();
+
+	// Compute probes.
+	MainStack.ProbeMask = 
+		(Link.Node().ProbeMask | GetClass()->StackTree->Element(0).ProbeMask) & Link.Node().IgnoreMask;
+
+	// End any latent action in progress.
+	LatentAction = 0;
+
+	return State!=NAME_None;
+	unguard;
+}
+
+//
+// Goto a label in the current state.
+// Returns 1 if went, 0 if not found.
+//
+int AActor::GotoLabel( FName Label )
+{
+	guard(AActor::GotoLabel);
+
+	debugState(GetClass()!=NULL);
+	debugState(GetClass()->Script!=NULL);
+	debugState(GetClass()->StackTree!=NULL);
+	debugState(GetClass()->StackTree->Num>0);
+
+	return FindLabelLink( MainStack.Script, MainStack.Code, &MainStack.Link, Label );
+	unguard;
+}
+
+
+//
+// Begin execution, by setting the state.
+//
+void AActor::BeginExecution()
+{
+	guard(UObject::BeginExecution);
+
+	// Init major info.
+	MainStack.InitVfCache();
+	MainStack.Locals = NULL;
+
+	checkState(GetClass()!=NULL);
+	checkState(GetClass()->Script!=NULL);
+	checkState(GetClass()->StackTree!=NULL);
+	checkState(GetClass()->StackTree->Num>0);
+	checkState(MainStack.Object==this);
+	checkState(Level!=NULL);
+	checkState(XLevel!=NULL);
+	checkState(XLevel->Element(0)!=NULL);
+	checkState(XLevel->Element(0)==Level);
+
+	// Init the state to None and then set the desired state, if any.
+	FName InitialState = State!=NAME_None ? State : NAME_Auto;
+	State              = NAME_None;
+
+
+	// Set the state.
+	GotoState( InitialState );
+	if( State != NAME_None )
+		GotoLabel( NAME_Begin );
+
+	unguardf(("(%s %s)",GetClassName(),GetName()));
+}
+/*-----------------------------------------------------------------------------
+	Intrinsics.
+-----------------------------------------------------------------------------*/
+
+DWORD  *GBoolAddr;
+DWORD  GBoolMask;
+
+/////////////////////////////////
+// Undefined intrinsic handler //
+/////////////////////////////////
+
+void UNENGINE_API execUndefined( FExecStack &Stack, UObject *Context, BYTE *&Result  )
+{
+	// Execute an undefined opcode.
+	guardSlow(execUndefined);
+	appErrorf("%s (%s): Unknown code token %02x", Stack.Script->GetName(), Stack.Link.Node().Name(), Stack.Code[-1] );
+	unguardexecSlow;
+}
+
+///////////////
+// Variables //
+///////////////
+
+static void execLocalVariable( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute a local variable.
+	guardSlow(execLocalVariable);
+	debugState(Stack.Object==Context);
+	debugState(Stack.Locals!=NULL);
+	Result = Stack.Locals + scriptReadWord(Stack.Code);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_LocalVariable, execLocalVariable );
+
+static void execObjectVariable( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute an object variable.
+	guardSlow(execObjectVariable);
+	Result = (BYTE*)Context + scriptReadWord(Stack.Code);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ObjectVariable, execObjectVariable );
+
+static void execStaticVariable( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute a static variable.
+	guardSlow(execStaticVariable);
+	Result = &Context->GetClass()->Bins[PROPBIN_PerClass]->Element(0) + scriptReadWord(Stack.Code);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_StaticVariable, execStaticVariable );
+
+static void execDefaultVariable( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute a default variable.
+	guardSlow(execDefaultVariable);
+	Result = &Context->GetClass()->Bins[PROPBIN_PerObject]->Element(0) + scriptReadWord(Stack.Code);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_DefaultVariable, execDefaultVariable );
+
+static void execArrayElement( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execArrayElement);
+
+	// Get base pointer.
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Result );
+
+	// Get array offset.
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+
+	// Add scaled offset to base pointer.
+	Result += *(INT*)Addr * *Stack.Code++;
+
+	// Bounds check.
+	if( *(INT*)Addr>=*Stack.Code++ || *(INT*)Addr<0 )
+	{
+		appErrorf
+		(
+			"Array bounds error in %s (%s): %i/%i",
+			Stack.Script->GetName(),
+			Stack.Link.Node().Name(),
+			*(INT*)Addr,Stack.Code[-1]
+		);
+		//!! try to recover somehow?
+	}
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ArrayElement, execArrayElement );
+
+static void execBoolVariable( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolVariable);
+
+	// Get bool variable.
+	BYTE bCode  = *Stack.Code++;
+	(*GIntrinsics[bCode >> 5])( Stack, Context, *(BYTE**)&GBoolAddr );
+	GBoolMask   = (DWORD)1 << (bCode&31);
+
+	// Note that we're not returning an in-place pointer to to the bool, so EX_Let does
+	// not work here. Instead, we use EX_LetBool which accesses GBoolAddr and GBoolMask.
+	*(DWORD*)Result = (*GBoolAddr & GBoolMask) ? 1 : 0;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_BoolVariable, execBoolVariable );
+
+/////////////
+// Nothing //
+/////////////
+
+static void execNothing( FExecStack &Stack, UObject *Context, BYTE *&Result  )
+{
+}
+AUTOREGISTER_INTRINSIC( EX_Nothing, execNothing );
+
+//////////////
+// Commands //
+//////////////
+
+static void execStop( FExecStack &Stack, UObject *Context, BYTE *&Result  )
+{
+	// Exec EX_Stop.
+	guardSlow(execStop);
+	Stack.Code = NULL;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Stop, execStop );
+
+static void execEndCode( FExecStack &Stack, UObject *Context, BYTE *&Result  )
+{
+	// Exec EX_EndCode.
+	guardSlow(execEndCode);
+	Stack.Code = NULL;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_EndCode, execEndCode );
+
+static void execSwitch( FExecStack &Stack, UObject *Context, BYTE *&Result  )
+{
+	// Execute EX_Switch.
+	guardSlow(execSwitch);
+
+	// Get switch size.
+	BYTE bSize = *Stack.Code++;
+
+	// Get switch expression.
+	BYTE SwitchBuffer[MAX_CONST_SIZE], *SwitchVal=SwitchBuffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, SwitchVal );
+
+	// Check each case clause till we find a match.
+	for( ; ; )
+	{
+		// Skip over case token.
+		debugState(*Stack.Code==EX_Case);
+		Stack.Code++;
+
+		// Get address of next handler.
+		INT wNext = scriptReadWord( Stack.Code );
+		if( wNext == MAXWORD ) // Default case or end of cases.
+			break;
+
+		// Get case expression.
+		BYTE Buffer[MAX_STRING_CONST_SIZE], *Val=Buffer;
+		(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Val );
+
+		// Compare.
+		if( (bSize ? memcmp(SwitchVal,Val,bSize) : strcmp((char*)SwitchVal,(char*)Val) )==0 )
+			break;
+
+		// Jump to next handler.
+		Stack.Code = &Stack.Script->Element(wNext);
+	}
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Switch, execSwitch );
+
+static void execCase( FExecStack &Stack, UObject *Context, BYTE *&Result  )
+{
+	// Skip over EX_Case and its expression.
+	guardSlow(execCase);
+
+	// Get address of next handler.
+	INT wNext = scriptReadWord( Stack.Code );
+	if( wNext != MAXWORD )
+	{
+		BYTE Buffer[MAX_STRING_CONST_SIZE], *Val=Buffer;
+		(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Val );
+	}
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Case, execCase );
+
+static void execJump( FExecStack &Stack, UObject *Context, BYTE *&Result  )
+{
+	// Execute EX_Jump.
+	guardSlow(execJump);
+
+	// Jump immediate.
+	Stack.Code = &Stack.Script->Element( scriptReadWord( Stack.Code ) );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Jump, execJump );
+
+static void execJumpIfNot( FExecStack &Stack, UObject *Context, BYTE *&Result  )
+{
+	// Execute EX_JumpIfNot.
+	guardSlow(execJumpIfNot);
+
+	// Get code offset.
+	INT wOffset = scriptReadWord( Stack.Code );
+
+	// Get boolean test value.
+	BYTE Buffer[MAX_CONST_SIZE], *Val=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Val );
+
+	// Jump if false.
+	if( !*(DWORD*)Val )
+		Stack.Code = &Stack.Script->Element(wOffset);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_JumpIfNot, execJumpIfNot );
+
+static void execAssert( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute EX_Assert.
+	guardSlow(execAssert);
+
+	// Get line number.
+	INT wLine = scriptReadWord( Stack.Code );
+
+	// Get boolean assert value.
+	BYTE Buffer[MAX_CONST_SIZE], *Val=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Val );
+
+	// Check it.
+	if( !*(DWORD*)Val )
+	{
+		appErrorf
+		(
+			"%s (%s): Assertion failed, line %i",
+			Stack.Script->GetName(),
+			Stack.Link.Node().Name(), 
+			wLine
+		);
+	}
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Assert, execAssert );
+
+static void execGotoLabel( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute EX_GotoLabel.
+	guardSlow(execGotoLabel);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_NAME(N);
+	if( !ActorContext->GotoLabel( N ) )
+		ScriptWarn( Stack, "GotoLabel (%s): Label not found", N );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_GotoLabel, execGotoLabel );
+
+static void execBroadcast( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute EX_Broadcast.
+	guardSlow(execBroadcast);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	// Get optional name of broadcast destination.
+	FName NameBuffer, *Name=&NameBuffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, *(BYTE**)&Name );
+
+	// Get broadcast class mask.
+	UClass *ClassBuffer, **Class=&ClassBuffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, *(BYTE**)&Class );
+
+	// Get relative skip offset.
+	INT wOffset = scriptReadWord( Stack.Code );
+
+	// Broadcast to all matching actors.
+	//debugf("BC:%s TO:%s",(*Name)(),*Class ? (*Class)->GetName() : "NULL" );
+	ULevel *Level = ActorContext->GetLevel();
+	for( int iActor=0; iActor<Level->Num; iActor++ )
+	{
+		AActor *Actor = Level->Element(iActor);
+		if
+		(	(Actor)
+		&&	( *Name==NAME_None || *Name == Actor->GetFName() )
+        &&  ( Actor->IsA(*Class) ) )
+        {
+			// Call the function through a temporary execution stack. This assumes and 
+			// requires that the following command is a function call and will generate its
+			// own locals frame.
+			FExecStack NewStack = Stack;
+			BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+			(*GIntrinsics[*NewStack.Code++])( NewStack, Actor, Addr );
+        }
+	}
+
+	// Go to skip offset.
+	Stack.Code += wOffset;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Broadcast, execBroadcast );
+
+////////////////
+// Assignment //
+////////////////
+
+static void execLet( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute EX_Let.
+	guardSlow(execLet);
+
+	// Get size.
+	BYTE Size = *Stack.Code++;
+
+	// Get variable address.
+	BYTE *Var=NULL;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Var );
+
+	// Get value.
+	BYTE Buffer[MAX_CONST_SIZE], *Val=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Val );
+
+	// Copy value to variable.
+	if( Var )
+		memcpy( Var, Val, Size );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Let, execLet );
+
+static void execLet1( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute EX_Let1.
+	guardSlow(execLet1);
+
+	// Get variable address.
+	BYTE *Var=NULL;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Var );
+
+	// Get value.
+	BYTE Buffer[1], *Val=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Val );
+
+	// Copy value to variable.
+	if( Var )
+		*(BYTE*)Var = *(BYTE*)Val;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Let1, execLet1 );
+
+static void execLet4( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute EX_Let4.
+	guardSlow(execLet4);
+
+	// Get variable address.
+	BYTE *Var=NULL;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Var );
+
+	// Get value.
+	BYTE Buffer[4], *Val=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Val );
+
+	// Copy value to variable.
+	if( Var )
+		*(DWORD*)Var = *(DWORD*)Val;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Let4, execLet4 );
+
+static void execLetBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute EX_LetBool.
+	guardSlow(execLetBool);
+
+	// Get variable address.
+	BYTE BoolHolder[4], *Var=BoolHolder;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Var );
+
+	// Remember globals.
+	DWORD *BoolAddr = GBoolAddr;
+	DWORD  BoolMask = GBoolMask;
+
+	// Get value.
+	BYTE Buffer[MAX_CONST_SIZE], *Val=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Val );
+
+	// Perform boolean assignment.
+	if( BoolAddr )
+	{
+		if( *(DWORD*)Val ) *BoolAddr |=  BoolMask;
+		else               *BoolAddr &= ~BoolMask;
+	}
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_LetBool, execLetBool );
+
+static void execLetString( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute EX_LetString.
+	guardSlow(execLetString);
+
+	// Get variable address.
+	BYTE *Var=NULL;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Var );
+
+	// Get value.
+	BYTE Buffer[MAX_STRING_CONST_SIZE]; BYTE *Val=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Val );
+
+	// Copy value to variable.
+	if( Var )
+		strcpy( (char*)Var, (char*)Val );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_LetString, execLetString );
+
+/////////////////////////
+// Context expressions //
+/////////////////////////
+
+static void execSelf( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Execute EX_Self.
+	guardSlow(execSelf);
+
+	// Get Self actor for this context.
+	*(UObject**)Result = Context;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Self, execSelf );
+
+static void execContext( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execContext);
+
+	// Get actor variable.
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+
+	// Execute or skip the following expression in the actor's context.
+	AActor *NewContext = *(AActor**)Addr;
+	if( NewContext != NULL )
+	{
+		debugState(NewContext->GetClass()!=NULL);
+
+		// Skip the skip info.
+		Stack.Code += 3;
+
+		// Evaluate expression in that actor's context.
+		(*GIntrinsics[*Stack.Code++])( Stack, NewContext, Result );
+	}
+	else
+	{
+		// Get the skipover info.
+		INT  wSkip = scriptReadWord( Stack.Code );
+		BYTE bSize = *Stack.Code++;
+
+		// Fill the result, unless it's NULL which indicates the caller wants a left-value.
+		if( Result )
+			memset( Result, 0, bSize );
+		GBoolAddr = NULL;
+
+		// Skip the context expression.
+		Stack.Code += wSkip;
+
+		// Display debugging message.
+		ScriptWarn( Stack, "Accessed None" );
+	}
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_Context, execContext );
+
+////////////////////
+// Function calls //
+////////////////////
+
+static void execVirtualFunction( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVirtualFunction);
+	debugState(FExecStackMain::NUM_CACHE_ENTRIES==4);
+	debugInput(Context!=NULL);
+
+	FStackNodeLink *Link;
+	FStackNode     *Node;
+	INT            IsState = Context->IsA("Actor") && ((AActor*)Context)->State!=NAME_None;
+
+	// Get virtual function name.
+	FName Message = scriptReadName(Stack.Code);
+
+	// Get virtual function cache info.
+	FExecStackMain::FVfCacheEntry *Cache = Context->MainStack.VfCache, *CacheStart=Cache;
+
+	// Make all virtual function cache entries staler.
+	CacheStart[0].Staleness++;
+	CacheStart[1].Staleness++;
+	CacheStart[2].Staleness++;
+	CacheStart[3].Staleness++;
+
+	// See if the virtual function is cached.
+	for( int i=0; i<FExecStackMain::NUM_CACHE_ENTRIES && Cache->Name!=Message; i++,Cache++ );
+	if( i < FExecStackMain::NUM_CACHE_ENTRIES )
+	{
+		// The virtual function is cached.
+		//debugf("Cached: %s",Message());
+		Cache->Staleness = 0;
+		Link = &Cache->Link;
+		Node = &Link->Node();
+		goto Found;
+	}
+
+	// Find the virtual function in state scope or global scope.
+	// Traverse the current stack node to find the specified function.
+	Link = &Context->MainStack.Link.Node().ChildFunctions;
+	Recheck:
+	while( Link->Class != NULL )
+	{
+		Node = &Link->Node();
+		if( Node->Name == Message )
 		{
-		case TOKEN_End:
-			AddResultText("TOKEN_End\r\n");
-			break;
-		case TOKEN_Identifier:
-			AddResultText("TOKEN_Identifier: %s\r\n",Token.Identifier);
-			break;
-		case TOKEN_Symbol:
-			AddResultText("TOKEN_Symbol: %s\r\n",Token.Identifier);
-			break;
-		case TOKEN_IntegerConst:
-			AddResultText("TOKEN_IntegerConst: %i\r\n",Token.Integer);
-			break;
-		case TOKEN_FloatConst:
-			AddResultText("TOKEN_FloatConst: %f\r\n",Token.Float);
-			break;
-		case TOKEN_StringConst:
-			AddResultText("TOKEN_StringConst: <%s>\r\n",Token.String);
-			break;
-		case TOKEN_ResourceConst:
-			AddResultText("TOKEN_ResourceConst: <%s(%s)>\r\n",GRes.GetTypeName(Token.ResType),Token.Res->Name);
-			break;
-		case TOKEN_VectorConst:
-			AddResultText("TOKEN_VectorConst: <Vector(%f,%f,%f)>\r\n",Token.Vector.X,Token.Vector.Y,Token.Vector.Z);
-			break;
-		case TOKEN_RotationConst:
-			AddResultText("TOKEN_RotationConst: <Rotation(%i,%i,%i)>\r\n",Token.Rotation.Pitch,Token.Rotation.Yaw,Token.Rotation.Roll);
-			break;
-		case TOKEN_NameConst:
-			AddResultText("TOKEN_NameConst: <Name(%s)>\r\n",Token.Name.Name());
-			break;
-		default:
-			AddResultText("TOKEN_UNKNOWN\r\n");
-			break;
-		};
-	};
+			// Update the cache.
+			//debugf("Uncached: %s",Message());
+			{
+				int i1 = 0 + (CacheStart[0 ].Staleness < CacheStart[1 ].Staleness);
+				int i2 = 2 + (CacheStart[2 ].Staleness < CacheStart[3 ].Staleness);
+				int i  =     (CacheStart[i1].Staleness < CacheStart[i2].Staleness) ? i2 : i1;
+				CacheStart[i].Name      = Message;
+				CacheStart[i].Link      = *Link;
+				CacheStart[i].Staleness = 0;
+			}
+			
+			// Found it.
+			Found:
+			if( Node->iIntrinsic )
+			{
+				// Virtual intrinsic function.
+				(*GIntrinsics[ Node->iIntrinsic ])(Stack, Context, Result);
+			}
+			else
+			{
+				// Virtual scripted function.
+				FMemMark Mark(GMem);
+				debugState(Node->iCode!=MAXWORD);
+				FExecStack NewStack( Context, *Link, new(GMem,MEM_Zeroed,Node->LocalsSize)BYTE );
 
-/*-----------------------------------------------------------------------------
-	Global functions.
------------------------------------------------------------------------------*/
+				// Form the parms.
+				BYTE *Dest = NewStack.Locals;
+				FOutParmRec Outs[MAX_FUNC_PARMS], *Out = Outs;
+				while( (Out->Size = *NewStack.Code++) != 0 )
+				{
+					debugState(*NewStack.Code==0 || *NewStack.Code==1);
+					Out->Src = Out->Dest = Dest;
+					(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Out->Dest );
+					if( Out->Dest != Dest )
+						memcpy( Dest, Out->Dest, Out->Size );
+					Dest += Out->Size;
+					Out  += *NewStack.Code++;
+				}
+				debugState(*Stack.Code==EX_EndFunctionParms);
+				Stack.Code++;
 
-//
-// Resource flags used for make:
-//
-enum
-	{
-	RF_DID_ANALYZE = RF_Temp1, // Set for classes that were analyzed (and maybe recompiled)
-	};
+				// Execute the code.
+				BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr, B;
+				while( (B = *NewStack.Code++) != EX_Return )
+					(*GIntrinsics[B])( NewStack, NewStack.Object, Addr=Buffer );
 
-//
-// Compile the specified actor class's text script and output the
-// results into its token script.
-//
-// Assumes:
-// * Class->ScriptText contains the script text.
-// * Class has been initialized as a valid resource
-// * ActorPropertiesAreValid indicates whether actor properties are set to meaningful values
-//
-// Does not assume:
-// * Class contains valid properties
-//
-int UNREAL_API CompileScript(UClass *Class,int ActorPropertiesAreValid)
-{
-	guard(CompileScript);
+				// Copy back outparms.
+				while( --Out >= Outs )
+					memcpy( Out->Dest, Out->Src, Out->Size );
 
-	FScriptCompiler	Compiler;
-	int Success;
+				// Snag return offset and finish.
+				Result = &NewStack.Locals[Node->CodeLabelOffset];
 
-	Compiler.InitMake();
-
-	if(Class->ScriptText)	Success = Compiler.Compile(Class,&GMem,ActorPropertiesAreValid);
-	else					Success = 0;
-
-	Compiler.ExitMake(Success);
-
-	return Success;
-
-	unguard;
-}
-
-int Make(FScriptCompiler &Compiler,UClass *Class,int MakeAll)
-{
-	guard(Make);
-
-	if(MakeAll || (Class->ScriptText->DataCRC() != Class->ScriptTextCRC) ||
-		(Class->ParentClass && Class->ParentClass->ScriptText && 
-		(Class->ParentClass->ScriptText->DataCRC() != Class->ParentTextCRC)))
-	{
-		MakeAll=1;
-		if(!Compiler.Compile(Class,&GMem,1)) 
-			return 0;
+				// Release temp memory.
+				Mark.Pop();
+			}
+			return;
+		}
+		Link = &Node->Next;
 	}
-	UClass *TestClass;
-	FOR_ALL_TYPED_RES(TestClass,RES_Class,UClass)
+	if( IsState )
 	{
-		if((TestClass->ParentClass==Class) && !Make(Compiler,TestClass,MakeAll)) return 0;
+		// Failed to find a state version of the function, so check for a global version.
+		IsState  = 0;
+		Link     = &Context->GetClass()->StackTree->Element(0).ChildFunctions;
+		goto Recheck;
 	}
-	END_FOR_ALL_RES;
-
-	// Success.
-	return 1;
-	unguard;
+	appErrorf( "Function '%s' not found in %s (%s)", Message(), Stack.Object->GetClassName(), Stack.Link.Node().Name() );
+	unguardexecSlow;
 }
+AUTOREGISTER_INTRINSIC( EX_VirtualFunction, execVirtualFunction );
 
-//
-// Make scripts hierarchically.
-//
-int UNREAL_API MakeScripts(UClass *Class,int MakeAll)
+static void execFinalFunction( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
-	guard(MakeScripts);
+	guardSlow(execFinalFunction);
 
-	FScriptCompiler	Compiler;
+	// Make new stack frame in the current actor context.
+	FMemMark Mark(GMem);
+	FStackNodeLink NewLink = scriptReadStackNodeLink(Stack.Code);
+	FStackNode     &Node   = NewLink.Node();
+	FExecStack NewStack( Context, NewLink, new(GMem,MEM_Zeroed,Node.LocalsSize)BYTE );
+	debugState(Node.iCode!=MAXWORD);
 
-	Compiler.InitMake();
-
-	if(MakeAll)	Compiler.AddResultText("Making all scripts.\r\n");	
-	else			Compiler.AddResultText("Making changed scripts.\r\n");
-
-	// Go through all classes in an arbitrary order and make sure each one
-	// is conditionally remade.
-	int Success = Make(Compiler,Class,MakeAll);
-
-	Compiler.ExitMake(Success);
-
-	return Success;
-
-	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	Script Resource Implementation.
------------------------------------------------------------------------------*/
-
-void UScript::Register(FResourceType *Type)
-{
-	guard(UScript::Register);
-
-	Type->HeaderSize = sizeof (UScript);
-	Type->RecordSize = 1;
-	Type->Version    = 1;
-	strcpy (Type->Descr,"Script");
-
-	unguard;
-}
-void UScript::InitHeader()
-{
-	guard(UScript::InitHeader);
-
-	Class			= NULL;
-	Length			= 0;
-	NumStackTree	= 0;
-
-	unguard;
-}
-void UScript::InitData()
-{
-	guard(UScript::InitData);
-	mymemset(Data,0,Length);
-	unguard;
-}
-int UScript::QuerySize()
-{
-	guard(UScript::QuerySize);
-	return Length;
-	unguard;
-}
-int UScript::QueryMinSize()
-{
-	guard(UScript::QueryMinSize);
-	return QuerySize();
-	unguard;
-}
-const char *UScript::Import(const char *Buffer, const char *BufferEnd,const char *FileType)
-{
-	guard(UScript::Import);
-	return Buffer;
-	unguard;
-}
-char *UScript::Export(char *Buffer,const char *FileType,int Indent)
-{
-	guard(UScript::Export);
-	memcpy(Buffer,GetData(),Length);
-	return Buffer;
-	unguard;
-}
-void UScript::QueryHeaderReferences(FResourceCallback &Callback)
-{
-	guard(UScript::QueryHeaderReferences);
-	Callback.Resource (this,(UResource **)&Class,0);
-	unguard;
-}
-void UScript::QueryDataReferences(FResourceCallback &Callback)
-{
-	guard(UScript::QueryDataReferences);
-
-	FStackNode *StackTree = (FStackNode *)GetData();
-	for (int i=0; i<NumStackTree; i++)
+	// Form the parms.
+	BYTE *Dest = NewStack.Locals;
+	FOutParmRec Outs[MAX_FUNC_PARMS], *Out = Outs;
+	while( (Out->Size = *NewStack.Code++) != 0 )
 	{
-		StackTree[i].QueryReferences(this,Callback,0);
+		debugState(*NewStack.Code==0 || *NewStack.Code==1);
+		Out->Src = Out->Dest = Dest;
+		(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Out->Dest );
+		if( Out->Dest != Dest )
+			memcpy( Dest, Out->Dest, Out->Size );
+		Dest += Out->Size;
+		Out  += *NewStack.Code++;
 	}
-	unguard;
+	debugState(*Stack.Code==EX_EndFunctionParms);
+	Stack.Code++;
+
+	// Execute the code.
+	
+	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr, B;
+	while( (B = *NewStack.Code++) != EX_Return )
+		(*GIntrinsics[B])( NewStack, NewStack.Object, Addr=Buffer );
+
+	// Copy back outparms.
+	while( --Out >= Outs )
+		memcpy( Out->Dest, Out->Src, Out->Size );
+
+	// Snag return offset and finish.
+	Result = &NewStack.Locals[Node.CodeLabelOffset];
+	Mark.Pop();
+	unguardexecSlow;
 }
-void UScript::Flip()
+AUTOREGISTER_INTRINSIC( EX_FinalFunction, execFinalFunction );
+
+///////////////
+// Constants //
+///////////////
+
+static void execIntConst( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
-	guard(UScript::Flip);
-	UResource::Flip();
-	unguard;
+	guardSlow(execIntConst);
+	*(INT*)Result = scriptReadInt(Stack.Code);
+	unguardexecSlow;
 }
-AUTOREGISTER_RESOURCE(RES_Script,UScript,0xB2D90873,0xCCD211cf,0x91360000,0xC028B992);
+AUTOREGISTER_INTRINSIC( EX_IntConst, execIntConst );
 
-/*-----------------------------------------------------------------------------
-	UScript Custom Implementation.
------------------------------------------------------------------------------*/
-
-//
-// Decompile a subexpression.
-//
-char *DecompileExpr(UScript *Script,INT iTree,char *Str,BYTE **ThisCode)
+static void execFloatConst( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
-	guard(DecompileExpr);
-	BYTE *Code = *ThisCode;
+	guardSlow(execFloatConst);
+	*(FLOAT*)Result = scriptReadFloat(Stack.Code);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_FloatConst, execFloatConst );
 
-	EExprToken E = (EExprToken) *Code++;
-	switch (E)
+static void execStringConst( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// If everything goes properly, the caller won't overwrite the code.
+	guardSlow(execStringConst);
+	Result      = Stack.Code;
+	Stack.Code += strlen((char*)Stack.Code)+1;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_StringConst, execStringConst );
+
+static void execObjectConst( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execObjectConst);
+	*(UObject**)Result = (UObject*)scriptReadInt(Stack.Code);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ObjectConst, execObjectConst );
+
+static void execNameConst( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execNameConst);
+	*(FName*)Result = scriptReadName(Stack.Code);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_NameConst, execNameConst );
+
+static void execRotationConst( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationConst);
+	((FRotation*)Result)->Pitch = scriptReadWord( Stack.Code );
+	((FRotation*)Result)->Yaw   = scriptReadWord( Stack.Code );
+	((FRotation*)Result)->Roll  = scriptReadWord( Stack.Code );
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_RotationConst, execRotationConst );
+
+static void execVectorConst( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorConst);
+	*(FVector*)Result = *(FVector*)Stack.Code;
+	Stack.Code += sizeof(FVector);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_VectorConst, execVectorConst );
+
+static void execByteConst( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteConst);
+	*(BYTE*)Result = *Stack.Code++;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ByteConst, execByteConst );
+
+static void execIntZero( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntZero);
+	*(INT*)Result = 0;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_IntZero, execIntZero );
+
+static void execIntOne( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntOne);
+	*(INT*)Result = 1;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_IntOne, execIntOne );
+
+static void execTrue( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execTrue);
+	*(INT*)Result = 1;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_True, execTrue );
+
+static void execFalse( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFalse);
+	*(DWORD*)Result = 0;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_False, execFalse );
+
+static void execNoObject( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execNoObject);
+	*(UObject**)Result = NULL;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_NoObject, execNoObject );
+
+static void execIntConstByte( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntConstByte);
+	*(INT*)Result = *Stack.Code++;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_IntConstByte, execIntConstByte );
+
+/////////////////
+// Conversions //
+/////////////////
+
+static void execResizeString( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execResizeString);
+
+	// Get new length.
+	BYTE NewLength = *Stack.Code++;
+	debugState(NewLength>0);
+
+	// Get copy of string expression to convert.
+	BYTE *Addr = Result;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	if( Addr != Result )
+		strncpy( (char*)Result, (char*)Addr, NewLength );
+	Result[NewLength-1] = 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ResizeString, execResizeString );
+
+static void execActorCast( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execActorCast);
+
+	// Get destination class of dynamic actor class.
+	UClass *Class = (UClass *)scriptReadInt(Stack.Code);
+
+	// Compile actor expression.
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+
+	AActor *Castee = *(AActor**)Addr;
+	if( Castee && Castee->IsA(Class) )
 	{
-		case EX_Nothing:
+		// Cast succeeded.
+		*(AActor**)Result = Castee;
+	}
+	else
+	{
+		// Cast failed.
+		*(AActor**)Result = NULL;
+	}
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ActorCast, execActorCast );
+
+static void execByteToInt( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteToInt);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(INT*)Result = *(BYTE*)Addr;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ByteToInt, execByteToInt );
+
+static void execByteToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteToBool);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(DWORD*)Result = *(BYTE*)Addr ? 1 : 0;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ByteToBool, execByteToBool );
+
+static void execByteToFloat( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteToFloat);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(FLOAT*)Result = *(BYTE*)Addr;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ByteToFloat, execByteToFloat );
+
+static void execByteToString( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Bytes can't overflow maximum size.
+	guardSlow(execByteToString);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	itoa(*(BYTE*)Addr,(char*)Result,10);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ByteToString, execByteToString );
+
+static void execIntToByte( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntToByte);
+	BYTE Buffer[MAX_CONST_SIZE];
+	Result = Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Result );
+	// Result is automatically truncated.
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_IntToByte, execIntToByte );
+
+static void execIntToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntToBool);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(INT*)Result = *(INT*)Addr ? 1 : 0;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_IntToBool, execIntToBool );
+
+static void execIntToFloat( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntToFloat);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(FLOAT*)Result = *(INT*)Addr;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_IntToFloat, execIntToFloat );
+
+static void execIntToString( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	// Integers can't overflow maximum size.
+	guardSlow(execIntToString);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	itoa(*(INT*)Addr,(char*)Result,10);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_IntToString, execIntToString );
+
+static void execBoolToByte( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolToByte);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(BYTE*)Result = *(DWORD*)Addr & 1;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_BoolToByte, execBoolToByte );
+
+static void execBoolToInt( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolToInt);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(INT*)Result = *(DWORD*)Addr & 1;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_BoolToInt, execBoolToInt );
+
+static void execBoolToFloat( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolToFloat);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(FLOAT*)Result = *(DWORD*)Addr & 1;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_BoolToFloat, execBoolToFloat );
+
+static void execBoolToString( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolToString);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	strcpy( (char*)Result, (*(DWORD*)Addr&1) ? "True" : "False" );
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_BoolToString, execBoolToString );
+
+static void execFloatToByte( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatToByte);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(BYTE*)Result = *(FLOAT*)Addr;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_FloatToByte, execFloatToByte );
+
+static void execFloatToInt( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatToInt);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(INT*)Result = *(FLOAT*)Addr;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_FloatToInt, execFloatToInt );
+
+static void execFloatToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatToBool);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(DWORD*)Result = *(FLOAT*)Addr!=0.0 ? 1 : 0;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_FloatToBool, execFloatToBool );
+
+static void execFloatToString( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatToString);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	sprintf((char*)Result,"%f",*(FLOAT*)Addr);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_FloatToString, execFloatToString );
+
+static void execObjectToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execObjectToBool);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(DWORD*)Result = *(UObject**)Addr!=NULL;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ObjectToBool, execObjectToBool );
+
+static void execObjectToInt( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execObjectToInt);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	UObject *Test = *(UObject**)Addr;
+	*(DWORD*)Result = Test ? Test->GetIndex() : -1;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ObjectToInt, execObjectToInt );
+
+static void execObjectToString( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execObjectToString);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	strcpy((char*)Result, *(UObject**)Addr ? (*(UObject**)Addr)->GetName() : "None");
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_ObjectToString, execObjectToString );
+
+static void execNameToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execNameToBool);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(DWORD*)Result = *(FName*)Addr!=NAME_None ? 1 : 0;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_NameToBool, execNameToBool );
+
+static void execNameToString( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execNameToString);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	strcpy((char*)Result,(*(FName*)Addr)());
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_NameToString, execNameToString );
+
+static void execStringToByte( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringToByte);
+	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(BYTE*)Result = atoi((char*)Addr);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_StringToByte, execStringToByte );
+
+static void execStringToInt( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringToInt);
+	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(INT*)Result = atoi((char*)Addr);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_StringToInt, execStringToInt );
+
+static void execStringToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringToBool);
+	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	if     ( stricmp((char*)Addr,"True" ) == 0 ) *(INT*)Result = 1;
+	else if( stricmp((char*)Addr,"False") == 0 ) *(INT*)Result = 0;
+	else                                         *(INT*)Result = atoi((char*)Addr) ? 1 : 0;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_StringToBool, execStringToBool );
+
+static void execStringToFloat( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringToFloat);
+	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(FLOAT*)Result = atof((char*)Addr);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_StringToFloat, execStringToFloat );
+
+static void execStringToVector( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringToVector);
+	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(FVector*)Result = GMath.ZeroVector;
+	GetFVECTOR((char*)Addr,(FVector*)Result);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_StringToVector, execStringToVector );
+
+static void execStringToRotation( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringToRotation);
+	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(FRotation*)Result = GMath.ZeroRotation;
+	GetFROTATION((char*)Addr,(FRotation*)Result,1.0);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_StringToRotation, execStringToRotation );
+
+static void execVectorToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorToBool);
+	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(DWORD*)Result = ((FVector*)Addr)->IsZero() ? 0 : 1;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_VectorToBool, execVectorToBool );
+
+static void execVectorToString( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorToString);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	sprintf((char*)Result,"%f,%f,%f",((FVector*)Addr)->X,((FVector*)Addr)->Y,((FVector*)Addr)->Z);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_VectorToString, execVectorToString );
+
+static void execVectorToRotation( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorToRotation);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(FRotation*)Result = ((FVector*)Addr)->Rotation();
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_VectorToRotation, execVectorToRotation );
+
+static void execRotationToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationToBool);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(DWORD*)Result = ((FRotation*)Addr)->IsZero() ? 0 : 1;
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_RotationToBool, execRotationToBool );
+
+static void execRotationToVector( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationToVector);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	*(FVector*)Result = ((FRotation*)Addr)->Vector();
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_RotationToVector, execRotationToVector );
+
+static void execRotationToString( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationToString);
+	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	sprintf((char*)Result,"%i,%i,%i",((FRotation*)Addr)->Pitch&65535,((FRotation*)Addr)->Yaw&65535,((FRotation*)Addr)->Roll&65535);
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EX_RotationToString, execRotationToString );
+
+////////////////////////////////////////////
+// Intrinsic bool operators and functions //
+////////////////////////////////////////////
+
+static void execBoolUnaryNot( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolUnaryNot);
+
+	P_GET_BOOL(A);
+	P_FINISH;
+
+	*(DWORD*)Result = !A;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 129, execBoolUnaryNot );
+
+static void execBoolLogicEQ( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolLogicEQ);
+
+	P_GET_BOOL(A);
+	P_GET_BOOL(B);
+	P_FINISH;
+
+	*(DWORD*)Result = ((!A) == (!B));
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 242, execBoolLogicEQ );
+
+static void execBoolLogicNE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolLogicNE);
+
+	P_GET_BOOL(A);
+	P_GET_BOOL(B);
+	P_FINISH;
+
+	*(DWORD*)Result = ((!A) != (!B));
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 243, execBoolLogicNE );
+
+static void execBoolBinaryAnd( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolBinaryAnd);
+
+	P_GET_BOOL(A);
+	P_GET_SKIP_OFFSET(W);
+
+	if( A )
+	{
+		P_GET_BOOL(B);
+		*(DWORD*)Result = A && B;
+		P_FINISH;
+	}
+	else
+	{
+		*(DWORD*)Result = 0;
+		Stack.Code += W;
+	}
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 130, execBoolBinaryAnd );
+
+static void execBoolBinaryXor( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolBinaryXor);
+
+	P_GET_BOOL(A);
+	P_GET_BOOL(B);
+	P_FINISH;
+
+	*(DWORD*)Result = !A ^ !B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 131, execBoolBinaryXor );
+
+static void execBoolBinaryOr( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBoolBinaryOr);
+	P_GET_BOOL(A);
+	P_GET_SKIP_OFFSET(W);
+	if( !A )
+	{
+		P_GET_BOOL(B);
+		*(DWORD*)Result = A || B;
+		P_FINISH;
+	}
+	else
+	{
+		*(DWORD*)Result = 1;
+		Stack.Code += W;
+	}
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 132, execBoolBinaryOr );
+
+////////////////////////////////////////////
+// Intrinsic byte operators and functions //
+////////////////////////////////////////////
+
+static void execByteBinaryMulAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteBinaryMulAssign);
+
+	P_GET_BYTE_REF(A);
+	P_GET_BYTE(B);
+	P_FINISH;
+
+	*(BYTE*)Result = (*A *= B);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 5, execByteBinaryMulAssign );
+
+static void execByteBinaryDivAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteBinaryDivAssign);
+
+	P_GET_BYTE_REF(A);
+	P_GET_BYTE(B);
+	P_FINISH;
+
+	*(BYTE*)Result = B ? (*A /= B) : 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 6, execByteBinaryDivAssign );
+
+static void execByteBinaryAddAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteBinaryAddAssign);
+
+	P_GET_BYTE_REF(A);
+	P_GET_BYTE(B);
+	P_FINISH;
+
+	*(BYTE*)Result = (*A += B);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 7, execByteBinaryAddAssign );
+
+static void execByteBinarySubAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteBinarySubAssign);
+
+	P_GET_BYTE_REF(A);
+	P_GET_BYTE(B);
+	P_FINISH;
+
+	*(BYTE*)Result = (*A -= B);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 8, execByteBinarySubAssign );
+
+static void execByteUnaryPreInc( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteUnaryPreInc);
+
+	P_GET_BYTE_REF(A);
+	P_FINISH;
+
+	*(BYTE*)Result = ++(*A);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 9, execByteUnaryPreInc );
+
+static void execByteUnaryPreDec( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteUnaryPreDec);
+
+	P_GET_BYTE_REF(A);
+	P_FINISH;
+
+	*(BYTE*)Result = --(*A);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 10, execByteUnaryPreDec );
+
+static void execByteUnaryPostInc( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteUnaryPostInc);
+
+	P_GET_BYTE_REF(A);
+	P_FINISH;
+
+	*(BYTE*)Result = (*A)++;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 11, execByteUnaryPostInc );
+
+static void execByteUnaryPostDec( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execByteUnaryPostDec);
+
+	P_GET_BYTE_REF(A);
+	P_FINISH;
+
+	*(BYTE*)Result = (*A)--;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 12, execByteUnaryPostDec );
+
+/////////////////////////////////
+// Int operators and functions //
+/////////////////////////////////
+
+static void execIntUnaryBitNot( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntUnaryBitNot);
+
+	P_GET_INT(A);
+	P_FINISH;
+
+	*(INT*)Result = ~A;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 13, execIntUnaryBitNot );
+
+static void execIntUnaryNeg( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntUnaryNeg);
+
+	P_GET_INT(A);
+	P_FINISH;
+
+	*(INT*)Result = -A;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 15, execIntUnaryNeg );
+
+static void execIntBinaryMul( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryMul);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = A * B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 16, execIntBinaryMul );
+
+static void execIntBinaryDiv( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryDiv);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = B ? A / B : 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 17, execIntBinaryDiv );
+
+static void execIntBinaryAdd( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryAdd);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = A + B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 18, execIntBinaryAdd );
+
+static void execIntBinarySub( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinarySub);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = A - B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 19, execIntBinarySub );
+
+static void execIntBinaryLeftShift( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryLeftShift);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = A << B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 20, execIntBinaryLeftShift );
+
+static void execIntBinaryRightShift( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryRightShift);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = A >> B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 21, execIntBinaryRightShift );
+
+static void execIntLogicLT( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntLogicLT);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A < B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 22, execIntLogicLT );
+
+static void execIntLogicGT( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntLogicGT);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A > B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 23, execIntLogicGT );
+
+static void execIntLogicLE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntLogicLE);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A <= B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 24, execIntLogicLE );
+
+static void execIntLogicGE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntLogicGE);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A >= B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 25, execIntLogicGE );
+
+static void execIntLogicEQ( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntLogicEQ);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A == B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 26, execIntLogicEQ );
+
+static void execIntLogicNE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntLogicNE);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A != B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 27, execIntLogicNE );
+
+static void execIntBinaryAnd( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryAnd);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = A & B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 28, execIntBinaryAnd );
+
+static void execIntBinaryXor( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryXor);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = A ^ B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 29, execIntBinaryXor );
+
+static void execIntBinaryOr( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryOr);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = A | B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 30, execIntBinaryOr );
+
+static void execIntBinaryMulAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryMulAssign);
+
+	P_GET_INT_REF(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = (*A *= B);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 31, execIntBinaryMulAssign );
+
+static void execIntBinaryDivAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryDivAssign);
+
+	P_GET_INT_REF(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = (B ? *A /= B : 0);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 32, execIntBinaryDivAssign );
+
+static void execIntBinaryAddAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinaryAddAssign);
+
+	P_GET_INT_REF(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = (*A += B);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 33, execIntBinaryAddAssign );
+
+static void execIntBinarySubAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntBinarySubAssign);
+
+	P_GET_INT_REF(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = (*A -= B);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 34, execIntBinarySubAssign );
+
+static void execIntUnaryPreInc( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntUnaryPreInc);
+
+	P_GET_INT_REF(A);
+	P_FINISH;
+
+	*(INT*)Result = ++(*A);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 35, execIntUnaryPreInc );
+
+static void execIntUnaryPreDec( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntUnaryPreDec);
+
+	P_GET_INT_REF(A);
+	P_FINISH;
+
+	*(INT*)Result = --(*A);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 36, execIntUnaryPreDec );
+
+static void execIntUnaryPostInc( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntUnaryPostInc);
+
+	P_GET_INT_REF(A);
+	P_FINISH;
+
+	*(INT*)Result = (*A)++;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 37, execIntUnaryPostInc );
+
+static void execIntUnaryPostDec( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntUnaryPostDec);
+
+	P_GET_INT_REF(A);
+	P_FINISH;
+
+	*(INT*)Result = (*A)--;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 38, execIntUnaryPostDec );
+
+static void execIntFuncRand( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntFuncRand);
+
+	P_GET_INT(A);
+	P_FINISH;
+
+	*(INT*)Result = A>0 ? (rand() % A) : 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 39, execIntFuncRand );
+
+static void execIntFuncMin( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntFuncMin);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = Min(A,B);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 121, execIntFuncMin );
+
+static void execIntFuncMax( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntFuncMax);
+
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = Max(A,B);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 122, execIntFuncMax );
+
+static void execIntFuncClamp( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIntFuncClamp);
+
+	P_GET_INT(V);
+	P_GET_INT(A);
+	P_GET_INT(B);
+	P_FINISH;
+
+	*(INT*)Result = Clamp(V,A,B);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 123, execIntFuncClamp );
+
+///////////////////////////////////
+// Float operators and functions //
+///////////////////////////////////
+
+static void execFloatUnaryNeg( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatUnaryNeg);
+
+	P_GET_FLOAT(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = -A;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 41, execFloatUnaryNeg );
+
+static void execFloatBinaryPow( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatBinaryPow);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = exp( B * log(A) );
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 42, execFloatBinaryPow );
+
+static void execFloatBinaryMul( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatBinaryMul);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = A * B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 43, execFloatBinaryMul );
+
+static void execFloatBinaryDiv( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatBinaryDiv);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = A / B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 44, execFloatBinaryDiv );
+
+static void execFloatBinaryMod( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatBinaryMod);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = fmod(A,B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 45, execFloatBinaryMod );
+
+static void execFloatBinaryAdd( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatBinaryAdd);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = A + B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 46, execFloatBinaryAdd );
+
+static void execFloatBinarySub( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatBinarySub);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = A - B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 47, execFloatBinarySub );
+
+static void execFloatLogicLT( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatLogicLT);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A < B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 48, execFloatLogicLT );
+
+static void execFloatLogicGT( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatLogicGT);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A > B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 49, execFloatLogicGT );
+
+static void execFloatLogicLE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatLogicLE);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A <= B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 50, execFloatLogicLE );
+
+static void execFloatLogicGE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatLogicGE);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A >= B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 51, execFloatLogicGE );
+
+static void execFloatLogicEQ( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatLogicEQ);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A == B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 52, execFloatLogicEQ );
+
+static void execFloatLogicNE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatLogicNE);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A != B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 53, execFloatLogicNE );
+
+static void execFloatLogicAE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatLogicAE);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(DWORD*)Result = Abs(A - B)<KINDA_SMALL_NUMBER;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 82, execFloatLogicAE );
+
+static void execFloatBinaryMulAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatBinaryMulAssign);
+
+	P_GET_FLOAT_REF(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = (*A *= B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 54, execFloatBinaryMulAssign );
+
+static void execFloatBinaryDivAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatBinaryDivAssign);
+
+	P_GET_FLOAT_REF(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = (*A /= B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 55, execFloatBinaryDivAssign );
+
+static void execFloatBinaryAddAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatBinaryAddAssign);
+
+	P_GET_FLOAT_REF(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = (*A += B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 56, execFloatBinaryAddAssign );
+
+static void execFloatBinarySubAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatBinarySubAssign);
+
+	P_GET_FLOAT_REF(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = (*A -= B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 57, execFloatBinarySubAssign );
+
+static void execFloatFuncAbs( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncAbs);
+
+	P_GET_FLOAT(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = Abs(A);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 58, execFloatFuncAbs );
+
+static void execFloatFuncSin( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncSin);
+
+	P_GET_FLOAT(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = sin(A);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 59, execFloatFuncSin );
+
+static void execFloatFuncCos( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncCos);
+
+	P_GET_FLOAT(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = cos(A);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 60, execFloatFuncCos );
+
+static void execFloatFuncTan( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncTan);
+
+	P_GET_FLOAT(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = tan(A);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 61, execFloatFuncTan );
+
+static void execFloatFuncAtan( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncAtan);
+
+	P_GET_FLOAT(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = atan(A);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 62, execFloatFuncAtan );
+
+static void execFloatFuncExp( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncExp);
+
+	P_GET_FLOAT(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = exp(A);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 63, execFloatFuncExp );
+
+static void execFloatFuncLog( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncLog);
+
+	P_GET_FLOAT(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = log(A);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 64, execFloatFuncLog );
+
+static void execFloatFuncSqrt( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncSqrt);
+
+	P_GET_FLOAT(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = sqrt(A);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 65, execFloatFuncSqrt );
+
+static void execFloatFuncSquare( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncSquare);
+
+	P_GET_FLOAT(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = Square(A);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 66, execFloatFuncSquare );
+
+static void execFloatFuncFRand( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncFRand);
+
+	P_FINISH;
+
+	*(FLOAT*)Result = frand();
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 67, execFloatFuncFRand );
+
+static void execFloatFuncFMin( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncFMin);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = Min(A,B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 116, execFloatFuncFMin );
+
+static void execFloatFuncFMax( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncFMax);
+
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = Max(A,B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 117, execFloatFuncFMax );
+
+static void execFloatFuncFClamp( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncFClamp);
+
+	P_GET_FLOAT(V);
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = Clamp(V,A,B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 118, execFloatFuncFClamp );
+
+static void execFloatFuncLerp( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncLerp);
+
+	P_GET_FLOAT(V);
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = A + V*(B-A);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 119, execFloatFuncLerp );
+
+static void execFloatFuncSmerp( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFloatFuncSmerp);
+
+	P_GET_FLOAT(V);
+	P_GET_FLOAT(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = A + (3.0*V*V - 2.0*V*V*V)*(B-A);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 120, execFloatFuncSmerp );
+
+////////////////////////////////////
+// String operators and functions //
+////////////////////////////////////
+
+static void execStringBinaryConcat( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringBinaryAdd);
+
+	P_GET_STRING(A);
+	P_GET_STRING(B);
+	P_FINISH;
+
+	INT Size = strlen(A);
+	strcpy((char*)Result,A);
+	strncpy((char*)Result + Size, B, MAX_STRING_CONST_SIZE - Size);
+	Result[MAX_STRING_CONST_SIZE-1] = 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 100, execStringBinaryConcat );
+
+static void execStringLogicLT( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringLogicLT);
+
+	P_GET_STRING(A);
+	P_GET_STRING(B);
+	P_FINISH;
+
+	*(DWORD*)Result = strcmp(A,B) < 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 69, execStringLogicLT );
+
+static void execStringLogicGT( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringLogicGT);
+
+	P_GET_STRING(A);
+	P_GET_STRING(B);
+	P_FINISH;
+
+	*(DWORD*)Result = strcmp(A,B) > 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 70, execStringLogicGT );
+
+static void execStringLogicLE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringLogicLE);
+
+	P_GET_STRING(A);
+	P_GET_STRING(B);
+	P_FINISH;
+
+	*(DWORD*)Result = strcmp(A,B) <= 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 71, execStringLogicLE );
+
+static void execStringLogicGE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringLogicGE);
+
+	P_GET_STRING(A);
+	P_GET_STRING(B);
+	P_FINISH;
+
+	*(DWORD*)Result = strcmp(A,B) >= 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 72, execStringLogicGE );
+
+static void execStringLogicEQ( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringLogicEQ);
+
+	P_GET_STRING(A);
+	P_GET_STRING(B);
+	P_FINISH;
+
+	*(DWORD*)Result = strcmp(A,B) == 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 73, execStringLogicEQ );
+
+static void execStringLogicNE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringLogicNE);
+
+	P_GET_STRING(A);
+	P_GET_STRING(B);
+	P_FINISH;
+
+	*(DWORD*)Result = strcmp(A,B) != 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 74, execStringLogicNE );
+
+static void execStringLogicAE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringLogicAE);
+
+	P_GET_STRING(A);
+	P_GET_STRING(B);
+	P_FINISH;
+
+	*(DWORD*)Result = stricmp(A,B) == 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 40, execStringLogicAE );
+
+static void execStringFuncLen( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringFuncLen);
+
+	P_GET_STRING(S);
+	P_FINISH;
+
+	*(INT*)Result = strlen(S);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 76, execStringFuncLen );
+
+static void execStringFuncInStr( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringFuncInStr);
+
+	P_GET_STRING(S);
+	P_GET_STRING(A);
+	P_FINISH;
+
+	CHAR *Ptr = strstr(S,A);
+	*(INT*)Result = Ptr ? Ptr - S : -1;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 77, execStringFuncInStr );
+
+static void execStringFuncMid( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringFuncMid);
+
+	P_GET_STRING(A);
+	P_GET_INT(I);
+	P_GET_INT_OPT(C,65535);
+	P_FINISH;
+
+	if( I < 0 ) C += I;
+	I = Clamp( I, 0, (int)strlen(A) );
+	C = Clamp( C, 0, (int)strlen(A)-I );
+	strncpy( (char*)Result, A + I, C );
+	Result[C]=0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 78, execStringFuncMid );
+
+static void execStringFuncLeft( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringFuncLeft);
+
+	P_GET_STRING(A);
+	P_GET_INT(N);
+	P_FINISH;
+
+	N = Clamp( N, 0, (int)strlen(A) );
+	strncpy( (char*)Result, A, N );
+	Result[N]=0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 79, execStringFuncLeft );
+
+static void execStringFuncRight( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringFuncRight);
+
+	P_GET_STRING(A);
+	P_GET_INT(N);
+	P_FINISH;
+
+	N = Clamp( (int)strlen(A) - N, 0, (int)strlen(A) );
+	strcpy( (char*)Result, A + N );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 80, execStringFuncRight );
+
+static void execStringFuncCaps( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStringFuncCaps);
+
+	P_GET_STRING(A);
+	P_FINISH;
+
+	for( int i=0; A[i]; i++ )
+		Result[i] = toupper(A[i]);
+	Result[i]=0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 81, execStringFuncCaps );
+
+////////////////////////////////////
+// Vector operators and functions //
+////////////////////////////////////
+
+static void execVectorUnaryNeg( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorUnaryNeg);
+
+	P_GET_VECTOR(A);
+	P_FINISH;
+
+	*(FVector*)Result = -A;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 83, execVectorUnaryNeg );
+
+static void execVectorBinaryMulVF( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryMulVF);
+
+	P_GET_VECTOR(A);
+	P_GET_FLOAT (B);
+	P_FINISH;
+
+	*(FVector*)Result = A*B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 84, execVectorBinaryMulVF );
+
+static void execVectorBinaryMulFV( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryMulFV);
+
+	P_GET_FLOAT (A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(FVector*)Result = A*B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 85, execVectorBinaryMulFV );
+
+static void execVectorBinaryMulVV( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryMulVV);
+
+	P_GET_VECTOR(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(FVector*)Result = A*B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 296, execVectorBinaryMulVV );
+
+static void execVectorBinaryDivVF( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryDivVF);
+
+	P_GET_VECTOR(A);
+	P_GET_FLOAT (B);
+	P_FINISH;
+
+	*(FVector*)Result = A/B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 86, execVectorBinaryDivVF );
+
+static void execVectorBinaryAdd( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryAdd);
+
+	P_GET_VECTOR(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(FVector*)Result = A+B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 87, execVectorBinaryAdd );
+
+static void execVectorBinarySub( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinarySub);
+
+	P_GET_VECTOR(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(FVector*)Result = A-B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 88, execVectorBinarySub );
+
+static void execVectorDetransform( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorDetransform);
+
+	P_GET_VECTOR(A);
+	P_GET_ROTATION(B);
+	P_FINISH;
+
+	*(FVector*)Result = A.TransformVectorBy(GMath.UnitCoords / B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 275, execVectorDetransform );
+
+static void execVectorTransform( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorTransform);
+
+	P_GET_VECTOR(A);
+	P_GET_ROTATION(B);
+	P_FINISH;
+
+	*(FVector*)Result = A.TransformVectorBy(GMath.UnitCoords * B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 276, execVectorTransform );
+
+static void execVectorLogicEQ( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorLogicEQ);
+
+	P_GET_VECTOR(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A.X==B.X && A.Y==B.Y && A.Z==B.Z;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 89, execVectorLogicEQ );
+
+static void execVectorLogicNE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorLogicNE);
+
+	P_GET_VECTOR(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A.X!=B.X || A.Y!=B.Y || A.Z!=B.Z;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 90, execVectorLogicNE );
+
+static void execVectorBinaryDot( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryDot);
+
+	P_GET_VECTOR(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = A|B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 91, execVectorBinaryDot );
+
+static void execVectorBinaryCross( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryCross);
+
+	P_GET_VECTOR(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(FVector*)Result = A^B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 92, execVectorBinaryCross );
+
+static void execVectorBinaryMulVFAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryMulVFAssign);
+
+	P_GET_VECTOR_REF(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FVector*)Result = (*A *= B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 93, execVectorBinaryMulVFAssign );
+
+static void execVectorBinaryMulVVAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryMulVVAssign);
+
+	P_GET_VECTOR_REF(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(FVector*)Result = (*A *= B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 297, execVectorBinaryMulVVAssign );
+
+static void execVectorBinaryDivAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryDivAssign);
+
+	P_GET_VECTOR_REF(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FVector*)Result = (*A /= B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 94, execVectorBinaryDivAssign );
+
+static void execVectorBinaryAddAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinaryAddAssign);
+
+	P_GET_VECTOR_REF(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(FVector*)Result = (*A += B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 95, execVectorBinaryAddAssign );
+
+static void execVectorBinarySubAssign( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorBinarySubAssign);
+
+	P_GET_VECTOR_REF(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(FVector*)Result = (*A -= B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 96, execVectorBinarySubAssign );
+
+static void execVectorFuncSize( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorFuncSize);
+
+	P_GET_VECTOR(A);
+	P_FINISH;
+
+	*(FLOAT*)Result = A.Size();
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 97, execVectorFuncSize );
+
+static void execVectorFuncNormal( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorFuncNormal);
+
+	P_GET_VECTOR(A);
+	P_FINISH;
+
+	*(FVector*)Result = A.Normal();
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 98, execVectorFuncNormal );
+
+static void execVectorFuncInvert( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorFuncInvert);
+
+	P_GET_VECTOR_REF(X);
+	P_GET_VECTOR_REF(Y);
+	P_GET_VECTOR_REF(Z);
+	P_FINISH;
+
+	FCoords Temp = FCoords( FVector(0,0,0), *X, *Y, *Z ).Inverse();
+	*X           = Temp.XAxis;
+	*Y           = Temp.YAxis;
+	*Z           = Temp.ZAxis;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 99, execVectorFuncInvert );
+
+static void execVectorFuncVRand( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorFuncVRand);
+	P_FINISH;
+	do
+	{
+		// Check random vectors in the unit sphere so result is statistically uniform.
+		((FVector*)Result)->X = frand();
+		((FVector*)Result)->Y = frand();
+		((FVector*)Result)->Z = frand();
+	} while( ((FVector*)Result)->SizeSquared() > 1.0 );
+	((FVector*)Result)->Normalize();
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 124, execVectorFuncVRand );
+
+static void execVectorFuncDist( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorFuncDist);
+
+	P_GET_VECTOR(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	*(FLOAT*)Result = (B-A).Size();
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 125, execVectorFuncDist );
+
+//////////////////////////////////////
+// Rotation operators and functions //
+//////////////////////////////////////
+
+static void execRotationLogicEQ( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorLogicEQ);
+
+	P_GET_ROTATION(A);
+	P_GET_ROTATION(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A.Pitch==B.Pitch && A.Yaw==B.Yaw && A.Roll==B.Roll;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 14, execRotationLogicEQ );
+
+static void execRotationLogicNE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVectorLogicNE);
+
+	P_GET_ROTATION(A);
+	P_GET_ROTATION(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A.Pitch!=B.Pitch || A.Yaw!=B.Yaw || A.Roll!=B.Roll;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 0x80 + 75, execRotationLogicNE );
+
+static void execRotationMul1( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationMul1);
+
+	P_GET_ROTATION(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FRotation*)Result = A * B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 287, execRotationMul1 );
+
+static void execRotationMul2( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationMul2);
+
+	P_GET_FLOAT(A);
+	P_GET_ROTATION(B);
+	P_FINISH;
+
+	*(FRotation*)Result = B * A;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 288, execRotationMul2 );
+
+static void execRotationDiv1( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationDiv1);
+
+	P_GET_ROTATION(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*(FRotation*)Result = A * (1.0/B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 289, execRotationDiv1 );
+
+static void execRotationMulEq( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationMul1);
+
+	P_GET_ROTATION_REF(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*A = *A * B;
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 290, execRotationMulEq );
+
+static void execRotationDivEq( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationMul1);
+
+	P_GET_ROTATION_REF(A);
+	P_GET_FLOAT(B);
+	P_FINISH;
+
+	*A = *A * (1.0/B);
+
+	unguardexecSlow;
+}	
+AUTOREGISTER_INTRINSIC( 291, execRotationDivEq );
+
+static void execRotationFuncGetAxes( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationFuncGetAxes);
+
+	P_GET_ROTATION(A);
+	P_GET_VECTOR_REF(X);
+	P_GET_VECTOR_REF(Y);
+	P_GET_VECTOR_REF(Z);
+	P_FINISH;
+
+	FCoords Coords = GMath.UnitCoords;
+	Coords /= A;
+	*X = Coords.XAxis;
+	*Y = Coords.YAxis;
+	*Z = Coords.ZAxis;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 101, execRotationFuncGetAxes );
+
+static void execRotationFuncGetUnAxes( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRotationFuncGetUnAxes);
+
+	P_GET_ROTATION(A);
+	P_GET_VECTOR_REF(X);
+	P_GET_VECTOR_REF(Y);
+	P_GET_VECTOR_REF(Z);
+	P_FINISH;
+
+	FCoords Coords = GMath.UnitCoords * A;
+	*X = Coords.XAxis;
+	*Y = Coords.YAxis;
+	*Z = Coords.ZAxis;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 102, execRotationFuncGetUnAxes );
+
+////////////////////////////////////////////
+// Intrinsic name operators and functions //
+////////////////////////////////////////////
+
+static void execNameLogicEQ( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execNameLogicEQ);
+
+	P_GET_NAME(A);
+	P_GET_NAME(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A == B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 126, execNameLogicEQ );
+
+static void execNameLogicNE( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execNameLogicNE);
+
+	P_GET_NAME(A);
+	P_GET_NAME(B);
+	P_FINISH;
+
+	*(DWORD*)Result = A != B;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 127, execNameLogicNE );
+
+/////////////////////////////
+// Log and error functions //
+/////////////////////////////
+
+static void execLog( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execLog);
+
+	P_GET_STRING(S);
+	P_FINISH;
+
+	debug( LOG_ScriptLog, S );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 103, execLog );
+
+static void execWarn( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execLog);
+
+	P_GET_STRING(S);
+	P_FINISH;
+
+	ScriptWarn( Stack, "%s", S );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 104, execWarn );
+
+static void execError( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execLog);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_STRING(S);
+	P_FINISH;
+
+	ScriptWarn( Stack, S );
+	ActorContext->XLevel->DestroyActor( ActorContext );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 0x80 + 105, execError );
+
+static void execMessage( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execMessage);
+	debugInput(Context!=NULL);
+
+	P_GET_STRING(S);
+	P_FINISH;
+
+	debug( LOG_Play, S );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 268, execMessage );
+
+static void execPawnMessage( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execPawnMessage);
+	debugInput(Context!=NULL);
+	debugInput(Context->IsA("Pawn"));
+	APawn *PawnContext = (APawn*)Context;
+
+	P_GET_STRING(S);
+	P_FINISH;
+
+	if( PawnContext->GetPlayer() ) PawnContext->Camera->Log( LOG_Play, S );
+	else debug( LOG_Play, S );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 269, execPawnMessage );
+
+/////////////////////
+// High intrinsics //
+/////////////////////
+
+#define HIGH_INTRINSIC(n) \
+	static void execHighIntrinsic##n( FExecStack &Stack, UObject *Context, BYTE *&Result ) \
+	{ \
+		guardSlow(execHighIntrinsic##n); \
+		(*GIntrinsics[ n*0x100 + *Stack.Code++ ])(Stack, Context, Result); \
+		unguardexecSlow; \
+	} \
+	AUTOREGISTER_INTRINSIC( 0x60 + n, execHighIntrinsic##n );
+
+HIGH_INTRINSIC(0);
+HIGH_INTRINSIC(1);
+HIGH_INTRINSIC(2);
+HIGH_INTRINSIC(3);
+HIGH_INTRINSIC(4);
+HIGH_INTRINSIC(5);
+HIGH_INTRINSIC(6);
+HIGH_INTRINSIC(7);
+HIGH_INTRINSIC(8);
+HIGH_INTRINSIC(9);
+HIGH_INTRINSIC(10);
+HIGH_INTRINSIC(11);
+HIGH_INTRINSIC(12);
+HIGH_INTRINSIC(13);
+HIGH_INTRINSIC(14);
+HIGH_INTRINSIC(15);
+
+//////////////////////////////
+// Slow function initiators //
+//////////////////////////////
+
+enum EPollSlowFuncs
+{
+	EPOLL_Sleep			= 384,
+	EPOLL_FinishAnim	= 385,
+};
+
+static void execSleep( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execSleep);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_FLOAT(Seconds);
+	P_FINISH;
+
+	ActorContext->LatentAction = EPOLL_Sleep;
+	ActorContext->LatentFloat  = Seconds;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 256, execSleep );
+
+static void execFinishAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFinishAnim);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_FINISH;
+
+	if( ActorContext->bAnimLoop )
+	{
+		// We are looping, so finish at the next sequence end.
+		ActorContext->bAnimLoop     = 0;
+		ActorContext->bAnimFinished = 0;
+	}
+	ActorContext->LatentAction = EPOLL_FinishAnim;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 261, execFinishAnim );
+
+///////////////////////////
+// Slow function pollers //
+///////////////////////////
+
+static void execPollSleep( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execPollSleep);
+	debugState(Stack.Object->IsA("Actor"));
+	AActor *StackActor = (AActor*)Stack.Object;
+
+	FLOAT DeltaSeconds = *(FLOAT*)Result;
+	if( (StackActor->LatentFloat -= DeltaSeconds) <= 0.0 )
+	{
+		// Awaken.
+		StackActor->LatentAction = 0;
+	}
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EPOLL_Sleep, execPollSleep );
+
+static void execPollFinishAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execPollFinishAnim);
+	debugState(Stack.Object->IsA("Actor"));
+	AActor *StackActor = (AActor*)Stack.Object;
+
+	if( StackActor->bAnimFinished )
+		StackActor->LatentAction = 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EPOLL_FinishAnim, execPollFinishAnim );
+
+/////////////////////////
+// Animation functions //
+/////////////////////////
+
+static void execPlayAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execPlayAnim);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+	
+	P_GET_NAME(SequenceName);
+	P_GET_FLOAT_OPT(AnimRate,1.0);
+	P_GET_BOOL_OPT(bTweenInto,ActorContext->AnimSequence!=NAME_None);
+	P_FINISH;
+
+	// Set one-shot animation.
+	if( ActorContext->Mesh )
+	{
+		FMeshAnimSeq *Seq = ActorContext->Mesh->GetAnimSeq( SequenceName );
+		if( Seq )
 		{
-			Str += sprintf(Str,"Nothing");
+			ActorContext->AnimSequence  = SequenceName;
+			ActorContext->AnimRate      = AnimRate * (Seq->Rate / Seq->NumFrames);
+			ActorContext->AnimFrame     = bTweenInto ? (-1.0/Seq->NumFrames) : (0.0);
+			ActorContext->AnimEnd       = 1.0 - 1.0 / Seq->NumFrames;
+			ActorContext->bAnimNotify   = (Seq->NumNotifys!=0);
+			ActorContext->bAnimFinished = 0;
+			ActorContext->bAnimLoop     = 0;
+		}
+		else ScriptWarn( Stack, "PlayAnim: Sequence '%s' not found in Mesh '%s'", SequenceName(), ActorContext->Mesh->GetName() );
+	} else ScriptWarn( Stack, "PlayAnim: No mesh" );
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 259, execPlayAnim );
+
+static void execLoopAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execLoopAnim);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+	
+	P_GET_NAME(SequenceName);
+	P_GET_FLOAT_OPT(AnimRate,1.0);
+	P_GET_BOOL_OPT(bTweenInto,ActorContext->AnimSequence!=NAME_None);
+	P_GET_FLOAT_OPT(MinRate,0.0);
+	P_FINISH;
+
+	// Set looping animation.
+	if( ActorContext->Mesh )
+	{
+		FMeshAnimSeq *Seq = ActorContext->Mesh->GetAnimSeq( SequenceName );
+		if( Seq )
+		{
+			ActorContext->AnimSequence  = SequenceName;
+			ActorContext->AnimRate      = AnimRate * (Seq->Rate / Seq->NumFrames);
+			ActorContext->AnimFrame     = bTweenInto ? (-1.0/Seq->NumFrames) : (0.0);
+			ActorContext->AnimEnd       = 1.0 - 1.0 / Seq->NumFrames;
+			ActorContext->AnimMinRate   = MinRate * (Seq->Rate / Seq->NumFrames);
+			ActorContext->bAnimNotify   = (Seq->NumNotifys!=0);
+			ActorContext->bAnimFinished = 0;
+			ActorContext->bAnimLoop     = 1;
+		}
+		else ScriptWarn( Stack, "LoopAnim: Sequence '%s' not found in Mesh '%s'", SequenceName(), ActorContext->Mesh->GetName() );
+	} else ScriptWarn( Stack, "LoopAnim: No mesh" );
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 260, execLoopAnim );
+
+static void execTweenAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execLoopAnim);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_NAME(SequenceName);
+	P_GET_FLOAT(AnimTime);
+	P_FINISH;
+
+	// Tweening an animation from wherever it is, to the start of a specified sequence.
+	if( ActorContext->Mesh )
+	{
+		FMeshAnimSeq *Seq = ActorContext->Mesh->GetAnimSeq( SequenceName );
+		if( Seq )
+		{
+			ActorContext->AnimSequence  = SequenceName;
+			ActorContext->AnimRate      = (AnimTime>0.0) ? (1.0 / (AnimTime * Seq->NumFrames)) : (0.0);
+			ActorContext->AnimFrame     = -1.0/Seq->NumFrames;
+			ActorContext->AnimEnd       = 0.0;
+			ActorContext->bAnimNotify   = 0;
+			ActorContext->bAnimFinished = 0;
+			ActorContext->bAnimLoop     = 0;
+		}
+		else ScriptWarn( Stack, "TweenAnim: Sequence '%s' not found in Mesh '%s'", SequenceName(), ActorContext->Mesh->GetName() );
+	} else ScriptWarn( Stack, "LoopAnim: No mesh" );
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 294, execTweenAnim );
+
+static void execStopAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStopAnim);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_FINISH;
+
+	// Set looping animation.
+	ActorContext->AnimRate      = 0.0;
+	ActorContext->bAnimFinished = 1;
+	ActorContext->bAnimLoop     = 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 282, execStopAnim );
+
+//////////////////////////////
+// Force feedback functions //
+//////////////////////////////
+
+static void execPlayForce( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execStopAnim);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Pawn"));
+	APawn *PawnContext = (APawn*)Context;
+
+	P_GET_BYTE(PlayForceType);
+	P_GET_VECTOR(Force);
+	P_GET_FLOAT(Time);
+	P_FINISH;
+
+	//todo!!
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 295, execPlayForce );
+
+/////////////////////////////
+// Class related functions //
+/////////////////////////////
+
+static void execClassIsChildOf( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execClassIsChildOf);
+
+	P_GET_OBJECT(UClass,K);
+	P_GET_OBJECT(UClass,C);
+	P_FINISH;
+
+	*(DWORD*)Result = (C && K) ? K->IsChildOf(C) : 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 258, execClassIsChildOf );
+
+///////////////////////////////
+// State and label functions //
+///////////////////////////////
+
+static void execGoto( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execGoto);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_NAME(L);
+	P_FINISH;
+
+	ActorContext->GotoLabel( L );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 112, execGoto );
+
+static void execGotoState( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execGotoState);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_NAME_OPT(S,NAME_None);
+	P_GET_NAME_OPT(L,NAME_Begin);
+	P_FINISH;
+
+	if( ActorContext->GotoState( S ) )
+	{
+		if( L != NAME_None )
+		{
+			ActorContext->GotoLabel( L );
+		}
+	}
+	else ScriptWarn( Stack, "GotoState (%s %s): State not found", S, L );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 113, execGotoState );
+
+static void execIsProbing( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIsProbing);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_NAME(N);
+	P_FINISH;
+
+	*(DWORD*)Result = ActorContext->IsProbing(N);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 114, execIsProbing );
+
+static void execIsLabel( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIsLabel);
+	debugInput(Context!=NULL);
+
+	P_GET_NAME(L);
+	P_FINISH;
+
+	UScript *DummyScript;
+	BYTE    *DummyByte;
+	*(DWORD*)Result = FindLabelLink(DummyScript,DummyByte,&Context->MainStack.Link,L);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 115, execIsLabel );
+
+static void execIsState( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execIsState);
+	debugInput(Context!=NULL);
+
+	P_GET_NAME(S);
+	P_GET_NAME_OPT(L,NAME_None);
+	P_FINISH;
+
+	for( FStackNodeLink *Link = &Context->MainStack.Link.Node().ChildStates; Link->Class; Link=&Link->Node().Next )
+		if( Link->Node().Name == S )
+			break;
+	UScript *DummyScript;
+	BYTE    *DummyByte;
+	*(DWORD*)Result = !Link->Class ? 0 : L==NAME_None ? 1 : FindLabelLink(DummyScript,DummyByte,Link,L);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 116, execIsState );
+
+static void execEnable( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execEnable);
+	debugInput(Context!=NULL);
+
+	P_GET_NAME(N);
+	if( N.GetIndex()>=PROBE_MIN && N.GetIndex()<PROBE_MAX )
+		Context->MainStack.ProbeMask |= (Context->MainStack.Link.Node().ProbeMask & ((QWORD)1<<(N.GetIndex()-PROBE_MIN)));
+	P_FINISH;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 117, execEnable );
+
+static void execDisable( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execDiable);
+	debugInput(Context!=NULL);
+
+	P_GET_NAME(N);
+	if( N.GetIndex()>=PROBE_MIN && N.GetIndex()<PROBE_MAX )
+		Context->MainStack.ProbeMask &= ~((QWORD)1<<(N.GetIndex()-PROBE_MIN));
+	P_FINISH;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 118, execDisable );
+
+///////////////
+// Collision //
+///////////////
+
+static void execSetCollision( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execSetCollision);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_BOOL_OPT(NewCollideActors,ActorContext->bCollideActors);
+	P_GET_BOOL_OPT(NewBlockActors,  ActorContext->bBlockActors  );
+	P_GET_BOOL_OPT(NewBlockPlayers, ActorContext->bBlockPlayers );
+	P_FINISH;
+
+	ActorContext->SetCollision( NewCollideActors, NewBlockActors, NewBlockPlayers );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 262, execSetCollision );
+
+static void execSetCollisionSize( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execSetCollisionSize);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_FLOAT(NewRadius);
+	P_GET_FLOAT(NewHeight);
+	P_FINISH;
+
+	// Untouch this actor.
+	if( ActorContext->bCollideActors )
+		ActorContext->GetLevel()->Hash.RemoveActor( ActorContext );
+
+	// Set collision sizes.
+	ActorContext->CollisionRadius = NewRadius;
+	ActorContext->CollisionHeight = NewHeight;
+
+	// Touch this actor.
+	if( ActorContext->bCollideActors )
+		ActorContext->GetLevel()->Hash.RemoveActor( ActorContext );
+
+	// Return boolean success or failure.
+	*(DWORD*)Result = 1;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 283, execSetCollisionSize );
+
+static void execSetFloor( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execSetFloor);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT(AActor,NewFloor);
+	P_FINISH;
+
+	ActorContext->SetFloor( NewFloor );
+
+	unguardSlow;
+}
+AUTOREGISTER_INTRINSIC( 298, execSetFloor );
+
+static void execCollisionTrace( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execCollisionTrace);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_VECTOR_REF (HitLocation);
+	P_GET_VECTOR_REF (HitNormal);
+	P_GET_VECTOR     (TraceEnd);
+	P_GET_VECTOR_OPT (TraceStart,ActorContext->Location);
+	P_GET_FLOAT_OPT  (Radius,ActorContext->CollisionRadius);
+	P_GET_FLOAT_OPT  (Height,ActorContext->CollisionHeight);
+	P_GET_BOOL_OPT   (bReboundAdjust,1);
+	P_FINISH;
+
+	//todo!!
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 284, execCollisionTrace );
+
+///////////
+// Audio //
+///////////
+
+static void execAmbientSoundSet( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execAmbientSoundSet);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT(USound,Sound);
+	P_FINISH;
+
+	//debugf("AmbientSoundSet %s",Sound ? Sound->GetName() : "NULL");
+	ActorContext->SetAmbientSound(Sound);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 263, execAmbientSoundSet );
+
+static void execPlaySound( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execPlaySound);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT(USound,Sound);
+	P_GET_FLOAT_OPT(Volume,1.0);
+	P_GET_FLOAT_OPT(Radius,0.0);
+	P_GET_FLOAT_OPT(Pitch,1.0);
+	P_FINISH;
+
+	//debugf("PlaySound %s",Sound ? Sound->GetName() : "NULL");
+	ActorContext->MakeSound( Sound, Radius, Volume, Pitch );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 264, execPlaySound );
+
+static void execPlayPrimitiveSound( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execPlayPrimitiveSound);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT(USound,Sound);
+	P_GET_FLOAT_OPT(Volume,1.0);
+	P_GET_FLOAT_OPT(Pitch,1.0);
+	P_FINISH;
+
+	//debugf("PlayPrimitiveSound %s",Sound ? Sound->GetName() : "NULL");
+	ActorContext->PrimitiveSound( Sound, Volume, Pitch );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 265, execPlayPrimitiveSound );
+
+//////////////
+// Movement //
+//////////////
+
+static void execMove( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execMove);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_VECTOR(Delta);
+	P_FINISH;
+
+	FCheckResult Hit(1.0);
+	*(DWORD*)Result = ActorContext->GetLevel()->MoveActor( ActorContext, &Delta, Hit );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 266, execMove );
+
+static void execSetLocation( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execSetLocation);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_VECTOR(NewLocation);
+	P_FINISH;
+
+	*(DWORD*)Result = ActorContext->GetLevel()->FarMoveActor( ActorContext, &NewLocation );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 267, execSetLocation );
+
+static void execSetRotation( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execSetRotation);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_ROTATION(NewRotation);
+	P_FINISH;
+
+	*(DWORD*)Result = ActorContext->GetLevel()->RotateActor( ActorContext, NewRotation );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 299, execSetRotation );
+
+///////////////
+// Reckoning //
+///////////////
+
+static void execDistanceTo( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execDistanceTo);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_ACTOR(Other);
+	P_FINISH;
+
+	*(FLOAT*)Result = Other ? (ActorContext->Location - Other->Location).Size() : 0.0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 270, execDistanceTo );
+
+static void execCanSee( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execCanSee);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_ACTOR(Other);
+	P_FINISH;
+
+	FCheckResult Hit(0.0);
+	*(DWORD*)Result = Other ? !ActorContext->GetLevel()->Model->LineCheck
+	(
+		Hit,
+		NULL,
+		ActorContext->Location,
+		Other->Location,
+		0
+	) : 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 271, execCanSee );
+
+///////////////
+// Relations //
+///////////////
+
+static void execSetOwner( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execSetOwner);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_ACTOR(NewOwner);
+	P_FINISH;
+
+	ActorContext->SetOwner( NewOwner );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 272, execSetOwner );
+
+////////////////////////
+// Internet functions //
+////////////////////////
+
+static void execInternetSend( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execInternetSend);
+
+	P_FINISH;
+	P_GET_STRING(ToURL);
+	P_GET_STRING(Msg);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 274, execInternetSend );
+
+//////////////////
+// Line tracing //
+//////////////////
+
+static void execTrace( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execTrace);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_VECTOR_REF(HitLocation);
+	P_GET_VECTOR_REF(HitNormal);
+	P_GET_VECTOR(TraceEnd);
+	P_GET_VECTOR_OPT(TraceStart,ActorContext->Location);
+	P_GET_BOOL_OPT(bTraceActors,ActorContext->bCollideActors);
+	P_FINISH;
+
+	// Trace the line.
+	FCheckResult Hit(1.0);
+	ActorContext->XLevel->Trace
+	(
+		Hit,
+		ActorContext,
+		TraceEnd,
+		TraceStart,
+		bTraceActors
+	);
+	*(AActor**)Result = Hit.Actor;
+	*HitLocation      = Hit.Location;
+	*HitNormal        = Hit.Normal;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 277, execTrace );
+
+///////////////////////
+// Spawn and Destroy //
+///////////////////////
+
+static void execSpawn( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execSpawn);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT(UClass,SpawnClass);
+	P_GET_OBJECT_OPT(SpawnOwner,NULL);
+	P_GET_NAME_OPT(SpawnName,NAME_None);
+	P_GET_VECTOR_OPT(SpawnLocation,ActorContext->Location);
+	P_GET_ROTATION_OPT(SpawnRotation,ActorContext->Rotation);
+	P_FINISH;
+
+	// Spawn and return actor.
+	*(AActor**)Result = ActorContext->GetLevel()->SpawnActor
+	(
+		SpawnClass,
+		(AActor*)SpawnOwner,
+		SpawnName,
+		&SpawnLocation,
+		&SpawnRotation
+	);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 278, execSpawn );
+
+static void execDestroy( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execDestroy);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_FINISH;
+	
+	*(DWORD*)Result = ActorContext->GetLevel()->DestroyActor( ActorContext );
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 279, execDestroy );
+
+////////////
+// Timing //
+////////////
+
+static void execSetTimer( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execSetTimer);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_FLOAT(NewTimerRate);
+	P_GET_BOOL(bLoop);
+	P_FINISH;
+
+	ActorContext->TimerCounter = 0.0;
+	ActorContext->TimerRate    = NewTimerRate;
+	ActorContext->bTimerLoop   = bLoop;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 280, execSetTimer );
+
+static void execSetTickRate( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execSetTickRate);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_GET_FLOAT(NewTickRate);
+	P_FINISH;
+
+	ActorContext->TickCounter = 0.0;
+	ActorContext->TickRate    = NewTickRate;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 281, execSetTickRate );
+
+/* Prototype code for an intrinsic function.
+static void exec( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(exec);
+
+	P_FINISH;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( ?, exec );
+*/
+
+/*-----------------------------------------------------------------------------
+	Intrinsic registry.
+-----------------------------------------------------------------------------*/
+
+//
+// Register an intrinsic function.
+// Called at startup time, before engine initialization.
+//
+int UNENGINE_API RegisterIntrinsic
+(
+	int iIntrinsic,
+	void (*Func)( FExecStack &Stack, UObject *Context, BYTE *&Result )
+)
+{
+	static int Initialized = 0;
+	if( !Initialized )
+	{
+		Initialized = 1;
+		for( int i=0; i<EX_Max; i++ )
+			GIntrinsics[i] = execUndefined;
+	}
+	if( iIntrinsic<0 || iIntrinsic>ARRAY_COUNT(GIntrinsics) || GIntrinsics[iIntrinsic]!=execUndefined) 
+		GIntrinsicDuplicate = 1;
+	GIntrinsics[iIntrinsic] = Func;
+	return 0;
+}
+
+/*-----------------------------------------------------------------------------
+	Script processing function.
+-----------------------------------------------------------------------------*/
+
+//
+// Script processing function.
+// Should return 1 if processed, 0 if not.
+//
+void UObject::Process( FName Message, PMessageParms *Parms )
+{
+	guard(UObject::Process);
+	AActor *Actor = (AActor*)this;
+
+	if( !IsA("Actor") || Actor->bDeleteMe )
+		return;
+	if( Actor->GetLevel()->GetState() != LEVEL_UpPlay )
+		return;
+
+	// Validate.
+	debugState(Class!=NULL);
+	debugState(Class->Script!=NULL);
+	debugState(Class->StackTree!=NULL);
+	debugState(Class->StackTree->Num>0);
+	debugState(MainStack.Link.Class!=NULL);
+	debugState(MainStack.Link.iNode!=MAXWORD);
+	debugState(MainStack.Object==this);
+
+	// Make sure we're probing for this message.
+	if( IsProbing( Message ) )
+	{
+		// Traverse the current stack node to find the specified function.
+		clock(GServer.ScriptExecTime);
+		INT            IsState = IsA("Actor") && (((AActor*)this)->State!=NAME_None);
+		FStackNodeLink *Link   = &MainStack.Link.Node().ChildFunctions;
+		FStackNode     *Node;
+		Recheck:
+		while( Link->Class != NULL )
+		{
+			Node = &Link->Node();
+			if( Node->Name == Message )
+			{
+				//debugf("Found %i %s - %s",iMe,Class->GetName(),Message());
+				//debugf("%s LocalsSize=%i",Message(),Node->LocalsSize);
+
+				// Calling an intrinsic function from the engine is illegal, because the
+				// intrinsics call script parsing functions.
+				checkState(Node->iIntrinsic==0);
+				checkState(Node->iCode!=MAXWORD);
+				debugState(Node->ParmsSize==0 || Parms!=NULL);
+
+				// If an undefined engine function, skip it.
+				if( !(Node->StackNodeFlags & SNODE_DefinedFunc) )
+					goto Unfound;
+
+				// Create a new local execution stack.
+				FMemMark Mark(GMem);
+				FExecStack NewStack( this, *Link, new(GMem,MEM_Zeroed,Node->LocalsSize)BYTE );
+				memcpy( NewStack.Locals, Parms, Node->ParmsSize );
+
+				// Parse the outparms.
+				BYTE *Dest = (BYTE*)Parms;
+				BYTE *Src  = NewStack.Locals;
+				FOutParmRec Outs[MAX_FUNC_PARMS], *Out = Outs;
+				while( (Out->Size = *NewStack.Code++) != 0 )
+				{
+					debugState(*NewStack.Code==0 || *NewStack.Code==1);
+					Out->Src  = Src;
+					Out->Dest = Dest;
+					Src      += Out->Size;
+					Dest     += Out->Size;
+					Out      += *NewStack.Code++;
+				}
+
+				// Execute the script code.
+				BYTE Buffer[MAX_CONST_SIZE], *Addr, B;
+				while( (B = *NewStack.Code++) != EX_Return )
+					(*GIntrinsics[B])( NewStack, this, Addr=Buffer );
+
+				// Copy outparms and return value back.
+				while( --Out >= Outs )
+					memcpy( Out->Dest, Out->Src, Out->Size );
+
+				// Restore locals bin.
+				Mark.Pop();
+
+				unclock(GServer.ScriptExecTime);
+				return;
+			}
+			Link = &Node->Next;
+		}
+		if( IsState )
+		{
+			// Failed to find a state version of the function, so check for a global version.
+			IsState  = 0;
+			Link     = &GetClass()->StackTree->Element(0).ChildFunctions;
+			goto Recheck;
+		}
+		unclock(GServer.ScriptExecTime);
+	}
+
+	Unfound:;
+	unguardf(("(class %s, func %s)",GetClassName(),Message()));
+}
+
+/*-----------------------------------------------------------------------------
+	UScript resource implementation.
+-----------------------------------------------------------------------------*/
+
+//
+// Serialize an expression to an archive.
+// Returns expression token.
+//
+static EExprToken SerializeExpr( UScript *Script, INT &iCode, FArchive &Ar )
+{
+	guard(SerializeExpr);
+
+	// Get expr token.
+	Ar << Script->Element(iCode);
+	EExprToken Expr = (EExprToken)Script->Element(iCode++);
+	if( Expr >= EX_MinConversion && Expr < EX_MaxConversion )
+	{
+		// A type conversion.
+		SerializeExpr( Script, iCode, Ar );
+	}
+	else if( Expr >= EX_FirstIntrinsic )
+	{
+		// Intrinsic final function with id 1-127.
+		while( SerializeExpr( Script, iCode, Ar ) != EX_EndFunctionParms );
+	}
+	else if( Expr >= EX_ExtendedIntrinsic )
+	{
+		// Intrinsic final function with id 128-16383.
+		Ar << Script->Element(iCode++);
+		while( SerializeExpr( Script, iCode, Ar ) != EX_EndFunctionParms );
+	}
+	else switch( Expr )
+	{
+		case EX_LocalVariable:
+		case EX_ObjectVariable:
+		case EX_StaticVariable:
+		case EX_UnusedVariable:
+		case EX_DefaultVariable:
+		{
+			Ar << *(WORD*)&Script->Element(iCode); iCode+=sizeof(WORD);
 			break;
 		}
-		case EX_LocalVariable:
-		case EX_GlobalVariable:
+		case EX_BoolVariable:
+		{
+			Ar << Script->Element(iCode);
+			Expr = (EExprToken)(Script->Element(iCode++) >> 5);
+			checkState( Expr==EX_LocalVariable || Expr==EX_ObjectVariable || Expr==EX_StaticVariable || Expr==EX_DefaultVariable );
+			Ar << *(WORD*)&Script->Element(iCode); iCode+=sizeof(WORD);
+			break;
+		}
+		case EX_Nothing:
+		case EX_EndFunctionParms:
+		case EX_IntZero:
+		case EX_IntOne:
+		case EX_True:
+		case EX_False:
+		case EX_NoObject:
+		case EX_Self:
+		{
+			break;
+		}
+		case EX_Context:
+		{
+			SerializeExpr( Script, iCode, Ar );              // Actor expression.
+			Ar << *(WORD*)&Script->Element(iCode); iCode+=2; // Skip offset.
+			Ar << *(BYTE*)&Script->Element(iCode++);         // Skip size.
+			SerializeExpr( Script, iCode, Ar );              // Context expression.
+			break;
+		}
 		case EX_ArrayElement:
 		{
-			int IsArrayElement = 0;
-			if( E==EX_ArrayElement )
-			{
-				IsArrayElement = 1;
-				E = (EExprToken) *Code++;
-				if((E!=EX_LocalVariable)&&(E!=EX_GlobalVariable)) appError("ArrayElement inconsistency");
-			}
-			EClassPropertyType Type = (EClassPropertyType) *Code++;
-			WORD Offset = *(WORD *)Code; Code += 2;
-			Str += sprintf(Str,"[%s:%s+%i",(E==EX_GlobalVariable)?"G":"L",GetPropertyTypeName(Type),Offset);
-
-			if( IsArrayElement )
-			{
-				Str += sprintf(Str,"(");
-				Str  = DecompileExpr(Script,iTree,Str,&Code);
-				Str += sprintf(Str,")");
-			}
-			Str += sprintf(Str,"]");
+			SerializeExpr( Script, iCode, Ar );
+			SerializeExpr( Script, iCode, Ar );
+			Ar << Script->Element(iCode++);
+			Ar << Script->Element(iCode++);
 			break;
 		}
-		case EX_Function:
-		case EX_FastFunction:
+		case EX_VirtualFunction:
 		{
-			if( E==EX_FastFunction )
-			{
-				int     iNode         = *(WORD     *)Code; Code += 2;
-				UScript *FuncScript   = *(UScript **)Code; Code += 4;
-				FStackNode *FuncNode  = &((FStackNode *)FuncScript->GetData())[iNode];
-				Str                  += sprintf(Str,"%s[%s.%i](",FuncNode->Name.Name(),FuncScript->Name,iNode);
-			}
-			else // E==EX_Function
-			{
-				FName Name  = *(FName *)Code; Code += sizeof(FName);
-				Str        += sprintf(Str,"%s[?](",Name.Name());
-			}
-			while (*Code != EX_Nothing)
-			{
-				Str = DecompileExpr(Script,iTree,Str,&Code);
-				if(*Code!=EX_Nothing) Str += sprintf(Str,",");
-			}
-			Str += sprintf(Str,")");
+			Ar << *(FName *)&Script->Element(iCode); iCode+=sizeof(FName);
+			while( SerializeExpr( Script, iCode, Ar ) != EX_EndFunctionParms );
 			break;
 		}
-		case EX_IntegerConst:
+		case EX_FinalFunction:
 		{
-			Str  += sprintf(Str,"%i",*(INT *)Code);
-			Code += sizeof(INT);
+			Ar << *(FStackNodeLink*)&Script->Element(iCode); iCode+=sizeof(FStackNodeLink);
+			while( SerializeExpr( Script, iCode, Ar ) != EX_EndFunctionParms );
 			break;
 		}
-		case EX_RealConst:
+		case EX_IntConst:
 		{
-			Str  += sprintf(Str,"%f",*(FLOAT *)Code);
-			Code += sizeof(FLOAT);
+			Ar << *(INT *)&Script->Element(iCode); iCode+=sizeof(INT);
+			break;
+		}
+		case EX_FloatConst:
+		{
+			Ar << *(FLOAT *)&Script->Element(iCode); iCode+=sizeof(FLOAT);
 			break;
 		}
 		case EX_StringConst:
 		{
-			Str  += sprintf(Str,"\"%s\"",(char *)Code);
-			Code += strlen((char *)Code)+1;
+			do Ar << Script->Element(iCode++); while( Script->Element(iCode-1) != 0);
 			break;
 		}
-		case EX_ResourceConst:
+		case EX_ObjectConst:
 		{
-			Str += sprintf(Str,"%s(%s)",
-				GRes.GetTypeName(*(BYTE *)Code),
-				(*(UResource **)(Code+1))->Name);
-			Code += sizeof(BYTE) + sizeof(UResource *);
+			Ar << *(UObject **)&Script->Element(iCode); iCode+=sizeof(UObject*);
 			break;
 		}
 		case EX_NameConst:
 		{
-			Str += sprintf(Str,"%s",((FName *)Code)->Name());
-			Code += sizeof(FName);
+			Ar << *(FName *)&Script->Element(iCode); iCode+=sizeof(FName);
 			break;
 		}
 		case EX_RotationConst:
 		{
-			FRotation *R = (FRotation *)Code;
-			Code += sizeof(FRotation);
-
-			Str += sprintf(Str,"Rotation(%i,%i,%i)",R->Pitch,R->Yaw,R->Roll);
+			Ar << *(WORD*)&Script->Element(iCode+0);
+			Ar << *(WORD*)&Script->Element(iCode+2);
+			Ar << *(WORD*)&Script->Element(iCode+4);
+			iCode+=6;
 			break;
 		}
 		case EX_VectorConst:
 		{
-			FVector *V = (FVector *)Code;
-			Code += sizeof(FVector);
-
-			Str += sprintf(Str,"Vector(%f,%f,%f)",V->X,V->Y,V->Z);
+			Ar << *(FVector *)&Script->Element(iCode); iCode+=sizeof(FVector);
 			break;
 		}
-		case EX_Error:
+		case EX_ByteConst:
 		{
-			appErrorf("Encountered EX_Error",E);
+			Ar << Script->Element(iCode++);
+			break;
+		}
+		case EX_ResizeString:
+		{
+			Ar << Script->Element(iCode++);
+			SerializeExpr( Script, iCode, Ar );
+			break;
+		}
+		case EX_IntConstByte:
+		{
+			Ar << Script->Element(iCode++);
+			break;
+		}
+		case EX_ActorCast:
+		{
+			Ar << *(UClass **)&Script->Element(iCode); iCode+=sizeof(UClass*);
+			SerializeExpr( Script, iCode, Ar );
+			break;
+		}
+		case EX_EndCode:
+		case EX_Stop:
+		case EX_Return:
+		{
+			break;
+		}
+		case EX_JumpIfNot:
+		{
+			Ar << *(WORD*)&Script->Element(iCode); iCode+=2; // Code offset.
+			SerializeExpr( Script, iCode, Ar );              // Boolean expr.
+			break;
+		}
+		case EX_Switch:
+		{
+			Ar << Script->Element(iCode++);     // Size.
+			SerializeExpr( Script, iCode, Ar ); // Switch expr.
+			break;
+		}
+		case EX_Jump:
+		{
+			Ar << *(WORD*)&Script->Element(iCode); iCode+=2; // Code offset.
+			break;
+		}
+		case EX_Assert:
+		{
+			Ar << *(WORD*)&Script->Element(iCode); iCode += 2; // Line number.
+			SerializeExpr( Script, iCode, Ar );                // Assert expr.
+			break;
+		}
+		case EX_Case:
+		{
+			WORD *W=(WORD*)&Script->Element(iCode); Ar << *W; iCode+=2; // Code offset.
+			if( *W != MAXWORD ) SerializeExpr( Script, iCode, Ar );     // Boolean expr.
+			break;
+		}
+		case EX_LabelTable:
+		{
+			checkState((iCode&3)==0);
+			for( ; ; )
+			{
+				FLabelEntry *E = (FLabelEntry*)&Script->Element(iCode);
+				Ar << *E; iCode+=sizeof(FLabelEntry);
+				if( E->Name == NAME_None ) break;
+			}
+			break;
+		}
+		case EX_GotoLabel:
+		{
+			SerializeExpr( Script, iCode, Ar ); // Label name expr.
+			break;
+		}
+		case EX_Broadcast:
+		{
+			SerializeExpr( Script, iCode, Ar );              // Name expr.
+			SerializeExpr( Script, iCode, Ar );              // Class expr.
+			Ar << *(WORD*)&Script->Element(iCode); iCode+=2; // Skip offset;
+			SerializeExpr( Script, iCode, Ar );              // Function call expr.
+			break;
+		}
+		case EX_Let:
+		{
+			Ar << Script->Element(iCode++);     // Size.
+			SerializeExpr( Script, iCode, Ar ); // Variable expr.
+			SerializeExpr( Script, iCode, Ar ); // Assignment expr.
+			break;
+		}
+		case EX_Let1:
+		case EX_Let4:
+		case EX_LetBool:
+		case EX_LetString:
+		{
+			SerializeExpr( Script, iCode, Ar ); // Variable expr.
+			SerializeExpr( Script, iCode, Ar ); // Assignment expr.
+			break;
+		}
+		case EX_Skip:
+		{
+			Ar << *(WORD*)&Script->Element(iCode); iCode+=2; // Skip size.
+			SerializeExpr( Script, iCode, Ar );              // Expression to possibly skip.
+			break;
+		}
+		case EX_BeginFunction:
+		{
+			for( ; ; )
+			{
+				Ar << Script->Element(iCode);		// Parm size.
+				if( Script->Element(iCode++) == 0 )
+					break;
+				Ar << Script->Element(iCode++);		// OutParm flag.
+			}
 			break;
 		}
 		default:
 		{
-			appErrorf("Unrecognized expr token %i",E);
+			appErrorf( "Bad expr token %02x", Expr );
 			break;
 		}
 	}
-	*ThisCode = Code;
-	return Str;
-
+	return Expr;
 	unguard;
 }
 
-
 //
-// Decompile everything at a particular stack tree node, including
-// variable declarations, functions/events, states, and code.
+// Serialize a script's data to an archive.
 //
-char *DecompileStackNode
-(
-	UScript	*Script,
-	INT		iTree,
-	char	*Str,
-	int		Indent,
-	int		ParentLinks
-)
+void UScript::SerializeData( FArchive &Ar )
 {
-	guard(DecompileStackNode);
+	guard(UScript::SerializeData);
+	INT iCode=0;
 
-	UClass		*Class  = Script->Class;
-	FStackNode	*Node	= &((FStackNode *)Script->GetData())[iTree];
+	// Serialize all code.
+	while( iCode < Num )
+		SerializeExpr( this, iCode, Ar );
 
-	// Decompile peer stack nodes first, since they exist in the linked list in
-	// reverse order.
-	if(ParentLinks ? (Node->Next.Script!=NULL) : (Node->Next.Script==Script))
-	{
-		Str = DecompileStackNode (Node->Next.Script,Node->Next.iNode,Str,Indent,ParentLinks);
-	}
-
-	// Figure out parameters/variables.
-	FClassProperty *Properties=NULL;
-	BYTE *Data=NULL;
-	int iStart,iEnd,ThisIndent=0;
-
-	if(iTree==0)
-	{
-		// Global variables.
-		if(Class->ParentClass)	iStart = Class->ParentClass->Num;
-		else					iStart = 0;
-
-		iEnd		= Class->Num;
-		Properties	= &Class->Element(0);
-		Data		= (BYTE *)&Class->DefaultActor;
-		ThisIndent  = Indent;
-	}
-	else 
-	{
-		iStart		= 0;
-		iEnd		= Node->NumProperties;
-
-		if(Node->NumProperties>0)
-		{
-			Properties	= (FClassProperty *)(&Script->GetData()[Node->PropertiesOffset]);
-			Data		= &Script->GetData()[Node->DataOffset];
-			ThisIndent  = Indent+4;
-		}
-	}
-
-	// Command that caused the nesting.
-	switch (Node->NestType)
-	{
-		case NEST_None:
-		{
-			Str += sprintf(Str,"%s#Error, empty stack node",spc(Indent));
-			break;
-		}
-		case NEST_Class:
-		{
-			// Class <name> [Expands <parent>]:
-			Str += sprintf(Str,"%sClass %s",spc(Indent),Class->Name);
-			if(Class->ParentClass) Str += sprintf(Str," Expands %s",Class->ParentClass->Name);
-			if(Class->Intrinsic)   Str += sprintf(Str," Intrinsic");
-			Str += sprintf(Str,"\r\n");
-			break;
-		}
-		case NEST_State:
-		{
-			// State <name> [,[Auto] [Editable]]
-			Str += sprintf(Str,"%sState %s\r\n",spc(Indent),Node->Name.Name());
-			break;
-		}
-		case NEST_When:
-		case NEST_Function:
-		case NEST_Operator:
-		{
-			int First=1;
-			Str += sprintf(Str,"%s",spc(Indent));
-
-			if		(Node->NestType==NEST_Function)	Str+=sprintf(Str,"Function ");
-			else if(Node->NestType==NEST_Operator)	Str+=sprintf(Str,"Operator ");
-			else									Str+=sprintf(Str,"When ");
-
-			Str += sprintf(Str,"%s(",Node->Name.Name());
-			while ((iStart<iEnd) && (Properties[iStart].Flags & CPF_Param))
-			{
-				if(!First) Str += sprintf(Str,", ");
-				Str = Properties[iStart++].ExportTCX(Str,Data);
-				First=0;
-			}
-			Str += sprintf(Str,")");
-			if( (iStart<iEnd) && (Properties[iStart].Flags & CPF_ReturnValue) )
-			{
-				Str += sprintf(Str," ");
-				Str = Properties[iStart++].ExportTCX(Str,Data);
-			}
-			Str += sprintf(Str,"\r\n");
-			break;
-		}
-		case NEST_If:
-		{
-			Str += sprintf(Str,"%sIf ?\r\n",spc(Indent));
-			break;
-		}
-		case NEST_Loop:
-		{
-			Str += sprintf(Str,"%sWhile ?\r\n",spc(Indent));
-			break;
-		}
-		case NEST_Select:
-		{
-			Str += sprintf(Str,"%sSelect Case ?\r\n",spc(Indent));
-			break;
-		}
-		case NEST_Case:
-		{
-			Str += sprintf(Str,"%sCase ?\r\n",spc(Indent));
-			break;
-		}
-		case NEST_For:
-		{
-			Str += sprintf(Str,"%sFor ?=? to ?\r\n",spc(Indent));
-			break;
-		}
-		default:
-		{
-			Str += sprintf(Str,"%s#Error: unknown nest type\r\n",spc(Indent));
-			break;
-		}
-	}
-
-	// Variable declarations at this stack node.
-	if( (iTree==0) || (Node->NumProperties>0) )
-	{
-		while( iStart < iEnd )
-		{
-			Str += sprintf(Str,"%s",spc(ThisIndent));
-			Str  = Properties[iStart].ExportTCX(Str,Data);
-			Str += sprintf(Str,"\r\n");
-
-			iStart++;
-		}
-	}
-
-	// Code at this stack node.
-	if(Node->CodeStart)
-	{
-		BYTE *Code = &Script->GetData()[Script->CodeOffset + Node->CodeStart];
-		while (1)
-		{
-			BYTE B = *Code++;
-			switch(B)
-			{
-				case SC_End:
-					Str += sprintf(Str,"%s   SC_End\r\n",spc(Indent));
-					goto Done;
-				case SC_Let:
-				case SC_Function:
-				case SC_For:
-				case SC_While:
-				case SC_Select:
-				case SC_GotoCode:
-				case SC_GotoState:
-				case SC_If:
-				case SC_Error:
-					Str += sprintf(Str,"%s   SC_Unimplemented\r\n",spc(Indent));
-				case SC_Test:
-					Str += sprintf(Str,"%s   SC_Test\r\n",spc(Indent));
-					break;
-				case SC_TestEval:
-					Str += sprintf(Str,"%s   SC_TestEval(",spc(Indent));
-					Str  = DecompileExpr(Script,iTree,Str,&Code);
-					Str += sprintf(Str,")\r\n");
-					break;
-				default:
-					throwf("Illegal code token");
-					break;
-			}
-		}
-		Done:;
-	}
-
-	// Child functions and states.
-	if(ParentLinks ? (Node->ChildFunctions.Script!=NULL) : (Node->ChildFunctions.Script==Script))
-	{
-		Str = DecompileStackNode (Node->ChildFunctions.Script,Node->ChildFunctions.iNode,Str,Indent+4,ParentLinks);
-	}
-	if(ParentLinks ? (Node->ChildStates.Script!=NULL) : (Node->ChildStates.Script==Script))
-	{
-		Str = DecompileStackNode (Node->ChildStates.Script,Node->ChildStates.iNode,Str,Indent+4,ParentLinks);
-	}
-
-	// Command that ended the nesting.
-	switch (Node->NestType)
-	{
-		case NEST_None:		Str += sprintf(Str,"%s#EndError\r\n",	spc(Indent)); break;
-		case NEST_Class:	Str += sprintf(Str,"%sEndClass\r\n",	spc(Indent)); break;
-		case NEST_State:	Str += sprintf(Str,"%sEndState\r\n",	spc(Indent)); break;
-		case NEST_When:		Str += sprintf(Str,"%sEndWhen\r\n",		spc(Indent)); break;
-		case NEST_Function:	Str += sprintf(Str,"%sEndFunction\r\n",	spc(Indent)); break;
-		case NEST_Operator:	Str += sprintf(Str,"%sEndFunction\r\n",	spc(Indent)); break;
-		case NEST_If:		Str += sprintf(Str,"%sEndIf\r\n",		spc(Indent)); break;
-		case NEST_Loop:		Str += sprintf(Str,"%sEndWhile\r\n",	spc(Indent)); break;
-		case NEST_Select:	Str += sprintf(Str,"%sEndSelect\r\n",	spc(Indent)); break;
-		case NEST_Case:		Str += sprintf(Str,"%sEndCase\r\n",		spc(Indent)); break;
-		case NEST_For:		Str += sprintf(Str,"%sNext\r\n",		spc(Indent)); break;
-		default:			Str += sprintf(Str,"%s#EndError\r\n",	spc(Indent)); break;
-	}
-	return Str;
+	checkState(iCode==Num);
 	unguard;
 }
+IMPLEMENT_DB_CLASS(UScript);
+
+/*-----------------------------------------------------------------------------
+	UStackTree.
+-----------------------------------------------------------------------------*/
 
 //
-// Decompile a script
+// FStackNode serializer.
 //
-char *UScript::Decompile( char *Str,int ParentLinks )
+FArchive& operator<<( FArchive& Ar, FStackNode &Node )
 {
-	guard(UScript::Decompile);
+	guard(FStackNode::<<);
 
-	Str = DecompileStackNode(this,0,Str,0,ParentLinks);
+	// Archive the stuff.
+	Ar << Node.Parent << Node.ChildFunctions << Node.ChildStates << Node.Next;
+	Ar << Node.Name << Node.iCode << Node.CodeLabelOffset << Node.Line << Node.Pos;
+	Ar << Node.NestType << Node.StackNodeFlags << Node.NumParms << Node.OperPrecedence;
 
-	return Str;
+	if( Node.NestType==NEST_Class || Node.NestType==NEST_State )
+	{
+		// Class/State-specific union info.
+		Ar << Node.ProbeMask << Node.IgnoreMask;
+	}
+	else
+	{
+		// Function info.
+		Ar << Node.LocalsSize;
+		Ar << Node.ParmsSize << Node.iIntrinsic;
+		Ar << Node.iFirstProperty << Node.NumProperties;
+
+		// Set intrinsic function.
+		if( Node.iIntrinsic != 0 )
+		{
+			checkState(Node.iIntrinsic<EX_Max);
+			checkState(GIntrinsics[Node.iIntrinsic] != NULL);
+		}
+	}
+
+	return Ar;
 	unguard;
 }
+
+IMPLEMENT_DB_CLASS(UStackTree);
 
 /*-----------------------------------------------------------------------------
 	The End.

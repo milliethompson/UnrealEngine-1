@@ -8,7 +8,7 @@
 		* Created by Tim Sweeney
 =============================================================================*/
 
-#ifndef _INC_UNSPAN // Prevent header from being included multiple times
+#ifndef _INC_UNSPAN
 #define _INC_UNSPAN
 
 /*------------------------------------------------------------------------------------
@@ -21,12 +21,10 @@
 class FScreenBounds
 {
 public:
-	int		Valid;
-	int		MinX,MinY;
-	int		MaxX,MaxY;
+	BOOL    Valid;
+	FLOAT	MinX,MinY;
+	FLOAT	MaxX,MaxY;
 	FLOAT	MinZ,MaxZ;
-
-	void DebugDump();
 };
 
 //
@@ -55,29 +53,29 @@ public:
 	int		ValidLines;		// Number of lines at beginning (for screen).
 	int		Churn;			// Number of lines added since start.
 	FSpan	**Index;		// Contains (EndY-StartY) units pointing to first span or NULL.
-	FSpan	*List;			// Entries.
-	FMemPool *Mem;			// Memory pool everything is stored in.
+	FMemStack *Mem;			// Memory pool everything is stored in.
+	FMemMark Mark;			// Top of memory pool marker.
 
 	// Allocation.
-	void AllocIndex				(int AllocStartY, int AllocEndY, FMemPool *Mem);
-	void AllocAndInitIndex		(int AllocStartY, int AllocEndY, FMemPool *Mem);
-	void AllocIndexForScreen	(int SXR, int SYR, FMemPool *Mem);
+	void AllocIndex				(int AllocStartY, int AllocEndY, FMemStack *Mem);
+	void AllocAndInitIndex		(int AllocStartY, int AllocEndY, FMemStack *Mem);
+	void AllocIndexForScreen	(int SXR, int SYR, FMemStack *Mem);
 	void Release				();
 	void GetValidRange			(SWORD *ValidStartY,SWORD *ValidEndY);
 
 	// Merge/copy/alter operations.
-	void CopyIndexFrom			(const FSpanBuffer &Source,								  FMemPool *Mem);
-	void MergeFrom				(const FSpanBuffer &Source1, const FSpanBuffer &Source2,  FMemPool *Mem);
+	void CopyIndexFrom			(const FSpanBuffer &Source,								  FMemStack *Mem);
+	void MergeFrom				(const FSpanBuffer &Source1, const FSpanBuffer &Source2,  FMemStack *Mem);
 	void MergeWith				(const FSpanBuffer &Other);
 
 	// Grabbing and updating from rasterizations.
-	int  CopyFromRange			(FSpanBuffer &ScreenSpanBuffer,int Y1, int Y2, FMemPool *Mem);
+	int  CopyFromRange			(FSpanBuffer &ScreenSpanBuffer,int Y1, int Y2, FMemStack *Mem);
 	int  CopyFromRaster			(FSpanBuffer &ScreenSpanBuffer,class FRasterPoly &Raster);
 	int  CopyFromRasterUpdate	(FSpanBuffer &ScreenSpanBuffer,class FRasterPoly &Raster);
 
 	// Rectangle/lattice operations.
-	int  CalcRectFrom			(const FSpanBuffer &Source,BYTE GridXBits,BYTE GridYBits, FMemPool *Mem);
-	void CalcLatticeFrom		(const FSpanBuffer &Source,								  FMemPool *Mem);
+	int  CalcRectFrom			(const FSpanBuffer &Source,BYTE GridXBits,BYTE GridYBits, FMemStack *Mem);
+	void CalcLatticeFrom		(const FSpanBuffer &Source,								  FMemStack *Mem);
 
 	// Occlusion.
 	int	 BoxIsVisible           (int X1, int Y1, int X2, int Y2);
@@ -88,7 +86,7 @@ public:
 	void AssertNotEmpty			(char *Name); // Assert it contains active spans.
 	void AssertValid			(char *Name); // Assert its data is ok.
 	void AssertGoodEnough		(char *Name); // Check everything but ValidLines.
-	void DebugDraw				(ICamera *Camera,BYTE Color);
+	void DebugDraw				(UCamera *Camera,BYTE Color);
 };
 
 /*------------------------------------------------------------------------------------

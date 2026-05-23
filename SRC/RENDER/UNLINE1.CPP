@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnLine1.cpp: INCLUDABLE C FILE for drawing lines.
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	This is used to avoid the overhead of establishing a stack frame and calling
@@ -26,7 +26,7 @@ if (!Dotted) // Regular line
 else // Dotted line
 	{
 	int LineToggle=0;
-	#define L_DRAWPIXEL(Dest)  if (LineToggle^=1) DRAWPIXEL(Dest)
+	#define L_DRAWPIXEL(Dest)  if( (LineToggle^=1) != 0 ) DRAWPIXEL(Dest)
 	#define ISDOTTED 1
 	#define L_ASMPIXEL(Tag)\
 		__asm{mov edx,[LineToggle]}\

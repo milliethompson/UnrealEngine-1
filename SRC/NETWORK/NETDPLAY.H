@@ -1,7 +1,7 @@
 /*=============================================================================
 	NetDPlay.h: Unreal Windows DirectPlay networking
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -32,12 +32,7 @@ class NDirectPlayDriver : public NDriver
 	NSocket *ClientOpenServer(char *ServerURL,char *ErrorMessage);
 	void BeginAdvertising(NServerAd *Ad);
 	void EndAdvertising(NServerAd *Ad);
-	//
-	// FTask interface:
-	//
-	void TaskTick();
-	void TaskExit();
-	char *TaskStatus(char *Name,char *Desc);
+	void Tick();
 	//
 	// Custom variables:
 	//

@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnTask.cpp: Unreal task manager for Windpws
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -23,11 +23,11 @@ extern FWindowsCameraManager CameraManager;
 // Unreal task manager for windows.  Manages all tasks.  Tasks are
 // updated via their Tick routines in CUnrealWnApp.MessagePump().
 //
-class FWindowsTaskManager : public FTaskManager
+class FWindowsTaskManager : public FTaskManagerBase
 {
 public:
 
-	// FTaskManager interface.
+	// FTaskManagerBase interface.
 	virtual void Init();
 	virtual void Exit();
 	virtual int Exec(const char *Cmd,FOutputDevice *Out=GApp);
@@ -47,7 +47,7 @@ public:
 };
 
 FWindowsTaskManager WindowsTaskManager;
-FTaskManager *TaskManager = &WindowsTaskManager;
+FTaskManagerBase *TaskManager = &WindowsTaskManager;
 
 /*-----------------------------------------------------------------------------
 	Init & Exit.
@@ -87,7 +87,7 @@ void FWindowsTaskManager::Exit()
 		if( Tasks[i] )
 		{
 			char Name[256],Descr[256];
-			debugf(LOG_Task,"Task is still running: %s",Tasks[i]->TaskStatus(Name,Descr));
+			debugf(LOG_Exit,"Task is still running: %s",Tasks[i]->TaskStatus(Name,Descr));
 		}
 	}
 	Initialized=0;
@@ -109,22 +109,7 @@ int FWindowsTaskManager::Exec(const char *Cmd,FOutputDevice *Out)
 	const char *Str = Cmd;
 	AssertInitialized();
 
-	if( GetCMD(&Str,"STATUS") && (GetCMD(&Str,"TASK") || !Str[0]) )
-	{
-		int n=0;
-		for (int i=0; i<MAX_TASKS; i++) 
-			if (Tasks[i]) n++;
-
-		Out->Logf("   TASK - Ok, %i/%i tasks",n,TopTask);
-		return Str[0]!=0;
-	}
-	else if( GetCMD(&Str,"HELP") )
-	{
-		Out->Log("   PS - List all tasks");
-		Out->Log("   KILL - Kill a task");
-		return 0;
-	}
-	else if( GetCMD(&Str,"TASKS") )
+	if( GetCMD(&Str,"TASKS") )
 	{
 		Out->Log("Unreal tasks:");
 		for( int i=0; i<MAX_TASKS; i++ )
@@ -133,7 +118,7 @@ int FWindowsTaskManager::Exec(const char *Cmd,FOutputDevice *Out)
 			{
 				char Name[256],Descr[256];
 				Tasks[i]->TaskStatus(Name,Descr);
-				Out->Logf(" %i. %s (%s) %3.1f ms",Tasks[i]->TaskID,Name,Descr[0] ? Descr : "Ok",GApp->CpuToMilliseconds(Tasks[i]->TaskTickTime));
+				Out->Logf(" %i. %s (%s) %3.1f ms",Tasks[i]->TaskID,Name,Descr[0] ? Descr : "Ok",GApp->CpuToMilliseconds(Tasks[i]->TaskCpuTime));
 			}
 		}
 		return 1;
@@ -216,9 +201,10 @@ int FWindowsTaskManager::AddTask(FTask *Task,FTask *Owner,FOutputDevice *Out,ETa
 	Task->Priority		= Priority;
 	Task->TaskFlags		= Flags;
 	Task->TaskID		= TaskID;
+	Task->LastTickTime	= App.Platform.MicrosecondTime();
 
 	char Name[256],Descr[256];
-	debugf(LOG_Task,"Created task: %s",Task->TaskStatus(Name,Descr));
+	debugf(LOG_Info,"Created task: %s",Task->TaskStatus(Name,Descr));
 	return TaskID;
 
 	unguard;
@@ -236,7 +222,7 @@ void FWindowsTaskManager::KillTask(FTask *Task)
 	AssertInitialized();
 
 	char Name[256],Descr[256];
-	debugf(LOG_Task,"Destroyed task: %s",Task->TaskStatus(Name,Descr));
+	debugf(LOG_Info,"Destroyed task: %s",Task->TaskStatus(Name,Descr));
 
 	for( int i=0; i<MAX_TASKS; i++ )
 	{
@@ -264,110 +250,47 @@ void FWindowsTaskManager::KillTasksUsing(FOutputDevice *Out)
 }
 
 /*-----------------------------------------------------------------------------
-	Tasking Kernel & Windows Message Pump.
+	Windows Message Pump.
 -----------------------------------------------------------------------------*/
 
 //
 // Unreal's main message pump.  All windows in Unreal receive messages
-// somewhere below this function on the stack.  This is tuned to keep
-// the UnrealServer executing at a constant rate while rendering the screen 
-// at a variable frame rate and processing all player input to achieve
-// maximum responsiveness.
-//
-// This also doubles as Unreal's tasking kernel.
+// somewhere below this function on the stack.
 //
 void CUnrealWnApp::MessagePump()
 {
 	guard(CUnrealWnApp::MessagePump);
+	MSG Msg;
 
-	int Ticks=0;
-	while( 1 )
+	for( ; ; )
 	{
-		MSG Msg;
-		while
-		(
-			PeekMessage(&Msg,NULL,WM_KEYFIRST,WM_KEYLAST,PM_REMOVE) ||
-			PeekMessage(&Msg,NULL,WM_LBUTTONDOWN,WM_MBUTTONDBLCLK,PM_REMOVE) ||
-			PeekMessage(&Msg,NULL,WM_QUIT,WM_QUIT,PM_REMOVE) ||
-			PeekMessage(&Msg,NULL,WM_QUIT,WM_MOUSEMOVE,PM_REMOVE)
-		)
+		// Handle all incoming messages.
+		while( PeekMessage( &Msg, NULL, 0, 0, PM_REMOVE ) )
 		{
-			if (Msg.message!=WM_QUIT) 
-				RouteMessage(&Msg);
-			else 
+			if( Msg.message == WM_QUIT )
 				return;
 
-			if (Msg.message==WM_MOUSEMOVE) 
+			RouteMessage(&Msg);
+			if( Msg.message == WM_MOUSEMOVE ) 
 				break;
 		}
-		
-		int GotMessage;
-		if( CameraManager.FullscreenCamera || Ticks )
-		{
-			GotMessage = PeekMessage(&Msg,NULL,0,0,PM_REMOVE);
-		}
-		else
-		{
-			if (!GetMessage(&Msg,NULL,0,0)) 
-				return;
-			
-			GotMessage=1;
-		}
-		
-		if( GotMessage )
-		{
-			if( Msg.message==WM_QUIT )
-			{
-				return;
-			}
-			else if( Msg.message==WM_UNREALTIMER )
-			{
-				int Throttle=0;
-				do
-				{
-					if( ++Throttle < 6 )
-					{
-						for( int i=0; i<WindowsTaskManager.MAX_TASKS; i++ )
-						{
-							FTask *Task = WindowsTaskManager.Tasks[i];
-							if( Task && (Task->Priority==PRIORITY_Realtime) )
-							{
-								Task->TaskTickTime=0;
-								clock(Task->TaskTickTime);
-								Task->TaskTick();
-								unclock(Task->TaskTickTime);
-							}
-						}
-						Ticks++;
-					}
-				} while (PeekMessage(&Msg,NULL,WM_UNREALTIMER,WM_UNREALTIMER,PM_REMOVE));
-				
-				GAudio.Tick();
-				if (CameraManager.CursorIsCaptured()) 
-					goto DoCameras;
-			}
-			else RouteMessage(&Msg);
-		}
-		else if( Ticks && !CameraManager.CursorIsCaptured() )
-		{
-			DoCameras:
 
-			// Ticks>=1, and it represents the number of server ticks that have
-			// passed before this camera tick.
-
-			for( int i=0; i<WindowsTaskManager.MAX_TASKS; i++ )
+		// Update all stuff.
+		for( int i=0; i<WindowsTaskManager.MAX_TASKS; i++ )
+		{
+			FTask *Task = WindowsTaskManager.Tasks[i];
+			if( Task && (Task->Priority==PRIORITY_Realtime || Task->Priority==PRIORITY_Camera) )
 			{
-				FTask *Task = WindowsTaskManager.Tasks[i];
-				if( Task && (Task->Priority==PRIORITY_Camera) )
-				{
-					Task->TaskTickTime=0;
-					clock(Task->TaskTickTime);
-					Task->TaskTick();
-					unclock(Task->TaskTickTime);
-				}
+				QWORD NewTime = App.Platform.MicrosecondTime();
+				Task->TaskCpuTime = 0;
+				clock(Task->TaskCpuTime);
+				Task->TaskTick((FLOAT)(SQWORD)(NewTime - Task->LastTickTime) / 1000000.0);
+				unclock(Task->TaskCpuTime);
+				Task->LastTickTime = NewTime;
 			}
-			Ticks=0;
 		}
+		GObj.Tick();				
+		GAudio.Tick();
 	}
 	unguard;
 }

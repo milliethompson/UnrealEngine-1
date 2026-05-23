@@ -3,7 +3,9 @@ BEGIN
   MultiUse = -1  'True
 END
 Attribute VB_Name = "DbHook"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 '/////////////////////////////////////////////////////////
 ' DbHook.cls: Gatekeeper server database hook class.
@@ -330,12 +332,12 @@ Public Sub NoteDbEditIndex(Index As Long, _
                     "+" & Key & " " & NewDeltaFields, _
                     "")
             Else
-                
+            
                 ' This is now field limited. So we must
                 ' determine whether it was field limited
                 ' before the update.
                 If Not TempWasFieldLimited(Subscribers(i)) Then
-                    
+            
                     ' This wasn't field-limited before, but it
                     ' is now, so we have to tell the client to
                     ' delete it:

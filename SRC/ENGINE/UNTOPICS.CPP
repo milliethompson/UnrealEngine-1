@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnTopics.cpp: FTopicTable implementation
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	What's happening: This is how pieces of information are exchanged between
@@ -48,7 +48,7 @@ void FGlobalTopicTable::Exit()
 //
 // Register a topic.
 //
-//warning: This routine is called in the resource type constructors before
+//warning: This routine is called in the object type constructors before
 // anything has been initialized and before the code has actually begun
 // executing.  Anything done here must be 100% safe independent of startup order.
 //
@@ -92,36 +92,37 @@ FTopicHandler *FGlobalTopicTable::Find(const char *TopicName)
 	unguard;
 }
 
-void FGlobalTopicTable::Get(ULevel *Level, const char *Topic, const char *Item, char *Data)
+//
+// Get the value of a topic's item.
+//
+void FGlobalTopicTable::Get( ULevel *Level, const char *Topic, const char *Item, FOutputDevice &Out )
 {
 	guard(FGlobalTopicTable::Get);
 
-	// Handlers expect data to default to an empty response.
-	*Data = 0;
-
 	// Try to find it.
 	FTopicHandler *Handler = Find(Topic);
-
-	if (!Level)
-		Level = GServer.Levels->Element(0);
-
-	if (Handler)
-		Handler->Get(Level,Topic,Item,Data);
+	if( Handler )
+	{
+		Level = Level ? Level : GServer.GetLevel();
+		Handler->Get(Level,Item,Out);
+	}
 
 	unguard;
 }
 
-void FGlobalTopicTable::Set(ULevel *Level, const char *Topic, const char *Item, const char *Value)
+//
+// Set the value of a topic's item.
+//
+void FGlobalTopicTable::Set( ULevel *Level, const char *Topic, const char *Item, const char *Value )
 {
 	guard(FGlobalTopicTable::Set);
 
 	FTopicHandler *Handler = Find(Topic);
 
-	if (!Level) 
-		Level = GServer.Levels->Element(0);
+	Level = Level ? Level : GServer.GetLevel();
 
-	if (Handler) 
-		Handler->Set(Level,Topic,Item,Value);
+	if( Handler )
+		Handler->Set(Level,Item,Value);
 
 	unguard;
 }

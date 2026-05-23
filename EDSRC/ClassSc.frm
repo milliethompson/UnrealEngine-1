@@ -1,148 +1,202 @@
-VERSION 4.00
+VERSION 5.00
+Object = "{3B7C8863-D78F-101B-B9B5-04021C009402}#1.1#0"; "richtx32.ocx"
 Begin VB.Form frmScriptEd 
    Caption         =   "Class Script Editor"
-   ClientHeight    =   7725
-   ClientLeft      =   7620
-   ClientTop       =   7005
+   ClientHeight    =   7335
+   ClientLeft      =   3570
+   ClientTop       =   6435
    ClientWidth     =   7935
-   Height          =   8370
    Icon            =   "ClassSc.frx":0000
-   Left            =   7560
    LinkTopic       =   "Form1"
-   ScaleHeight     =   7725
+   MDIChild        =   -1  'True
+   PaletteMode     =   1  'UseZOrder
+   ScaleHeight     =   7335
    ScaleWidth      =   7935
    ShowInTaskbar   =   0   'False
-   Top             =   6420
-   Width           =   8055
-   Begin VB.TextBox EditBox 
-      BeginProperty Font 
-         name            =   "Courier New"
-         charset         =   0
-         weight          =   400
-         size            =   9
-         underline       =   0   'False
-         italic          =   0   'False
-         strikethrough   =   0   'False
-      EndProperty
-      ForeColor       =   &H00800000&
-      Height          =   7335
+   Begin RichTextLib.RichTextBox EditBox 
+      Height          =   5775
       Left            =   0
-      MultiLine       =   -1  'True
-      ScrollBars      =   3  'Both
       TabIndex        =   0
-      TabStop         =   0   'False
-      Text            =   "ClassSc.frx":030A
       Top             =   0
       Width           =   7935
-   End
-   Begin VB.Menu FileMenu 
-      Caption         =   "&File"
-      Begin VB.Menu FileSave 
-         Caption         =   "&Save"
-         Shortcut        =   ^S
-      End
-      Begin VB.Menu EditRevert 
-         Caption         =   "&Revert"
-      End
-   End
-   Begin VB.Menu EditMenu 
-      Caption         =   "&Edit"
-      Begin VB.Menu EditCut 
-         Caption         =   "Cu&t"
-         Shortcut        =   ^X
-      End
-      Begin VB.Menu EditCopy 
-         Caption         =   "&Copy"
-         Shortcut        =   ^C
-      End
-      Begin VB.Menu EditPaste 
-         Caption         =   "&Paste"
-         Shortcut        =   ^V
-      End
-      Begin VB.Menu ZYPSY 
-         Caption         =   "-"
-      End
-      Begin VB.Menu EditUndoRedo 
-         Caption         =   "&Undo/Redo"
-         Shortcut        =   ^Z
-      End
-      Begin VB.Menu ZBLAST 
-         Caption         =   "-"
-      End
-      Begin VB.Menu EditFind 
-         Caption         =   "&Find"
-         Shortcut        =   ^F
-      End
-      Begin VB.Menu EditFindNext 
-         Caption         =   "Find &Next"
-         Shortcut        =   {F3}
-      End
-   End
-   Begin VB.Menu ScriptMenu 
-      Caption         =   "&Script"
-      Begin VB.Menu ScriptCompile 
-         Caption         =   "&Compile"
-         Shortcut        =   {F5}
-      End
-      Begin VB.Menu ScriptMakeChanged 
-         Caption         =   "&Make Changed Scripts"
-         Shortcut        =   {F6}
-      End
-      Begin VB.Menu ScriptMakeAll 
-         Caption         =   "Make &All Scripts"
-         Shortcut        =   {F7}
-      End
-      Begin VB.Menu ZSWAY 
-         Caption         =   "-"
-      End
-      Begin VB.Menu GoToNextError 
-         Caption         =   "&Go to Next Error"
-         Shortcut        =   {F4}
-      End
-      Begin VB.Menu ScriptResults 
-         Caption         =   "&Show Results"
-         Shortcut        =   {F8}
-      End
-      Begin VB.Menu ClassEditDefaults 
-         Caption         =   "&Edit Default Actor Properties"
-         Shortcut        =   {F9}
-      End
-   End
-   Begin VB.Menu HelpMenu 
-      Caption         =   "&Help"
-      Begin VB.Menu HelpExamples 
-         Caption         =   "&Examples"
-      End
-      Begin VB.Menu HelpOverview 
-         Caption         =   "&Language Overview"
-      End
-      Begin VB.Menu ZOGGST 
-         Caption         =   "-"
-      End
-      Begin VB.Menu HelpCommands 
-         Caption         =   "&Command Reference"
-      End
-      Begin VB.Menu HelpEvents 
-         Caption         =   "&Event Reference"
-      End
+      _ExtentX        =   13996
+      _ExtentY        =   10186
+      _Version        =   327680
+      BackColor       =   4194304
+      Enabled         =   -1  'True
+      ScrollBars      =   2
+      RightMargin     =   26085.17
+      AutoVerbMenu    =   -1  'True
+      TextRTF         =   $"ClassSc.frx":030A
+      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "Courier New"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
    End
 End
 Attribute VB_Name = "frmScriptEd"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
-Dim ShiftPressed As Boolean
 
-Private Sub ClassEditDefaults_Click()
+Dim ShiftPressed As Boolean
+Dim FirstUndo As Long
+Dim LastUndo As Long
+Dim CurUndo As Long
+Dim Sizing As Boolean
+Dim Changed As Boolean
+
+Dim Undo(20) As String
+Dim UndoPos(20) As Long
+Dim UndoTop(20) As Long
+Dim UndoLength(20) As Long
+
+' Set the editor top.
+Public Sub SetTop(DestTop As Long)
+    Dim CurTop As Long
+
+    CurTop = SendMessage(EditBox.hwnd, EM_GETFIRSTVISIBLELINE, 0, 0)
+    While CurTop > DestTop
+        Call SendMessage(EditBox.hwnd, EM_SCROLL, SB_LINEUP, 0)
+        CurTop = CurTop - 1
+    Wend
+    While CurTop < DestTop
+        Call SendMessage(EditBox.hwnd, EM_SCROLL, SB_LINEDOWN, 0)
+        CurTop = CurTop + 1
+    Wend
+End Sub
+
+' The set cursor position.
+Public Sub LoadAll()
+
+    DisableRedraw (EditBox.hwnd)
+
+    If Visible Then EditBox.SetFocus
+    EditBox.TextRTF = Ed.Server.GetProp("RTF", Caption)
+    EditBox.SelStart = CLng(Ed.Server.GetProp("TEXTPOS", Caption))
+    Call SendMessage(EditBox.hwnd, EM_SCROLLCARET, 0, 0)
+    SetTop (CLng(Ed.Server.GetProp("TEXTTOP", Caption)))
+
+    EnableRedraw (EditBox.hwnd)
+    EditBox.Refresh
+
+End Sub
+
+' Save everything.
+Public Sub PreSave()
+    Call Ed.Server.SetProp("TEXT", Caption, EditBox.Text)
+    Call Ed.Server.SetProp("TEXTPOS", Caption, Str(EditBox.SelStart))
+    Call Ed.Server.SetProp("TEXTTOP", Caption, Str(SendMessage(EditBox.hwnd, EM_GETFIRSTVISIBLELINE, 0, 0)))
+End Sub
+
+' Set selection start, end, and length.
+Public Sub GotoText(Start As Long, Length As Long)
+    EditBox.SetFocus
+    EditBox.SelStart = Start
+    EditBox.SelLength = Length
+    Call SendMessage(EditBox.hwnd, EM_SCROLLCARET, 0, 0)
+End Sub
+
+' Set script editable flag.
+Private Sub SetScriptControls(Flag As Boolean, EditFlag As Boolean)
+    frmMain.ScriptMenu.Visible = Flag
+    frmMain.EditCopy.Visible = Flag
+    frmMain.EditFind.Visible = Flag
+    frmMain.EditFindNext.Visible = Flag
+    frmMain.EditDivider1.Visible = Flag
+    frmMain.EditDivider2.Visible = Flag
+    frmMain.EditCut.Visible = EditFlag
+    frmMain.EditPaste.Visible = EditFlag
+End Sub
+
+Private Sub EditBox_Change()
+    Changed = True
+End Sub
+
+Private Sub Form_Activate()
+    Set frmMain.ScriptForm = Me
+    frmMain.hwndScript = hwnd
+    Call SetScriptControls(True, Not EditBox.Locked)
+End Sub
+
+Private Sub Form_Deactivate()
+    If frmMain.hwndScript = Me.hwnd Then
+        Set frmMain.ScriptForm = Nothing
+        frmMain.hwndScript = 0
+        Call SetScriptControls(False, False)
+    End If
+End Sub
+
+Public Sub ScriptEditDefaults_Click()
     frmActorProperties.GetClassDefaultActor (Caption)
 End Sub
 
-Private Sub Editbox_KeyDown(KeyCode As Integer, Shift As Integer)
-    If Shift Then
-        ShiftPressed = True
-    Else
-        ShiftPressed = False
+Private Sub SaveState(Index As Long)
+    UndoPos(Index) = EditBox.SelStart
+    'MsgBox "Saving " & Index & ": " & EditBox.SelStart & " - " & UndoPos(Index)
+    UndoLength(Index) = EditBox.SelLength
+    UndoTop(Index) = SendMessage(EditBox.hwnd, EM_GETFIRSTVISIBLELINE, 0, 0)
+    Undo(Index) = EditBox.TextRTF
+End Sub
+
+Private Sub MarkUndo()
+    
+    LastUndo = (CurUndo + 1) Mod 20
+        
+    SaveState (LastUndo)
+    If LastUndo = FirstUndo Then
+        FirstUndo = (FirstUndo + 1) Mod 20
     End If
+    
+    CurUndo = LastUndo
+    Changed = False
+
+End Sub
+
+Private Sub PerformDo(Index As Long, CursorDelta As Long)
+    Dim CursorIndex As Long
+    CursorIndex = (Index + CursorDelta + 20) Mod 20
+    
+    DisableRedraw (EditBox.hwnd)
+    
+    EditBox.TextRTF = Undo(Index)
+    EditBox.SetFocus
+    EditBox.SelStart = UndoPos(CursorIndex)
+    EditBox.SelLength = UndoLength(CursorIndex)
+    Call SendMessage(EditBox.hwnd, EM_SCROLLCARET, 0, 0)
+    SetTop (UndoTop(Index))
+    'MsgBox "Getting " & Index & ": " & EditBox.SelStart & " - " & UndoPos(Index)
+
+    EnableRedraw (EditBox.hwnd)
+    EditBox.Refresh
+End Sub
+
+Public Sub EditUndo_Click()
+    If CurUndo <> FirstUndo And Not EditBox.Locked Then
+
+        If Changed Then
+            MarkUndo
+        End If
+
+        CurUndo = (CurUndo + 20 - 1) Mod 20
+        Call PerformDo(CurUndo, 0)
+    End If
+    Changed = False
+End Sub
+
+Public Sub EditRedo_Click()
+    If CurUndo <> LastUndo And Not EditBox.Locked And Not Changed Then
+        CurUndo = (CurUndo + 1) Mod 20
+        Call PerformDo(CurUndo, 0)
+    End If
+    Changed = False
 End Sub
 
 Private Sub Editbox_KeyPress(KeyAscii As Integer)
@@ -151,12 +205,16 @@ Private Sub Editbox_KeyPress(KeyAscii As Integer)
     Dim i As Integer
     Dim c As Integer
     Dim S, e As Integer
-    '
-    If KeyAscii = 9 And Editbox.SelLength > 0 Then
+    
+    S = EditBox.Text
+    
+    If KeyAscii = 9 And EditBox.SelLength > 0 Then
+        MarkUndo
+        DisableRedraw (EditBox.hwnd)
         KeyAscii = 0
-        S = Editbox.SelStart
+        S = EditBox.SelStart
         If ShiftPressed Then
-            NewText = Editbox.SelText
+            NewText = EditBox.SelText
             If Left(NewText, 1) = Chr(9) Then NewText = Mid(NewText, 2)
             For i = 1 To Len(NewText)
                 If Mid(NewText, i, 2) = Chr(10) + Chr(9) Then
@@ -164,7 +222,7 @@ Private Sub Editbox_KeyPress(KeyAscii As Integer)
                 End If
             Next i
         Else
-            NewText = Chr(9) + Editbox.SelText
+            NewText = Chr(9) + EditBox.SelText
             For i = 1 To Len(NewText)
                 If Mid(NewText, i, 1) = Chr(10) Then
                     NewText = Left(NewText, i) + Chr(9) + Mid(NewText, i + 1)
@@ -172,66 +230,148 @@ Private Sub Editbox_KeyPress(KeyAscii As Integer)
                 End If
             Next i
         End If
-        Editbox.SelText = NewText
-        Editbox.SelStart = S
-        Editbox.SelLength = Len(NewText)
+        EditBox.SelText = NewText
+        EditBox.SelStart = S
+        EditBox.SelLength = Len(NewText)
+        EnableRedraw (EditBox.hwnd)
+        EditBox.Refresh
     End If
+End Sub
+
+Private Sub Editbox_KeyDown(KeyCode As Integer, Shift As Integer)
+    Dim T As String
+    Dim N As Long, S As Long
+    Dim Pre As String
+
+    If KeyCode = 13 And Not EditBox.Locked Then
+        ' Enter.
+        S = EditBox.SelStart
+        T = Left(EditBox.Text, S)
+        N = Len(T) + 2
+        While N > 1
+            If Mid(T, N - 1, 1) = Chr(10) Then
+                Pre = ""
+                While Mid(T, N, 1) = Chr(9) Or Mid(T, N, 1) = " "
+                    Pre = Pre + Mid(T, N, 1)
+                    N = N + 1
+                Wend
+                GoTo Done
+            End If
+            N = N - 1
+        Wend
+Done:
+        MarkUndo
+        EditBox.SelText = Chr(13) & Chr(10) & Pre
+        EditBox.SelLength = 0
+        KeyCode = 0
+    ElseIf Changed And (KeyCode = 38 Or KeyCode = 40 Or KeyCode = 40 Or _
+        KeyCode = 33 Or KeyCode = 34 Or KeyCode = 36 Or KeyCode = 35) Then
+        ' Cursor movement.
+        MarkUndo
+    ElseIf KeyCode = 46 Then
+        ' Del.
+        MarkUndo
+    ElseIf KeyCode = 90 Then
+        ' Ctrl-Z.
+        EditUndo_Click
+        KeyCode = 0
+    End If
+
+    If (Shift And vbShiftMask) <> 0 Then
+        ShiftPressed = True
+    Else
+        ShiftPressed = False
+    End If
+
 End Sub
 
 Private Sub Editbox_KeyUp(KeyCode As Integer, Shift As Integer)
     ShiftPressed = False
 End Sub
 
-Private Sub EditCopy_Click()
-    Editbox.SetFocus
-    SendKeys "^{C}"
+Public Sub EditCopy_Click()
+    Clipboard.Clear
+    Clipboard.SetText EditBox.SelText
 End Sub
 
-Private Sub EditCut_Click()
-    Editbox.SetFocus
-    SendKeys "^{X}"
+Public Sub EditCut_Click()
+    MarkUndo
+    Clipboard.Clear
+    Clipboard.SetText EditBox.SelText
+    EditBox.SelText = ""
 End Sub
 
-Private Sub EditFind_Click()
-    '
+Public Sub EditPaste_Click()
+    MarkUndo
+    EditBox.SelText = Clipboard.GetText
+End Sub
+
+Public Sub EditFind_Click()
     frmScriptFind.ScriptName = Caption
+    frmScriptFind.LineNum.Text = Str(1 + EditBox.GetLineFromChar(1 + EditBox.SelStart))
+    frmScriptFind.DoReplace.Enabled = Not EditBox.Locked
+    frmScriptFind.DoReplaceAll.Enabled = Not EditBox.Locked
     frmScriptFind.Show 1
-    '
     EditFindNext_Click
 End Sub
 
-Private Sub EditFindNext_Click()
+Public Sub EditFindNext_Click()
     Dim Find As String
     Dim Replace As String
     Dim Test As String
-    Dim Length As Integer
-    Dim P As Integer
-    Dim DoCaps As Integer
-    Dim OldStart As Integer
-    '
+    Dim Length As Long
+    Dim LineNum As Long
+    Dim P As Long, c As Long, D As Long
+    Dim DoCaps As Long
+    Dim OldStart As Long
+
+    If GFindResult = 4 Then
+        ' Go to line number via binary search.
+        LineNum = CLng(frmScriptFind.LineNum) - 1
+        Length = Len(EditBox.Text)
+        c = Length
+        P = 0
+        While c > 0
+            If P < 1 Then P = 1
+            If P >= Length Then P = Length
+            D = EditBox.GetLineFromChar(P)
+            If D < LineNum Then
+                P = P + c
+            ElseIf D > LineNum Then
+                P = P - c
+            Else
+                GoTo Found
+            End If
+            c = c / 2
+        Wend
+        If c = 0 Then Exit Sub
+Found:
+        Call GotoText(P, 0)
+        SendKeys "{END}+{HOME}"
+        Exit Sub
+    End If
+    
     Find = frmScriptFind.FindText
     Replace = frmScriptFind.ReplaceText
-    '
+    
     If Trim(Find) = "" Then Exit Sub
-    '
+    
     DoCaps = IIf(frmScriptFind.CaseSensitive.Value, 0, 1)
-    '
+    
     If DoCaps = 1 Then Find = UCase(Find)
-    '
+
     If GFindResult = 1 Then
-        '
-        ' Find:
-DoFind: '
+        ' Find.
+DoFind:
         P = InStr( _
-            Editbox.SelStart + Editbox.SelLength + 1, _
-            Editbox.Text, _
+            EditBox.SelStart + EditBox.SelLength + 1, _
+            EditBox.Text, _
             Find, _
             DoCaps)
         If P > 0 Then
-            Editbox.SelStart = P - 1
-            Editbox.SelLength = Len(Find)
+            Call GotoText(P - 1, Len(Find))
         Else
-            Editbox.SelStart = Len(Editbox.Text)
+            Call GotoText(Len(EditBox.Text), 0)
         End If
         If GFindResult = 3 Then GoTo DoRep
         '
@@ -239,74 +379,68 @@ DoFind: '
         '
         ' Replace:
 DoRep:  '
-        Test = Mid(Editbox.Text, Editbox.SelStart + 1, Len(Find))
+        Test = Mid(EditBox.Text, EditBox.SelStart + 1, Len(Find))
         If DoCaps = 1 Then Test = UCase(Test)
         '
         If Test = Find Then
-            OldStart = Editbox.SelStart
-            Editbox.Text = _
-                Left(Editbox.Text, Editbox.SelStart) & _
+            OldStart = EditBox.SelStart
+            EditBox.Text = _
+                Left(EditBox.Text, EditBox.SelStart) & _
                 Replace & _
-                Mid(Editbox.Text, Editbox.SelStart + Len(Find) + 1)
-            Editbox.SelStart = OldStart + Len(Replace)
-            Editbox.SelLength = 0
+                Mid(EditBox.Text, EditBox.SelStart + Len(Find) + 1)
+            Call GotoText(OldStart + Len(Replace), 0)
             GoTo DoFind
         Else
             If GFindResult <> 3 Then GoTo DoFind
         End If
-        Editbox.SelStart = Len(Editbox.Text)
+        Call GotoText(Len(EditBox.Text), 0)
         '
     ElseIf GFindResult = 3 Then
         '
         ' Replace All
         '
         GoTo DoFind
-        '
     End If
-End Sub
-
-Private Sub EditPaste_Click()
-    Editbox.SetFocus
-    SendKeys "^{V}"
-End Sub
-
-Private Sub EditRevert_Click()
-    Editbox.SetFocus
-    Editbox.Text = Ed.Server.GetProp("TEXT", Caption)
-End Sub
-
-Private Sub EditUndoRedo_Click()
-    Editbox.SetFocus
-    Call SendMessage(Editbox.hwnd, EM_UNDO, 0, 0)
-End Sub
-
-Private Sub FileSave_Click()
-    Editbox.SetFocus
-    DoFileSave
-End Sub
-
-Sub DoFileSave()
-    Call Ed.Server.SetProp("TEXT", Caption, Editbox.Text)
-    Call Ed.Server.SetProp("TEXTPOS", Caption, Str(Editbox.SelStart))
 End Sub
 
 Private Sub Form_Load()
     Dim i As Integer
     Dim Tabs As DWORDREC
-    '
+    Dim Intrinsic As Boolean
+    
     Me.Left = (ScriptEdLeft + 140) * Screen.TwipsPerPixelX: ScriptEdLeft = (ScriptEdLeft + 32) Mod 300
     Me.Top = (ScriptEdTop + 140) * Screen.TwipsPerPixelY: ScriptEdTop = (ScriptEdTop + 32) Mod 200
-    '
+    
     Call Ed.SetOnTop(Me, "ClassScriptEditor" & Str(GNumMiscForms), TOP_NORMAL)
-    '
-    Tabs.Value = 12
-    Call SendTabsMessage(Editbox.hwnd, EM_SETTABSTOPS, 1, Tabs)
-    '
+    
+    Tabs.Value = 16
+    Call SendTabsMessage(EditBox.hwnd, EM_SETTABSTOPS, 1, Tabs)
+    
+    ' Rich text control.
+    EditBox.SelStart = 0
+    EditBox.SelLength = Len(EditBox.Text)
+    EditBox.SelColor = &HFF00&
+    EditBox.SelTabCount = 16
+    For i = 0 To 15
+        EditBox.SelTabs(i) = 420 * i
+    Next i
+
     DoResize
 End Sub
 
 Private Sub Form_Resize()
-    DoResize
+    If Sizing = False Then
+        Sizing = True
+        If WindowState <> 1 Then
+            ' Maximized or resized.
+            DoResize
+        Else
+            ' Minimized.
+            Show
+            SetFocus
+        End If
+        Sizing = False
+    End If
 End Sub
 
 Private Sub DoResize()
@@ -321,60 +455,71 @@ Private Sub DoResize()
         MustExit = True
     End If
     If MustExit Then Exit Sub
-    '
-    Editbox.Width = ScaleWidth
-    Editbox.Height = ScaleHeight - Editbox.Top
+
+    EditBox.Width = ScaleWidth
+    EditBox.Height = ScaleHeight - EditBox.Top
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
+    PreSave
+    Form_Deactivate
     Call Ed.EndOnTop(Me)
     Call RemoveMiscForm(Me)
-    DoFileSave
 End Sub
 
 Sub StartCompile()
+    MarkUndo
+    PreSaveAll
     Call frmResults.UpdateStatus("Compiling...")
-    Call Ed.Server.SetProp("TEXT", Caption, Editbox.Text)
-    Call Ed.Server.SetProp("TEXTPOS", Caption, Str(Editbox.SelStart))
 End Sub
 
 Sub EndCompile()
+    LoadAll
     frmResults.UpdateResults
     frmActorProperties.NoteClassChange
 End Sub
 
-Private Sub GoToNextError_Click()
+Public Sub ScriptNextError_Click()
     frmResults.GoToNext
 End Sub
 
-Private Sub ScriptCompile_Click()
+Public Sub ScriptCompile_Click()
     StartCompile
     Ed.Server.Exec "SCRIPT COMPILE CLASS=" & Caption
     EndCompile
     frmResults.Results_DblClick
 End Sub
 
-Public Sub PreSave()
-    Call Ed.Server.SetProp("TEXT", Caption, Editbox.Text)
+Public Sub ResetUndo()
+    UndoPos(LastUndo) = EditBox.SelStart
+    Undo(LastUndo) = EditBox.TextRTF
 End Sub
 
 Public Sub PostLoad()
-    Editbox.SetFocus
-    Editbox.Text = Ed.Server.GetProp("TEXT", Caption)
+    
+    DisableRedraw (EditBox.hwnd)
+    Call GotoText(0, Len(EditBox.Text))
+    EditBox.TextRTF = Ed.Server.GetProp("RTF", Caption)
+    Call GotoText(0, 0)
+    EnableRedraw (EditBox.hwnd)
+    
+    EditBox.Refresh
+    ResetUndo
+
 End Sub
 
-Private Sub ScriptMakeAll_Click()
+Public Sub ScriptMakeAll_Click()
     StartCompile
     Ed.Server.Exec "SCRIPT MAKE ALL"
     EndCompile
 End Sub
 
-Private Sub ScriptMakeChanged_Click()
+Public Sub ScriptMakeChanged_Click()
     StartCompile
     Ed.Server.Exec "SCRIPT MAKE"
     EndCompile
 End Sub
 
-Private Sub ScriptResults_Click()
+Public Sub ScriptResults_Click()
     frmResults.UpdateResults
 End Sub

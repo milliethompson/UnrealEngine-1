@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnRender.cpp: Main Unreal rendering functions and pipe
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -12,28 +12,29 @@
 #include "UnRender.h"
 #include "UnRaster.h"
 #include "UnRenDev.h"
+#include "UnFireEn.h"
 
-FGlobalRender			GRender;
-FGlobalRaster			GRaster;
-FGlobalBlit				GBlit;
-
-UNRENDER_API FGlobalRender *GRendPtr = &GRender;
+/*-----------------------------------------------------------------------------
+	Globals.
+-----------------------------------------------------------------------------*/
 
 #if STATS
 FRenderStats GStat;
 #endif
 
-#define ASM_LATTICE ASM
+extern FGlobalRaster GRaster;
+
+//#define ASM_LATTICE ASM
 
 class FMipTable
-	{
+{
 	public:
 	BYTE MipLevel; 
 	BYTE RoutineOfs;
-	} GSmallMipTable[512*4],GLargeMipTable[512*4],GNoMipTable[512*4];
+} GSmallMipTable[512*4], GLargeMipTable[512*4], GOtherMipTable[512*4], GNoMipTable[512*4];
 
 extern "C"
-	{
+{
 	ASMVAR FMipTable	*TRL_MipTable;
 	ASMVAR FLOAT		TRL_FBaseU;
 	ASMVAR FLOAT		TRL_FBaseV;
@@ -42,170 +43,168 @@ extern "C"
 	ASMVAR DWORD		TRL_LightBaseU;
 	ASMVAR DWORD		TRL_LightBaseV;
 	ASMVAR DWORD		TRL_LightVMask;
+	ASMVAR DWORD		TRO_DitherMask;
 	ASMVAR BYTE			*TRL_MipRef;
-	ASMVAR FBlitMipInfo	*TRL_MipPtr[8];
 	ASMVAR BYTE			TRL_LightMeshShift;
 	ASMVAR BYTE			TRL_LightMeshUShift;
 	ASMVAR BYTE			TRL_RoutineOfsEffectBase;
 	void CDECL			TRL_RectLoop();
 	void CDECL			TRL_SelfModRect();
-	};
+};
 
 /*-----------------------------------------------------------------------------
-	FGlobalRender statics
+	FRender statics.
 -----------------------------------------------------------------------------*/
 
-INT 			FGlobalRender::MaxTransforms;
+DWORD 			FRender::Stamp;
 
-FVector			**FGlobalRender::VectorTransformFirst;
-FVector			**FGlobalRender::VectorTransformLast;
-FTransform		**FGlobalRender::PointTransformFirst;
-FTransform		**FGlobalRender::PointTransformLast;
+FMemStack		FRender::PointMem;
+FMemStack		FRender::VectorMem;
 
-FTransform		*FGlobalRender::PointTransform;
-FVector			*FGlobalRender::VectorTransform;
+FMemMark		FRender::PointMark;
+FMemMark		FRender::VectorMark;
 
-FTexLattice		*FGlobalRender::LatticePtr[MAX_YR][MAX_XR];
+FRender::FStampedPoint  *FRender::PointCache;
+FRender::FStampedVector *FRender::VectorCache;
 
-FRenderStats	*FGlobalRender::Stat;
+FTexLattice		*FRender::LatticePtr[MAX_YR][MAX_XR];
+
+FRenderStats	*FRender::Stat;
 
 /*-----------------------------------------------------------------------------
-	FGlobalRender init & exit
+	FRender init & exit.
 -----------------------------------------------------------------------------*/
 
 //
 // Initialize the rendering engine and allocate all temporary buffers.
 // Calls appError if failure.
 //
-void FGlobalRender::Init()
-	{
-	GUARD;
-	static int TempStatic=0;
-	//
-	// Validate defined constants:
-	//
-	if (FBspNode::MAX_NODE_VERTICES > FPoly::MAX_FPOLY_VERTICES) appError ("Vertex problem");
-	//
-	MaxTransforms		= 32768+16383;
+void FRender::Init()
+{
+	guard(FRender::Init);
+
+	// Validate stuff.
+	checkState(FBspNode::MAX_NODE_VERTICES<=FPoly::MAX_VERTICES);
+	checkState(sizeof(FVector)==12);
+	checkState(sizeof(FRotation)==12);
+	checkState(sizeof(FCoords)==48);
+
+	GBlitPtr			= &GBlit;
 	MaxDynamics			= 1024;
 	MaxPostDynamics		= 768;
-	//
-	// Allocate rendering stuff
-	//
-	PointTransform  = appMallocArray(MaxTransforms,FTransform,		"PointCache");
-	VectorTransform = appMallocArray(MaxTransforms,FVector,			"VectorCache");
+
+	// Allocate rendering stuff.
+	PointCache		= appMallocArray(MAX_POINTS,FStampedPoint,		"PointCache");
+	VectorCache		= appMallocArray(MAX_VECTORS,FStampedVector,	"VectorCache");
 	DynamicsIndex   = appMallocArray(MaxDynamics,FDynamicsIndex,	"DynamicsCache");
 	PostDynamics    = appMallocArray(MaxPostDynamics,INDEX,			"PostDynCache");
-	//
-	mymemset(LatticePtr,0,sizeof(LatticePtr));
-	//
+
+	memset( LatticePtr, 0, sizeof(LatticePtr) );
+
 	InitDither();
 	GCache.Flush();
-	//
-	// Initialize dynamics info:
-	//
+
+	// Initialize dynamics info.
 	DynamicsLocked  = 0;
-	//
-	// Misc params:
-	//
+
+	// Misc params.
+	TRO_DitherMask	= 3;
 	Toggle			= 0;
 	RendIter		= 0;
 	ShowLattice		= 0;
 	DoDither		= 1;
 	ShowChunks		= 0;
 	LeakCheck		= 0;
+	Temporal		= 0;
+	Antialias		= 0;
 	Extra1			= 0;
 	Extra2			= 0;
 	Extra3			= 0;
 	Extra4			= 0;
 	AllStats		= 0;
-	//
-	VectorTransformFirst = VectorTransformLast = NULL;
-	PointTransformFirst  = PointTransformLast  = NULL;
-	//
-	for (int i=0; i<MaxTransforms; i++)	VectorTransform[i].Align = FVA_Uncached;
-	for (    i=0; i<MaxTransforms; i++)	PointTransform [i].Align = FVA_Uncached;
-	//
-	// Init edge occluder:
-	//
-	GEdgeOccluder->Init(GApp,&GMem,&GDynMem);
-	//
-	// Init stats:
-	//
-#if STATS
-	mymemset(&GStat,0,sizeof(GStat));
-	Stat = &GStat;
-#endif
-	//
-	debug(LOG_Init,"Rendering initialized");
-	//
+	MipMultiplier	= 1.0;
+
+	for(int i=0; i<MAX_POINTS; i++ ) PointCache [i].Stamp = Stamp;
+	for(    i=0; i<MAX_VECTORS; i++) VectorCache[i].Stamp = Stamp;
+
+	// Init stats.
+	STAT(memset(&GStat,0,sizeof(GStat));)
+	STAT(Stat = &GStat;)
+
 	GRaster.Init();
-	//
-	for (i=0; i<8; i++)
-		{
-		TRL_MipPtr[i] = &GBlit.Mips[i];
+
+	for( i=0; i<MAX_MIPS; i++ )
 		GBlit.MipRef[i] = GBlit.PrevMipRef[i] = 0;
-		};
-	for (int n=0; n<2048; n++)
-		{
+
+	for( int n=0; n<2048; n++ )
+	{
 		int i   = (n<1024) ? (n) : (1024-n);
 		int Mip = (i/4) - 127;
 		int Ofs = (i&3);
-		if (Mip<0)
-			{
+		if( Mip<0 )
+		{
 			GSmallMipTable[n].MipLevel    = 0;
 			GSmallMipTable[n].RoutineOfs  = 1;
-			}
-		else if (Mip<7)
-			{
+		}
+		else if( Mip<7 )
+		{
 			GSmallMipTable[n].MipLevel    = Mip;
 			GSmallMipTable[n].RoutineOfs  = Mip*16 + (i&3)*4 + 1;
-			}
+		}
 		else
-			{
+		{
 			GSmallMipTable[n].MipLevel    = 7;
 			GSmallMipTable[n].RoutineOfs  = 7*16 + 1;
-			};
+		}
+		GOtherMipTable[n] = GSmallMipTable[n>0 ? n-1 : 0];
+
 		GLargeMipTable[n].MipLevel   = Clamp(Mip,0,7);
 		GLargeMipTable[n].RoutineOfs = Clamp(Mip,0,7)*16 + 1;
-		//
+
 		GNoMipTable[n].MipLevel      = 0;
 		GNoMipTable[n].RoutineOfs    = 1;
-		};
+	}
 	GLightManager->Init();
-	UNGUARD("FGlobalRender::Init");
-	};
+
+	// Allocate memory stacks.
+	PointMem.Init (GCache,16384,65536);
+	VectorMem.Init(GCache,2048, 8192);
+
+	debug(LOG_Init,"Rendering initialized");
+	unguard;
+}
 
 //
 // Shut down the rendering engine
 //
-void FGlobalRender::Exit ()
-	{
-	GUARD;
-	//
-	GEdgeOccluder->Exit();
-	//
+void FRender::Exit()
+{
+	guard(FRender::Exit);
+
 	GRaster.Exit();
-	//
-	appFree(PointTransform);
-	appFree(VectorTransform);
+
+	appFree(PointCache);
+	appFree(VectorCache);
 	appFree(DynamicsIndex);
 	appFree(PostDynamics);
-	//
+
 	debug(LOG_Exit,"Rendering closed");
-	//
-	UNGUARD("FGlobalRender::Exit");
-	};
+
+	// Shut down memory stacks.
+	PointMem.Exit();
+
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	FGlobalRender Stats display
+	FRender Stats display.
 -----------------------------------------------------------------------------*/
 
 enum {STAT_Y = 16};
 
-void FGlobalRender::DrawStats(ICamera *Camera)
+void FRender::DrawStats( UCamera *Camera )
 {
-	guard(FGlobalRender::DrawStats);
+	guard(FRender::DrawStats);
 	char TempStr[256];
 
 	ThisEndTime			= GApp->MicrosecondTime()/1000;
@@ -224,11 +223,11 @@ void FGlobalRender::DrawStats(ICamera *Camera)
 			NodesDraw,
 			PolysDraw
 		);
-		GGfx.StrLen(&XL,&YL,0,0,GGfx.SmallFont,TempStr);
+		GGfx.SmallFont->StrLen(XL,YL,0,0,TempStr);
 
-		int Y=Camera->SYR;
-		GGfx.BurnRect(Camera->Texture,0,Camera->SXR,Y-YL-3,Y,0);
-		GGfx.Printf(Camera->Texture,(Camera->SXR-XL)/2,Y-YL-2,0,GGfx.SmallFont,NormalFontColor,TempStr);
+		int Y=Camera->Y;
+		Camera->Texture->BurnRect(0,Camera->X,Y-YL-3,Y,0);
+		GGfx.SmallFont->Printf(Camera->Texture,(Camera->X-XL)/2,Y-YL-2,0,TempStr);
 	}
 #if STATS
 	if (AllStats)
@@ -250,8 +249,8 @@ void FGlobalRender::DrawStats(ICamera *Camera)
 			GApp->CpuToMilliseconds(GStat.PalTime));
 		ShowStat(Camera,&StatYL,TempStr);
 
-		sprintf(TempStr,"  TICK Server=%05.1f Level=%05.1f Actor=%05.1f Audio=%05.1f Frags=%i",
-			GApp->CpuToMilliseconds(GServer.TaskTickTime),
+		sprintf(TempStr,"  TICK Script=%05.1f Level=%05.1f Actor=%05.1f Audio=%05.1f Frags=%i",
+			GApp->CpuToMilliseconds(GServer.ScriptExecTime),
 			GApp->CpuToMilliseconds(GServer.LevelTickTime),
 			GApp->CpuToMilliseconds(GServer.ActorTickTime),
 			GApp->CpuToMilliseconds(GServer.AudioTickTime),
@@ -262,10 +261,10 @@ void FGlobalRender::DrawStats(ICamera *Camera)
 		GCache.Status(TempStr+strlen(TempStr));
 		ShowStat	(Camera,&StatYL,TempStr);
 
-		sprintf(TempStr,"  LITE PTS=%05i MESHES=%04i LITAGE=%04iK LITMEM=%04iK",
+		sprintf(TempStr,"  LITE PTS=%05i MESHES=%04i LITAGE=%04i LITMEM=%04iK",
 			GStat.MeshPtsGen,
 			GStat.MeshesGen,
-			GStat.Lightage>>10,
+			GStat.Lightage,
 			GStat.LightMem>>10);
 		ShowStat(Camera,&StatYL,TempStr);
 
@@ -329,7 +328,7 @@ void FGlobalRender::DrawStats(ICamera *Camera)
 
 		sprintf(TempStr,"  SPRT NUM=%i MESH=%i CHNKS=%i FINAL=%i DRAWN=%i",
 			GStat.NumSprites,
-			GStat.MeshMapsDrawn,
+			GStat.MeshesDrawn,
 			GStat.NumChunks,
 			GStat.NumFinalChunks,
 			GStat.ChunksDrawn);
@@ -340,7 +339,7 @@ void FGlobalRender::DrawStats(ICamera *Camera)
 			GStat.SpanRejig);
 		ShowStat(Camera,&StatYL,TempStr);
 
-#if (!NO_SLOW_CLOCK)
+#if DO_SLOW_CLOCK
 		sprintf(TempStr,"  MSEC Gen=%05.1f Lat=%05.1f TMap=%05.1f Asm=%05.1f",
 			GApp->CpuToMilliseconds(GStat.Generate),
 			GApp->CpuToMilliseconds(GStat.CalcLattice),
@@ -371,7 +370,7 @@ void FGlobalRender::DrawStats(ICamera *Camera)
 		ShowStat(Camera,&StatYL,TempStr);
 
 		// Show cache stats.
-		GCache.DrawCache(Camera->Screen,Camera->SXR,Camera->SYR,Camera->ColorBytes);
+		GCache.DrawCache(Camera->Screen,Camera->X,Camera->Y,Camera->ColorBytes);
 	}
 #endif // STATS
 	unguard;
@@ -380,42 +379,48 @@ void FGlobalRender::DrawStats(ICamera *Camera)
 //
 // Show one statistic and update the pointer.
 //
-void FGlobalRender::ShowStat( ICamera *Camera, int *StatYL,const char *Str )
+void FRender::ShowStat( UCamera *Camera, int *StatYL,const char *Str )
 {
-	guard(FGlobalRender::ShowStat);
+	guard(FRender::ShowStat);
 
 	int	XL,YL;
 	if( *StatYL==0 )
 	{
-		GGfx.Printf (Camera->Texture,16,STAT_Y + *StatYL,0,GGfx.SmallFont,NormalFontColor,"Statistics:");
-		GGfx.StrLen (&XL,&YL,0,1,GGfx.SmallFont,"Statistics:");
+		GGfx.SmallFont->Printf(Camera->Texture,16,STAT_Y + *StatYL,0,"Statistics:");
+		GGfx.SmallFont->StrLen(XL,YL,0,1,"Statistics:");
 		*StatYL += YL;
 	}
-	GGfx.Printf (Camera->Texture,16,STAT_Y + *StatYL,0,GGfx.SmallFont,NormalFontColor,"%s",Str);
-    GGfx.StrLen (&XL,&YL,0,1,GGfx.SmallFont,Str);
+	GGfx.SmallFont->Printf(Camera->Texture,16,STAT_Y + *StatYL,0,"%s",Str);
+    GGfx.SmallFont->StrLen (XL,YL,0,1,Str);
 	*StatYL += YL;
 	unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	FGlobalRender PreRender & PostRender
+	FRender PreRender & PostRender.
 -----------------------------------------------------------------------------*/
 
 //
 // Set up for rendering a frame.
 //
-void FGlobalRender::PreRender( ICamera *Camera )
+void FRender::PreRender( UCamera *Camera )
 {
-	guard(FGlobalRender::PreRender);
+	guard(FRender::PreRender);
 
 	// Set math to low precision.
 	GApp->EnableFastMath(1);
 
-	LastEndTime		= ThisEndTime;
-	ThisStartTime	= GApp->MicrosecondTime()/1000;
+	// Init stats.
+	STAT(memset(Stat,0,sizeof(FRenderStats)));
+	LastEndTime   = ThisEndTime;
+	ThisStartTime = GApp->MicrosecondTime()/1000;
 
+	// Init counts.
 	NodesDraw		= 0;
 	PolysDraw		= 0;
+
+	// Bump the iteration count.
+	RendIter++;
 
 	// Reset all stats to zero.
 	STAT(memset(&GStat,0,sizeof(GStat)));
@@ -426,42 +431,71 @@ void FGlobalRender::PreRender( ICamera *Camera )
 //
 // Clean up after rendering a frame.
 //
-void FGlobalRender::PostRender( ICamera *Camera )
+void FRender::PostRender( UCamera *Camera )
 {
 	// Draw whatever stats were requested.
-	DrawStats(Camera);
+	if( Camera->Actor->RendMap==REN_Polys || Camera->Actor->RendMap==REN_PolyCuts || Camera->Actor->RendMap==REN_DynLight || Camera->Actor->RendMap==REN_PlainTex )
+		DrawStats( Camera );
 
 	// Restore default precision.
 	GApp->EnableFastMath(0);
 }
 
 /*-----------------------------------------------------------------------------
-	FGlobalRender command line
+	FRender command line.
 -----------------------------------------------------------------------------*/
 
 //
 // Execute a command line.
 //
-int FGlobalRender::Exec(const char *Cmd,FOutputDevice *Out)
-	{
-	GUARD;
+int FRender::Exec(const char *Cmd,FOutputDevice *Out)
+{
+	guard(FRender::Exec);
 	const char *Str = Cmd;
-	//
-	if (GetCMD(&Str,"STATUS"))
+
+	if( GetCMD(&Str,"STATS") )
+	{
+		AllStats ^= 1; 
+		Out->Logf("Stats are %s",AllStats?"on":"off"); 
+		return 1;
+	}
+	else if( GetCMD(&Str,"FPS") )
+	{
+		QuickStats ^= 1; 
+		Out->Logf("FPS display is %s",QuickStats?"on":"off"); 
+		return 1;
+	}
+	else if( GetCMD(&Str,"DETAIL") )
+	{
+		if (GetCMD(&Str,"LOW"))
 		{
-		if (GetCMD(&Str,"REN") || !Str[0])
-			{
-			Out->Logf("   REN - Alive and well");
-			return Str[0]!=0;
-			}
-		else return 0;
+			// Low detail.
+			TRO_DitherMask = 0;
+			Out->Logf("Low detail");
+			return 1;
 		}
-	else if (GetCMD(&Str,"STATS"))
+		else if (GetCMD(&Str,"MEDIUM"))
 		{
-		AllStats ^= 1; Out->Logf("Stats are %s",AllStats?"on":"off"); return 1;
+			// Low detail.
+			TRO_DitherMask = 1;
+			Out->Logf("Medium detail");
+			return 1;
 		}
-	else if (GetCMD(&Str,"REND"))
+		else if (GetCMD(&Str,"HIGH"))
 		{
+			// Low detail.
+			TRO_DitherMask = 3;
+			Out->Logf("High detail");
+			return 1;
+		}
+		else
+		{
+			Out->Logf("Bad detail setting");
+			return 1;
+		}
+	}
+	else if( GetCMD(&Str,"REND") )
+	{
 		if 		(GetCMD(&Str,"SMOOTH"))		GGfx.Smooth		^= 1;
 		else if (GetCMD(&Str,"STRETCH"))	GGfx.Stretch	^= 1;
 		else if (GetCMD(&Str,"LEAK"))		LeakCheck		^= 1;
@@ -473,319 +507,306 @@ int FGlobalRender::Exec(const char *Cmd,FOutputDevice *Out)
 		else if (GetCMD(&Str,"EXTRA3"))		Extra3			^= 1;
 		else if (GetCMD(&Str,"EXTRA4"))		Extra4			^= 1;
 		else if (GetCMD(&Str,"T"))			Toggle			^= 1;
+		else if (GetCMD(&Str,"TEMPORAL"))	Temporal		^= 1;
+		else if (GetCMD(&Str,"ANTIALIAS"))	Antialias		^= 1;
+		else if (GetCMD(&Str,"SET"))
+		{
+			GetFLOAT(Str,"MIPMULT=",&MipMultiplier);
+		}
 		else return 0;
 		Out->Log("Rendering option recognized");
 		return 1;
-		}
+	}
 	else return 0; // Not executed
-	//
-	UNGUARD("FGlobalRender::Exec");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	FGlobalRender point and vector transformation cache
+	FRender point and vector transformation cache.
 -----------------------------------------------------------------------------*/
 
 //
 // Initialize the point and vector transform caches for a frame.
 //
-void FGlobalRender::InitTransforms (IModel *ModelInfo)
-	{
-	GUARD;
-	//
-	VectorTransformFirst = VectorTransformLast = (FVector   **)GMem.Get(ModelInfo->MaxVectors * sizeof(FVector   *));
-	PointTransformFirst  = PointTransformLast  = (FTransform**)GMem.Get(ModelInfo->MaxPoints  * sizeof(FTransform*));
-	//
-	UNGUARD("FGlobalRender::InitTransforms");
-	};
+void FRender::InitTransforms( UModel *Model )
+{
+	guard(FRender::InitTransforms);
+
+	// Push memory stacks.
+	PointMark.Push(PointMem);
+	VectorMark.Push(VectorMem);
+
+	// Increment stamp.
+	Stamp++;
+
+	unguard;
+}
 
 //
 // Free and empty the point and vector transform caches.
 //
-void FGlobalRender::ExitTransforms( void )
+void FRender::ExitTransforms( void )
 {
-	guard(FGlobalRender::ExitTransforms);
+	guard(FRender::ExitTransforms);
 
-	for( FVector** V = VectorTransformFirst; V<VectorTransformLast; V++ )
-	{
-		(*V)->Align = FVA_Uncached;
-	}
-	for( FTransform** P = PointTransformFirst; P<PointTransformLast; P++ )
-	{
-		(*P)->Align = FVA_Uncached;
-	}
-	GMem.Release(VectorTransformFirst);
+	// Pop memory stacks.
+	VectorMark.Pop();
+	PointMark.Pop();
 
 	unguard;
 }
 
 /*--------------------------------------------------------------------------
-	Clippers
+	Clippers.
 --------------------------------------------------------------------------*/
 
 //
 // Clipping macro used by ClipBspSurf and ClipTexPts.
 //
 #define CLIPPER(DOT1EXPR,DOT2EXPR,CACHEDVIEWPLANE)\
-	{\
+{\
 	Num1    = 0;\
 	SrcPtr  = &SrcList  [0];\
 	DestPtr = &DestList [0];\
 	P1		= SrcList   [Num0-1];\
 	Dot1	= DOT1EXPR;\
-	while (Num0-- > 0)\
-		{\
+	while( Num0-- > 0 )\
+	{\
 		P2   = *SrcPtr++;\
 		Dot2 = DOT2EXPR;\
-		if (Dot1>=0.0) /* P1 is unclipped */ \
-			{\
+		if( Dot1 >= 0.0 ) /* P1 is unclipped */ \
+		{\
 			*DestPtr++ = P1;\
 			Num1++;\
-			if (Dot2<0.0) /* P1 is unclipped, P2 is clipped. */ \
-				{\
+			if( Dot2 < 0.0 ) /* P1 is unclipped, P2 is clipped. */ \
+			{\
 				*Top = *P2 + (*P1-*P2) * (Dot2/(Dot2-Dot1));\
-				Top->iTransform = MAXWORD;\
+				Top->iTransform = INDEX_NONE;\
 				Top->iSide      = P2->iSide; /* Cache partially clipped side rasterization */ \
 				*DestPtr++		= Top++;\
 				Num1++;\
-				};\
 			}\
-		else if (Dot2>0.0) /* P1 is clipped, P2 is unclipped. */ \
-			{\
-			*Top = *P2 + (*P1-*P2) * (Dot2/(Dot2-Dot1));\
-			Top->iTransform = MAXWORD;\
+		}\
+		else if( Dot2 > 0.0 ) /* P1 is clipped, P2 is unclipped. */ \
+		{\
+			*Top            = *P2 + (*P1-*P2) * (Dot2/(Dot2-Dot1));\
+			Top->iTransform = INDEX_NONE;\
 			Top->iSide      = CACHEDVIEWPLANE; /* Fully clipped side - use cache from view planes 0-3 */ \
 			*DestPtr++      = Top++;\
 			Num1++;\
-			};\
+		}\
 		P1   = P2;\
 		Dot1 = Dot2;\
-		};\
-	if (Num1<3) {STAT(GStat.ClipNil++); unclockSlow(Clip); return 0;};\
+	}\
+	if( Num1<3 ) {STAT(GStat.ClipNil++; unclockSlow(GStat.Clip);); return 0;};\
 	Num0     = Num1;\
 	TempList = SrcList;\
 	SrcList  = DestList;\
 	DestList = TempList;\
-	};
+}
 
 //
 // Transform a Bsp poly into a list of points, and return number of points or zero
 // if outcode rejected.
 //
-int inline FGlobalRender::TransformBspSurf(IModel *ModelInfo,ICamera *Camera,
-	INDEX iNode, FTransform **Pts, BYTE &AllCodes)
-	{
-	clockSlow(Transform);
-	//
-	FBspNode   		*Node		= &ModelInfo->BspNodes[iNode];
-	FVertPool		*VertPool	= &ModelInfo->VertPool[Node->iVertPool];
+int inline FRender::TransformBspSurf
+(
+	UModel		*Model,
+	UCamera		*Camera,
+	INDEX		iNode,
+	FTransform	**Pts, 
+	BYTE		&AllCodes
+)
+{
+	STAT(clockSlow(GStat.Transform));
+
+	FBspNode   		*Node		= &Model->Nodes(iNode);
+	FVert			*VertPool	= &Model->Verts(Node->iVertPool);
 	BYTE			Outcode		= FVF_OutReject;
 	FTransform		**DestPtr	= &Pts[0];
 	int				Num			= Node->NumVertices;;
-	//
-	// Transform, outcode reject, and build initial point list:
-	//
+
+	// Transform, outcode reject, and build initial point list.
 	AllCodes = 0;
-	for (int i=0; i<Num; i++)
-		{
+	for( int i=0; i<Num; i++ )
+	{
 		*DestPtr			 = &GetPoint(Camera,VertPool->pVertex);
 		(*DestPtr)->iSide	 = VertPool->iSide;
 		Outcode				&= (*DestPtr)->Flags;
 		AllCodes			|= (*DestPtr)->Flags;
-		//
-#if PARANOID
-			if (VertPool->iSide<4) appErrorf("Bad iSide %i",VertPool->iSide);
-#endif
+
+		debugState(VertPool->iSide==INDEX_NONE || VertPool->iSide>=4);
+
 		VertPool++;
 		DestPtr++;
-		};
-	unclockSlow(Transform);
-	//
+	}
+	STAT(unclockSlow(GStat.Transform));
 	if (Outcode) return 0;
 	else return Num;
-	};
+}
 
 //
 // Transform and clip a Bsp poly.  Outputs the transformed points to OutPts and
 // returns the number of points, which will be zero or >=3.
 //
-int FGlobalRender::ClipBspSurf (IModel *ModelInfo, ICamera *Camera, INDEX iNode, FTransform *OutPts)
-	{
-	GUARD;
-	clockSlow(Clip);
-	//
+int FRender::ClipBspSurf
+(
+	UModel		*Model,
+	UCamera		*Camera,
+	INDEX		iNode,
+	FTransform	*OutPts
+)
+{
+	guard(FRender::ClipBspSurf);
+	STAT(clockSlow(GStat.Clip));
+
 	static FTransform WorkPts[FBspNode::MAX_FINAL_VERTICES],*List0[FBspNode::MAX_FINAL_VERTICES],*List1[FBspNode::MAX_FINAL_VERTICES];
 	FTransform		*Top,*P1,*P2;
 	FTransform		**SrcList,**DestList,**TempList,**SrcPtr,**DestPtr;
-	FLOAT			Dot1,Dot2,Factor;
+	FLOAT			Dot1,Dot2;
 	BYTE			AllCodes;
 	int				Num0,Num1;
-	//
-	Num0 = TransformBspSurf(ModelInfo,Camera,iNode,List0,AllCodes);
-	if (!Num0)
-		{
+
+	Num0 = TransformBspSurf(Model,Camera,iNode,List0,AllCodes);
+	if( !Num0 )
+	{
 		STAT(GStat.ClipOutcodeReject++;)
-		unclockSlow(Clip);
+		STAT(unclockSlow(GStat.Clip));
 		return 0;
-		};
+	}
 	Top = &WorkPts[0];
 	SrcList	 = List0;
 	DestList = List1;
-	//
-	// Clip point list by each view frustrum clipping plane:
-	//
-	if (AllCodes & FVF_OutXMin) CLIPPER
-		(
-		P1->X * Camera->ProjZRSX2 + P1->Z,
-		P2->X * Camera->ProjZRSX2 + P2->Z,0
-		); 
-	if (AllCodes & FVF_OutXMax) CLIPPER
-		(
-		P1->Z - P1->X * Camera->ProjZRSX2,
-		P2->Z - P2->X * Camera->ProjZRSX2,1
-		);
-	if (AllCodes & FVF_OutYMin) CLIPPER
-		(
-		P1->Y * Camera->ProjZRSY2 + P1->Z,
-		P2->Y * Camera->ProjZRSY2 + P2->Z,2
-		); 
-	if (AllCodes & FVF_OutYMax) CLIPPER
-		(
-		P1->Z - P1->Y * Camera->ProjZRSY2,
-		P2->Z - P2->Y * Camera->ProjZRSY2,3
-		);
+
+	// Clip point list by each view frustrum clipping plane.
+	if( AllCodes & FVF_OutXMin ) CLIPPER
+	(
+		P1->X * Camera->ProjZRX2 + P1->Z,
+		P2->X * Camera->ProjZRX2 + P2->Z,0
+	); 
+	if( AllCodes & FVF_OutXMax ) CLIPPER
+	(
+		P1->Z - P1->X * Camera->ProjZRX2,
+		P2->Z - P2->X * Camera->ProjZRX2,1
+	);
+	if( AllCodes & FVF_OutYMin ) CLIPPER
+	(
+		P1->Y * Camera->ProjZRY2 + P1->Z,
+		P2->Y * Camera->ProjZRY2 + P2->Z,2
+	); 
+	if( AllCodes & FVF_OutYMax ) CLIPPER
+	(
+		P1->Z - P1->Y * Camera->ProjZRY2,
+		P2->Z - P2->Y * Camera->ProjZRY2,3
+	);
 	P2     = &OutPts  [0];
 	SrcPtr = &SrcList [0];
-	for (int i=0; i<Num0; i++)
-		{
+	for( int i=0; i<Num0; i++ )
+	{
 		P1 = *SrcPtr++;
-		if ((P1->iTransform==MAXWORD)||(P1->IntX==MAXINT))
-			{
-			Factor      = Camera->ProjZ / P1->Z;
-			//
-			P1->ScreenX = 65536.0 * (P1->X * Factor + Camera->FSXR15);
-			P1->ScreenY = P1->Y * Factor + Camera->FSYR15;
-			//
-			ftoi(P1->IntX,P1->ScreenX);
-			ftoi(P1->IntY,P1->ScreenY-0.5);
-			//
-			// Prevent numerical imprecision errors (tiny Z) from killing clipper.
-			// This happens once every few hours of operation when the player happens
-			// to be very, very close to a polygon.
-			//
-			if		(P1->IntX < 0			)	{P1->ScreenX=0.0;			P1->IntX=0;}
-			else if (P1->IntX > Camera->FixSXR)	{P1->ScreenX=Camera->FSXR1;	P1->IntX=Camera->FixSXR;};
-			//
-			if		(P1->IntY < 0			)	{P1->ScreenY=0.0;			P1->IntY=0;}
-			else if (P1->IntY > Camera->SYR	)	{P1->ScreenY=Camera->FSYR1;	P1->IntY=Camera->SYR;};
-			};
+		if( P1->iTransform==INDEX_NONE || P1->ScreenX==-1 )
+		{
+			FLOAT Factor = Camera->ProjZ / P1->Z;
+			P1->ScreenX  = 65536.0 * (P1->X * Factor + Camera->FX15);
+			P1->ScreenY  = P1->Y * Factor + Camera->FY15;
+		}
 		*P2++ = *P1;
-		};
+	}
 	STAT(GStat.ClipAccept++;)
-	unclockSlow(Clip);
+	STAT(unclockSlow(GStat.Clip));
 	return Num0;
-	//
-	UNGUARD("FGlobalRender::ClipBspSurf");
-	};
+
+	unguard;
+}
 
 //
 // Clip a set of points with vertex texture coordinates and vertex lighting values.
 // Outputs the points to OutPts and returns the number of poiints, which will be
 // 0 or >=3.
 //
-int FGlobalRender::ClipTexPoints (ICamera *Camera, FTransTex *InPts, FTransTex *OutPts, int Num0)
-	{
-	GUARD;
-	clockSlow(Clip);
-	//
-	static FTransTex WorkPts[FBspNode::MAX_FINAL_VERTICES],*List0[FBspNode::MAX_FINAL_VERTICES],*List1[FBspNode::MAX_FINAL_VERTICES];
-	FTransTex		*Top,*P1,*P2;
-	FTransTex		**SrcList,**DestList,**TempList,**SrcPtr,**DestPtr;
-	FLOAT			Dot1,Dot2,Factor;
+int FRender::ClipTexPoints( UCamera *Camera, FTransTexture *InPts, FTransTexture *OutPts, int Num0 )
+{
+	guard(FRender::ClipTexPoints);
+	STAT(clockSlow(GStat.Clip));
+
+	static FTransTexture WorkPts[FBspNode::MAX_FINAL_VERTICES],*List0[FBspNode::MAX_FINAL_VERTICES],*List1[FBspNode::MAX_FINAL_VERTICES];
+	FTransTexture	*Top,*P1,*P2;
+	FTransTexture	**SrcList,**DestList,**TempList,**SrcPtr,**DestPtr;
+	FLOAT			Dot1,Dot2;
 	BYTE			AllCodes,Outcode;
 	int				Num1;
-	//
+
 	DestPtr	 = &List0[0];
 	Outcode  = FVF_OutReject;
 	AllCodes = 0;
-	for (int i=0; i<Num0; i++)
-		{
+	for( int i=0; i<Num0; i++ )
+	{
 		*DestPtr     = &InPts[i];
 		Outcode		&= (*DestPtr)->Flags;
 		AllCodes	|= (*DestPtr)->Flags;
 		DestPtr++;
-		};
-	if (Outcode) return 0;
-	//
+	}
+	if( Outcode ) return 0;
+
 	Top      = &WorkPts[0];
 	SrcList	 = List0;
 	DestList = List1;
-	//
-	// Clip point list by each view frustrum clipping plane:
-	//
-	if (AllCodes & FVF_OutXMin) CLIPPER
-		(
-		P1->X * Camera->ProjZRSX2 + P1->Z,
-		P2->X * Camera->ProjZRSX2 + P2->Z,INDEX_NONE
-		); 
-	if (AllCodes & FVF_OutXMax) CLIPPER
-		(
-		P1->Z - P1->X * Camera->ProjZRSX2,
-		P2->Z - P2->X * Camera->ProjZRSX2,INDEX_NONE
-		);
-	if (AllCodes & FVF_OutYMin) CLIPPER
-		(
-		P1->Y * Camera->ProjZRSY2 + P1->Z,
-		P2->Y * Camera->ProjZRSY2 + P2->Z,INDEX_NONE
-		); 
-	if (AllCodes & FVF_OutYMax) CLIPPER
-		(
-		P1->Z - P1->Y * Camera->ProjZRSY2,
-		P2->Z - P2->Y * Camera->ProjZRSY2,INDEX_NONE
-		);
+
+	// Clip point list by each view frustrum clipping plane.
+	if( AllCodes & FVF_OutXMin ) CLIPPER
+	(
+		P1->X * Camera->ProjZRX2 + P1->Z,
+		P2->X * Camera->ProjZRX2 + P2->Z,INDEX_NONE
+	); 
+	if( AllCodes & FVF_OutXMax ) CLIPPER
+	(
+		P1->Z - P1->X * Camera->ProjZRX2,
+		P2->Z - P2->X * Camera->ProjZRX2,INDEX_NONE
+	);
+	if( AllCodes & FVF_OutYMin ) CLIPPER
+	(
+		P1->Y * Camera->ProjZRY2 + P1->Z,
+		P2->Y * Camera->ProjZRY2 + P2->Z,INDEX_NONE
+	); 
+	if( AllCodes & FVF_OutYMax ) CLIPPER
+	(
+		P1->Z - P1->Y * Camera->ProjZRY2,
+		P2->Z - P2->Y * Camera->ProjZRY2,INDEX_NONE
+	);
 	P2     = &OutPts  [0];
 	SrcPtr = &SrcList [0];
-	for (i=0; i<Num0; i++)
-		{
+	for( i=0; i<Num0; i++ )
+	{
 		P1 = *SrcPtr++;
-		if (P1->iTransform==MAXWORD)
-			{
-			Factor      = Camera->ProjZ / P1->Z;
-			//
-			P1->ScreenX = P1->X * Factor + Camera->FSXR15;
-			P1->ScreenY = P1->Y * Factor + Camera->FSYR15;
-			};
-		ftoi(P1->IntX,P1->ScreenX-0.5);
-		ftoi(P1->IntY,P1->ScreenY-0.5);
-		//
-		// Prevent numerical imprecision errors (tiny Z) from killing clipper:
-		//
-		if		(P1->IntX < 0			)	{P1->ScreenX=0.0;			P1->IntX=0;				debug(LOG_Info,"FlowX0");}
-		else if (P1->IntX > Camera->SXR	)	{P1->ScreenX=Camera->FSXR;	P1->IntX=Camera->SXR;	debug(LOG_Info,"FlowX1");};
-		if		(P1->IntY < 0			)	{P1->ScreenY=0.0;			P1->IntY=0;				debug(LOG_Info,"FlowY0");}
-		else if (P1->IntY > Camera->SYR	)	{P1->ScreenY=Camera->FSYR;	P1->IntY=Camera->SYR;	debug(LOG_Info,"FlowY1");};
-		//
+		if( P1->iTransform == INDEX_NONE )
+			P1->Transform( Camera, 0 );
 		*P2++ = *P1;
-		};
-	unclockSlow(Clip);
+	}
+	STAT(unclockSlow(GStat.Clip));
 	return Num0;
-	//
-	UNGUARD("FGlobalReneder::ClipTexPoints");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Bsp occlusion functions
+	Bsp occlusion functions.
 -----------------------------------------------------------------------------*/
 
 //
 // Checks whether the node's bouding box is totally occluded.  Returns 0 if
 // total occlusion, 1 if all or partial visibility.
 //
-int FGlobalRender::BoundVisible(ICamera *Camera, FBoundingRect *Bound, FSpanBuffer *SpanBuffer,
-	FScreenBounds *Results, FCoords *Rotation)
-	{
-	GUARD;
-	//
+int FRender::BoundVisible
+(
+	UCamera			*Camera,
+	FBoundingRect	*Bound,
+	FSpanBuffer		*SpanBuffer,
+	FScreenBounds	*Results,
+	FCoords			*Rotation
+)
+{
+	guard(FRender::BoundVisible);
+	STAT(GStat.BoxChecks++);
+
 	FCoords			*CameraCoords;
 	FCoords			TempCoords;
 	FCoords       	BoxDot[2];
@@ -796,95 +817,84 @@ int FGlobalRender::BoundVisible(ICamera *Camera, FBoundingRect *Bound, FSpanBuff
 	int         	BoxX,BoxY;
 	int 			BoxMinX,BoxMaxX,BoxMinY,BoxMaxY;
 	int				i,OutCode;
-	//
-	STAT(GStat.BoxChecks++);
-	//
-	if (!Rotation)
-		{
-		//
-		// Box is axis-aligned; use camera coordinate system as-is:
-		//
+
+	if( !Rotation )
+	{
+		// Box is axis-aligned; use camera coordinate system as-is.
 		CameraCoords = &Camera->Coords;
-		}
+	}
 	else
-		{
-		//
+	{
 		// Generate a new, rotated camera coordinate system to make up for the box's rotation:
-		//
-		TempCoords   = Camera->Coords;
-		CameraCoords = &TempCoords;
-		//
-		TempCoords.TransformByCoords(*Rotation);
-		//
-		TempCoords.Origin = Camera->Coords.Origin - Rotation->Origin;
-		TempCoords.Origin.TransformVector (*Rotation);
-		TempCoords.Origin += Rotation->Origin;
-		};
-	//
-	// Handle rejection in orthogonal views:
-	//
-	if (Camera->Camera->IsOrtho())
-		{
+		TempCoords        = Camera->Coords * (*Rotation);
+		TempCoords.Origin = (Camera->Coords.Origin - Rotation->Origin).TransformVectorBy(*Rotation) + Rotation->Origin;
+		CameraCoords      = &TempCoords;
+	}
+
+	// Handle rejection in orthogonal views.
+	if( Camera->IsOrtho() )
+	{
 		FLOAT SX1,SY1,SX2,SY2;
 		Project (Camera,&Bound->Min,&SX1,&SY1,NULL);
 		Project (Camera,&Bound->Max,&SX2,&SY2,NULL);
-		//
+
 		return
-			(!(
-				((SX1<0.0         )&&(SX2<0.0         )) ||
-				((SY1<0.0         )&&(SY2<0.0         )) ||
-				((SX1>Camera->FSXR)&&(SX2>Camera->FSXR)) ||
-				((SY1>Camera->FSYR)&&(SY2>Camera->FSYR))
-			));
-		};
-	//
+		(
+			!(
+				((SX1<0.0       )&&(SX2<0.0       )) ||
+				((SY1<0.0       )&&(SY2<0.0       )) ||
+				((SX1>Camera->FX)&&(SX2>Camera->FX)) ||
+				((SY1>Camera->FY)&&(SY2>Camera->FY))
+			)
+		);
+	}
+
 	// Trivial accept: If camera is within bouding box, skip calculations because
-	// the bounding box is definitely in view:
-	//
+	// the bounding box is definitely in view.
 	CameraLoc = CameraCoords->Origin;
 	NewMin    = Bound->Min - CameraLoc;
 	NewMax    = Bound->Max - CameraLoc;
-	//
-	if ((NewMin.X < 0.0) && (NewMax.X > 0.0) &&
+	if(
+		(NewMin.X < 0.0) && (NewMax.X > 0.0) &&
 		(NewMin.Y < 0.0) && (NewMax.Y > 0.0) &&
-		(NewMin.Z < 0.0) && (NewMax.Z > 0.0))
-		{
+		(NewMin.Z < 0.0) && (NewMax.Z > 0.0)
+	)
+	{
 		if (Results) Results->Valid = 0;
 		STAT(GStat.BoxIn++);
 		return 1; // Visible
-		};
-	//
+	}
+
 	// Test bounding-box side-of-camera rejection.  Since box is axis-aligned,
 	// this can be optimized: Box can only be rejected if all 8 dot products of the
 	// 8 box sides are less than zero.  This is the case iff each dot product
 	// component is less than zero.
-	//
 	BoxDot[0].ZAxis.X = NewMin.X * CameraCoords->ZAxis.X; BoxDot[1].ZAxis.X = NewMax.X * CameraCoords->ZAxis.X;
 	BoxDot[0].ZAxis.Y = NewMin.Y * CameraCoords->ZAxis.Y; BoxDot[1].ZAxis.Y = NewMax.Y * CameraCoords->ZAxis.Y;
 	BoxDot[0].ZAxis.Z = NewMin.Z * CameraCoords->ZAxis.Z; BoxDot[1].ZAxis.Z = NewMax.Z * CameraCoords->ZAxis.Z;
-	//
-	if ((BoxDot[0].ZAxis.X<=0.0) && (BoxDot[0].ZAxis.Y<=0.0) && (BoxDot[0].ZAxis.Z<=0.0) &&
-		(BoxDot[1].ZAxis.X<=0.0) && (BoxDot[1].ZAxis.Y<=0.0) && (BoxDot[1].ZAxis.Z<=0.0))
-		{
+
+	if(
+		(BoxDot[0].ZAxis.X<=0.0) && (BoxDot[0].ZAxis.Y<=0.0) && (BoxDot[0].ZAxis.Z<=0.0) &&
+		(BoxDot[1].ZAxis.X<=0.0) && (BoxDot[1].ZAxis.Y<=0.0) && (BoxDot[1].ZAxis.Z<=0.0)
+	)
+	{
 		if (Results) Results->Valid = 0;
 		STAT(GStat.BoxBacks++);
 		return 0; // Totally behind camera - invisible
-		};
-	//
-	// Transform bounding box min and max coords into screenspace
-	//
+	}
+
+	// Transform bounding box min and max coords into screenspace.
 	BoxDot[0].XAxis.X = NewMin.X * CameraCoords->XAxis.X; BoxDot[1].XAxis.X = NewMax.X * CameraCoords->XAxis.X;
 	BoxDot[0].XAxis.Y = NewMin.Y * CameraCoords->XAxis.Y; BoxDot[1].XAxis.Y = NewMax.Y * CameraCoords->XAxis.Y;
 	BoxDot[0].XAxis.Z = NewMin.Z * CameraCoords->XAxis.Z; BoxDot[1].XAxis.Z = NewMax.Z * CameraCoords->XAxis.Z;
-	//
+
 	BoxDot[0].YAxis.X = NewMin.X * CameraCoords->YAxis.X; BoxDot[1].YAxis.X = NewMax.X * CameraCoords->YAxis.X;
 	BoxDot[0].YAxis.Y = NewMin.Y * CameraCoords->YAxis.Y; BoxDot[1].YAxis.Y = NewMax.Y * CameraCoords->YAxis.Y;
 	BoxDot[0].YAxis.Z = NewMin.Z * CameraCoords->YAxis.Z; BoxDot[1].YAxis.Z = NewMax.Z * CameraCoords->YAxis.Z;
-	//
-	// View-pyramid reject (outcode test):
-	//
+
+	// View-pyramid reject (outcode test).
 	int ThisCode,AllCodes;
-	//
+
 	BoxMinZ=Pts[0].Z;
 	BoxMaxZ=Pts[0].Z;
 	OutCode  = 1|2|4|8;
@@ -898,12 +908,12 @@ int FGlobalRender::BoundVisible(ICamera *Camera, FBoundingRect *Bound, FSpanBuff
 		if (First || (P.Z > BoxMaxZ)) BoxMaxZ = P.Z;\
 		\
 		P.X = BoxDot[i].XAxis.X + BoxDot[j].XAxis.Y + BoxDot[k].XAxis.Z;\
-		Temp = P.X * Camera->ProjZRSX2;\
+		Temp = P.X * Camera->ProjZRX2;\
 		if (Temp < -P.Z) ThisCode |= 1;\
 		if (Temp >= P.Z) ThisCode |= 2;\
 		\
 		P.Y = BoxDot[i].YAxis.X + BoxDot[j].YAxis.Y + BoxDot[k].YAxis.Z;\
-		Temp = P.Y * Camera->ProjZRSY2;\
+		Temp = P.Y * Camera->ProjZRY2;\
 		if (Temp <  -P.Z) ThisCode |= 4;\
 		if (Temp >=  P.Z) ThisCode |= 8;\
 		\
@@ -912,48 +922,45 @@ int FGlobalRender::BoundVisible(ICamera *Camera, FBoundingRect *Bound, FSpanBuff
 	CMD(0,0,0,1,Pts[0]); CMD(1,0,0,0,Pts[1]); CMD(0,1,0,0,Pts[2]); CMD(1,1,0,0,Pts[3]);
 	CMD(0,0,1,0,Pts[4]); CMD(1,0,1,0,Pts[5]); CMD(0,1,1,0,Pts[6]); CMD(1,1,1,0,Pts[7]);
 	#undef CMD
-	//
-	if (OutCode)
-		{
+
+	if( OutCode )
+	{
 		STAT(GStat.BoxOutOfPyramid++;);
 		return 0; // Invisible - pyramid reject
-		};
-	//
-	// Calculate projections of 8 points and take X,Y min/max bounded to Span X,Y window:
-	//
+	}
+
+	// Calculate projections of 8 points and take X,Y min/max bounded to Span X,Y window.
 	Persp1 = Camera->ProjZ / BoxMinZ;
 	Persp2 = Camera->ProjZ / BoxMaxZ;
-	//
+
 	Pt = &Pts[0];
-	BoxMinX = BoxMaxX = Camera->SXR2 + ftoi(Pt->X * Persp1);
-	BoxMinY = BoxMaxY = Camera->SYR2 + ftoi(Pt->Y * Persp1);
-	//
+	BoxMinX = BoxMaxX = Camera->X2 + ftoi(Pt->X * Persp1);
+	BoxMinY = BoxMaxY = Camera->Y2 + ftoi(Pt->Y * Persp1);
+
 	if (AllCodes & 1) BoxMinX = 0;
-	if (AllCodes & 2) BoxMaxX = Camera->SXR;
+	if (AllCodes & 2) BoxMaxX = Camera->X;
 	if (AllCodes & 4) BoxMinY = 0;
-	if (AllCodes & 8) BoxMaxY = Camera->SYR;
-	//
-	for (i=0; i<8; i++)
-		{
-		//
-		// Check with MinZ:
-		//
-		BoxX = Camera->SXR2 + ftoi(Pt->X * Persp1);
-		BoxY = Camera->SYR2 + ftoi(Pt->Y * Persp1);
+	if (AllCodes & 8) BoxMaxY = Camera->Y;
+
+	for( i=0; i<8; i++ )
+	{
+		// Check with MinZ.
+		BoxX = Camera->X2 + ftoi(Pt->X * Persp1);
+		BoxY = Camera->Y2 + ftoi(Pt->Y * Persp1);
 		if (BoxX < BoxMinX) BoxMinX = BoxX; else if (BoxX > BoxMaxX) BoxMaxX = BoxX;
 		if (BoxY < BoxMinY) BoxMinY = BoxY; else if (BoxY > BoxMaxY) BoxMaxY = BoxY;
-		//
-		// Check with MaxZ:
-		//										
-		BoxX = Camera->SXR2 + ftoi(Pt->X * Persp2);
-		BoxY = Camera->SYR2 + ftoi(Pt->Y * Persp2);
+
+		// Check with MaxZ.
+		BoxX = Camera->X2 + ftoi(Pt->X * Persp2);
+		BoxY = Camera->Y2 + ftoi(Pt->Y * Persp2);
 		if (BoxX < BoxMinX) BoxMinX = BoxX; else if (BoxX > BoxMaxX) BoxMaxX = BoxX;
 		if (BoxY < BoxMinY) BoxMinY = BoxY; else if (BoxY > BoxMaxY) BoxMaxY = BoxY;
-		//
+
 		Pt++;
-		};
-	if (Results) // Set bounding box size
-		{
+	}
+	if( Results )
+	{
+		// Set bounding box size.
 		Results->Valid = 1;
 		Results->MinZ  = BoxMinZ;
 		Results->MaxZ  = BoxMaxZ;
@@ -961,29 +968,29 @@ int FGlobalRender::BoundVisible(ICamera *Camera, FBoundingRect *Bound, FSpanBuff
 		Results->MinY  = BoxMinY;
 		Results->MaxX  = BoxMaxX;
 		Results->MaxY  = BoxMaxY;
-		};
-	if ((!SpanBuffer) || SpanBuffer->BoxIsVisible(BoxMinX,BoxMinY,BoxMaxX,BoxMaxY))
-		{
-		return 1; // Visible
-		}
+	}
+	if( (!SpanBuffer) || SpanBuffer->BoxIsVisible(BoxMinX,BoxMinY,BoxMaxX,BoxMaxY) )
+	{
+		return 1; // Visible.
+	}
 	else
-		{
+	{
 		STAT(GStat.BoxSpanOccluded++);
-		return 0; // Invisible
-		};
-	UNGUARD("FGlobalRender::BoundVisible");
-	};
+		return 0; // Invisible.
+	}
+	unguard;
+}
 
 enum ENodePass
-	{
+{
 	PASS_Front=0,
 	PASS_Plane=1,
 	PASS_Back=2,
-	};
+};
 
 class FNodeStack
-	{
-	public:
+{
+public:
 	int			iNode;
 	int			iFarNode;
 	int			FarOutside;
@@ -991,16 +998,18 @@ class FNodeStack
 	int			DrewStuff;
 	ENodePass	Pass;
 	FNodeStack	*Prev;
-	};
+};
 
-FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop )
+FBspDrawList *FRender::OccludeBsp( UCamera *Camera, FSpanBuffer *Backdrop )
 {
-	static IModel 				*ModelInfo;
+	static UModel				*Model;
 	static FSpanBuffer			ZoneSpanBuffer[UBspNodes::MAX_ZONES],*SpanBuffer;
 	static FBspDrawList			*TempDrawList,*DrawList,**AllPolyDrawLists;
 	static FRasterSetup			WorkingRaster;
-	static FBspNode      		*Node,*BspNodes;
-	static FBspSurf      		*Poly,*BspSurfs;
+	static FBspNode      		*Node;
+	static UBspNodes::Ptr		Nodes;
+	static UBspSurfs::Ptr		Surfs;
+	static FBspSurf      		*Poly;
 	static FNodeStack			*Stack;
 	static FTransform 			Pts[FBspNode::MAX_FINAL_VERTICES];
 	static FRasterSideSetup		**SideCache;
@@ -1013,61 +1022,60 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 	static int           		Visible,Merging,Mergeable,Outside,Pass,DrewStuff,NumPts;
 	static int					CoplanarPass;
 
-	guard(FGlobalRender::OccludeBsp);
+	guard(FRender::OccludeBsp);
 
-	if ( Camera->Level.ModelInfo.NumBspNodes==0 )
+	Model = Camera->Level->Model;
+	if ( Model->Nodes->Num==0 )
 		return 0;
 	
 	STAT(clock(GStat.OcclusionTime));
 
 	DrawList			= NULL;
-	TempDrawList		= (FBspDrawList *)GMem.Get(sizeof(FBspDrawList));
+	TempDrawList		= new(GMem)FBspDrawList;
 
-	ModelInfo			= &Camera->Level.ModelInfo;
-	AllPolyDrawLists    = (FBspDrawList     **)GMem.GetZeroed(ModelInfo->MaxBspSurfs   *sizeof(FBspDrawList     *));
-	SideCache	        = (FRasterSideSetup **)GMem.GetZeroed(ModelInfo->NumSharedSides*sizeof(FRasterSideSetup *));
-	BspNodes			= ModelInfo->BspNodes;
-	BspSurfs			= ModelInfo->BspSurfs;
+	AllPolyDrawLists    = new(GMem,MEM_Zeroed,Model->Surfs->Max)FBspDrawList*;
+	SideCache	        = new(GMem,MEM_Zeroed,Model->Verts->NumSharedSides)FRasterSideSetup*;
+	Nodes				= Model->Nodes;
+	Surfs				= Model->Surfs;
 	Origin				= Camera->Coords.Origin;
-	iViewZone			= ModelInfo->PointZone(Origin);
+	iViewZone			= Model->PointZone(Origin);
 	ViewZoneMask		= (iViewZone!=0) ? ~0 : 0;
 
 	/* For debugging
 	bug	("%i",
-		ModelInfo->MaxBspSurfs   *sizeof(INDEX) +
-		ModelInfo->NumSharedSides*sizeof(FRasterSideSetup *) +
-		ModelInfo->MaxBspSurfs   *sizeof(BYTE));
+		Level->MaxBspSurfs   *sizeof(INDEX) +
+		Level->NumSharedSides*sizeof(FRasterSideSetup *) +
+		Level->MaxBspSurfs   *sizeof(BYTE));
 	*/
 
 	// Init first four units of the rasterization side setup cache so that they
 	// represent the setups for the four view frustrum clipping planes.
 	for ( int i=0; i<4; i++ )
-	{
-		SideCache[i]=(FRasterSideSetup *)GDynMem.GetFast(sizeof(FRasterSideSetup));
-	}
-	SideCache[0]->P.X = 0;					SideCache[0]->DP.X = 0; // X min clipping plane
-	SideCache[1]->P.X = Fix(Camera->SXR);	SideCache[1]->DP.X = 0; // X max clipping plane
-	SideCache[2]->P.X = 0;					SideCache[2]->DP.X = 0; // Y min clipping plane
-	SideCache[3]->P.X = Fix(Camera->SYR);	SideCache[3]->DP.X = 0; // Y max clipping plane
+		SideCache[i] = new(GDynMem)FRasterSideSetup;
+
+	SideCache[0]->P.X = 0;				SideCache[0]->DP.X = 0; // X min clipping plane
+	SideCache[1]->P.X = Fix(Camera->X);	SideCache[1]->DP.X = 0; // X max clipping plane
+	SideCache[2]->P.X = 0;				SideCache[2]->DP.X = 0; // Y min clipping plane
+	SideCache[3]->P.X = Fix(Camera->Y);	SideCache[3]->DP.X = 0; // Y max clipping plane
 
 	// Init zone span buffers.
 	for ( i=0; i<UBspNodes::MAX_ZONES; i++ )
 		ZoneSpanBuffer[i].AllocIndex(0,0,&GDynMem);
 	
-	ZoneSpanBuffer[iViewZone].AllocIndexForScreen( Camera->SXR,Camera->SYR,&GDynMem );
+	ZoneSpanBuffer[iViewZone].AllocIndexForScreen( Camera->X,Camera->Y,&GDynMem );
 	ActiveZoneMask = ((QWORD)1) << iViewZone;
 
 	// Init unrolled recursion stack.
-	Stack				= (FNodeStack *)GMem.Get(sizeof(FNodeStack));
+	Stack				= new(GMem)FNodeStack;
 	Stack->Prev			= NULL;
 	iNode				= 0;
-	Outside				= FBspNode::ROOT_OUTSIDE;
+	Outside				= Model->RootOutside;
 	DrewStuff			= 0;
 	Pass				= PASS_Front;
 
 	for( ;; )
 	{
-		Node = &BspNodes[iNode];
+		Node = &Nodes(iNode);
 
 		// Pass 1: Process node for the first time and optionally recurse with front node.
 		if( Pass==PASS_Front )
@@ -1085,7 +1093,7 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 			{
 				// Use bounding box rejection if occluded on the previous frame.
 				FScreenBounds Results;
-				if( !BoundVisible(Camera,&ModelInfo->Bounds[Node->iBound],iViewZone?NULL:&ZoneSpanBuffer[0],&Results,NULL) )
+				if( !BoundVisible(Camera,&Model->Bounds(Node->iBound),iViewZone?NULL:&ZoneSpanBuffer[0],&Results,NULL) )
 				{
 					goto PopStack;
 				}
@@ -1125,7 +1133,7 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 					Stack->Pass  		= PASS_Plane;
 					
 					FNodeStack *Prev	= Stack;
-					Stack				= (FNodeStack *)GMem.Get(sizeof(FNodeStack));
+					Stack				= new(GMem)FNodeStack;
 					Stack->Prev			= Prev;
 
 					iNode				= Node->iFront;
@@ -1148,7 +1156,7 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 					Stack->Pass			= PASS_Plane;
 
 					FNodeStack *Prev	= Stack;
-					Stack				= (FNodeStack *)GMem.Get(sizeof(FNodeStack));
+					Stack				= new(GMem)FNodeStack;
 					Stack->Prev			= Prev;
 
 					iNode				= Node->iBack;
@@ -1218,7 +1226,7 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 				{
 					// Note: Can't zone mask reject coplanars due to moving brush rules.
 					iSurf		= Node->iSurf;
-					Poly		= &BspSurfs[iSurf];
+					Poly		= &Surfs(iSurf);
 					PolyFlags	= Poly->PolyFlags | Camera->ExtraPolyFlags;
 
 					// Skip this polygon if we're not processing it on this pass.
@@ -1241,7 +1249,7 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 					STAT(GStat.NodesDone++);
 
 					// Clip it.
-					NumPts = ClipBspSurf( ModelInfo,Camera,iNode,Pts );
+					NumPts = ClipBspSurf( Model, Camera, iNode, Pts );
 					if( !NumPts )
 						goto NextCoplanar;
 
@@ -1249,7 +1257,7 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 					if( Node->NodeFlags & NF_PolyOccluded )
 					{
 						FScreenBounds Box;
-						WorkingRaster.CalcBound(Pts,NumPts,Box);
+						WorkingRaster.CalcBound( Pts, NumPts, Box );
 						if( !SpanBuffer->BoundIsVisible(Box) )
 						{
 							STAT(GStat.NumRasterBoxReject++);
@@ -1258,15 +1266,16 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 					}
 
 					// If this is a portal and we're not portal rendering, skip it.
-					if( (Poly->PolyFlags & PF_Portal)&&(iViewZone==0) ) 
+					if( (Poly->PolyFlags & PF_Portal) && iViewZone==0 ) 
 						goto NextCoplanar;
 
 					// Rasterize it.
-					WorkingRaster.SetupCached(*Camera,Pts,NumPts,&GMem,&GDynMem,SideCache);
-					WorkingRaster.Generate(GRaster.Raster);
+					WorkingRaster.SetupCached( Camera, Pts, NumPts, &GMem, &GDynMem, SideCache );
+					WorkingRaster.Generate( GRaster.Raster );
 
 					// Assimilate the texture's flags.
-					if( Poly->Texture ) PolyFlags |= Poly->Texture->PolyFlags;
+					if( Poly->Texture )
+						PolyFlags |= Poly->Texture->PolyFlags;
 
 					// Make sure this is facing forward
 					if( (PolyFlags & (PF_TwoSided | PF_Portal)) && !IsFront )
@@ -1274,14 +1283,14 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 
 					Mergeable = !
 					(
-						(PolyFlags & ( PF_NoOcclude|PF_NoMerge) )
+						(PolyFlags & (PF_NoOcclude|PF_NoMerge) )
 					||	(Node->NodeFlags & NF_NoMerge)
-					||	(GApp->RenDev && GApp->RenDev->Active)
+					||	GCameraManager->RenDev
 					);
 					Merging = 
 					(
 						(Mergeable && AllPolyDrawLists[iSurf])
-					||	((PolyFlags&PF_Portal) && (Camera->RendMap!=REN_Zones))
+					||	((PolyFlags&PF_Portal) && (Camera->Actor->RendMap!=REN_Zones))
 					);
 					if( !Merging )
 					{
@@ -1289,10 +1298,10 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 						{
 							// Look up cached bounds to exploit frame-to-frame coherence.
 							int GuessStartY = Clamp(Poly->LastStartY-4,0,GRaster.Raster->StartY);
-							int GuessEndY	= Clamp(Poly->LastEndY  +4,GRaster.Raster->EndY,Camera->SYR);
+							int GuessEndY	= Clamp(Poly->LastEndY  +4,GRaster.Raster->EndY,Camera->Y);
 							TempDrawList->Span.AllocIndex(GuessStartY,GuessEndY,&GDynMem);
 						}
-						else if( GApp->RenDev && GApp->RenDev->Active )
+						else if( GCameraManager->RenDev )
 						{
 							TempDrawList->Span.AllocIndex(GRaster.Raster->StartY,GRaster.Raster->EndY,&GMem);	
 						}
@@ -1308,16 +1317,20 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 					else							
 						Visible = TempDrawList->Span.CopyFromRaster(*SpanBuffer,*GRaster.Raster);
 
-					if ( Visible && (PolyFlags & PF_Portal) )
+					if( Visible && (PolyFlags & PF_Portal) )
 					{
 						if( iOppositeZone !=0 )
 						{
 							ActiveZoneMask |= ((QWORD)1)<<iOppositeZone;
 							ZoneSpanBuffer[iOppositeZone].MergeWith(TempDrawList->Span);
 						}
-						if( Camera->RendMap==REN_Zones ) goto DrawNoMerge; // Actually display zone portals
+						if( Camera->Actor->RendMap==REN_Zones )
+						{
+							// Actually display zone portals.
+							goto DrawNoMerge;
+						}
 					}
-					else if( Visible && ((!(Camera->ShowFlags&SHOW_PlayerCtrl)) || !(PolyFlags & PF_Invisible)) )
+					else if( Visible && ((!(Camera->Actor->ShowFlags&SHOW_PlayerCtrl)) || !(PolyFlags & PF_Invisible)) )
 					{
 						// Compute Z range.
 						MaxZ = MinZ = Pts[0].Z;
@@ -1326,22 +1339,14 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 							if(			Pts[i].Z > MaxZ ) MaxZ = Pts[i].Z;
 							else if(	Pts[i].Z < MinZ ) MinZ = Pts[i].Z;
 						}
-						if( ( PolyFlags & PF_FakeBackdrop ) && (Camera->ShowFlags&SHOW_Backdrop) )
+						if( ( PolyFlags & PF_FakeBackdrop ) && (Camera->Actor->ShowFlags&SHOW_Backdrop) )
 						{
-							if (Backdrop) Backdrop->MergeWith(TempDrawList->Span);
+							if( Backdrop ) Backdrop->MergeWith(TempDrawList->Span);
 						}
 						else if( !Merging )
 						{
 							// Create new draw-list entry.
 							DrawNoMerge:
-							if( GApp->RenDev && GApp->RenDev->Active )
-							{
-								TempDrawList->NumPts = NumPts;
-								TempDrawList->Pts    = (FTransform *)GDynMem.Get(NumPts * sizeof(FTransform));
-								memcpy(TempDrawList->Pts,Pts,NumPts * sizeof(FTransform));
-
-								TempDrawList->Span.Release();
-							}
 							AllPolyDrawLists[Node->iSurf] = TempDrawList;
 							TempDrawList->iNode		= iNode;
 							TempDrawList->iZone		= Node->iZone[IsFront];
@@ -1351,10 +1356,37 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 							TempDrawList->MinZ		= MinZ;
 							TempDrawList->Texture	= Poly->Texture;
 							TempDrawList->Next      = DrawList;
-							
-							DrawList                = TempDrawList;
-							TempDrawList            = (FBspDrawList*)GDynMem.Get(sizeof(FBspDrawList));
-							
+						
+							if( GCameraManager->RenDev )
+							{
+								// Save stuff out for hardware rendering.
+								TempDrawList->NumPts = NumPts;
+								TempDrawList->Pts    = new(GDynMem,NumPts)FTransform;
+								memcpy(TempDrawList->Pts,Pts,NumPts * sizeof(FTransform));
+								TempDrawList->Span.Release();
+
+								// Hardware rendering sort key.
+								TempDrawList->Key = TempDrawList->iSurf;
+								if( Poly->Texture )
+								{
+									TempDrawList->Key += (Poly->Texture->GetIndex() << 12);
+									if( Poly->Texture->Palette )	
+										TempDrawList->Key += (Poly->Texture->Palette->GetIndex() << 24);
+								}
+							}
+							else
+							{
+								// Software rendering sort key.
+								TempDrawList->Key = TempDrawList->iZone << (32-6);
+								if( Poly->Texture )
+								{
+									TempDrawList->Key += Poly->Texture->GetIndex();
+									if( Poly->Texture->Palette )	
+										TempDrawList->Key += Poly->Texture->Palette->GetIndex() << 12;
+								}
+							}
+							DrawList     = TempDrawList;
+							TempDrawList = new(GDynMem)FBspDrawList;
 							PolysDraw++;
 						}
 						else
@@ -1376,11 +1408,11 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 							if (!ActiveZoneMask)
 							{
 								// Screen is now completely filled.
-								BspNodes[iOriginalNode].NodeFlags &= ~NF_AllOccluded;
+								Nodes(iOriginalNode).NodeFlags &= ~NF_AllOccluded;
 								Stack = Stack->Prev;
 								while( Stack != NULL )
 								{
-									BspNodes[Stack->iNode].NodeFlags &= ~NF_AllOccluded;
+									Nodes(Stack->iNode).NodeFlags &= ~NF_AllOccluded;
 									Stack = Stack->Prev;
 								}
 								goto DoneRendering;
@@ -1399,12 +1431,12 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 					if( Node->iPlane==INDEX_NONE ) break;
 
 					iNode	= Node->iPlane;
-					Node	= &BspNodes[iNode];
+					Node	= &Nodes(iNode);
 					Dot		= Node->Plane.PlaneDot(Origin);
 					IsFront	= Dot>0.0;
 				}
 				iNode  = iOriginalNode;
-				Node   = &BspNodes[iNode];
+				Node   = &Nodes(iNode);
 				Dot		= Node->Plane.PlaneDot(Origin);
 				IsFront	= Dot>0.0;
 			}
@@ -1434,7 +1466,7 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 				DrewStuff			= 0;
 
 				FNodeStack *Prev	= Stack;
-				Stack				= (FNodeStack *)GMem.Get(sizeof(FNodeStack));
+				Stack				= new(GMem)FNodeStack;
 				Stack->Prev			= Prev;
 
 				continue;
@@ -1446,7 +1478,7 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 		// Assert: Pass==PASS_Back.
 
 		PrePopStack:
-		Node = &BspNodes[iNode];
+		Node = &Nodes(iNode);
 		if( !DrewStuff )	Node->NodeFlags |=  NF_AllOccluded;
 		else				Node->NodeFlags &= ~NF_AllOccluded;
 
@@ -1477,7 +1509,7 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 	}
 
 	// Update stats:
-	STAT(GStat.NumZones=ModelInfo->NumZones);
+	STAT(GStat.NumZones=Model->Nodes->NumZones);
 	STAT(GStat.CurZone =iViewZone);
 	for (i=0; i<UBspNodes::MAX_ZONES; i++) if (ZoneSpanBuffer[i].EndY) STAT(GStat.VisibleZones++);
 
@@ -1488,7 +1520,7 @@ FBspDrawList *FGlobalRender::OccludeBsp( ICamera *Camera, FSpanBuffer *Backdrop 
 }
 
 /*-----------------------------------------------------------------------------
-	Lattice builders
+	Lattice builders.
 -----------------------------------------------------------------------------*/
 
 //
@@ -1505,14 +1537,11 @@ FVector	LSL_Normal,LSL_TextureU,LSL_TextureV,LSL_Base;
 
 inline void LatticeSetupLoop( FTexLattice** LatticeBase,FTexLattice* TopLattice,int Start,int End )
 {
+	guard(LatticeSetupLoop);
+	debugInput(End>Start);
+
 	static const int ConstLight = ToLatticeLight(UNLIT_LIGHT_VALUE);
-
-	GUARD;
 	FTexLattice *Original    = TopLattice;
-
-#if PARANOID
-	if (End<=Start)appError("SpanLoop inconsistency 1");
-#endif
 
 #if ASM_LATTICE
 	static FLOAT StepIn;
@@ -1660,13 +1689,13 @@ inline void LatticeSetupLoop( FTexLattice** LatticeBase,FTexLattice* TopLattice,
 	FLOAT XRZ		= LSL_XRZ + StepIn * LSL_XRZInc;
 
 	int n = End - Start;
-	while (n-- > 0)
+	while( n-- > 0 )
 	{
 		FLOAT Z						= 1.0/RZ;
 		TopLattice->Loc.Z			= Z;
 		TopLattice->Loc.X			= Z * XRZ;
 		TopLattice->Loc.Y			= Z * LSL_YRZ;
-		TopLattice->Loc.D			= Z * LSL_MipMult;
+		TopLattice->Loc.W			= Z * LSL_MipMult;
 		*(FLOAT *)&TopLattice->U	= Z * URZ + LSL_BaseU;
 		*(FLOAT *)&TopLattice->V	= Z * VRZ + LSL_BaseV;
 		TopLattice->RoutineOfs		= 0;
@@ -1674,175 +1703,178 @@ inline void LatticeSetupLoop( FTexLattice** LatticeBase,FTexLattice* TopLattice,
 		TopLattice->U				= TopLattice->U << 8;
 		TopLattice->V				= TopLattice->V << 8;
 
-		TopLattice->G				= ConstLight;
+		TopLattice->G				= GLightManager->Mesh.PtrVOID ? ConstLight : Clamp(ftoi(0x2800 * 768.0 * RZ),0x100,0x3000);
 
-		RZ  += LSL_RZGradSX;
-		URZ += LSL_URZGradSX;
-		VRZ += LSL_VRZGradSX;
-		XRZ += LSL_XRZInc;
+		RZ                         += LSL_RZGradSX;
+		URZ                        += LSL_URZGradSX;
+		VRZ                        += LSL_VRZGradSX;
+		XRZ                        += LSL_XRZInc;
 
 		*LatticePtr++ = TopLattice++;
 	}
 #endif
-	UNGUARD("SpanLoop");
+	unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	Texture rectangle setup loop
+	Texture rectangle setup loop.
 -----------------------------------------------------------------------------*/
 
-void inline RectLoop(FTexLattice **LatticeBase,int Start, int End)
-	{
+void inline RectLoop( FTexLattice **LatticeBase,int Start, int End )
+{
 #if ASM_LATTICE
 	__asm
-		{
+	{
 		pushad					; Save regs
 		mov edi,[LatticeBase]	; Get lattice base pointer
 		mov esi,[Start]			; Get start
 		mov ebp,[End]			; Get end
-		;
+
 		call TRL_RectLoop		; Setup
-		;
+
 		popad					; Restore regs
-		};
+	}
 #else
-	GUARD;
-	//
-	int DoSublattice = 0;
-	if (GRender.LightList.Index)
-		{
-		DoSublattice	= 1;
-		INT MeshBaseU	= GRender.LightList.Index->TextureUStart;
-		INT MeshBaseV	= GRender.LightList.Index->TextureVStart;
-		};
+	guard(RectLoop);
+
+	int MeshBaseU = GLightManager->TextureUStart;
+	int MeshBaseV = GLightManager->TextureVStart;
+
 	FTexLattice **LatticePtr = &LatticeBase[Start];
-	while (Start++ < End)
-		{
-		FTexLattice *T0		= LatticePtr[0];
-		FTexLattice *T1		= LatticePtr[1];
-		FTexLattice *B0		= LatticePtr[MAX_XR];
-		FTexLattice *B1		= LatticePtr[MAX_XR+1];
-		//
-		FMipTable *T = &TRL_MipTable[*(DWORD *)&T0->Loc.D >> 21];
-		//
-		T0->RoutineOfs = T->RoutineOfs + TRL_RoutineOfsEffectBase;
-		//
+	while( Start++ < End )
+	{
+		FTexLattice *T0	= LatticePtr[0];
+		FTexLattice *T1	= LatticePtr[1];
+		FTexLattice *B0	= LatticePtr[MAX_XR];
+		FTexLattice *B1	= LatticePtr[MAX_XR+1];
+
+		FMipTable *T	= &TRL_MipTable[*(DWORD *)&T0->Loc.W >> 21];
+
+		T0->RoutineOfs	= T->RoutineOfs + TRL_RoutineOfsEffectBase;
+
 		GBlit.MipRef[T->MipLevel  ] = 1;
 		GBlit.MipRef[T->MipLevel+1] = 1;
-		//
-		FBlitMipInfo *Mip	= &GBlit.Mips[Max(T->MipLevel,T->MipLevel)];
-		INT  VMask			= Mip->VMask;
-		INT  NotVMask		= ~VMask;
-		//
-		BYTE GP			    = GBlit.LatticeXBits;
-		BYTE GL			    = GBlit.LatticeYBits;
-		BYTE GM			    = T->MipLevel;
-		BYTE GMU		    = GM + Mip->UBits;
-		//
-		// Lattice setup:
-		//
-		int B_IU,B_IUX,B_IUY,B_IUXY;
-		int B_IV,B_IVX,B_IVY,B_IVXY;
-		int B_IG,B_IGX,B_IGY,B_IGXY;
-		//
-		B_IU			= (T0->U + TRL_TexBaseU         ) >> GMU;
-		B_IUX			= (T1->U - T0->U                ) >> GMU;
-		B_IUY			= (B0->U - T0->U                ) >> GMU;
-		B_IUXY			= (T0->U - T1->U - B0->U + B1->U) >> GMU;
-		//
-		B_IV			= (T0->V + TRL_TexBaseV         ) >> GM;
-		B_IVX			= (T1->V - T0->V                ) >> GM;
-		B_IVY			= (B0->V - T0->V                ) >> GM;
-		B_IVXY			= (T0->V - T1->V - B0->V + B1->V) >> GM;
-		//
+
+		FMipInfo &Mip	= GBlit.Texture->Mips[T->MipLevel];
+		INT  VMask		= Mip.VMask;
+		INT  NotVMask	= ~VMask;
+
+		BYTE GP			= GBlit.LatticeXBits;
+		BYTE GL			= GBlit.LatticeYBits;
+		BYTE GM			= T->MipLevel;
+		BYTE GMU		= GM + Mip.UBits;
+
+		// Lattice setup.
+		int B_IU		= (T0->U + TRL_TexBaseU         ) >> GMU;
+		int B_IUX		= (T1->U - T0->U                ) >> GMU;
+		int B_IUY		= (B0->U - T0->U                ) >> GMU;
+		int B_IUXY		= (T0->U - T1->U - B0->U + B1->U) >> GMU;
+
+		int B_IV		= (T0->V + TRL_TexBaseV         ) >> GM;
+		int B_IVX		= (T1->V - T0->V                ) >> GM;
+		int B_IVY		= (B0->V - T0->V                ) >> GM;
+		int B_IVXY		= (T0->V - T1->V - B0->V + B1->V) >> GM;
+
 		T0->L			= (B_IV   << (16      )&0xffff0000);
 		T0->LY			= (B_IVY  << (16-GL   )&0xffff0000);
 		T0->LX			= (B_IVX  << (16-GP   )&0xffff0000);
 		T0->LXY			= (B_IVXY << (16-GP-GL)&0xffff0000);
-		//
+	
 		T0->H			= ((B_IU   << (16      ))&NotVMask  )+(((B_IV   >> (16      )))&VMask);
 		T0->HY			= ((B_IUY  << (16-GL   ))&NotVMask  )+(((B_IVY  >> (16+   GL)))&VMask);
 		T0->HX			= ((B_IUX  << (16-GP   ))&NotVMask  )+(((B_IVX  >> (16+GP   )))&VMask);
 		T0->HXY			= ((B_IUXY << (16-GP-GL))&NotVMask  )+(((B_IVXY >> (16+GP+GL)))&VMask);
-		//
-		// Sublattice setup:
-		//
-		if (DoSublattice)
-			{
-			VMask			= (1 << GRender.LightList.MeshVBits) - 1;
-			NotVMask		= ~VMask;
-			//
-			GP				= GBlit.InterXBits;
-			GL				= GBlit.InterYBits;
-			GM				= GRender.LightList.Index->MeshShift;
-			GMU				= GM + GRender.LightList.MeshUBits;
-			//
-			B_IU			= (T0->U - MeshBaseU - FIX(16)   ) >> GMU;
-			B_IUX			= (T1->U - T0->U                 ) >> GMU;
-			B_IUY			= (B0->U - T0->U                 ) >> GMU;
-			B_IUXY			= (T0->U - T1->U - B0->U + B1->U ) >> GMU;
-			//
-			B_IV			= (T0->V - MeshBaseV + FIX(16)   ) >> GM;
-			B_IVX			= (T1->V - T0->V                 ) >> GM;
-			B_IVY			= (B0->V - T0->V                 ) >> GM;
-			B_IVXY			= (T0->V - T1->V - B0->V + B1->V ) >> GM;
-			//
-			B_IG			= (T0->G                         );
-			B_IGX			= (T1->G - T0->G                 );
-			B_IGY			= (B0->G - T0->G                 );
-			B_IGXY			= (T0->G - T1->G - B0->G + B1->G );
-			//
-			T0->SubL		= (((B_IG                ))&0x0000ffff)+((B_IV   << (16      ))&0xffff0000);
-			T0->SubLY		= (((B_IGY  >> (      GL)))&0x0000ffff)+((B_IVY  << (16-GL   ))&0xffff0000);
-			T0->SubLX		= (((B_IGX  >> (   GP   )))&0x0000ffff)+((B_IVX  << (16-GP   ))&0xffff0000);
-			T0->SubLXY		= (((B_IGXY >> (   GP+GL)))&0x0000ffff)+((B_IVXY << (16-GP-GL))&0xffff0000);
-			//
-			T0->SubH		= (((B_IV   >> (16      )))&VMask     )+((B_IU   << (16      ))&NotVMask  );
-			T0->SubHY		= (((B_IVY  >> (16+   GL)))&VMask     )+((B_IUY  << (16-GL   ))&NotVMask  );
-			T0->SubHX		= (((B_IVX  >> (16+GP   )))&VMask     )+((B_IUX  << (16-GP   ))&NotVMask  );
-			T0->SubHXY		= (((B_IVXY >> (16+GP+GL)))&VMask     )+((B_IUXY << (16-GP-GL))&NotVMask  );
-			};
+
+		// Sublattice setup.
+		if( GLightManager->iLightMesh != INDEX_NONE )
+		{
+			VMask		= (1 << GLightManager->MeshVBits) - 1;
+			NotVMask	= ~VMask;
+
+			BYTE GP		= GBlit.InterXBits;
+			BYTE GL		= GBlit.InterYBits;
+			BYTE GM		= GLightManager->MeshShift;
+			BYTE GMU	= GM + GLightManager->MeshUBits;
+
+			int B_IU	= (T0->U - MeshBaseU             ) >> GMU;
+			int B_IUX	= (T1->U - T0->U                 ) >> GMU;
+			int B_IUY	= (B0->U - T0->U                 ) >> GMU;
+			int B_IUXY	= (T0->U - T1->U - B0->U + B1->U ) >> GMU;
+
+			int B_IV	= (T0->V - MeshBaseV             ) >> GM;
+			int B_IVX	= (T1->V - T0->V                 ) >> GM;
+			int B_IVY	= (B0->V - T0->V                 ) >> GM;
+			int B_IVXY	= (T0->V - T1->V - B0->V + B1->V ) >> GM;
+
+			int B_IG	= (T0->G                         );
+			int B_IGX	= (T1->G - T0->G                 );
+			int B_IGY	= (B0->G - T0->G                 );
+			int B_IGXY	= (T0->G - T1->G - B0->G + B1->G );
+
+			T0->SubL	= (((B_IG                ))&0x0000ffff)+((B_IV   << (16      ))&0xffff0000);
+			T0->SubLY	= (((B_IGY  >> (      GL)))&0x0000ffff)+((B_IVY  << (16-GL   ))&0xffff0000);
+			T0->SubLX	= (((B_IGX  >> (   GP   )))&0x0000ffff)+((B_IVX  << (16-GP   ))&0xffff0000);
+			T0->SubLXY	= (((B_IGXY >> (   GP+GL)))&0x0000ffff)+((B_IVXY << (16-GP-GL))&0xffff0000);
+
+			T0->SubH	= (((B_IV   >> (16      )))&VMask     )+((B_IU   << (16      ))&NotVMask  );
+			T0->SubHY	= (((B_IVY  >> (16+   GL)))&VMask     )+((B_IUY  << (16-GL   ))&NotVMask  );
+			T0->SubHX	= (((B_IVX  >> (16+GP   )))&VMask     )+((B_IUX  << (16-GP   ))&NotVMask  );
+			T0->SubHXY	= (((B_IVXY >> (16+GP+GL)))&VMask     )+((B_IUXY << (16-GP-GL))&NotVMask  );
+		}
+		else
+		{
+			int B_IG	= (T0->G                         );
+			int B_IGX	= (T1->G - T0->G                 );
+			int B_IGY	= (B0->G - T0->G                 );
+			int B_IGXY	= (T0->G - T1->G - B0->G + B1->G );
+
+			T0->SubL	= ((B_IG                ))&0x0000ffff;
+			T0->SubLY	= ((B_IGY  >> (      GL)))&0x0000ffff;
+			T0->SubLX	= ((B_IGX  >> (   GP   )))&0x0000ffff;
+			T0->SubLXY	= ((B_IGXY >> (   GP+GL)))&0x0000ffff;
+
+			T0->SubH	= 0;
+			T0->SubHY	= 0;
+			T0->SubHX	= 0;
+			T0->SubHXY	= 0;
+		}
 		LatticePtr++;
-		};
-	UNGUARD("RectLoop");
+	}
+	unguard;
 #endif
-	};
+}
 
 /*-----------------------------------------------------------------------------
-	Software textured Bsp surface rendering
+	Software textured Bsp surface rendering.
 -----------------------------------------------------------------------------*/
 
 //
 // Draw a software-textured Bsp surface.
 //
-void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
+void DrawSoftwareTexturedBspSurf( UCamera* Camera, FBspDrawList* Draw )
 {
 	guard(DrawSoftwareTexturedBspSurf);
 
 	FCoords				&Coords		= Camera->Coords;
-	ILevel				*Level		= &Camera->Level;
-	IModel				*ModelInfo	= &Level->ModelInfo;
-	ALevelDescriptor	*Descriptor	= Level->Descriptor;
-	UTexture			*Texture;
-	UPalette			*Palette;
+	ULevel				*Level		= Camera->Level;
+	ALevelInfo			*LevelInfo	= Level->Info;
 
-	FTexLattice	**LatticeBase,*FirstLattice,*TopLattice;
+	FTexLattice	**LatticeBase;
 	FSpanBuffer	SubRectSpan,SubLatticeSpan,RectSpan,LatticeSpan;
 	FSpan		*Span,**SpanIndex;
 	FLOAT		UPanRate,VPanRate;
 	INT			iLightMesh,PolyFlags,YR;
 
-	GBlit.ZoneDescriptor=0;
-	for ( int i=0; i<8; i++ ) 
+	for ( int i=0; i<MAX_MIPS; i++ ) 
 		GBlit.MipRef[i]=0;
 
 	if ( (Draw->iSurf != INDEX_NONE) && !(Draw->PolyFlags & PF_Environment) )
 	{
-		FBspSurf *Surf	= &ModelInfo->BspSurfs[Draw->iSurf];
-		Texture			= Surf->Texture ? Surf->Texture : GGfx.DefaultTexture;
-		Palette			= Texture->Palette;
+		FBspSurf *Surf	= &Level->Model->Surfs(Draw->iSurf);
+		GBlit.Texture	= Surf->Texture ? Surf->Texture : GGfx.DefaultTexture;
+		GBlit.Palette	= GBlit.Texture->Palette;
 		GBlit.iZone		= Draw->iZone;
-		GBlit.ZoneDescriptor = Camera->Level.GetZoneDescriptor(GBlit.iZone);
+		GBlit.Zone		= Camera->Level->GetZoneActor(Draw->iZone);
 
 		PolyFlags		= Surf->PolyFlags;
 		iLightMesh		= (PolyFlags & PF_Unlit) ? INDEX_NONE : Surf->iLightMesh;
@@ -1853,10 +1885,10 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 		GBlit.LatticeXBits	= 7;
 		GBlit.LatticeYBits	= 6;
 
-		LSL_Normal			= GRender.GetVector(ModelInfo,Coords,Surf->vNormal);
+		LSL_Normal			= GRender.GetVector(Level->Model,Coords,Surf->vNormal);
 		LSL_Base     		= GRender.GetPoint (Camera,Surf->pBase);
-		LSL_TextureU 		= GRender.GetVector(ModelInfo,Coords,Surf->vTextureU);
-		LSL_TextureV 		= GRender.GetVector(ModelInfo,Coords,Surf->vTextureV);
+		LSL_TextureU 		= GRender.GetVector(Level->Model,Coords,Surf->vTextureU);
+		LSL_TextureV 		= GRender.GetVector(Level->Model,Coords,Surf->vTextureV);
 		LSL_XRZInc			= Camera->RProjZ * (1 << GBlit.LatticeXBits);
 		LSL_YRZInc			= Camera->RProjZ * (1 << GBlit.LatticeYBits);
 		LSL_RBaseNormal		= 1.0/(LSL_Normal | LSL_Base);
@@ -1898,37 +1930,39 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 		TRL_TexBaseU	= Fix(Surf->PanU);
 		TRL_TexBaseV	= Fix(Surf->PanV);
 
-		UPanRate		= Descriptor->TexUPanSpeed;
-		VPanRate		= Descriptor->TexVPanSpeed;
+		UPanRate		= LevelInfo->TexUPanSpeed;
+		VPanRate		= LevelInfo->TexVPanSpeed;
 
 		LSL_MipMult		= 1.0;
 
-		if ( GBlit.ZoneDescriptor && ((AZoneDescriptor*)GBlit.ZoneDescriptor)->bWaterZone )
+		if ( GBlit.Zone && GBlit.Zone->bWaterZone )
 			PolyFlags |= PF_WaterWavy;
 	}
 	else
 	{
+		GBlit.Zone		 = NULL;
+
 		GBlit.LatticeXBits = 5;
 		GBlit.LatticeYBits = 3;
 
 		PolyFlags		= PF_AutoUPan | PF_AutoVPan | PF_CloudWavy;
 		iLightMesh		= INDEX_NONE;
 
-		LSL_TextureU 	= GMath.XAxisVector*65536;		LSL_TextureU.TransformVector(Coords);
-		LSL_TextureV 	= GMath.YAxisVector*65536;		LSL_TextureV.TransformVector(Coords);
-		LSL_Normal   	= GMath.ZAxisVector;			LSL_Normal.TransformVector  (Coords);
-		LSL_Base     	= GMath.ZAxisVector*90.0*Descriptor->SkyScale; LSL_Base.TransformVector(Coords);
+		LSL_TextureU 	= GMath.XAxisVector.TransformVectorBy(Coords)*65536;//!!inefficient
+		LSL_TextureV 	= GMath.YAxisVector.TransformVectorBy(Coords)*65536;
+		LSL_Normal   	= GMath.ZAxisVector.TransformVectorBy(Coords);
+		LSL_Base     	= GMath.ZAxisVector.TransformVectorBy(Coords)*(90.0*LevelInfo->SkyScale);
 		LSL_RBaseNormal	= 1.0/(LSL_Normal | LSL_Base);
 
 		TRL_TexBaseU	= 0;
 		TRL_TexBaseV	= 0;
 
-		Texture			= Descriptor->SkyTexture ? Descriptor->SkyTexture : GGfx.DefaultTexture;
-		Palette			= Descriptor->SkyPalette ? Descriptor->SkyPalette->Palette : Texture->Palette;
+		GBlit.Texture	= LevelInfo->SkyTexture ? LevelInfo->SkyTexture : GGfx.DefaultTexture;
+		GBlit.Palette	= LevelInfo->SkyTexture ? LevelInfo->SkyTexture->Palette : GBlit.Texture->Palette;
 		GBlit.iZone		= 0;
 
-		UPanRate		= Descriptor->SkyUPanSpeed;
-		VPanRate		= Descriptor->SkyVPanSpeed;
+		UPanRate		= LevelInfo->SkyUPanSpeed;
+		VPanRate		= LevelInfo->SkyVPanSpeed;
 
 		LSL_MipMult		= 2.0;
 
@@ -1948,8 +1982,11 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 		}
 	}
 
+	// Disable currently-unsupported PolyFlags.
+	PolyFlags &= ~(PF_Transparent | PF_Masked);
+
 	// Setup dynamic lighting.
-	GLightManager->SetupForSurf(Camera,LSL_Normal,LSL_Base,Draw->iSurf,iLightMesh,PolyFlags,Draw->iZone);
+	GLightManager->SetupForSurf(Camera,LSL_Normal,LSL_Base,Draw->iSurf,iLightMesh,PolyFlags,GBlit.Zone,GBlit.Texture);
 
 	// Clamp lattice size to the min/max specified by lighting code:
 	GBlit.LatticeXBits = Clamp((int)GBlit.LatticeXBits,GLightManager->MinXBits,GLightManager->MaxXBits);
@@ -1961,19 +1998,19 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 		if ( GBlit.LatticeXBits >= GBlit.LatticeYBits )	GBlit.LatticeXBits--;
 		else											GBlit.LatticeYBits--;
 	}
-	if ( Camera->SXR<420 && GBlit.LatticeYBits>0 ) GBlit.LatticeYBits--;
+	if ( Camera->X<420 && GBlit.LatticeYBits>0 ) GBlit.LatticeYBits--;
 
 	// Prevent from being larger than storage will allow.
-	while ( (Camera->SXR >> GBlit.LatticeXBits) > (MAX_XR-2) )	GBlit.LatticeXBits++;
-	while ( (Camera->SYR >> GBlit.LatticeYBits) > (MAX_YR-2) )	GBlit.LatticeYBits++;
+	while ( (Camera->X >> GBlit.LatticeXBits) > (MAX_XR-2) )	GBlit.LatticeXBits++;
+	while ( (Camera->Y >> GBlit.LatticeYBits) > (MAX_YR-2) )	GBlit.LatticeYBits++;
 
 	// Prevent from being larger than precision will reasonably allow.
 	if ( GBlit.LatticeXBits>7 ) GBlit.LatticeXBits=7;
 	if ( GBlit.LatticeYBits>7 ) GBlit.LatticeYBits=7;
 
 	// For testing: Hardcode lattice size.
-	//GBlit.LatticeXBits	= 6;
-	//GBlit.LatticeYBits	= 6;
+	//GBlit.LatticeXBits	= 4;
+	//GBlit.LatticeYBits	= 4;
 
 	GBlit.LatticeX			= 1 << GBlit.LatticeXBits;
 	GBlit.LatticeY			= 1 << GBlit.LatticeYBits;
@@ -1983,7 +2020,7 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 
 	// Compute sublattice size needed for mesh lighting.
 	GBlit.SubXBits = Min(GBlit.LatticeXBits,(BYTE)2);
-	GBlit.SubYBits = Clamp(GBlit.LatticeYBits-2,0,(Camera->SXR>400) ? 2 : 1);
+	GBlit.SubYBits = Clamp(GBlit.LatticeYBits-2,0,(Camera->X>400) ? 2 : 1);
 
 	GBlit.SubX = 1 << GBlit.SubXBits;
 	GBlit.SubY = 1 << GBlit.SubYBits;
@@ -1997,7 +2034,7 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 	GBlit.InterXNotMask		= ~(GBlit.InterX-1);
 
 	// Set up texture mapping.
-	rendDrawAcrossSetup(Camera,Texture,Palette,PolyFlags,0);
+	rendDrawAcrossSetup(Camera,GBlit.Texture,GBlit.Palette,PolyFlags,0);
 
 	// Compute lattice hierarchy.
 	if (!SubRectSpan.CalcRectFrom	(Draw->Span,GBlit.SubXBits,GBlit.SubYBits,&GMem)) return;
@@ -2006,25 +2043,22 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 	if (!RectSpan.CalcRectFrom		(SubRectSpan,GBlit.InterXBits,GBlit.InterYBits,&GMem)) return;
 	LatticeSpan.CalcLatticeFrom		(RectSpan,&GMem);
 
-	FirstLattice	= (FTexLattice *)GMem.Get(0);
-	TopLattice		= FirstLattice;
-
 	// Setup magic numbers.
-	LSL_XRZ    		= (1.0 - Camera->FSXR2) * Camera->RProjZ; // 1.0 is subpixel adjustment based on rasterizer convention
-	LSL_YRZ 		= (LatticeSpan.StartY * GBlit.LatticeY + 1.0 - Camera->FSYR2) * Camera->RProjZ;
+	LSL_XRZ    		= (1.0 - Camera->FX2) * Camera->RProjZ; // 1.0 is subpixel adjustment based on rasterizer convention
+	LSL_YRZ 		= (LatticeSpan.StartY * GBlit.LatticeY + 1.0 - Camera->FY2) * Camera->RProjZ;
 
 	LSL_XRZInc		= Camera->RProjZ * GBlit.LatticeX;
 	LSL_YRZInc		= Camera->RProjZ * GBlit.LatticeY;
 
-	LSL_MipMult *= 1.5 * (2.8/Camera->SXR) * (0.5 / 65536.0) * sqrt
+	LSL_MipMult *= GRender.MipMultiplier * (2.8/Camera->X) * (0.5 / 65536.0) * sqrt
 		(
-		(Square(0.75) + Square(Camera->RProjZ * Camera->FSXR2 * LSL_RBaseNormal * 75.0)) *
+		(Square(0.75) + Square(Camera->RProjZ * Camera->FX2 * LSL_RBaseNormal * 75.0)) *
 		(LSL_TextureU.SizeSquared() + LSL_TextureV.SizeSquared())
-		) * Camera->FovAngle / 90.0;
-	//LSL_MipMult = 1.0/Camera->SXR; // To disable angular mip adjustment.
+		) * Camera->Actor->FovAngle / 90.0;
+	//LSL_MipMult = 1.0/Camera->X; // To disable angular mip adjustment.
 
-	if ( PolyFlags & PF_AutoUPan ) TRL_TexBaseU += Fix(Descriptor->Ticks) * UPanRate;
-	if ( PolyFlags & PF_AutoVPan ) TRL_TexBaseV += Fix(Descriptor->Ticks) * VPanRate;
+	if ( PolyFlags & PF_AutoUPan ) TRL_TexBaseU += LevelInfo->TimeSeconds*35.0 * 65536.0 * UPanRate;
+	if ( PolyFlags & PF_AutoVPan ) TRL_TexBaseV += LevelInfo->TimeSeconds*35.0 * 65536.0 * VPanRate;
 
 	LSL_RZGradSX   	= LSL_XRZInc * LSL_Normal.X * LSL_RBaseNormal;	
 	LSL_RZGradSY	= LSL_YRZInc * LSL_Normal.Y * LSL_RBaseNormal;
@@ -2042,7 +2076,7 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 
 #if ASM_LATTICE
 	TRL_RoutineOfsEffectBase = 0;
-	if ( GLightManager->MeshVoid )
+	if ( GLightManager->Mesh.PtrVOID )
 	{
 		TRL_LightVMask      = (DWORD)0xffffffff >> (32-GLightManager->MeshVBits);
 		TRL_LightBaseU		= -GLightManager->TextureUStart;
@@ -2050,7 +2084,7 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 		TRL_LightMeshShift	= GLightManager->MeshShift;
 		TRL_LightMeshUShift	= GLightManager->MeshShift + GLightManager->MeshUBits;
 	}
-	TRL_MipRef	= &GBlit.MipRef[0];
+	TRL_MipRef = &GBlit.MipRef[0];
 	__asm
 	{
 		mov al,[GBlit]GBlit.LatticeXBits
@@ -2062,18 +2096,19 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 #endif
 
 	// Interpolate affine values RZ, URZ, VRZ, XRZ, YRZ.
-	clockSlow(CalcLattice);
-	if		(GBlit.Texture->MipOfs[1]==MAXDWORD)	TRL_MipTable = GNoMipTable;
-	else if (GBlit.VBits<=8)						TRL_MipTable = GSmallMipTable;
-	else											TRL_MipTable = GLargeMipTable;
+	STAT(clockSlow(GStat.CalcLattice));
+	if		(GBlit.Texture->Mips[1].Offset==MAXDWORD)	TRL_MipTable = GNoMipTable;
+	else if (GBlit.Texture->VBits<=8)					TRL_MipTable = (GRender.GetTemporalIter()&1) ? GSmallMipTable:GOtherMipTable;
+	else												TRL_MipTable = GLargeMipTable;
 
-	SpanIndex	= &LatticeSpan.Index [0];
+	SpanIndex = &LatticeSpan.Index [0];
 	LatticeBase	= &GRender.LatticePtr[LatticeSpan.StartY+1][1];
 	for ( YR=LatticeSpan.StartY; YR<LatticeSpan.EndY; YR++ )
 	{
 		Span = *SpanIndex++;
 		while ( Span )
 		{
+			FTexLattice *TopLattice = new(GMem,Span->End - Span->Start)FTexLattice;
 			LatticeSetupLoop( LatticeBase, TopLattice, Span->Start, Span->End );
 			if( GLightManager->LatticeEffects )
 			{
@@ -2085,7 +2120,6 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 			}
 
 			STAT(GStat.LatsMade += Span->End - Span->Start);
-			TopLattice += Span->End - Span->Start;
 			Span        = Span->Next;
 		}
 		LSL_RZ 		+= LSL_RZGradSY;
@@ -2094,8 +2128,7 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 		LSL_YRZ		+= LSL_YRZInc;
 		LatticeBase	+= MAX_XR;
 	}
-
-	SpanIndex	= &RectSpan.Index[0];
+	SpanIndex = &RectSpan.Index[0];
 	LatticeBase	= &GRender.LatticePtr[RectSpan.StartY+1][1];
 	for ( YR=RectSpan.StartY; YR<RectSpan.EndY; YR++ )
 	{
@@ -2107,17 +2140,15 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 		}
 		LatticeBase += MAX_XR;
 	}
-	GMem.GetFast( (int)TopLattice-(int)FirstLattice );
-
-	unclockSlow( CalcLattice );
+	STAT(unclockSlow( GStat.CalcLattice ));
 
 	// Draw it.
 	rendDrawAcross
-		(
+	(
 		Camera,
 		&Draw->Span,&RectSpan,&LatticeSpan,&SubRectSpan,&SubLatticeSpan,
-		GLightManager->MeshVoid!=NULL
-		);
+		GLightManager->Mesh.PtrVOID != NULL
+	);
 
 	// Finish up.
 	if ( GRender.ShowLattice )
@@ -2128,64 +2159,65 @@ void DrawSoftwareTexturedBspSurf( ICamera* Camera, FBspDrawList* Draw )
 	GLightManager->ReleaseLightBlock();
 	rendDrawAcrossExit();
 
-	unguardf(("(%s %ix%i)",GBlit.Texture->Name,GBlit.Texture->USize,GBlit.Texture->VSize));
+	unguardf(("(%s %ix%i)",GBlit.Texture->GetName(),GBlit.Texture->USize,GBlit.Texture->VSize));
 }
 
 /*-----------------------------------------------------------------------------
-	Drawers
+	Drawers.
 -----------------------------------------------------------------------------*/
 
 //
 // Draw the lattice grid, for lattice debugging.
 //
-void FGlobalRender::DrawLatticeGrid(ICamera *Camera,FSpanBuffer *LatticeSpan)
-	{
-	GUARD;
-	//
+void FRender::DrawLatticeGrid( UCamera *Camera,FSpanBuffer *LatticeSpan )
+{
+	guard(FRender::DrawLatticeGrid);
+
 	int Y         = LatticeSpan->StartY * GBlit.LatticeY;
 	BYTE *Dest1   = &Camera->Screen[Y * Camera->Stride];
 	FSpan **Index = &LatticeSpan->Index[0];
-	for (int i=LatticeSpan->StartY; i<LatticeSpan->EndY; i++)
-		{
-		if (Y>=Camera->SYR) break;
+	for( int i=LatticeSpan->StartY; i<LatticeSpan->EndY; i++ )
+	{
+		if (Y>=Camera->Y) break;
 		FSpan *Span = *Index++;
-		while (Span)
-			{
+		while( Span )
+		{
 			BYTE *Dest = Dest1 + Span->Start * GBlit.LatticeX;
-			for (int j=Span->Start; j<Span->End; j++)
-				{
+			for( int j=Span->Start; j<Span->End; j++ )
+			{
 				*Dest  = BrushWireColor;
 				Dest  += GBlit.LatticeX;
-				};
+			}
 			Span = Span->Next;
-			};
+		}
 		Y     += GBlit.LatticeY;
 		Dest1 += Camera->Stride * GBlit.LatticeY;
-		};
-	UNGUARD("FGlobalRender::DrawLatticeGrid");
-	};
+	}
+	unguard;
+}
 
 //
 // Draw a flatshaded poly.
 //
-void FGlobalRender::DrawFlatPoly (ICamera *Camera,FSpanBuffer *SpanBuffer, BYTE Color)
-	{
-	GUARD;
+void FRender::DrawFlatPoly( UCamera *Camera,FSpanBuffer *SpanBuffer, BYTE Color )
+{
+	guard(FRender::DrawFlatPoly);
+
 	FSpan			*Span,**Index;
 	int				m,n;
-	//
+
 	m     = SpanBuffer->EndY - SpanBuffer->StartY;
 	Index = &SpanBuffer->Index [0];
-	//
-	if (Camera->ColorBytes==1)
-		{
+
+	if( Camera->ColorBytes==1 )
+	{
 		BYTE *Line = &Camera->Screen [SpanBuffer->StartY * Camera->Stride];
 		while (m-- > 0)
 			{
 			Span = *Index++;
 			while (Span)
 				{
-				mymemset(&Line[Span->Start],Color,Span->End - Span->Start);
+				memset(&Line[Span->Start],Color,Span->End - Span->Start);
 				Span   = Span->Next;
 				};
 			Line += Camera->Stride;
@@ -2195,8 +2227,10 @@ void FGlobalRender::DrawFlatPoly (ICamera *Camera,FSpanBuffer *SpanBuffer, BYTE 
 		{
 		WORD *Screen,*Line,HiColor;
 		//
-		if (Camera->Caps & CC_RGB565)	HiColor = GGfx.DefaultColors[Color].HiColor565();
-		else							HiColor = GGfx.DefaultColors[Color].HiColor555();
+		GGfx.DefaultPalette->Lock(LOCK_Read);
+		if (Camera->Caps & CC_RGB565)	HiColor = GGfx.DefaultPalette(Color).HiColor565();
+		else							HiColor = GGfx.DefaultPalette(Color).HiColor555();
+		GGfx.DefaultPalette->Unlock(LOCK_Read);
 		//
 		Line = &((WORD *)Camera->Screen)[SpanBuffer->StartY * Camera->Stride];
 		while (m-- > 0)
@@ -2214,7 +2248,10 @@ void FGlobalRender::DrawFlatPoly (ICamera *Camera,FSpanBuffer *SpanBuffer, BYTE 
 		}
 	else
 		{
-		DWORD TrueColor = GGfx.DefaultColors[Color].TrueColor();
+		GGfx.DefaultPalette->Lock(LOCK_Read);
+		DWORD TrueColor = GGfx.DefaultPalette(Color).TrueColor();
+		GGfx.DefaultPalette->Unlock(LOCK_Read);
+		//
 		DWORD *Screen,*Line;
 		//
 		Line = &((DWORD *)Camera->Screen)[SpanBuffer->StartY * Camera->Stride];
@@ -2231,15 +2268,15 @@ void FGlobalRender::DrawFlatPoly (ICamera *Camera,FSpanBuffer *SpanBuffer, BYTE 
 			Line += Camera->Stride;
 			};
 		};
-	UNGUARD("FGlobalRender::DrawFlatPoly");
+	unguard;
 	};
 
 //
 // Draw a highlighted overlay polygon.
 //
-void FGlobalRender::DrawHighlight( ICamera *Camera,FSpanBuffer *SpanBuffer,BYTE Color )
+void FRender::DrawHighlight( UCamera *Camera,FSpanBuffer *SpanBuffer,BYTE Color )
 {
-	GUARD;
+	guard(FRender::DrawHighlight);
 	FSpan	*Span,**Index;
 	BYTE	*Screen,*Line;
 	int		X,Y,XOfs;
@@ -2273,10 +2310,13 @@ void FGlobalRender::DrawHighlight( ICamera *Camera,FSpanBuffer *SpanBuffer,BYTE 
 	}
 	else if( Camera->ColorBytes==2 )
 	{
-		Line = &Camera->Screen [Y * Camera->Stride * 2];
 		WORD HiColor;
-		if( Camera->Caps & CC_RGB565 ) HiColor = GGfx.DefaultColors[SelectColor].HiColor565();
-		else HiColor = GGfx.DefaultColors[SelectColor].HiColor555();
+		GGfx.DefaultPalette->Lock(LOCK_Read);
+		if( Camera->Caps & CC_RGB565 ) HiColor = GGfx.DefaultPalette(SelectColor).HiColor565();
+		else HiColor = GGfx.DefaultPalette(SelectColor).HiColor555();
+		GGfx.DefaultPalette->Unlock(LOCK_Read);
+		//
+		Line = &Camera->Screen [Y * Camera->Stride * 2];
 		while ( Y < SpanBuffer->EndY )
 		{
 			Span = *Index;
@@ -2300,8 +2340,11 @@ void FGlobalRender::DrawHighlight( ICamera *Camera,FSpanBuffer *SpanBuffer,BYTE 
 	}
 	else
 	{
-		Line			= &Camera->Screen [Y * Camera->Stride * 4];
-		DWORD TrueColor	= GGfx.DefaultColors[SelectColor].TrueColor();
+		GGfx.DefaultPalette->Lock(LOCK_Read);
+		DWORD TrueColor	= GGfx.DefaultPalette(SelectColor).TrueColor();
+		GGfx.DefaultPalette->Unlock(LOCK_Read);
+		//
+		Line = &Camera->Screen [Y * Camera->Stride * 4];
 		while ( Y < SpanBuffer->EndY )
 		{
 			Span = *Index;
@@ -2323,13 +2366,13 @@ void FGlobalRender::DrawHighlight( ICamera *Camera,FSpanBuffer *SpanBuffer,BYTE 
 			Index += 2;
 		}
 	}
-	UNGUARD("FGlobalRender::DrawHighlight");
+	unguard;
 }
 
 //
 // Draw a raster side.
 //
-void FGlobalRender::DrawRasterSide (BYTE *Line,int SXStride,FRasterSideSetup *Side,BYTE Color)
+void FRender::DrawRasterSide (BYTE *Line,int SXStride,FRasterSideSetup *Side,BYTE Color)
 	{
 	BYTE *Temp;
 	INT  FixX,FixDX,YL,L;
@@ -2378,16 +2421,17 @@ void FGlobalRender::DrawRasterSide (BYTE *Line,int SXStride,FRasterSideSetup *Si
 //
 // Draw a raster outline.
 //
-void FGlobalRender::DrawRasterOutline (ICamera *Camera,FRasterSetup *Raster, BYTE Color)
-	{
-	GUARD;
+void FRender::DrawRasterOutline( UCamera *Camera,FRasterSetup *Raster, BYTE Color )
+{
+	guard(FRender::DrawRasterOutline);
+
 	BYTE *StartScreenLine = &Camera->Screen[Raster->StartY * Camera->Stride];
-	//
+
 	DrawRasterSide(StartScreenLine,Camera->Stride,Raster->LeftSide, Color);
 	DrawRasterSide(StartScreenLine,Camera->Stride,Raster->RightSide,Color);
-	//
-	UNGUARD("FGlobalRender::DrawRasterOutline");
-	};
+
+	unguard;
+}
 
 //
 // Clean up LatticePtr by zeroing out all pointers
@@ -2395,269 +2439,776 @@ void FGlobalRender::DrawRasterOutline (ICamera *Camera,FRasterSetup *Raster, BYT
 // all NULL LatticeSpan pointers don't fall into the currently generated
 // lattice.
 //
-void FGlobalRender::CleanupLattice (FSpanBuffer &LatticeSpan)
-	{
-	GUARD;
+void FRender::CleanupLattice( FSpanBuffer &LatticeSpan )
+{
+	guard(FRender::CleanupLattice);
+
 	FSpan		**Index			= &LatticeSpan.Index [0];
 	FTexLattice **LatticePtr1	= &LatticePtr  [LatticeSpan.StartY+1][1];
-	//
-	for (int i=LatticeSpan.StartY; i<LatticeSpan.EndY; i++)
-		{
+
+	for( int i=LatticeSpan.StartY; i<LatticeSpan.EndY; i++ )
+	{
 		FSpan *Span = *Index++;
-		while (Span)
-			{
+		while( Span )
+		{
 			FTexLattice **Lattice = &LatticePtr1[Span->Start];
 			for (int j=Span->Start; j<Span->End; j++) *Lattice++ = NULL;
 			Span = Span->Next;
-			};
+		}
 		LatticePtr1 += MAX_XR;
-		};
-#if PARANOID
-		for (i=0; i<MAX_YR; i++) for (int j=0; j<MAX_XR; j++) if (LatticePtr[i][j]) appErrorf("Failed %i,%i",i,j);
+	}
+#if 0
+	for( i=0; i<MAX_YR; i++ )
+		for( int j=0; j<MAX_XR; j++ )
+			if( LatticePtr[i][j] )
+				appErrorf( "Failed %i,%i",i,j );
 #endif
-	//
-	UNGUARD("FGlobalRender::CleanupLattice");
-	};
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	General Bsp surface rendering
+	General Bsp surface rendering.
 -----------------------------------------------------------------------------*/
 
-//
-// Draw a Bsp surface
-//
-void FGlobalRender::DrawBspSurf (ICamera *Camera, FBspDrawList *Draw)
+// Draw a Bsp surface.
+void FRender::DrawBspSurf( UCamera *Camera, FBspDrawList *Draw )
+{
+	guard(FRender::DrawBspSurf);
+	FMemMark Mark(GMem);
+
+#if 0
+	//!! FireEngine test!
+	static int Inited=0;
+	static FireEngineParams Parms;
+	static FLOAT F=0.0;
+	if( Inited )
 	{
-	GUARD;
-	//
-	IModel 		*ModelInfo 		= &Camera->Level.ModelInfo;
-	FBspNode	*Node 			= &ModelInfo->BspNodes [Draw->iNode];
-	FBspSurf	*Poly 			= &ModelInfo->BspSurfs [Node->iSurf];
-	DWORD		PolyFlags		= Draw->PolyFlags;
-	void		*MemTop			= GMem.GetFast(0);
-	FSpanBuffer	TempLinearSpan;
-	//
-	UTexture *Texture = ModelInfo->BspSurfs[Draw->iSurf].Texture;
-	if (!Texture) Texture=GGfx.DefaultTexture;
-	//
-	if (GEditor && GEditor->Scan.Active) GEditor->Scan.PreScan ();
-	if (PolyFlags & PF_Selected) TempLinearSpan.CopyIndexFrom(Draw->Span,&GMem);
-	//
-	if (GApp->RenDev && GApp->RenDev->Active)
-		{
-		int  Index		  = (Camera->RendMap==REN_Polys) ? Draw->iSurf : Draw->iNode;
-		BYTE iColor       = Texture->MipZero.RemapIndex;
-		//
-		if (iColor>0x80) iColor -= (Index%6) << 3;
-		else			 iColor += (Index%6) << 3;
-		//
-		FVector	&TextureU	= GetVector(ModelInfo,Camera->Coords,Poly->vTextureU);
-		FVector	&TextureV 	= GetVector(ModelInfo,Camera->Coords,Poly->vTextureV);
-		FVector	&Normal   	= GetVector(ModelInfo,Camera->Coords,Poly->vNormal  );
-		FVector	&Base     	= GetPoint (Camera,        Poly->pBase    );
-		//
-		FColor Color = GGfx.DefaultColors[iColor];
-		GApp->RenDev->DrawPolyV
-			(
-			Camera,Poly->Texture ? Poly->Texture : GGfx.DefaultTexture,
-			Draw->Pts,Draw->NumPts,
-			Base,Normal,
-			TextureU,TextureV
-			);
-		}
-	else if ((Camera->RendMap!=REN_Polys)&&(Camera->RendMap!=REN_PolyCuts)&&(Camera->RendMap!=REN_Zones))
-		{
-		DrawSoftwareTexturedBspSurf(Camera,Draw);
-		}
+		guard(FireUpdate);
+		/*
+		TempSpark
+		(	
+			64+32.0*cos(F),
+			64+32.0*sin(F),
+            127,
+            &Parms
+		);
+		*/
+		F += 0.1;
+		CausticsUpdate( &Parms );
+		unguard;
+	}
 	else
+	{
+		guard(EngineTileInit);
+		Inited=1;
+		memset(&GGfx.DefaultTexture->Element(GGfx.DefaultTexture->Mips[0].Offset),0,GGfx.DefaultTexture->USize*GGfx.DefaultTexture->VSize);
+		CausticsEngineInit
+		(
+			GGfx.DefaultTexture->USize,
+			GGfx.DefaultTexture->VSize,
+			&GGfx.DefaultTexture->Element(GGfx.DefaultTexture->Mips[0].Offset),
+			&Parms
+		);
+		for( int i=0; i<20; i++ )
 		{
+			/*
+			Parms.DrawSparkType = 5;
+			FirePaint
+			(
+				frand()*127.0,
+				frand()*127.0,
+                1,
+                0,
+                &Parms
+			);
+			*/
+		}
+		unguard;
+	}
+#endif
+
+	UModel 		*Model 		= Camera->Level->Model;
+	FBspNode	*Node 		= &Model->Nodes (Draw->iNode);
+	FBspSurf	*Poly 		= &Model->Surfs (Node->iSurf);
+	DWORD		PolyFlags	= Draw->PolyFlags;
+	FSpanBuffer	TempLinearSpan;
+
+	UTexture *Texture = Model->Surfs(Draw->iSurf).Texture;
+	if( !Texture ) Texture=GGfx.DefaultTexture;
+
+	if( GEditor  && GEditor->Scan.Active ) GEditor->Scan.PreScan ();
+	if( PolyFlags & PF_Selected ) TempLinearSpan.CopyIndexFrom(Draw->Span,&GMem);
+
+	if ((Camera->Actor->RendMap!=REN_Polys)&&(Camera->Actor->RendMap!=REN_PolyCuts)&&(Camera->Actor->RendMap!=REN_Zones))
+	{
+		DrawSoftwareTexturedBspSurf(Camera,Draw);
+	}
+	else
+	{
 		BYTE Color = Texture->MipZero.RemapIndex;
-		//
 		int Index;
-		if ((Camera->RendMap==REN_Zones)&&(ModelInfo->NumZones>0))
-			{
+		if( (Camera->Actor->RendMap==REN_Zones)&&(Model->Nodes->NumZones>0) )
+		{
 			if (Node->iZone[1]==0) Color = 0x67 + ((Draw->iNode&3)<<3);
 			else Color = 0x28 + (Node->iZone[1]&0x07) + ((Draw->iNode&3)<<3) + ((Node->iZone[1]&0x28)<<2);
-			//
+
 			if (PolyFlags & PF_Portal) DrawHighlight (Camera,&Draw->Span,BrushSnapColor);
 			else DrawFlatPoly (Camera,&Draw->Span,Color);
-			}
+		}
 		else
-			{
-			if (Camera->RendMap==REN_Polys)	Index=Draw->iSurf;
+		{
+			if (Camera->Actor->RendMap==REN_Polys)	Index=Draw->iSurf;
 			else Index=Draw->iNode;
-			//
+
 			if (Color>0x80) Color -= (Index%6) << 3;
 			else			Color += (Index%6) << 3;
-			//
+
 			DrawFlatPoly (Camera,&Draw->Span,Color);
-			};
-		};
-	if (GEditor && (PolyFlags & PF_Selected)) DrawHighlight (Camera,&TempLinearSpan,SelectColor);
-	if (GEditor && GEditor->Scan.Active) GEditor->Scan.PostScan (EDSCAN_BspNodePoly,Draw->iNode,0,0,NULL);
-	GMem.Release(MemTop);
-	//
-	UNGUARD("FGlobalRender::DrawBspSurf");
-	};
+		}
+	}
+	if( GEditor && (PolyFlags & PF_Selected) )
+	{
+		DrawHighlight( Camera, &TempLinearSpan, SelectColor );
+	}
+	if( GEditor && GEditor->Scan.Active )
+	{
+		GEditor->Scan.PostScan( EDSCAN_BspNodePoly, Draw->iNode, 0, 0, NULL );
+	}
+	Mark.Pop();
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	Span buffer Bsp rendering
+	Edge postprocess antialiasing.
 -----------------------------------------------------------------------------*/
+
+// Antialias an edge whose two adjoining surfaces have already been drawn.
+#define IFTEST(cmd) ;
+void FRender::AntialiasEdge( UCamera *Camera, FLOAT X1, FLOAT Y1, FLOAT X2, FLOAT Y2 )
+{
+	guard(FRender::Antialias);
+
+	FLOAT FDX = (X2 - X1) / (Y2 - Y1);
+	if( Abs(FDX)<65536.0 )
+	{
+		// Vertical major.
+		if( Y1 > Y2 ) 
+		{
+			Exchange( X1, X2 );
+			Exchange( Y1, Y2 );
+		}
+
+		INT   Y   = (INT)Y1;
+		FLOAT Adj = (FLOAT)(Y+1) - Y1;
+		INT   X   = ftoi(X1 + Adj * FDX);
+		INT   DY  = (INT)Y2 - Y;
+		INT   DX  = (INT)FDX;
+
+		RAINBOW_PTR Line = &Camera->Screen[Y * Camera->ByteStride];
+		if( Camera->ColorBytes == 4 ) while( DY-- > 0 )
+		{
+			DWORD *A = &Line.PtrDWORD[Unfix(X)-1];
+			if( X>=65536 ) switch( X & 0xc000 )
+			{
+				case 0x0000:
+					IFTEST(A[1] = 0xff3f3f;) break;
+				case 0x4000: A[1]
+					=	((A[0]&0xfcfcfc)>>2)
+					+	((A[1]&0xfcfcfc)>>2) + ((A[1]&0xfefefe)>>1);
+					IFTEST(A[1] = 0xff7f7f;) break;
+				case 0x8000: A[1]
+					=	((A[0]&0xfefefe)>>1)
+					+	((A[1]&0xfefefe)>>1); 
+					IFTEST(A[1] = 0xffcfcf;) break;
+				case 0xc000: A[1]
+					=	((A[0]&0xfcfcfc)>>2) + ((A[0]&0xfefefe)>>1)
+					+	((A[1]&0xfcfcfc)>>2);
+					IFTEST(A[1] = 0xffffff;) break;
+			}
+			Line.PtrDWORD += Camera->Stride; X += DX;
+		}
+		else if( Camera->ColorBytes == 2 && (Camera->Caps & CC_RGB565) ) while( DY-- > 0 )
+		{
+			WORD *A = &Line.PtrWORD[Unfix(X)-1];
+			if( X>=65536 ) switch( X & 0xc000 )
+			{
+				case 0x0000:
+					break;
+				case 0x4000: A[1]
+					=	((A[0] & (0xe000 + 0x0780 + 0x001C))>>2) + ((A[1] & (0x0800 + 0x0020 + 0x0001))   )
+					+	((A[1] & (0xe000 + 0x0780 + 0x001C))>>2) + ((A[1] & (0xf000 + 0x07C0 + 0x001e))>>1);
+					break;
+				case 0x8000: A[1]
+					=	((A[0] & (0xf000 + 0x07C0 + 0x001e))>>1) + ((A[1] & (0x0800 + 0x0020 + 0x0001))   )
+					+	((A[1] & (0xf000 + 0x07C0 + 0x001e))>>1); 
+					break;
+				case 0xc000: A[1]
+					=	((A[0] & (0xe000 + 0x0780 + 0x001C))>>2) + ((A[0] & (0x0800 + 0x0020 + 0x0001))   )
+					+	((A[1] & (0xe000 + 0x0780 + 0x001C))>>2) + ((A[0] & (0xf000 + 0x07C0 + 0x001e))>>1);
+					break;
+			}
+			Line.PtrWORD += Camera->Stride; X += DX;
+		}
+		else if( Camera->ColorBytes == 2 ) while( DY-- > 0 )
+		{
+			WORD *A = &Line.PtrWORD[Unfix(X)-1];
+			if( X>=65536 ) switch( X & 0xc000 )
+			{
+				case 0x0000:
+					break;
+				case 0x4000: A[1]
+					=	((A[0] & (0x7000 + 0x0380 + 0x001C))>>2) + ((A[1] & (0x0400 + 0x0020 + 0x0001))   )
+					+	((A[1] & (0x7000 + 0x0380 + 0x001C))>>2) + ((A[1] & (0x7800 + 0x03C0 + 0x001e))>>1);
+					break;
+				case 0x8000: A[1]
+					=	((A[0] & (0x7800 + 0x03C0 + 0x001e))>>1) + ((A[1] & (0x0400 + 0x0020 + 0x0001))   )
+					+	((A[1] & (0x7800 + 0x03C0 + 0x001e))>>1); 
+					break;
+				case 0xc000: A[1]
+					=	((A[0] & (0x7000 + 0x0380 + 0x001C))>>2) + ((A[0] & (0x0400 + 0x0020 + 0x0001))   )
+					+	((A[1] & (0x7000 + 0x0380 + 0x001C))>>2) + ((A[0] & (0x7800 + 0x03C0 + 0x001e))>>1);
+					break;
+			}
+			Line.PtrWORD += Camera->Stride; X += DX;
+		}
+		else while( DY-- > 0 )
+		{
+			BYTE *A = &Line.PtrBYTE[Unfix(X)-1];
+			if( X>=65536 ) switch( X & 0xc000 )
+			{
+				case 0x0000: break;
+				case 0x4000: A[1] = GGfx.Blend256(GGfx.Blend256(A[0],A[1]),A[1]); break;
+				case 0x8000: A[1] = GGfx.Blend256(A[0],A[1]); break;
+				case 0xc000: A[1] = GGfx.Blend256(A[0],GGfx.Blend256(A[0],A[1])); break;
+			}
+			Line.PtrBYTE += Camera->Stride; X += DX;
+		}
+	}
+	else
+	{
+		// Horizontal major.
+		if( X2 < X1 )
+		{
+			Exchange(X1, X2);
+			Exchange(Y1, Y2);
+		}
+
+		INT YInc, LineInc, DX, DY;
+		INT Y = (INT)Y1;
+		if( Y2 > Y1 )
+		{
+			// Sloping downward.
+			YInc    = 1;
+			LineInc = Camera->Stride;
+			DY      = (INT)Y2 - Y;
+			DX		= (INT)FDX;
+		}
+		else
+		{
+			// Sloping upward.
+			YInc    = -1;
+			LineInc = -Camera->Stride;
+			DY		= Y - (INT)Y2;
+			DX		= -(INT)FDX;
+		}
+		FLOAT Adj = (FLOAT)(Y+1) - Y1;
+		INT   X   = ftoi(X1 + Adj * FDX);
+
+		RAINBOW_PTR Line = &Camera->Screen[Y * Camera->ByteStride];
+
+		INT   EndX  = Min(ftoi(X2),Fix(Camera->X));
+		FLOAT YAdj  = (FLOAT)Unfix(ftoi(X1)) + 1.0 - X1/65536.0;
+		INT   FixDY = 65536.0 * 65536.0 / FDX;
+		INT   FixY  = 65536.0 * Y1 + YAdj * FixDY;
+		INT   MinX  = Unfix(ftoi(X1));
+		INT   MaxX  = Unfix(Min(EndX,X));
+
+		if( Y2 < Y1 )
+		{
+			X += DX;
+			MaxX  = Unfix(Min(EndX,X));
+		}
+
+// Helper macro for setting up antialiasing.
+#define PRE_AA(type) \
+	while( DY-- >= 0 ) { \
+		type *A = &Line.Ptr##type[MinX - Camera->Stride]; \
+		type *B = &Line.Ptr##type[MinX]; \
+		type *E = &Line.Ptr##type[MaxX]; \
+		if( Y>0 && Y<Camera->Y ) while( B < E ) { \
+			switch( FixY & 0xc000 ) {
+
+// Helper macro for finishing antialiasing.
+#define POST_AA(type) \
+			} \
+		FixY += FixDY; A++; B++; \
+		} \
+	else FixY += FixDY * (E-B); \
+	MinX = Unfix(X); \
+	MaxX = Unfix(Min(EndX,X += DX)); \
+	Line.Ptr##type += LineInc; Y += YInc; \
+	} \
+
+		if( Camera->ColorBytes==4 ) 
+		{
+			PRE_AA(DWORD)
+			case 0x0000:
+				IFTEST(B[0] = 0xff3f3f;) break;
+			case 0x4000: B[0]
+				=	((A[0]&0xfcfcfc)>>2) 
+				+	((B[0]&0xfcfcfc)>>2) + ((B[0]&0xfefefe)>>1);
+				IFTEST(B[0] = 0xff7f7f;) break;
+			case 0x8000: B[0]
+				=	((A[0]&0xfefefe)>>1)
+				+	((B[0]&0xfefefe)>>1); 
+				IFTEST(B[0] = 0xffcfcf;) break;
+			case 0xc000: B[0]
+				=	((A[0]&0xfcfcfc)>>2) + ((A[0]&0xfefefe)>>1)
+				+	((B[0]&0xfcfcfc)>>2);
+				IFTEST(B[0] = 0xffffff;) break;
+			POST_AA(DWORD)
+		}
+		else if( Camera->ColorBytes==2 && (Camera->Caps & CC_RGB565 ) )
+		{
+			PRE_AA(WORD);
+			case 0x0000:
+				break;
+			case 0x4000: B[0]
+				=	((A[0] & (0xe000 + 0x0780 + 0x001C))>>2) + ((B[0] & (0x0800 + 0x0020 + 0x0001))   )
+				+	((B[0] & (0xe000 + 0x0780 + 0x001C))>>2) + ((B[0] & (0xf000 + 0x07C0 + 0x001e))>>1);
+				break;
+			case 0x8000: B[0]
+				=	((A[0] & (0xf000 + 0x07C0 + 0x001e))>>1) + ((B[0] & (0x0800 + 0x0020 + 0x0001))   )
+				+	((B[0] & (0xf000 + 0x07C0 + 0x001e))>>1); 
+				break;
+			case 0xc000: B[0]
+				=	((A[0] & (0xe000 + 0x0780 + 0x001C))>>2) + ((A[0] & (0x0800 + 0x0020 + 0x0001))   )
+				+	((B[0] & (0xe000 + 0x0780 + 0x001C))>>2) + ((A[0] & (0xf000 + 0x07C0 + 0x001e))>>1);
+				break;
+			POST_AA(WORD);
+		}
+		else if( Camera->ColorBytes==2 )
+		{
+			PRE_AA(WORD);
+			case 0x0000:
+				break;
+			case 0x4000: B[0]
+				=	((A[0] & (0x7000 + 0x0380 + 0x001C))>>2) + ((B[0] & (0x0400 + 0x0020 + 0x0001))   )
+				+	((B[0] & (0x7000 + 0x0380 + 0x001C))>>2) + ((B[0] & (0x7800 + 0x03C0 + 0x001e))>>1);
+				break;
+			case 0x8000: B[0]
+				=	((A[0] & (0x7800 + 0x03C0 + 0x001e))>>1) + ((B[0] & (0x0400 + 0x0020 + 0x0001))   )
+				+	((B[0] & (0x7800 + 0x03C0 + 0x001e))>>1); 
+				break;
+			case 0xc000: B[0]
+				=	((A[0] & (0x7000 + 0x0380 + 0x001C))>>2) + ((A[0] & (0x0400 + 0x0020 + 0x0001))   )
+				+	((B[0] & (0x7000 + 0x0380 + 0x001C))>>2) + ((A[0] & (0x7800 + 0x03C0 + 0x001e))>>1);
+				break;
+			POST_AA(WORD);
+		}
+		else
+		{
+			PRE_AA(BYTE);
+			case 0x0000: break;
+			case 0x4000: B[0] = GGfx.Blend256(GGfx.Blend256(A[0],B[0]),B[0]); break;
+			case 0x8000: B[0] = GGfx.Blend256(A[0],B[0]); break;
+			case 0xc000: B[0] = GGfx.Blend256(A[0],GGfx.Blend256(A[0],B[0])); break;
+			POST_AA(BYTE);
+		}
+#undef PRE_AA
+#undef POST_AA
+	}
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	Span buffer Bsp rendering.
+-----------------------------------------------------------------------------*/
+
+//
+// BSP draw list pointer for sorting.
+//
+struct FBspDrawListPtr
+{
+	FBspDrawList *Ptr;
+	friend inline INT Compare( const FBspDrawListPtr &A, const FBspDrawListPtr &B )
+		{ return A.Ptr->Key - B.Ptr->Key; }
+};
 
 //
 // Draw the entire world.
 //
-void FGlobalRender::DrawWorld(ICamera *Camera)
+#if 0
+///////////////////////////// !!BEGIN TEMPORARY TERRAIN HACK!! ////////////////////////////
+void FRender::DrawWorld( UCamera *Camera )
+{
+	guard(FRender::DrawWorld);
+
+	// Clear the screen.
+	memset(Camera->Screen,0,Camera->ByteStride*Camera->Y);
+
+	// Get the height map texture.
+	UTexture *HeightMap = new("CracksX",FIND_Optional)UTexture;
+	if( !HeightMap ) return;
+
+	UTexture *Surface = new("Default",FIND_Optional)UTexture;
+	if( !Surface ) return;
+
+	FMemMark MemMark(GMem);
+
+	FTextureInfo HInfo;
+	HeightMap->Lock(HInfo,Camera->Texture,TL_Render|TL_RenderPalette);
+	FMipInfo &HMip = *HInfo.Mips[0];
+
+	static FLOAT *Shades;
+	static int First=0;
+	if( !First )
 	{
-	GUARD;
-	VOID			*MemTop    = GMem.Get(0);
-	IModel			*ModelInfo = &Camera->Level.ModelInfo;
+		First=1;
+		Shades = new FLOAT[HMip.USize * HMip.VSize];
+		for( DWORD u=0; u<HMip.USize-1; u++ )
+		{
+			for( DWORD v=0; v<HMip.VSize-1; v++ )
+			{
+				FLOAT A  = HMip.Data[(u+0) + (v+0)*HMip.USize]/256.0;
+				FLOAT B  = HMip.Data[(u+1) + (v+0)*HMip.USize]/256.0;
+				FLOAT C  = HMip.Data[(u+0) + (v+1)*HMip.USize]/256.0;
+				FLOAT DX = B-A; DX = Sgn(DX) * sqrt(sqrt(Abs(DX)));
+				FLOAT DY = C-A; DY = Sgn(DY) * sqrt(sqrt(Abs(DY)));
+				Shades[u+v*HMip.USize] = 0.501 + 0.25 * DX + 0.25 * DY;
+			}
+		}
+	}
+
+	FTextureInfo TInfo;
+	Surface->Lock(TInfo,Camera->Texture,TL_Render|TL_RenderPalette,(AZoneInfo*)&Camera->Level->Actors(0));
+	FMipInfo TMip = *TInfo.Mips[2];
+
+	FLOAT HScale = 128.0;
+	FLOAT VScale = -16.0;
+
+	INT Step =
+		Camera->Actor->RendMap==REN_DynLight?1:
+		Camera->Actor->RendMap==REN_PlainTex?2:
+		Camera->Actor->RendMap==REN_Polys   ?4:
+		Camera->Actor->RendMap==REN_Zones   ?8:16;
+
+	// Draw backdrop.
+	if( Camera->Actor->ShowFlags & SHOW_Backdrop )
+	{
+		FSpanBuffer Backdrop;
+		Backdrop.AllocIndexForScreen(Camera->X,Camera->Y,&GMem);
+		DrawBackdrop(Camera,&Backdrop);
+	}
+	Surface->Unlock(TInfo);
+
+	// Draw the height map as polys.
+	static FTransTexture P[5];
+	static FTransTexture *T[4] = {&P[0],&P[1],&P[3],&P[2]};
+
+	FLOAT Alpha = 0.5 + 0.5 * cos(RendIter * 0.05);
+
+	FLOAT ViewDist=2048.0; // Figure out the proper math for:
+	INT MinU = ((INT)Max((Camera->Coords.Origin.X-ViewDist-2.0*Step*HScale)/HScale,-(int)HMip.USize/2)) & ~(Step-1);
+	INT MinV = ((INT)Max((Camera->Coords.Origin.Y-ViewDist-2.0*Step*HScale)/HScale,-(int)HMip.USize/2)) & ~(Step-1);
+	INT MaxU = ((INT)Min((Camera->Coords.Origin.X+ViewDist+2.0*Step*HScale)/HScale,+(int)HMip.VSize/2)) & ~(Step-1);
+	INT MaxV = ((INT)Min((Camera->Coords.Origin.Y+ViewDist+2.0*Step*HScale)/HScale,+(int)HMip.VSize/2)) & ~(Step-1);
+
+	/*
+	MinU = -(int)HMip.USize/2;
+	MaxU = +(int)HMip.USize/2;
+	MinV = -(int)HMip.VSize/2;
+	MaxV = +(int)HMip.VSize/2;
+	*/
+
+	for( INT v=MinV; v<MaxV-Step; v+=Step )
+	{
+		for( INT u=MinU; u<MaxU-Step; u+=Step )
+		{
+			// Get points.
+			int i=0;
+			for( int vv=0; vv<2; vv++ )
+			{
+				for( int uu=0; uu<2; uu++ )
+				{
+					// Setup.
+					int U = u + uu*Step;
+					int V = v + vv*Step;
+
+					// Get coords.
+					*(FVector*)T[i] = FVector( HScale*U, HScale*V, VScale*HMip.Data[U + V*HMip.USize]).TransformPointBy(Camera->Coords);
+					FLOAT Dist      = T[i]->Size();
+					FLOAT Darken    = Max(0.05,1.0 - Dist/ViewDist);
+
+					// Setup texture/shading.
+					T[i]->U = U * HScale * 65536.0 * 0.5; // Last#=sizing relative to norm
+					T[i]->V = V * HScale * 65536.0 * 0.5;
+					T[i]->G = 256.0 * 63.0 * Shades[(U&(HMip.USize-1)) + (V&(HMip.VSize-1))*HMip.USize] * Darken;
+
+					// Outcode it.
+					T[i]->ComputeOutcode(*Camera);
+
+					// Project.
+					FLOAT Factor  = Camera->ProjZ / T[i]->Z;
+					T[i]->ScreenX = T[i]->X * Factor + Camera->FX15;
+					T[i]->ScreenY = T[i]->Y * Factor + Camera->FY15;
+
+					i++;
+				}
+			}
+			// Draw textured surfaces.
+			if( 1 )
+			{
+				// Clip and draw as 2 triangles.
+				FTransTexture NewPts[16];
+				P[4]=P[0];
+				for( int TriOfs=0; TriOfs<=2; TriOfs+=2 )
+				{
+					int NumPts = GRender.ClipTexPoints(Camera,&P[TriOfs],NewPts,3);
+					if( NumPts > 0 )
+					{
+						// Draw tex.
+						FMemMark Mark(GMem);
+						FRasterTexSetup RasterTexSetup;
+						FRasterTexPoly *RasterTexPoly = (FRasterTexPoly	*)new(GMem,sizeof(FRasterTexPoly)+FGlobalRaster::MAX_RASTER_LINES*sizeof(FRasterTexLine))BYTE;
+
+						// Setup.
+						RasterTexSetup.Setup(*Camera,NewPts,NumPts,&GMem);
+						RasterTexSetup.Generate(RasterTexPoly);
+
+						// Draw it.
+						FPolySpanTextureInfoBase *Info = GSpanTextureMapper->SetupForPoly( Camera, Surface, 0, 0, 0 );
+						RasterTexPoly->Draw(*Camera,*Info,NULL);
+
+						// Finish up.
+						GSpanTextureMapper->FinishPoly(Info);
+						RasterTexSetup.Release();
+						Mark.Pop();
+					}
+				}
+			}
+			// Draw lines.
+			if( 0 )
+			{
+				BYTE Color = u>=MinU && v>=MinV && u<MaxU && v<MaxV ? AddWireColor : BrushWireColor;
+				Draw3DLine(Camera,&P[0],&P[1],0,Color,1,0);
+				Draw3DLine(Camera,&P[0],&P[3],0,Color,1,0);
+			}
+		}
+	}
+	HeightMap->Unlock(HInfo);
+	MemMark.Pop();
+	unguard;
+}
+///////////////////////////// END TEMPORARY TERRAIN HACK ////////////////////////////
+#else
+void FRender::DrawWorld( UCamera *Camera )
+{
+	guard(FRender::DrawWorld);
+	checkState(Camera->Level->Info!=NULL);
+	FMemMark MemMark(GMem);
+	FMemMark DynMark(GDynMem);
+
+	UModel			*Model = Camera->Level->Model;
 	FSpanBuffer		Backdrop;
 	FBspDrawList	*DrawList;
-	INDEX			iActorExclude;
-	//
-	if( !Camera->Level.Descriptor ) appError("Missing LevelDescriptor");
-	GRandoms->Tick(Camera->Level.Descriptor->Ticks);
-	//
-	if (GRend->LeakCheck) memset(Camera->Screen,BrushWireColor,Camera->SXR*Camera->SYR);
-	RendIter++;
-	//
-	// Tick the memory cache:
-	//
-	GCache.Tick();
-	//
-	dynamicsLock		(&Camera->Level.ModelInfo);
-	InitTransforms		(&Camera->Level.ModelInfo);
-	//
-	if (Camera->ShowFlags & SHOW_Actors)
-		{
-		iActorExclude = Camera->iActor;
-		if (Camera->Actor->bBehindView) iActorExclude = INDEX_NONE;
-		dynamicsSetup (Camera,iActorExclude);
-		};
-	if (ModelInfo->NumBspNodes)
-		{
+	AActor			*Exclude;
+
+	// Antialiasing.
+	if( Antialias )
+		Camera->ExtraPolyFlags |= PF_NoMerge;
+
+	// Fill the screen if desired.
+	if( LeakCheck )
+		memset( Camera->Screen, BrushWireColor, Camera->ByteStride*Camera->Y );
+
+	// Tick stuff.
+	GRandoms->Tick( Camera->Level->Info->TimeSeconds );
+	TemporalIter = Temporal ? TemporalIter+1 : 0;
+
+	// Init stuff.
+	dynamicsLock		(Camera->Level->Model);
+	InitTransforms		(Camera->Level->Model);
+
+	// Set up dynamic object rendering.
+	if( Camera->Actor->ShowFlags & SHOW_Actors )
+	{
+		Exclude = (AActor*)Camera->Actor;
+		if( Camera->Actor->bBehindView ) Exclude = NULL;
+		dynamicsSetup( Camera, Exclude );
+	}
+
+	// Prerender the world.
+	if( Model->Nodes->Num )
+	{
 		Backdrop.AllocIndex(0,0,&GDynMem);
-		DrawList = OccludeBsp(Camera,&Backdrop);
-		//!!DrawList = GEdgeOccluder->OccludeBsp(*Camera,&Backdrop);
-		}
+		DrawList = OccludeBsp( Camera, &Backdrop );
+	}
 	else
-		{
-		Backdrop.AllocIndexForScreen(Camera->SXR,Camera->SYR,&GDynMem);
+	{
+		Backdrop.AllocIndexForScreen(Camera->X,Camera->Y,&GDynMem);
 		DrawList = NULL;
-		};
-	GLightManager->DoDynamicLighting( &Camera->Level );
-	//
-	// Show backdrop if desired:
-	//
-	if ((Camera->ShowFlags & SHOW_Backdrop) && (Backdrop.ValidLines>0)) 
+	}
+
+	// Perform dynamic lighting only on visible parts of the bsp.
+	GLightManager->DoDynamicLighting( Camera->Level );
+
+	// Count surfaces to draw.
+	int Num[2]={0,0};
+	for( FBspDrawList *Draw = DrawList; Draw!=NULL; Draw = Draw->Next )
+		Num[(Draw->PolyFlags & PF_NoOcclude)!=0]++;
+
+	// Group surfaces into solid (draw-order irrelevant) and transparent.
+	FBspDrawListPtr *FirstDraw [2] = {new(GMem,Num[0])FBspDrawListPtr,new(GMem,Num[1])FBspDrawListPtr};
+	FBspDrawListPtr *LastDraw  [2] = {FirstDraw[0],FirstDraw[1]};
+	for( Draw = DrawList; Draw!=NULL; Draw = Draw->Next )
+		(LastDraw[(Draw->PolyFlags & PF_NoOcclude)!=0]++)->Ptr = Draw;
+
+	// Sort solid surfaces by texture and then by palette for cache coherence.
+	QSort( FirstDraw[0], Num[0] );
+
+	if( GCameraManager->RenDev )
+	{
+		// Draw everything in the world from front to back to hardware.
+		for( int Pass=0; Pass<2; Pass++ )
 		{
-		DrawBackdrop(Camera,&Backdrop);
-		}
-	if (GApp->RenDev && GApp->RenDev->Active)
-		{
-		GApp->RenDev->Lock(Camera);
-		//
-		// Draw everything in the world from front to back to hardware. Nothing has been
-		// merged. There can be no sorting errors.
-		//
-		for( FBspDrawList *Draw = DrawList; Draw!=NULL; Draw=Draw->Next )
+			FBspDrawListPtr *DrawPtr = FirstDraw[Pass];
+			while( DrawPtr < LastDraw[Pass] )
 			{
-			DrawBspSurf (Camera,Draw);
-			};
-		GApp->RenDev->Unlock(Camera);
+				// Setup for this surface.
+				FBspDrawList *Draw      = DrawPtr->Ptr;
+				UModel 		 *Model 	= Camera->Level->Model;
+				FBspSurf	 *Surf 		= &Model->Surfs( Draw->iSurf );
+				UTexture     *Texture   = Surf->Texture ? Surf->Texture : GGfx.DefaultTexture;
+				FVector	     TextureU	= GetVector( Model,  Camera->Coords, Surf->vTextureU ) / 65536.0;
+				FVector	     TextureV 	= GetVector( Model,  Camera->Coords, Surf->vTextureV ) / 65536.0;
+				FVector	     &Normal   	= GetVector( Model,  Camera->Coords, Surf->vNormal   );
+				FVector	     &Base     	= GetPoint ( Camera, Surf->pBase);
+
+				// Setup dynamic lighting for this surface.
+				GLightManager->SetupForSurf
+				(
+					Camera,
+					Normal,
+					Base,
+					Draw->iSurf,
+					Surf->iLightMesh,
+					Draw->PolyFlags,
+					Camera->Level->GetZoneActor(GBlit.iZone),
+					Texture
+				);
+
+				// Draw all polys sharing this surface.
+				INDEX iCurrentSurf = Draw->iSurf;
+				do
+				{
+					Draw = DrawPtr->Ptr;
+					GCameraManager->RenDev->DrawPolyV
+					(
+						Camera, 
+						Texture,
+						Draw->Pts,
+						Draw->NumPts,
+						Base,
+						Normal,
+						TextureU,
+						TextureV,
+						Surf->PanU,
+						Surf->PanV,
+						Draw->PolyFlags
+					);
+					DrawPtr++;
+				} while( DrawPtr<LastDraw[Pass] && DrawPtr->Ptr->iSurf==iCurrentSurf );
+				GLightManager->ReleaseLightBlock();
+			}
 		}
+	}
 	else
-		{
-		//
-		// Sort visible surfaces by texture for cache coherence, 
-		// since draw-order is irrelevant.
-		//
-		FBspDrawListPtr *FirstDraw = (FBspDrawListPtr *)GMem.Get(0);
-		FBspDrawListPtr *LastDraw  = FirstDraw;
-		//
-		for( FBspDrawList *Draw = DrawList; Draw!=NULL; Draw = Draw->Next )
-			{
-			(LastDraw++)->Ptr = Draw;
-			};
-		int Num = LastDraw-FirstDraw;
-		GMem.Get(Num * sizeof(FBspDrawListPtr));
-		QSort(FirstDraw,Num);
-		//
-		// Draw everything:
-		//
+	{
+		// Show backdrop if desired.
+		if( (Camera->Actor->ShowFlags & SHOW_Backdrop) && (Backdrop.ValidLines>0) )
+			DrawBackdrop(Camera,&Backdrop);
+
+		// Draw everything.
 		UTexture *PrevTex = NULL;
-		for( FBspDrawListPtr *DrawPtr = FirstDraw; DrawPtr < LastDraw; DrawPtr++ )
+		for( int Pass=0; Pass<2; Pass++ )
+		{
+			for( FBspDrawListPtr *DrawPtr = FirstDraw[Pass]; DrawPtr < LastDraw[Pass]; DrawPtr++ )
 			{
-			FBspDrawList *Draw = DrawPtr->Ptr;
-			if (!(Draw->PolyFlags & (PF_NoOcclude|PF_Portal)))
+				FBspDrawList *Draw = DrawPtr->Ptr;
+				if( !(Draw->PolyFlags & PF_Portal) )
 				{
-				// Handle texture:
-				if ((Draw->Texture!=PrevTex) || !PrevTex)
+					// Handle texture.
+					if( Draw->Texture!=PrevTex || !PrevTex )
 					{
-					STAT(GStat.UniqueTextures++);
-					if (Draw->Texture) STAT(GStat.UniqueTextureMem+=Draw->Texture->USize*Draw->Texture->VSize);
-					for (int j=0; j<8; j++) GBlit.PrevMipRef[j]=0;
-					PrevTex = Draw->Texture;
-					};
-				// Update span bounds:
-				FBspSurf *Poly = &ModelInfo->BspSurfs[Draw->iSurf];
-				Draw->Span.GetValidRange(&Poly->LastStartY,&Poly->LastEndY);
-				// Draw it:
-				DrawBspSurf (Camera,Draw);
-				// Must draw actors interspersed here as GDrawList entries!
-				};
-			};
-		//
-		// Now draw all non-occluding polygons in back-to-front order. For proper
-		// rendering, these must be interleaved with dynamics.
-		//
-		for( DrawPtr = LastDraw-1; DrawPtr >= FirstDraw; DrawPtr-- )
+						STAT(GStat.UniqueTextures++);
+						if( Draw->Texture ) STAT(GStat.UniqueTextureMem+=Draw->Texture->USize*Draw->Texture->VSize);
+						for( int j=0; j<MAX_MIPS; j++ ) GBlit.PrevMipRef[j]=0;
+						PrevTex = Draw->Texture;
+					}
+
+					// Update span bounds.
+					if( Pass == 0 )
+					{
+						FBspSurf *Poly = &Model->Surfs(Draw->iSurf);
+						Draw->Span.GetValidRange(&Poly->LastStartY,&Poly->LastEndY);
+					}
+
+					// Draw it.
+					DrawBspSurf( Camera, Draw );
+				}
+			}
+		}
+		if( Antialias )
+		{	
+			// Antialias in depth order.
+			for( FBspDrawList *Draw = DrawList; Draw!=NULL; Draw = Draw->Next )
 			{
-			FBspDrawList *Draw = DrawPtr->Ptr;
-			if (Draw->PolyFlags & (PF_NoOcclude|PF_Portal))
+				// Edge antialiasing test.
+				FTransform Pts[32];
+				int NumPts = ClipBspSurf( Model, Camera, Draw->iNode, Pts );
+				for( int i=0; i<NumPts; i++ )
 				{
-				STAT(GStat.UniqueTextures++);
-				if (Draw->Texture) STAT(GStat.UniqueTextureMem+=Draw->Texture->USize*Draw->Texture->VSize);
-				for (int j=0; j<8; j++) GBlit.PrevMipRef[j]=0;
-				DrawBspSurf (Camera,Draw);
-				};
-			Draw--;
-			};
-		};
-	if (Camera->ShowFlags & SHOW_Actors) dynamicsFinalize(Camera,1);
-	//
-	// Draw all moving brushes as wireframes:
-	//
-	if (Camera->ShowFlags & SHOW_MovingBrushes) DrawMovingBrushWires(Camera);
-	//
-	// Finish up:
-	//
-	STAT(GStat.GMem			= (int)(GMem.Top-GMem.Start));
-	STAT(GStat.GDynMem		= (int)(GDynMem.Top-GDynMem.Start));
-	STAT(GStat.NodesTotal	= ModelInfo->NumBspNodes);
-	//
-	GLightManager->UndoDynamicLighting( &Camera->Level );
-	//
-	ExitTransforms		();
-	dynamicsUnlock		(&Camera->Level.ModelInfo);
-	GMem.Release        (MemTop);
-	//
-	UNGUARD("FGlobalRender::DrawWorld");
-	};
+					// Get points.
+					FTransform *V1   = &Pts[i];
+					FTransform *V2   = &Pts[i?i-1:NumPts-1];
+					AntialiasEdge( Camera, V1->ScreenX, V1->ScreenY, V2->ScreenX, V2->ScreenY );
+				}
+			}
+		}
+	}
 
-void FScreenBounds::DebugDump()
-	{
-	debugf("Box (%i,%i)-(%i,%i)",MinX,MinY,MaxX,MaxY);
-	};
+	if( Camera->Actor->ShowFlags & SHOW_Actors )
+		dynamicsFinalize( Camera, 1 );
 
-void FGlobalRender::DrawBackdrop (ICamera *Camera, FSpanBuffer *SpanBuffer)
-	{
-	GUARD;
-	void *MemTop = GMem.Get(0);
-	//
-	for (int j=0; j<8; j++) GBlit.PrevMipRef[j]=0;
-	//
+	// Draw all moving brushes as wireframes.
+	if( Camera->Actor->ShowFlags & SHOW_MovingBrushes )
+		DrawMovingBrushWires(Camera);
+
+	// Finish up.
+	STAT(GStat.GMem       = GMem.GetByteCount());
+	STAT(GStat.GDynMem    = GDynMem.GetByteCount());
+	STAT(GStat.NodesTotal = Model->Nodes->Num);
+
+	GLightManager->UndoDynamicLighting( Camera->Level );
+
+	ExitTransforms();
+	dynamicsUnlock(Camera->Level->Model);
+	MemMark.Pop();
+	DynMark.Pop();
+
+	unguard;
+}
+#endif
+
+void FRender::DrawBackdrop( UCamera *Camera, FSpanBuffer *SpanBuffer )
+{
+	guard(FRender::DrawBackdrop);
+	FMemMark Mark(GMem);
+
+	for( int j=0; j<MAX_MIPS; j++ )
+		GBlit.PrevMipRef[j]=0;
+
 	FBspDrawList Draw;
 	Draw.iNode		= INDEX_NONE;
 	Draw.iSurf		= INDEX_NONE;
@@ -2665,14 +3216,94 @@ void FGlobalRender::DrawBackdrop (ICamera *Camera, FSpanBuffer *SpanBuffer)
 	Draw.PolyFlags	= 0;
 	Draw.NumPts		= 0;
 	Draw.Span		= *SpanBuffer;
-	Draw.Texture	= Camera->Level.Descriptor->SkyTexture;
-	//
+	Draw.Texture	= Camera->Level->Info->SkyTexture;
+
 	DrawSoftwareTexturedBspSurf(Camera,&Draw);
-	//
-	GMem.Release(MemTop);
-	UNGUARD("FGlobalRender::DrawBackdrop");
-	};
+
+	Mark.Pop();
+	unguard;
+}
 
 /*-----------------------------------------------------------------------------
-	The End
+	Texture locking/unlocking functions.
+-----------------------------------------------------------------------------*/
+
+// Structure containing all platform-specific locked texture info.
+struct FTextureInfoPlatform
+{
+	FCacheItem *Item;
+};
+
+// Called after the engine locks a texture, so that we can perform any
+// rendering engine specific locking work.
+void FRender::PostLockTexture( FTextureInfo &TextureInfo, UTexture *Camera )
+{
+	guard(FRender::PostLockTexture);
+	FTextureInfoPlatform &Plat = *(FTextureInfoPlatform *)TextureInfo.Platform;
+
+	// Init Plat.
+	Plat.Item = NULL;
+
+	if( TextureInfo.Flags & TL_RenderPalette )
+	{
+		// Get a Camera-compatible palette.
+		checkState(TextureInfo.Palette!=NULL);
+		TextureInfo.Colors = TextureInfo.Palette->GetColorDepthPalette(Plat.Item,Camera);
+	}
+	else if( TextureInfo.Flags & TL_RenderRamp )
+	{
+		// Get a Camera-compatible ramp.
+		TextureInfo.Colors = GetPaletteLightingTable
+		(
+			Camera,
+			TextureInfo.Palette,
+			TextureInfo.Zone,
+			NULL,
+			Plat.Item
+		);
+	}
+	unguard;
+}
+
+// Called before the engine unlocks a texture, so that we can perform any
+// rendering engine specific unlocking work.
+void FRender::PreUnlockTexture( FTextureInfo &TextureInfo )
+{
+	guard(FRender::PreUnlockTexture);
+	FTextureInfoPlatform &Plat = *(FTextureInfoPlatform *)TextureInfo.Platform;
+
+	// Unlock cache items.
+	if( Plat.Item ) Plat.Item->Unlock();
+
+	unguard;
+}
+
+// Called after the engine loads a texture, so that we can perform any
+// rendering engine specific fixup work.
+void FRender::PostLoadTexture( UTexture *Texture, DWORD PostFlags )
+{
+	guard(FRender::PostLoadTexture);
+	unguard;
+}
+
+// Called before the engine kills a texture, so that we can perform any
+// rendering engine specific texture killing work.
+void FRender::PreKillTexture( UTexture *Texture )
+{
+	guard(FRender::PreKillTexture);
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	Global subsystem instantiation.
+-----------------------------------------------------------------------------*/
+
+FGlobalRaster					GRaster;
+FGlobalBlit						GBlit;
+FRender							GRender;
+UNRENDER_API FRenderBase		*GRendPtr = &GRender;
+UNRENDER_API FEditorRenderBase	*GEditorRendPtr = &GRender;
+
+/*-----------------------------------------------------------------------------
+	The End.
 -----------------------------------------------------------------------------*/

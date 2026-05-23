@@ -2,7 +2,7 @@
 UnPrefer.h: Unreal user preferences
 Used by: Actor code, Engine code(?)
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0.
 
 Description:
@@ -22,7 +22,7 @@ Revision history:
 #include "Unreal.h"
 #include "UnKeyVal.h"
 
-class UNREAL_API FPreferences
+class UNENGINE_API FPreferences
     : public FKeyValues     // We provide a key-value interface.
 {
 public:
@@ -60,6 +60,6 @@ public:
 
 };
 
-extern UNREAL_API FPreferences GPreferences;
+extern UNENGINE_API FPreferences GPreferences;
 
 #endif

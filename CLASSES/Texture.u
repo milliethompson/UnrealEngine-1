@@ -1,0 +1,144 @@
+DeclareClass Name=Texture
+DeclareClass Name=Palette
+DeclareClass Name=FireTexture
+DeclareClass Name=WaterTexture
+
+Begin Class Name=Texture
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Texture: A texture map.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class Texture expands Object
+	intrinsic
+	package(UnEngine);
+
+//-----------------------------------------------------------------------------
+// Subtextures.
+
+var() texture BumpMap;       // Bump map to illuminate this texture with.
+var() texture DetailTexture; // Detail texture to apply.
+var() texture MacroTexture;  // Macrotexture to apply, not currently used.
+var() texture AnimNext;      // Next texture in animation sequence.
+
+//-----------------------------------------------------------------------------
+// The palette.
+
+var() const palette Palette;
+
+//-----------------------------------------------------------------------------
+// Inherent surface properties.
+
+// Lighting properties.
+var() float DiffuseC;        // Diffuse lighting coefficient (0-1).
+var() float SpecularC;       // Specular lighting coefficient (0-1).
+var() float ReflectivityC;   // Reflectivity (0-1), i.e. for shiny marble floors.
+
+// Physics properties.
+var() float FrictionC;       // Surface friction coefficient 0=total, 1=none.
+
+// Surface audio.
+var() sound FootstepSound;   // Footstep sound on surface.
+var() sound HitSound;        // When hit by a projectile.
+
+// Polygon flags.
+var() dword PolyFlags;       // Internal.
+
+// Texture flags.
+var() const bool bNoTile;    // Texture dimensions aren't powers of two.
+var() const bool bBumpMap;   // This is a normal-discretized bumpmap.
+
+//-----------------------------------------------------------------------------
+// Internal.
+
+// Texture dimensions.
+var() const byte UBits;      // Bits in U dimension.
+var() const byte VBits;      // Bits in V dimension.
+var() const int  USize;      // U dimension.
+var() const int  VSize;      // V dimension.
+
+// Internal stuff, not useful to scripts.
+var const int   ColorBytes;  // Bytes in color depth, 1 = 8-bit.
+var const int   CameraCaps;  // If a camera surface, its capabilities.
+var const dword MipZero;     // Overall average color of texture.
+var const dword MinColor;    // Minimum color in texture.
+var const dword MaxColor;    // Maximum color in texture.
+var const dword pad[16];     // Available for expansion.
+var const dword Mips[96];    // Internal mipmap table.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Texture
+   End DefaultProperties
+End Class
+
+Begin Class Name=Palette
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Palette: A texture palette.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class Palette expands Database
+	intrinsic
+	package(UnEngine);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=Palette
+   End DefaultProperties
+End Class
+
+Begin Class Name=FireTexture
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// FireTexture: A FireEngine fractal fire texture.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class FireTexture expands Texture
+	intrinsic
+	package(UnFire);
+
+// Spark types.
+enum ESpark
+{
+	SPARK_FireBurn
+	SPARK_FireSparkle
+	SPARK_FirePulse
+	SPARK_FireSignal
+	SPARK_FireBlaze
+	SPARK_FireOzHasSpoken
+	SPARK_FireCone
+	SPARK_FireBlazeRight
+	SPARK_FireBlazeLeft
+	SPARK_FireOrgan
+};
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=FireTexture
+   End DefaultProperties
+End Class
+
+Begin Class Name=WaterTexture
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// WaterTexture: A FireEngine fractal water texture.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class WaterTexture expands Texture
+	intrinsic
+	package(UnFire);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Class=WaterTexture
+   End DefaultProperties
+End Class

@@ -1,80 +1,94 @@
-VERSION 4.00
+VERSION 5.00
 Begin VB.Form frmCameraHolder 
    BackColor       =   &H00000000&
-   Caption         =   "CameraHolder"
+   BorderStyle     =   3  'Fixed Dialog
    ClientHeight    =   6990
-   ClientLeft      =   4095
-   ClientTop       =   4215
+   ClientLeft      =   2640
+   ClientTop       =   3150
    ClientWidth     =   6690
-   Height          =   7395
-   Left            =   4035
+   ControlBox      =   0   'False
    LinkTopic       =   "Form2"
+   MaxButton       =   0   'False
+   MDIChild        =   -1  'True
+   MinButton       =   0   'False
+   Moveable        =   0   'False
+   PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   6990
    ScaleWidth      =   6690
-   Top             =   3870
-   Width           =   6810
-   Begin VB.OLE RBox 
-      BackColor       =   &H00400000&
-      Height          =   90
-      Left            =   0
-      MousePointer    =   15  'Size All
-      TabIndex        =   0
-      Top             =   495
-      Visible         =   0   'False
-      Width           =   90
-   End
+   ShowInTaskbar   =   0   'False
    Begin VB.OLE LBox 
-      BackColor       =   &H00400000&
-      Height          =   90
-      Left            =   45
+      BackColor       =   &H00808080&
+      Height          =   150
+      Left            =   4485
       MousePointer    =   15  'Size All
-      TabIndex        =   1
-      Top             =   285
-      Visible         =   0   'False
-      Width           =   90
-   End
-   Begin VB.OLE RBar 
-      BackColor       =   &H00C0C0C0&
-      BorderStyle     =   0  'None
-      Height          =   90
-      Left            =   105
-      MousePointer    =   7  'Size N S
       TabIndex        =   4
-      Top             =   495
+      Top             =   2880
       Visible         =   0   'False
-      Width           =   1440
+      Width           =   150
+   End
+   Begin VB.OLE RBox 
+      BackColor       =   &H00808080&
+      Height          =   165
+      Left            =   4560
+      MousePointer    =   15  'Size All
+      TabIndex        =   3
+      Top             =   3090
+      Visible         =   0   'False
+      Width           =   150
    End
    Begin VB.OLE VBar 
-      BackColor       =   &H00C0C0C0&
-      BorderStyle     =   0  'None
-      Height          =   1020
-      Left            =   600
+      BackColor       =   &H00808080&
+      Height          =   1170
+      Left            =   720
       MousePointer    =   9  'Size W E
-      TabIndex        =   3
-      Top             =   120
+      TabIndex        =   2
+      Top             =   3240
       Visible         =   0   'False
-      Width           =   90
+      Width           =   135
    End
    Begin VB.OLE LBar 
-      BackColor       =   &H00C0C0C0&
-      BorderStyle     =   0  'None
-      Height          =   90
-      Left            =   150
+      BackColor       =   &H00808080&
+      Height          =   150
+      Left            =   2220
       MousePointer    =   7  'Size N S
-      TabIndex        =   2
-      Top             =   285
+      TabIndex        =   1
+      Top             =   4020
       Visible         =   0   'False
-      Width           =   1440
+      Width           =   1815
+   End
+   Begin VB.OLE RBar 
+      BackColor       =   &H00808080&
+      Height          =   150
+      Left            =   1800
+      MousePointer    =   7  'Size N S
+      TabIndex        =   0
+      Top             =   3720
+      Visible         =   0   'False
+      Width           =   1815
    End
 End
 Attribute VB_Name = "frmCameraHolder"
+Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 
 Dim VBarHold As Integer, LBarHold As Integer, RBarHold
 Dim LBoxHold As Integer, RBoxHold As Integer
 Dim VDelta As Integer, HDelta As Integer
+
+Public CX, CY, CXL, CYL As Integer ' Client window dimensions
+
+Private Sub Form_GotFocus()
+    ZOrder 1
+End Sub
+
+Private Sub Form_Load()
+    Dim h As Long
+    h = GetWindow(frmMain.hwnd, GW_CHILD)
+    Call SetWindowLong(hwnd, -8, h)
+End Sub
 
 '
 ' Vertical bar
@@ -95,8 +109,8 @@ Private Sub VBar_MouseMove(Button As Integer, Shift As Integer, X As Single, Y A
         NewX = VBar.Left + X - VDelta
         If NewX < 0 Then
             VBar.Left = 0
-        ElseIf NewX > frmMain.CXL - VBar.Width Then
-            VBar.Left = frmMain.CXL - VBar.Width
+        ElseIf NewX > CXL - VBar.Width Then
+            VBar.Left = CXL - VBar.Width
         Else
             VBar.Left = NewX
         End If
@@ -104,8 +118,8 @@ Private Sub VBar_MouseMove(Button As Integer, Shift As Integer, X As Single, Y A
     RBox.Left = VBar.Left
     LBar.Width = VBar.Left
     RBar.Left = VBar.Left + VBar.Width
-    RBar.Width = frmMain.CXL - (VBar.Left + VBar.Width)
-    Ed.CameraVertRatio = CSng(VBar.Left) / (frmMain.CXL - VBar.Width)
+    RBar.Width = CXL - (VBar.Left + VBar.Width)
+    Ed.CameraVertRatio = CSng(VBar.Left) / (CXL - VBar.Width)
     End If
 End Sub
 
@@ -132,13 +146,13 @@ Private Sub LBar_MouseMove(Button As Integer, Shift As Integer, X As Single, Y A
         NewY = LBar.Top + Y - HDelta
         If NewY < 0 Then
             LBar.Top = 0
-        ElseIf NewY > frmMain.CYL - LBar.Height Then
-            LBar.Top = frmMain.CYL - LBar.Height
+        ElseIf NewY > CYL - LBar.Height Then
+            LBar.Top = CYL - LBar.Height
         Else
             LBar.Top = NewY
         End If
         LBox.Top = LBar.Top
-        Ed.CameraLeftRatio = CSng(LBar.Top) / CSng(frmMain.CY + frmMain.CYL - LBar.Height)
+        Ed.CameraLeftRatio = CSng(LBar.Top) / CSng(CY + CYL - LBar.Height)
     End If
 End Sub
 
@@ -165,13 +179,13 @@ Private Sub RBar_MouseMove(Button As Integer, Shift As Integer, X As Single, Y A
         NewY = RBar.Top + Y - HDelta
         If NewY < 0 Then
             RBar.Top = 0
-        ElseIf NewY > frmMain.CYL - RBar.Height Then
-            RBar.Top = frmMain.CYL - RBar.Height
+        ElseIf NewY > CYL - RBar.Height Then
+            RBar.Top = CYL - RBar.Height
         Else
             RBar.Top = NewY
         End If
         RBox.Top = RBar.Top
-        Ed.CameraRightRatio = CSng(RBar.Top) / CSng(frmMain.CYL - RBar.Height)
+        Ed.CameraRightRatio = CSng(RBar.Top) / CSng(CYL - RBar.Height)
     End If
 End Sub
 
@@ -239,5 +253,89 @@ Private Sub RBox_MouseUp(Button As Integer, Shift As Integer, X As Single, Y As 
     RBoxHold = 0
     RBarHold = 0
     VBarHold = 0
+End Sub
+
+'
+' Open cameras
+'
+
+Public Sub OpenCameras(Reopen As Boolean)
+    ZOrder 1 '!!
+
+    Call Ed.OpenCamera(Reopen, 0, 0, VBar.Left / Screen.TwipsPerPixelX, _
+        LBar.Top / Screen.TwipsPerPixelY, _
+        SHOW_NORMAL + SHOW_STANDARD_VIEW + SHOW_AS_CHILD + SHOW_MOVINGBRUSHES, _
+        REN_ORTHXY, "Standard1")
+    Call Ed.OpenCamera(Reopen, (VBar.Left + VBar.Width) / Screen.TwipsPerPixelX, _
+        0, (CXL - VBar.Left - VBar.Width) / Screen.TwipsPerPixelX, _
+        RBar.Top / Screen.TwipsPerPixelY, _
+        SHOW_NORMAL + SHOW_STANDARD_VIEW + SHOW_AS_CHILD + SHOW_MOVINGBRUSHES, _
+        REN_ORTHXZ, "Standard2")
+    Call Ed.OpenCamera(Reopen, 0, (LBar.Top + LBar.Height) / Screen.TwipsPerPixelY, _
+        VBar.Left / Screen.TwipsPerPixelX, (CYL - LBar.Top - LBar.Height) / Screen.TwipsPerPixelY, _
+        SHOW_NORMAL + SHOW_STANDARD_VIEW + SHOW_MENU + SHOW_AS_CHILD + SHOW_MOVINGBRUSHES, _
+        REN_PLAINTEX, "Standard3")
+    Call Ed.OpenCamera(Reopen, (VBar.Left + VBar.Width) / Screen.TwipsPerPixelX, _
+        (RBar.Top + RBar.Height) / Screen.TwipsPerPixelY, _
+        (CXL - VBar.Left - VBar.Width) / Screen.TwipsPerPixelX, _
+        (CYL - RBar.Top - RBar.Height) / Screen.TwipsPerPixelY, _
+        SHOW_NORMAL + SHOW_STANDARD_VIEW + SHOW_AS_CHILD + SHOW_MOVINGBRUSHES, _
+        REN_ORTHYZ, "Standard4")
+End Sub
+
+'
+' Set positioning
+'
+
+Public Sub SetPos()
+
+    VBar.Visible = False
+    LBar.Visible = False
+    RBar.Visible = False
+    LBox.Visible = False
+    RBox.Visible = False
+    
+    Width = frmMain.ScaleWidth
+    Height = frmMain.ScaleHeight
+
+    CX = 0
+    CY = 0
+    CXL = ScaleWidth
+    CYL = ScaleHeight
+
+    If ScaleWidth >= 160 * Screen.TwipsPerPixelX And _
+        ScaleHeight >= 120 * Screen.TwipsPerPixelY And _
+        (Ed.Startup = 0) Then
+        
+        VBar.Top = 0
+        VBar.Height = CYL
+        VBar.Left = Ed.CameraVertRatio * (CXL - VBar.Width)
+        If VBar.Left < 0 Then VBar.Left = 0
+        If VBar.Left > CXL - VBar.Width Then VBar.Left = CXL - VBar.Width
+        
+        LBar.Left = 0
+        LBar.Width = VBar.Left
+        LBar.Top = Ed.CameraLeftRatio * (CYL - LBar.Height)
+        If LBar.Top < 0 Then LBar.Top = 0
+        If LBar.Top > CYL - LBar.Height Then LBar.Top = CYL - LBar.Height
+        
+        RBar.Left = VBar.Left + VBar.Width
+        RBar.Width = CXL - (VBar.Left + VBar.Width)
+        RBar.Top = Ed.CameraRightRatio * (CYL - RBar.Height)
+        If RBar.Top < 0 Then RBar.Top = 0
+        If RBar.Top > CYL - RBar.Height Then RBar.Top = CYL - RBar.Height
+        
+        LBox.Left = VBar.Left
+        LBox.Top = LBar.Top
+        
+        RBox.Left = VBar.Left
+        RBox.Top = RBar.Top
+        
+        VBar.Visible = True
+        LBar.Visible = True
+        RBar.Visible = True
+        LBox.Visible = True
+        RBox.Visible = True
+    End If
 End Sub
 

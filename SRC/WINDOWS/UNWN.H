@@ -18,27 +18,39 @@
 extern class CUnrealWnApp App;
 
 /////////////////////////////////////////////////////////////////////////////
-// CTimer.
+// FSimpleOutputDevice.
 /////////////////////////////////////////////////////////////////////////////
 
-class CUnrealTimer
+//
+// A simple output device which just encapsulates a CString.
+//
+class FSimpleOutputDevice : public FOutputDevice
 {
 public:
-
+	// FOutputDevice interface.
+	void Write( const void *ThisData, int Length, ELogType MsgType )
+	{
+		guard(FSimpleOutputDevice::Write);
+		if( Num+Length+1 > Max )
+		{
+			Max = Max*2 + Length + 2048;
+			Str = (char*)realloc( Str, Max );
+		}
+		memcpy( Str + Num, ThisData, Length+1 );
+		Num += Length;
+		unguard;
+	}
+	BSTR AllocSysString()
+	{
+		return CString(Str).AllocSysString();
+	}
+	FSimpleOutputDevice()
+	:	Num(0), Max(0), Str(NULL)
+	{};
+private:
 	// Variables.
-	MMRESULT	TimerHandle;
-	MMRESULT	TimerPeriod;
-	DWORD		TimerRate;
-	DWORD		TimerTicks;
-	DWORD		TimerBug;
-	DWORD		TimerAlive;
-
-	// Functions.
-	CTimer();
-	void Enable();
-	void Disable();
-	void Init(DWORD TimerRate);
-	void Exit();
+	int Num,Max;
+	char *Str;
 };
 
 /////////////////////////////////////////////////////////////////////////////
@@ -62,10 +74,10 @@ public:
 	char CmdLine[256];
 	char Error[1024];
 	char BaseDir[256];
-	int InOle,OleCrashed,UsageCount,InError,PlatformCrashed;
+	int InOle,OleCrashed,UsageCount,InError;
 
 	FGlobalPlatform Platform;
-	CUnrealTimer Timer;
+	//CUnrealTimer Timer;
 
 	void RouteMessage(void *Msg);
 	void MessagePump();
@@ -112,7 +124,7 @@ protected:
 
 static int inline CheckUnrealState(char *Descr)
 {
-	if( App.PlatformCrashed )
+	if( App.Platform.GuardTrap )
 	{
 		char Error[16384];
 		strcpy(Error,"Unrecoverable: ");
@@ -127,13 +139,19 @@ static int inline CheckUnrealState(char *Descr)
 		App.Platform.Logf(LOG_Critical,"Ole '%s' after server shutdown",Descr);
 		return 0;
 	}
-	else return 1;
+	else
+	{
+		GMem.Tick();
+		GDynMem.Tick();
+		return 1;
+	}
 }
 
 static void inline HandleOleError(char *Module)
 {
-	App.InOle=0;
-	App.OleCrashed=1;
+	App.InOle              = 0;
+	App.OleCrashed         = 1;
+	App.Platform.GuardTrap = 1;
 
 	App.Platform.ShutdownAfterError();
 
@@ -144,7 +162,7 @@ static void inline HandleOleError(char *Module)
 	App.Platform.Logf("Exiting due to Ole error");
 	App.Platform.CloseLog();
 
-	if (App.Platform.Debugging) DebugBreak();
+	if( App.Platform.Debugging ) DebugBreak();
 	else AfxThrowOleDispatchException(1,App.Platform.ErrorHist);
 }
 

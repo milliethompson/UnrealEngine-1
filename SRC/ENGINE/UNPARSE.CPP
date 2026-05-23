@@ -1,7 +1,7 @@
 /*==============================================================================
 UnParse.cpp: General parsing.
 
-Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 Compiled with Visual C++ 4.0.
 
 Description:
@@ -11,6 +11,7 @@ Revision history:
     * 06/10/96: Created by Mark
 ==============================================================================*/
 
+#include "Unreal.h"
 #include "UnParse.h"
 #include <ctype.h>
 
@@ -294,13 +295,13 @@ void FParse::AddString( char * & Target, const char * String )
 //----------------------------------------------------------------------------
 void FParse::FreeString(char * & Value)
 {
-    GUARD;
+    guard(FParse::FreeString);
     if( Value != 0 )
     {
         appFree( Value );
         Value = 0;
     }
-    UNGUARD( "FParse::FreeString" );
+    unguard;
 }
 
 //----------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnBlastC.cpp: C++ Texture blasting code
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -12,23 +12,17 @@
 #include "UnRender.h"
 
 /*-----------------------------------------------------------------------------
-	Compile options
+	Types.
 -----------------------------------------------------------------------------*/
 
-//#undef ASM /* To generate slow C code for everything */
-
-/*-----------------------------------------------------------------------------
-	Types
------------------------------------------------------------------------------*/
-
-enum {LIGHT_XR=512}; /* Duplicated in UnRender.inc */
-enum {LIGHT_X_TOGGLE=LIGHT_XR*4}; /* Duplicated in UnRender.inc */
+enum {LIGHT_XR				= 512};			// Duplicated in UnRender.inc.
+enum {LIGHT_X_TOGGLE		= LIGHT_XR*4};	// Duplicated in UnRender.inc.
 
 typedef void (*POST_EFFECT)();
-typedef void (*TEX_INNER)(int SkipIn,FTexLattice *T);
+typedef void (*TEX_INNER)( int SkipIn,FTexLattice *T );
 
 /*-----------------------------------------------------------------------------
-	Globals
+	Globals.
 -----------------------------------------------------------------------------*/
 
 extern "C"
@@ -39,20 +33,21 @@ extern "C"
 	TEX_INNER	GTexInner=NULL;
 	POST_EFFECT GEffect=NULL;
 	DWORD		GPolyFlags;
-	//
+
 	void PostMask_8P (); void PostBlend_8P (); void PostFire_8P ();
 	void PostMask_16P(); void PostBlend_16P(); void PostFire_16P();
 	void PostMask_32P(); void PostBlend_32P(); void PostFire_32P();
-	POST_EFFECT GEffectTable[5][FGlobalRender::DRAWRASTER_MAX] =
-		{
-			{NULL,	NULL,	NULL,			NULL,			NULL},			// 0-bit
-			{NULL,	NULL,	PostMask_8P,	PostBlend_8P,	PostFire_8P},	// 8-bit
-			{NULL,	NULL,	PostMask_16P,	PostBlend_16P,	PostFire_16P},	// 16-bit
-			{NULL,	NULL,	NULL,			NULL,			NULL},			// 24-bit
-			{NULL,	NULL,	NULL,			NULL,			NULL},			// 32-bit
-		};
+	POST_EFFECT GEffectTable[5][FRender::DRAWRASTER_MAX] =
+	{
+		{NULL,	NULL,	NULL,			NULL,			NULL},			// 0-bit
+		{NULL,	NULL,	PostMask_8P,	PostBlend_8P,	PostFire_8P},	// 8-bit
+		{NULL,	NULL,	PostMask_16P,	PostBlend_16P,	PostFire_16P},	// 16-bit
+		{NULL,	NULL,	NULL,			NULL,			NULL},			// 24-bit
+		{NULL,	NULL,	NULL,			NULL,			NULL},			// 32-bit
+	};
 
 	// Texture mapper inner loop.
+	ASMVAR  DWORD   TRO_DitherMask;
 	ASMVAR	QWORD	TMI_DTex;
 	ASMVAR	DWORD	TMI_DiffLight;
 	ASMVAR	DWORD	TMI_DiffDest;
@@ -94,7 +89,7 @@ extern "C"
 	ASMVAR	DWORD	*TLO_BotBase;
 	ASMVAR	DWORD	*TLO_FinalDest;
 	ASMVAR  FSpan	*TLO_RectSpan;
-	ASMVAR  VOID	(*TLO_LightInnerProc);
+	ASMVAR  void	(*TLO_LightInnerProc);
 	ASMVAR  FTexLattice **TLO_LatticeBase;
 
 	// TexRect outer loop.
@@ -118,6 +113,9 @@ extern "C"
 	void CDECL LightVInterpolate_8P_1();
 	void CDECL LightVInterpolate_8P_2();
 	void CDECL LightVInterpolate_8P_4();
+
+	// Lattice setup loop.
+	ASMVAR FMipInfo *TRL_MipPtr[MAX_MIPS];
 };
 
 #if !ASM
@@ -125,7 +123,7 @@ extern "C"
 #endif
 
 /*-----------------------------------------------------------------------------
-	Postprocessing effects
+	Postprocessing effects.
 -----------------------------------------------------------------------------*/
 
 //
@@ -154,46 +152,49 @@ void PostBlit_8P()
 
 // Blit with color 0 = see-through.
 void PostMask_8P()
-	{
+{
 	static FSpan *SpanNext;
 	FSpan *Span = TMO_OrigSpan;
-	while (Span)
-		{
+	while( Span )
+	{
 		SpanNext	= Span->Next;
-		//
+
 		BYTE *Src		= &TMO_DestBits	[Span->Start];
 		BYTE *Dest		= &TMO_Dest		[Span->Start];
 		BYTE *DestEnd	= &TMO_Dest		[Span->End];
-		while (((int)Dest & 3) && (Dest<DestEnd))
+		while( ((int)Dest & 3) && Dest<DestEnd )
+		{
+			if( *Src )
+				*Dest = *Src;
+			Src++;
+			Dest++;
+		}
+		while( Dest+3 < DestEnd )
+		{
+			if( *(DWORD *)Src )
 			{
-			if (*Src) *Dest = *Src; Src++; Dest++;
-			};
-		while ((Dest+3)<DestEnd)
-			{
-			if (*(DWORD *)Src)
+				if( Src[0] && Src[1] && Src[2] && Src[3] )
 				{
-				if (Src[0]&&Src[1]&&Src[2]&&Src[3])
-					{
 					*(DWORD *)Dest = *(DWORD *)Src;
-					}
+				}
 				else
-					{
+				{
 					if (Src[0]) Dest[0]=Src[0];
 					if (Src[1]) Dest[1]=Src[1];
 					if (Src[2]) Dest[2]=Src[2];
 					if (Src[3]) Dest[3]=Src[3];
-					};
-				};
-			Src+=4;
-			Dest+=4;
-			};
-		while (Dest<DestEnd)
-			{
+				}
+			}
+			Src  += 4;
+			Dest += 4;
+		}
+		while( Dest < DestEnd )
+		{
 			if (*Src) *Dest = *Src; Src++; Dest++;
-			};
+		}
 		Span = SpanNext;
-		};
-	};
+	}
+}
 
 // Blit with 64K palette blend table.
 void PostBlend_8P()
@@ -202,25 +203,25 @@ void PostBlend_8P()
 	FSpan *Span = TMO_OrigSpan;
 	while (Span)
 		{
-		SpanNext	= Span->Next;
+		SpanNext = Span->Next;
 		//
 		BYTE *Src		= &TMO_DestBits	[Span->Start];
 		BYTE *Dest		= &TMO_Dest		[Span->Start];
 		BYTE *DestEnd	= &TMO_Dest		[Span->End];
 		while (((int)Dest & 3) && (Dest<DestEnd))
 			{
-			*Dest = GGfx.Blender[(int)*Src+((int)*Dest<<8)]; Src++; Dest++;
+			*Dest = GGfx.BlendTable((int)*Src+((int)*Dest<<8)); Src++; Dest++;
 			};
 		while ((Dest+3)<DestEnd)
 			{
-			*Dest = GGfx.Blender[(int)*Src+((int)*Dest<<8)]; Src++; Dest++;
-			*Dest = GGfx.Blender[(int)*Src+((int)*Dest<<8)]; Src++; Dest++;
-			*Dest = GGfx.Blender[(int)*Src+((int)*Dest<<8)]; Src++; Dest++;
-			*Dest = GGfx.Blender[(int)*Src+((int)*Dest<<8)]; Src++; Dest++;
+			*Dest = GGfx.BlendTable((int)*Src+((int)*Dest<<8)); Src++; Dest++;
+			*Dest = GGfx.BlendTable((int)*Src+((int)*Dest<<8)); Src++; Dest++;
+			*Dest = GGfx.BlendTable((int)*Src+((int)*Dest<<8)); Src++; Dest++;
+			*Dest = GGfx.BlendTable((int)*Src+((int)*Dest<<8)); Src++; Dest++;
 			};
 		while (Dest<DestEnd)
 			{
-			*Dest = GGfx.Blender[(int)*Src+((int)*Dest<<8)]; Src++; Dest++;
+			*Dest = GGfx.BlendTable((int)*Src+((int)*Dest<<8)); Src++; Dest++;
 			};
 		Span = SpanNext;
 		};
@@ -272,46 +273,49 @@ void PostBlit_16P()
 
 // Blit with color 0 = see-through.
 void PostMask_16P()
-	{
+{
 	static FSpan *SpanNext;
 	FSpan *Span = TMO_OrigSpan;
-	while (Span)
-		{
+	while( Span )
+	{
 		SpanNext	= Span->Next;
-		//
+
 		WORD *Src		= &((WORD*)TMO_DestBits	)[Span->Start];
 		WORD *Dest		= &((WORD*)TMO_Dest		)[Span->Start];
 		WORD *DestEnd	= &((WORD*)TMO_Dest		)[Span->End];
-		while (((int)Dest & 3) && (Dest<DestEnd))
-			{
+		while( ((int)Dest & 3) && Dest<DestEnd )
+		{
 			if (*Src) *Dest = *Src; Src++; Dest++;
-			};
-		while ((Dest+3)<DestEnd)
+		}
+		while( (Dest+3)<DestEnd )
+		{
+			if( *(DWORD *)Src )
 			{
-			if (*(DWORD *)Src)
+				if( Src[0]&&Src[1]&&Src[2]&&Src[3] )
 				{
-				if (Src[0]&&Src[1]&&Src[2]&&Src[3])
-					{
 					*(DWORD *)Dest = *(DWORD *)Src;
-					}
+				}
 				else
-					{
+				{
 					if (Src[0]) Dest[0]=Src[0];
 					if (Src[1]) Dest[1]=Src[1];
 					if (Src[2]) Dest[2]=Src[2];
 					if (Src[3]) Dest[3]=Src[3];
-					};
-				};
+				}
+			}
 			Src+=4;
 			Dest+=4;
-			};
-		while (Dest<DestEnd)
-			{
-			if (*Src) *Dest = *Src; Src++; Dest++;
-			};
+		}
+		while( Dest < DestEnd )
+		{
+			if( *Src )
+				*Dest = *Src;
+			Src++;
+			Dest++;
+		}
 		Span = SpanNext;
-		};
-	};
+	}
+}
 
 // Blit with blending effects.
 void PostBlend_16P()
@@ -370,10 +374,9 @@ void PostFire_16P()
 	Setup.
 -----------------------------------------------------------------------------*/
 
-ITexture HackTextureInfo[MAX_MIPS];
 void rendDrawAcrossSetup
 (
-	ICamera		*Camera, 
+	UCamera		*Camera, 
 	UTexture	*Texture, 
 	UPalette	*Palette, 
 	DWORD		ThesePolyFlags, 
@@ -381,45 +384,37 @@ void rendDrawAcrossSetup
 )
 {
 	guard(rendDrawAcrossSetup);
-
-	// Set up globals.
-	GBlit.Texture = Texture ? Texture : GGfx.DefaultTexture;
-	GBlit.Palette = Palette ? Palette : GBlit.Texture->Palette;
+	checkInput(Texture!=NULL);
+	checkInput(Palette!=NULL);
 
 	// Handle poly flags.
 	GPolyFlags = (Texture->PolyFlags & ~NotPolyFlags) | ThesePolyFlags;
 
 	if( !(GPolyFlags & PF_Transparent) )
 	{
-		if (!(GPolyFlags & PF_Masked))			GBlit.DrawKind = FGlobalRender::DRAWRASTER_Normal;
-		else									GBlit.DrawKind = FGlobalRender::DRAWRASTER_Masked;
+		if( !(GPolyFlags & PF_Masked) )	GBlit.DrawKind = FRender::DRAWRASTER_Normal;
+		else							GBlit.DrawKind = FRender::DRAWRASTER_Masked;
 	}
 	else
 	{
-		GBlit.DrawKind   = FGlobalRender::DRAWRASTER_Blended;
+		GBlit.DrawKind = FRender::DRAWRASTER_Blended;
 	}
-	GEffect = GEffectTable[Camera->ColorBytes][GBlit.DrawKind];
+	//GEffect = GEffectTable[ Camera->ColorBytes ][ GBlit.DrawKind ];
+	GEffect = GEffectTable[ Camera->ColorBytes ][ FRender::DRAWRASTER_Normal ];
 
 	// Handle dithering.
-	if (GRender.DoDither && !(GPolyFlags & PF_NoSmooth )) GBlit.DitherBase = &GDither256;
-	else GBlit.DitherBase = &GNoDither256;
+	FDitherTable *DitherBase;
+	if( GRender.DoDither && !(GPolyFlags & PF_NoSmooth) )
+		DitherBase = &GDither256[GRender.TemporalIter&3];
+	else 
+		DitherBase = &GNoDither256;
 
 	// Set up mipmapping.
-	GBlit.UBits = Texture->UBits;
-	GBlit.VBits = Texture->VBits;
-
-	FBlitMipInfo *Mip = &GBlit.Mips[0];
 	for( int i=0; i<MAX_MIPS; i++ )
 	{
-		int MipLevel = i;
-		int USize,VSize;
-		Mip->Data		= Texture->GetData(HackTextureInfo[i],&MipLevel,Camera->ColorBytes,&USize,&VSize);
-		Mip->MipLevel	= MipLevel;
-		Mip->UBits		= Texture->UBits - MipLevel;
-		Mip->VBits		= Texture->VBits - MipLevel;
-		Mip->VMask		= VSize-1;
-		Mip->Dither		= &(*GBlit.DitherBase)[Mip->UBits];
-		Mip++;
+		FMipInfo &Mip	= GBlit.Texture->Mips[i];
+		Mip.Dither		= &(*DitherBase)[Texture->UBits].Unit[i];
+		TRL_MipPtr[i]	= &GBlit.Texture->Mips[i];
 	}
 	unguard;
 }
@@ -427,11 +422,6 @@ void rendDrawAcrossSetup
 void rendDrawAcrossExit()
 {
 	guard(rendDrawAcrossExit);
-
-	for( int i=0; i<MAX_MIPS; i++ )
-	{
-		GBlit.Texture->Unlock(HackTextureInfo[i]);
-	}
 	unguard;
 }
 
@@ -495,24 +485,22 @@ FCacheItem *ShaderCacheItem;
 
 //
 // Set up the self-modifying code for all versions of the
-// texture mapper (8 mips, 4 lines, 4 trilinear phases).
+// texture mapper (MAX_MIPS mips, TMAPPER_DITHER_LINES lines, 4 trilinear phases).
 //
-void TexSetup( ICamera *Camera )
+void TexSetup( UCamera *Camera )
 {
-	DWORD *ModPtr=0;
-	FDitherSet *Dither = &(*GBlit.DitherBase)[GBlit.UBits];
-
 	// Set up palette.
 	TMI_Shader = (DWORD)GRender.GetPaletteLightingTable
 	(
-		*Camera,
+		Camera->Texture,
 		GBlit.Palette,
-		GBlit.ZoneDescriptor,
-		(GPolyFlags & PF_CloudWavy) ? Camera->Level.Descriptor : NULL,
+		GBlit.Zone,
+		(GPolyFlags & PF_CloudWavy) ? Camera->Level->Info : NULL,
 		ShaderCacheItem
 	).PtrVOID;
 
 	// Set colordepth-specific texture mapper info.
+	DWORD *ModPtr = 0;
 	if( Camera->ColorBytes==1 )
 	{
 		TMI_ProcBase	= TMI_ProcTable8P;
@@ -541,8 +529,8 @@ void TexSetup( ICamera *Camera )
 #if ASM
 
 	// Set up all self-modifying code:
-	FBlitMipInfo *MipInfo  = &GBlit.Mips[0];
-	FBlitMipInfo *PrevInfo = &GBlit.Mips[1];
+	FMipInfo *MipInfo  = &GBlit.Texture->Mips[0];
+	FMipInfo *PrevInfo = &GBlit.Texture->Mips[1];
 
 	for( int Mip=0; Mip<MAX_MIPS; Mip++ )
 	{
@@ -554,17 +542,16 @@ void TexSetup( ICamera *Camera )
 			DWORD		PrevMask	= (0xffff >> (16-MipInfo->VBits)) + (0xffff0000 << (16-PrevInfo->UBits));
 			BYTE		UBits		= MipInfo->UBits;
 			BYTE		PrevUBits	= PrevInfo->UBits;
-			FDitherPair	*Pair		= &Dither->Pair[MipInfo->MipLevel][0][0];
 
-			if (GRend->Extra3) AddrMask = PrevMask = 0;
+			if (GRender.Extra3) AddrMask = PrevMask = 0;
 
 			static DWORD *ModPtr1;
 			ModPtr1 = ModPtr;
 
 			STAT(GStat.CodePatches += 16);
-			for( int Line=0; Line<4; Line++ )
+			for( DWORD Line=0; Line<=TRO_DitherMask; Line++ )
 			{
-				FDitherPair	*Pair = &Dither->Pair[Mip][Line][0];
+				FDitherPair *Pair = &MipInfo->Dither->Pair[Line][0];
 				__asm
 				{
 					pushad
@@ -606,170 +593,124 @@ void TexFinish(void)
 	Texture inner loops.
 -----------------------------------------------------------------------------*/
 
-//
-// C texture mapper inner loops.
-//
+#if !ASM
+
+// C texture mapper inner loops:
 // The C versions of these loops are extremely inefficient. The design goal
 // of the C texture loops was to precisely model the inputs and outputs of the 
 // assembly language loops rather than to be efficient or readable.
-//
 
-#if !ASM
-
+// Light value finder.
 inline DWORD LightValAt(BYTE *Dest) {return *(DWORD *)(Dest + TMI_DiffLight);};
 
 void TexInner8(int SkipIn,FTexLattice *T)
-	{
-	FBlitMipInfo *Mip		= &GBlit.Mips[T->RoutineOfs >> 4];
-	FDitherSet *Set			= Mip->Dither;
+{
+	FMipInfo *Mip			= &GBlit.Texture->Mips[T->RoutineOfs >> 4];
+	DWORD MipLevel			= Mip->MipLevel;
+	FDitherUnit *Unit		= &Mip->Dither[MipLevel];
 	BYTE *Texture			= Mip->Data;
 	BYTE  UBits				= Mip->UBits;
 	DWORD VMask				= Mip->VMask << UBits;
-	DWORD MipLevel			= Mip->MipLevel;
 	BYTE *Dest				= TMI_Dest;
 	BYTE *AlignedDest		= (BYTE *)((int)TMI_Dest & ~3);
 	QWORD Tex				= T->Q;
 	QWORD DTex				= T->QX;
-	//
-	if (SkipIn) Tex += SkipIn * DTex;
+
+	if( SkipIn ) Tex += SkipIn * DTex;
 	Tex  = (Tex  & ~(QWORD)0xffff) + LightValAt(AlignedDest);
 	DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(AlignedDest+4) - (Tex&0xffff))>>2);
-	if (SkipIn&3) Tex += (SkipIn&3) * (WORD)(DTex & 0xffff);
-	//
-	while (Dest < TMI_FinalDest)
-		{
-		QWORD ThisTex = Tex + Set->Pair[MipLevel][(int)Dest&3][TRO_Y&1].Offset;
-		*Dest++ = GGfx.ShadeData
-			[
+	if( SkipIn&3 ) Tex += (SkipIn&3) * (WORD)(DTex & 0xffff);
+
+	while( Dest < TMI_FinalDest )
+	{
+		QWORD ThisTex = Tex + Unit->Pair[(int)Dest&3][TRO_Y&1].Offset;
+		*Dest++ = ((WORD *)((int)TMI_Shader*2))
+		[
 			(int)(ThisTex&0x3f00)+
 			(int)Texture
-				[
+			[
 				((ThisTex >> (64-UBits))        ) +
 				((ThisTex >> (32-UBits)) & VMask)
-				]
-			];
+			]
+		];
 		Tex += DTex;
 		if (((int)Dest & 3)==0) DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(Dest+4) - (Tex&0xffff))>>2);
 		STAT(GStat.Extra1++);
-		};
-	};
-void TexInner16(int SkipIn,FTexLattice *T)
-	{
-	FBlitMipInfo *Mip	= &GBlit.Mips[T->RoutineOfs >> 4];
-	FDitherSet *Set		= Mip->Dither;
-	DWORD MipLevel			= Mip->MipLevel;
-	BYTE *Texture		= Mip->Data;
-	BYTE  UBits			= Mip->UBits;
-	DWORD VMask			= Mip->VMask << UBits;
-	BYTE *Dest			= TMI_Dest;
-	BYTE *AlignedDest   = (BYTE *)((int)TMI_Dest & ~3);
-	QWORD Tex			= T->Q;
-	QWORD DTex			= T->QX;
-	//
-	if (SkipIn) Tex += SkipIn * DTex;
-	Tex  = (Tex  & ~(QWORD)0xffff) + LightValAt(AlignedDest);
-	DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(AlignedDest+4) - (Tex&0xffff))>>2);
-	if (SkipIn&3) Tex += (SkipIn&3) * (WORD)(DTex & 0xffff);
-	//
-	while (Dest < TMI_FinalDest)
-		{
-		QWORD ThisTex = Tex + Set->Pair[MipLevel][(int)Dest&3][TRO_Y&1].Offset;
-		*(WORD *)((int)Dest++ * 2) = ((WORD *)((int)TMI_Shader*2))
-			[
-			(int)(ThisTex&0x3f00)+
-			(int)Texture
-				[
-				((ThisTex >> (64-UBits))        ) +
-				((ThisTex >> (32-UBits)) & VMask)
-				]
-			];
-		Tex += DTex;
-		if (((int)Dest & 3)==0) DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(Dest+4) - (Tex&0xffff))>>2);
-		STAT(GStat.Extra1++);
-		};
-	};
-void TexInner24(int SkipIn,FTexLattice *T)
-	{
-	FBlitMipInfo *Mip	= &GBlit.Mips[T->RoutineOfs >> 4];
-	BYTE *Texture		= Mip->Data;
-	FDitherSet *Set		= Mip->Dither;
+	}
+}
+void TexInner16( int SkipIn,FTexLattice *T )
+{
+	FMipInfo *Mip		= &GBlit.Texture->Mips[T->RoutineOfs >> 4];
 	DWORD MipLevel		= Mip->MipLevel;
-	BYTE  UBits			= Mip->UBits;
-	DWORD VMask			= Mip->VMask << UBits;
-	BYTE *Dest			= TMI_Dest;
-	BYTE *Dest3			= (BYTE *)((int)TMI_Dest * 3);
-	BYTE *AlignedDest   = (BYTE *)((int)TMI_Dest & ~3);
-	QWORD Tex			= T->Q;
-	QWORD DTex			= T->QX;
-	//
-	if (SkipIn) Tex += SkipIn * DTex;
-	Tex  = (Tex  & ~(QWORD)0xffff) + LightValAt(AlignedDest);
-	DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(AlignedDest+4) - (Tex&0xffff))>>2);
-	if (SkipIn&3) Tex += (SkipIn&3) * (WORD)(DTex & 0xffff);
-	//
-	union
-		{
-		BYTE B[4];
-		DWORD D;
-		} Temp;
-	while (Dest < TMI_FinalDest)
-		{
-		QWORD ThisTex = Tex + Set->Pair[MipLevel][(int)Dest&3][TRO_Y&1].Offset;
-		Temp.D = ((DWORD *)((int)TMI_Shader*4))
-			[
-			(int)(ThisTex&0x3f00)+
-			(int)Texture
-				[
-				((ThisTex >> (64-UBits))        ) +
-				((ThisTex >> (32-UBits)) & VMask)
-				]
-			];
-		Tex += DTex;
-		Dest3[0] = Temp.B[0];
-		Dest3[1] = Temp.B[1];
-		Dest3[2] = Temp.B[2];
-		Dest3 += 3;
-		Dest++;
-		if (((int)Dest & 3)==0) DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(Dest+4) - (Tex&0xffff))>>2);
-		STAT(GStat.Extra1++);
-		};
-	};
-void TexInner32(int SkipIn,FTexLattice *T)
-	{
-	FBlitMipInfo *Mip	= &GBlit.Mips[T->RoutineOfs >> 4];
+	FDitherUnit *Unit	= &Mip->Dither[MipLevel];
 	BYTE *Texture		= Mip->Data;
 	BYTE  UBits			= Mip->UBits;
-	FDitherSet *Set		= Mip->Dither;
-	DWORD MipLevel			= Mip->MipLevel;
 	DWORD VMask			= Mip->VMask << UBits;
 	BYTE *Dest			= TMI_Dest;
 	BYTE *AlignedDest   = (BYTE *)((int)TMI_Dest & ~3);
 	QWORD Tex			= T->Q;
 	QWORD DTex			= T->QX;
-	//
-	if (SkipIn) Tex += SkipIn * DTex;
+
+	if( SkipIn ) Tex += SkipIn * DTex;
 	Tex  = (Tex  & ~(QWORD)0xffff) + LightValAt(AlignedDest);
 	DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(AlignedDest+4) - (Tex&0xffff))>>2);
-	if (SkipIn&3) Tex += (SkipIn&3) * (WORD)(DTex & 0xffff);
-	//
-	while (Dest < TMI_FinalDest)
-		{
-		QWORD ThisTex = Tex + Set->Pair[MipLevel][(int)Dest&3][TRO_Y&1].Offset;
-		*(DWORD *)((int)Dest++ * 4) = ((DWORD *)((int)TMI_Shader*4))
-			[
+	if( SkipIn& 3) Tex += (SkipIn&3) * (WORD)(DTex & 0xffff);
+
+	while( Dest < TMI_FinalDest )
+	{
+		QWORD ThisTex = Tex + Unit->Pair[(int)Dest&3][TRO_Y&1].Offset;
+		*(WORD *)((int)Dest++ * 2) = ((WORD *)((int)TMI_Shader*2))
+		[
 			(int)(ThisTex&0x3f00)+
 			(int)Texture
-				[
+			[
 				((ThisTex >> (64-UBits))        ) +
 				((ThisTex >> (32-UBits)) & VMask)
-				]
-			];
+			]
+		];
 		Tex += DTex;
-		if (((int)Dest & 3)==0) DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(Dest+4) - (Tex&0xffff))>>2);
+		if( ((int)Dest & 3)==0 ) 
+			DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(Dest+4) - (Tex&0xffff))>>2);
 		STAT(GStat.Extra1++);
-		};
-	};
-TEX_INNER GTexInnerTable[5]={NULL,TexInner8,TexInner16,TexInner24,TexInner32};
+	}
+}
+void TexInner32(int SkipIn,FTexLattice *T)
+{
+	FMipInfo *Mip		= &GBlit.Texture->Mips[T->RoutineOfs >> 4];
+	DWORD MipLevel		= Mip->MipLevel;
+	FDitherUnit *Unit	= &Mip->Dither[MipLevel];
+	BYTE *Texture		= Mip->Data;
+	BYTE  UBits			= Mip->UBits;
+	DWORD VMask			= Mip->VMask << UBits;
+	BYTE *Dest			= TMI_Dest;
+	BYTE *AlignedDest   = (BYTE *)((int)TMI_Dest & ~3);
+	QWORD Tex			= T->Q;
+	QWORD DTex			= T->QX;
+
+	if( SkipIn ) Tex += SkipIn * DTex;
+	Tex  = (Tex  & ~(QWORD)0xffff) + LightValAt(AlignedDest);
+	DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(AlignedDest+4) - (Tex&0xffff))>>2);
+	if( SkipIn&3 ) Tex += (SkipIn&3) * (WORD)(DTex & 0xffff);
+
+	while( Dest < TMI_FinalDest )
+	{
+		QWORD ThisTex = Tex + Unit->Pair[(int)Dest&3][TRO_Y&1].Offset;
+		*(DWORD *)((int)Dest++ * 4) = ((DWORD *)((int)TMI_Shader*4))
+		[
+			(int)(ThisTex&0x3f00)+
+			(int)Texture
+			[
+				((ThisTex >> (64-UBits))        ) +
+				((ThisTex >> (32-UBits)) & VMask)
+			]
+		];
+		Tex += DTex;
+		if( ((int)Dest & 3)==0 )
+			DTex = (DTex & ~(QWORD)0xffff) + (WORD)((LightValAt(Dest+4) - (Tex&0xffff))>>2);
+		STAT(GStat.Extra1++);
+	}
+}
+TEX_INNER GTexInnerTable[5]={NULL,TexInner8,TexInner16,NULL,TexInner32};
 #endif
 
 /*-----------------------------------------------------------------------------
@@ -864,15 +805,22 @@ void TexOuter()
 -----------------------------------------------------------------------------*/
 
 void LightSetup()
-	{
-	TLI_MeshFloat			= GLightManager->GetMeshFloat();
+{
+	GGfx.SincTable->Lock(LOCK_Read);
+
+	TLI_MeshFloat			= GLightManager->Mesh.PtrFLOAT;
 	TLI_AddrMask			= (0xffffffff >> (32-GLightManager->MeshVBits)) + (0xffffffff << (32-GLightManager->MeshUBits));
-	TLI_Sinc				= GGfx.SincData;
+	TLI_Sinc				= &GGfx.SincTable(0);
 	TLI_ProcBase			= &TLI_ProcTable[(int)GLightManager->MeshUBits << 6];
-	//
+
 	TLM_GBlitInterX			= GBlit.InterX;
 	TLM_GBlitInterXBits2	= GBlit.InterXBits+2;
-	};
+}
+
+void LightFinish()
+{
+	GGfx.SincTable->Unlock(LOCK_Read);
+}
 
 #if !ASM
 void LightInner_P_Unlit()
@@ -928,10 +876,10 @@ void LightInner_P_Lit()
 			if ((!T) || (!T->RoutineOfs))
 				{
 				T = LatticeBase[-MAX_XR-1];
-//#if PARANOID
+#if CHECK_ALL
 				if (!T)				appError("LightInner inconsistency 1");
 				if (!T->RoutineOfs) appError("LightInner inconsistency 2");
-//#endif
+#endif
 				TLI_SkipIn += GBlit.InterX;
 				};
 			}
@@ -948,28 +896,28 @@ void LightInner_P_Lit()
 	//
 	QWORD Ofs = (QWORD)1 << (64-UBits);
 	while (Dest < TLI_DestEnd)
-		{
-		FLOAT *Addr1 = &((FLOAT*)GLightManager->MeshVoid)
-			[
+	{
+		FLOAT *Addr1 = &GLightManager->Mesh.PtrFLOAT
+		[
 			((Tex >> (64-UBits))        ) +
 			((Tex >> (32-UBits)) & VMask)
-			];
-		FLOAT *Addr2 = &((FLOAT*)GLightManager->MeshVoid)
-			[
+		];
+		FLOAT *Addr2 = &GLightManager->Mesh.PtrFLOAT
+		[
 			(((Tex+Ofs) >> (64-UBits))  ) +
 			((Tex >> (32-UBits)) & VMask)
-			];
-		FLOAT Alpha = GGfx.SincData[(Tex>>(56-UBits))&0xff];
-		//
+		];
+		FLOAT Alpha = GGfx.SincTable((Tex>>(56-UBits))&0xff);
+
 		FLOAT A		= Addr1[0];
 		FLOAT C		= Addr1[USize];
 		FLOAT AB	= A+(Addr2[0    ]-A)*Alpha;
 		FLOAT CD	= C+(Addr2[USize]-C)*Alpha;
-		//
-		*Dest++ = ((int)(AB + (CD-AB)*GGfx.SincData[(Tex>>24)&0xff]) & 0x3ff8);// + (Tex & 0x3ff8); // 2x2 Precision masked
+
+		*Dest++ = ((int)(AB + (CD-AB)*GGfx.SincTable((Tex>>24)&0xff)) & 0x3ff8);
 		Tex += DTex;
-		};
-	};
+	}
+}
 #endif
 
 //
@@ -1047,43 +995,43 @@ inline void LightOuter(FSpan *Span)
 -----------------------------------------------------------------------------*/
 
 void rendDrawAcross
-	(
-	ICamera *Camera,FSpanBuffer *SpanBuffer,
+(
+	UCamera *Camera,FSpanBuffer *SpanBuffer,
 	FSpanBuffer *RectSpanBuffer, FSpanBuffer *LatticeSpanBuffer,
 	FSpanBuffer *SubRectSpanBuffer, FSpanBuffer *SubLatticeSpanBuffer,
 	int Sampled
-	)
-	{
-	guard("rendDrawAcross");
+)
+{
+	guard(rendDrawAcross);
 	STAT(clock(GStat.TextureMap));
-	//
+
 	static int RectEndY,EndY;
 	static FSpan*const NullSpan = NULL;
 	static FSpan*const* RectSpanDecisionList[4] =
-		{
+	{
 		&NullSpan,&TMO_RectSpan,&TMO_NextRectSpan,&TMO_RectSpan
-		};
+	};
 	static FTexLattice**const* LatticeBaseDecisionList[4] =
-		{
+	{
 		&TMI_NextLatticeBase,&TMI_LatticeBase,&TMI_NextLatticeBase,&TMI_LatticeBase
-		};
+	};
 	static int*const SubRectDecisionList[2] =
-		{
+	{
 		&TRO_SubRectEndY,
 		&EndY
-		};
+	};
 	static int*const RectDecisionList[2] =
-		{
+	{
 		&RectEndY,
 		&EndY
-		};
+	};
 	static DWORD*const LightAlternator = (DWORD *)((int)&GLight[0] + (int)&GLight[LIGHT_X_TOGGLE]);
 	static DWORD*const OriginalLightBase[4]={&GLight[LIGHT_XR*1],&GLight[LIGHT_XR*1],&GLight[LIGHT_XR*2],&GLight[LIGHT_XR*3]};
-	//
+
 	static DWORD* LightBase[4];
 	static LIGHT_V_INTERPOLATE_PROC LightVInterpolateProc;
 	static FSpan **RectIndex,**SubLatticeIndex,**SubRectIndex;
-	//
+
 	LightVInterpolateProc = LightVInterpolateProcs[GBlit.SubYBits];
 	memcpy(LightBase,OriginalLightBase,sizeof(LightBase));
 #if ASM
@@ -1093,83 +1041,77 @@ void rendDrawAcross
 		GTexInner = GTexInnerTable[Camera->ColorBytes];
 		void (*TexOuterProc)() = TexOuter;
 #endif
-	//
-	// Set up texture mapper inner globals:
-	//
+
+	// Set up texture mapper inner globals.
 	TMI_LatticeBase		= &GRender.LatticePtr[RectSpanBuffer->StartY+1][1];
 	TMI_NextLatticeBase	= &TMI_LatticeBase[MAX_XR];
-	//
-	// Set up texture mapper outer globals:
-	//
+
+	// Set up texture mapper outer globals.
 	TMO_Stride = Camera->Stride;
-	if (!GEffect)
-		{
+	if( !GEffect )
+	{
 		TMO_DestBits          = NULL;
 		TMO_DestOrDestBitsPtr = &TMO_DestBits;
-		}
-	else // (GEffect)
-		{
-		TMO_DestBits = (BYTE *)GMem.Get(2048*1);
+	}
+	else
+	{
+		TMO_DestBits = new( GMem, 4096 )BYTE;
 		TMO_DestOrDestBitsPtr = &TMO_Dest;
-		};
+	}
 	TexSetup(Camera);
 	LightSetup();
-	//
-	// Set up:
-	//
+
+	// Set up.
 	TRO_SpanIndex	= &SpanBuffer->Index[0];
 	RectIndex		= &RectSpanBuffer->Index[0];
 	SubLatticeIndex	= &SubLatticeSpanBuffer->Index[0];
 	SubRectIndex	= &SubRectSpanBuffer->Index[0];
-	//
+
 	TRO_Y			= SpanBuffer->StartY;
 	EndY			= SpanBuffer->EndY;
 	TRO_SubRectEndY	= (SubRectSpanBuffer->StartY + 1) << GBlit.SubYBits;
 	RectEndY		= (RectSpanBuffer->StartY    + 1) << GBlit.LatticeYBits;
-	//
-	// Skip into top rect:
-	//
+
+	// Skip into top rect.
 	int SkipY = TRO_Y - (RectSpanBuffer->StartY << GBlit.LatticeYBits);
-	if (SkipY > 0)
-		{
+	if( SkipY > 0 )
+	{
 		int SubSkipY    = SkipY >> GBlit.SubYBits;
 		FSpan *RectSpan = *RectSpanBuffer->Index;
-		//
-		while (RectSpan)
-			{
+
+		while( RectSpan )
+		{
 			FTexLattice *T = TMI_LatticeBase[RectSpan->Start];
-			if (SubSkipY) for (int i=RectSpan->Start; i<RectSpan->End; i++)
-				{
+			if( SubSkipY ) for (int i=RectSpan->Start; i<RectSpan->End; i++)
+			{
 				T->Q		+= SkipY    * T->QY;
 				T->QX		+= SkipY    * T->QXY;
 				T->SubQ		+= SubSkipY * T->SubQY;
 				T->SubQX	+= SubSkipY * T->SubQXY;
 				T++;
-				}
+			}
 			else for (int i=RectSpan->Start; i<RectSpan->End; i++)
-				{
+			{
 				T->Q		+= SkipY * T->QY;
 				T->QX		+= SkipY * T->QXY;
 				T++;
-				}
+			}
 			RectSpan = RectSpan->Next;
-			};
-		};
-	//
-	// Prepare to traverse all lattice rows:
-	//
+		}
+	}
+
+	// Prepare to traverse all lattice rows.
 	TMO_Dest		= (BYTE *)((DWORD)Camera->Screen / Camera->ColorBytes) + SpanBuffer->StartY * TMO_Stride;
 	TMO_RectSpan	= *RectIndex++;
-	//
-	// Set up for first lighting sublattice:
-	//
+
+	// Set up for first lighting sublattice.
 	TLO_BotBase		= &GLight[0];
 	TLO_RectSpan	= *RectSpanBuffer->Index;
 	TLO_LatticeBase = TMI_LatticeBase;
-	//
+
 #if ASM
 	__asm
-		{
+	{
 		pushad
 		;
 		; Generate first row's lighting:
@@ -1287,7 +1229,7 @@ void rendDrawAcross
 		call	[LightVInterpolateProc]
 		SkipLighting:
 		;
-		; Texture map these 4 lines:
+		; Texture map these 1/2/4 lines:
 		;
 		mov eax,[TRO_Y]
 		call [TRO_OuterProc]
@@ -1328,19 +1270,19 @@ void rendDrawAcross
 		jl MainYLoop					; Next rect
 		;
 		popad
-		};
+	}
 #else
 	LightOuter(*SubLatticeIndex++);
-	while (TRO_Y < EndY)
-		{
+	while( TRO_Y < EndY )
+	{
 		RectEndY = *RectDecisionList[RectEndY > EndY]; //Logic version: if (RectEndY > EndY) RectEndY = EndY;
 		TMO_NextRectSpan = *RectIndex++;
-		//
-		while (TRO_Y < RectEndY)
-			{
+
+		while( TRO_Y < RectEndY )
+		{
 			TLO_TopBase		= LightBase[0] = TLO_BotBase;
 			TLO_BotBase		= (DWORD *)((int)LightAlternator - (int)TLO_BotBase);
-			//
+
 			// No-branch logic to set up pointers required by LightOuter, equivalant to the following:
 			//
 			//if (TempY<RectEndY)	{TLO_RectSpan = TMO_RectSpan;		TLO_LatticeBase = TMI_LatticeBase;}
@@ -1348,50 +1290,48 @@ void rendDrawAcross
 			//else					{TLO_RectSpan = NULL;				TLO_LatticeBase = TMI_NextLatticeBase;};
 			//
 			//if (TRO_SubRectEndY > EndY) TRO_SubRectEndY = EndY;
-			//
 			int TempY = TRO_Y + GBlit.SubY;
 			int Choice = (TempY<RectEndY) + (TempY<EndY)*2;
-			//
+
 			TLO_RectSpan		= *RectSpanDecisionList[Choice];
 			TLO_LatticeBase		= *LatticeBaseDecisionList[Choice];
-			//
+
 			TRO_SubRectEndY		= *SubRectDecisionList[TRO_SubRectEndY > EndY];
 			TRO_ThisLightBase	= &LightBase[TRO_Y + GBlit.SubY - TRO_SubRectEndY];
-			//
+
 			LightOuter(*SubLatticeIndex++);
 			LightVInterpolateProc(*SubRectIndex++);
-			//
-			do	{
+
+			do{
 				*TMO_DestOrDestBitsPtr	= TMO_Dest; //Translation: if (!GEffect) TMO_DestBits = TMO_Dest;
 				TMI_DiffLight			= (int)*TRO_ThisLightBase - (int)TMO_DestBits;
-				TMI_DiffDest			= (int)TMO_Dest       - (int)TMO_DestBits;
-				TMI_LineProcBase		= &TMI_ProcBase			[(TRO_Y&3)*2];
-				//
-				// Perform all texture mapping and rect updating:
-				//
+				TMI_DiffDest			= (int)TMO_Dest - (int)TMO_DestBits;
+				TMI_LineProcBase		= &TMI_ProcBase[(TRO_Y&TRO_DitherMask)*2];
+
+				// Perform all texture mapping and rect updating.
 				TMO_OrigSpan = TMO_Span = *TRO_SpanIndex++;
 				TexOuterProc();
 				if (GEffect) GEffect();
-				//
-				// Next line:
-				//
+
+				// Next line.
 				TMO_Dest += TMO_Stride;
 				TRO_ThisLightBase++;
 				} while (++TRO_Y < TRO_SubRectEndY);
-			// Next subrect:
+			// Next subrect.
 			TRO_SubRectEndY   = TRO_Y + GBlit.SubY;
-			};
+		}
 		// Next rect:
 		TMO_RectSpan		 = TMO_NextRectSpan;
 		TMI_LatticeBase		 = TMI_NextLatticeBase;
 		TMI_NextLatticeBase += MAX_XR;
 		RectEndY			 = TRO_Y + GBlit.LatticeY;
-		};
+	}
 #endif
 	TexFinish();
+	LightFinish();
 	STAT(unclock(GStat.TextureMap));
 	unguard;
-	};
+}
 
 /*-----------------------------------------------------------------------------
 	The End.

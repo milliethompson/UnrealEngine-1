@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnEdScan.cpp: Unreal editor click scanner
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -23,8 +23,8 @@ void FScan::PreScan()
 	int i,j,Ofs;
 	int X1   = Max (0,X - EDSCAN_RADIUS);
 	int Y1   = Max (0,Y - EDSCAN_RADIUS);
-	int XL   = Min (X + EDSCAN_RADIUS, Camera->SXR -1) - X1;
-	int YL   = Min (Y + EDSCAN_RADIUS, Camera->SYR -1) - Y1;
+	int XL   = Min (X + EDSCAN_RADIUS, Camera->X -1) - X1;
+	int YL   = Min (Y + EDSCAN_RADIUS, Camera->Y -1) - Y1;
 	//
 	if (Camera->ColorBytes==1)
 		{
@@ -60,13 +60,13 @@ void FScan::PreScan()
 // in the scan region have changed and, if so, makes note of them.
 //
 void FScan::PostScan (EEdScan ScanType,
-	int NewIndex, int NewA, int NewB, FVector *NewV)
+	int NewIndex, int NewA, int NewB, const FVector *NewV)
 	{
 	int i,j,Ofs;
 	int X1   = Max (0,X - EDSCAN_RADIUS);
 	int Y1   = Max (0,Y - EDSCAN_RADIUS);
-	int XL   = Min (X + EDSCAN_RADIUS, Camera->SXR -1) - X1;
-	int YL   = Min (Y + EDSCAN_RADIUS, Camera->SYR -1) - Y1;
+	int XL   = Min (X + EDSCAN_RADIUS, Camera->X -1) - X1;
+	int YL   = Min (Y + EDSCAN_RADIUS, Camera->Y -1) - Y1;
 	//
 	if (Camera->ColorBytes==1)
 		{
@@ -118,7 +118,7 @@ void FScan::PostScan (EEdScan ScanType,
 		};
 	};
 
-void FScan::Init(ICamera *NewCamera)
+void FScan::Init(UCamera *NewCamera)
 	{
 	// Caller must set X, Y
 	Camera = NewCamera;

@@ -1,7 +1,7 @@
 /*=============================================================================
 	UnSrv.cpp: CUnrealServer's implementation
 
-	Copyright 1996 Epic MegaGames, Inc. This software is a trade secret.
+	Copyright 1997 Epic MegaGames, Inc. This software is a trade secret.
 	Compiled with Visual C++ 4.0. Best viewed with Tabs=4.
 
 	Revision history:
@@ -20,6 +20,12 @@
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
+// Globals.
+/////////////////////////////////////////////////////////////////////////////
+
+enum {MAX_RESULTS_LENGTH=16384};
+
+/////////////////////////////////////////////////////////////////////////////
 // CUnrealServer.
 /////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +35,7 @@ CUnrealServer::CUnrealServer()
 {
 	EnableAutomation();
 	App.UnrealLockApp();
-	App.Platform.Log(LOG_Win,"Created CUnrealServer");
+	App.Platform.Log(LOG_Info,"Created CUnrealServer");
 }
 
 CUnrealServer::~CUnrealServer()
@@ -38,11 +44,10 @@ CUnrealServer::~CUnrealServer()
 
 void CUnrealServer::OnFinalRelease()
 {
-	App.Platform.Log(LOG_Win,"OnFinalRelease CUnrealServer");
+	App.Platform.Log(LOG_Info,"OnFinalRelease CUnrealServer");
 	App.UnrealUnlockApp();
 	CWnd::OnFinalRelease();
 }
-
 
 BEGIN_MESSAGE_MAP(CUnrealServer, CWnd)
 	//{{AFX_MSG_MAP(CUnrealServer)
@@ -83,23 +88,15 @@ SINGLEUSE_IMPLEMENT_OLECREATE(CUnrealServer, "Unreal.UnrealServer", 0x65033ed9, 
 
 void CUnrealServer::Exec(LPCTSTR Cmd) 
 {
-	static void *MemTop=GMem.Get(0);
-
 	if( !CheckUnrealState("Exec") )
 		return;
 	
 	try	
 	{
 		App.InOle=1;
-
-		int Leak = (int)GMem.Get(0)-(int)MemTop;
-		if (Leak!=0)
-			appErrorf("Memory leak: %i",Leak);
-
 		App.Platform.Log(LOG_Cmd,Cmd);
-
 		GUnreal.Exec(Cmd);
-
+		CheckUnrealState("PostExec");
 		App.InOle=0;
 	}
 	catch(...)
@@ -120,13 +117,12 @@ BSTR CUnrealServer::GetProp(LPCTSTR Topic, LPCTSTR Item)
 	
 	try	
 	{
-		CString	strResult;
-		char	szResult[16384];
+		FSimpleOutputDevice Out;
 		App.InOle=1;
-		GTopics.Get(NULL,Topic,Item,szResult);
-		strResult = szResult;
+		GTopics.Get(NULL,Topic,Item,Out);
+		CheckUnrealState("PostGetProp");
 		App.InOle=0;
-		return strResult.AllocSysString();
+		return Out.AllocSysString();
 	}
 	catch(...) 
 	{
@@ -162,6 +158,7 @@ void CUnrealServer::SetProp(LPCTSTR Topic, LPCTSTR Item, LPCTSTR NewValue)
 	{
 		App.InOle=1;
 		GTopics.Set(NULL,Topic,Item,const_cast<char *>(NewValue));
+		CheckUnrealState("PostSetProp");
 		App.InOle=0;
 	}
 	catch(...)
