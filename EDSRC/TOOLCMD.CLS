@@ -26,14 +26,22 @@ End Sub
 
 Public Sub DoHelp(ByVal Tool As String, ByRef UnrealEdApp As Object)
     Select Case (Tool)
+    Case "ACTOR SELECT INSIDE": ToolHelp (130) 'MWP: Help TBD
+    Case "ACTOR SELECT INVERT": ToolHelp (130) 'MWP: Help TBD
+    Case "ACTOR REPLACE BRUSH": ToolHelp (130) 'MWP: Help TBD
+    Case "ACTOR REPLACE": ToolHelp (130) 'MWP: Help TBD
+    Case "ACTOR HIDE SELECTED": ToolHelp (130) 'MWP:Help TBD
+    Case "ACTOR HIDE UNSELECTED": ToolHelp (130) 'MWP:Help TBD
+    Case "ACTOR UNHIDE ALL": ToolHelp (130) 'MWP:Help TBD
+    Case "ACTOR CLIP Z": ToolHelp (130) 'MWP:Help TBD
+    'Case "ACTOR CLIP XY": ToolHelp (130) 'MWP:XXX
+    'Case "ACTOR CLIP XYZ": ToolHelp (130) 'MWP:XXX
     Case "ACTOR SELECT ALL": ToolHelp (130)
     Case "POLY SELECT ALL": ToolHelp (128)
     Case "SELECT ALL": ToolHelp (402)
     Case "SELECT NONE": ToolHelp (402)
     Case "TRANSACTION UNDO": ToolHelp (409)
     Case "TRANSACTION REDO": ToolHelp (409)
-    Case "TEXTURE RESET": ToolHelp (403)
-    Case "BRUSH RESET": ToolHelp (401)
     Case "BRUSH ADD": ToolHelp (401)
     Case "BRUSH SUBTRACT": ToolHelp (401)
     Case "BRUSH FROM INTERSECTION": ToolHelp (401)
@@ -43,9 +51,6 @@ Public Sub DoHelp(ByVal Tool As String, ByRef UnrealEdApp As Object)
     Case "BRUSH FROM HULL": ToolHelp (401)
     Case "BRUSH FROM INTERIOR": ToolHelp (401)
     Case "BRUSH RESTORE": ToolHelp (401)
-    Case "BRUSH MIRROR": ToolHelp (401)
-    Case "TEXBROWSE": ToolHelp (123)
-    Case "ACTBROWSE": ToolHelp (329)
     Case "HELP": ToolHelp (126) ' Toolbar help
     Case "TOOLS": ToolHelp (408)
     End Select
@@ -56,12 +61,7 @@ Public Sub DoProperties(ByVal Tool As String, ByRef UnrealEdApp As Object)
     Case "POLY SELECT ALL": PopupNext = 1
     Case "SELECT NONE": PopupNext = 1
     Case "SELECT ALL": PopupNext = 1
-    Case "TEXTURE RESET": frmSurfaceProps.Show
-    Case "BRUSH RESET": frmBrush.Show
-    Case "BRUSH RESTORE": frmBrush.Show
-    Case "BRUSH MIRROR": frmBrush.Show
-    Case "TEXBROWSE": frmSurfaceProps.Show
-    Case "ACTBROWSE": frmActorProperties.Show
+    Case "ACTOR SELECT ALL": PopupNext = 1
     End Select
 End Sub
 
@@ -70,37 +70,35 @@ Public Sub DoClick(ByVal Tool As String, ByRef UnrealEdApp As Object)
     Call Ed.Tools.Highlight(Tool, True)
     '
     Select Case (Tool)
-    Case "HELP": Call Ed.Tools.Handlers(Ed.MRUTool).DoHelp(Ed.MRUTool, Ed)
-    Case "TEXBROWSE":
-        If Ed.BrowserPos = 2 Then
-            Ed.BrowserPos = 0
-            frmMain.ResizeAll (True)
-        End If
-        Call Ed.SetBrowserTopic("Textures")
-    Case "ACTBROWSE":
-        Call Ed.SetBrowserTopic("Classes")
-    Case "BRUSH ADD SPECIAL": frmAddSpecial.Show
-    Case "TEXTURE RESET":
-        Ed.Server.Exec "POLY TEXPAN RESET"
-        Ed.Server.Exec "POLY TEXSCALE"
-        Ed.Server.Exec "POLY TEXALIGN DEFAULT"
-    Case "BRUSH RESET":
-        frmMain.PopupMenu frmPopups.ResetBrush
-    Case "BRUSH MIRROR":
-        frmMain.PopupMenu frmPopups.MirrorBrush
+    Case "HELP":
+        Call Ed.Tools.Handlers(Ed.MRUTool).DoHelp(Ed.MRUTool, Ed)
+    Case "BRUSH ADD SPECIAL":
+        frmAddSpecial.Show
+    Case "BRUSH ADDMOVER":
+        Ed.ServerExec "BRUSH ADDMOVER CLASS=" & Ed.CurrentClass
+    Case "ACTOR REPLACE": 'MWP
+        Ed.ServerExec "ACTOR REPLACE CLASS=" & Ed.CurrentClass 'MWP
     Case Else:
-        Ed.Server.Exec (Tool)
+        Ed.ServerExec (Tool)
     End Select
     '
     Select Case Tool
+    Case "ACTOR SELECT INSIDE": Call Ed.StatusText("Select Inside") 'MWP
+    Case "ACTOR SELECT INVERT": Call Ed.StatusText("Invert Selection") 'MWP
+    Case "ACTOR REPLACE BRUSH": Call Ed.StatusText("Replace Selected Brushes") 'MWP
+    Case "ACTOR REPLACE": Call Ed.StatusText("Replace Selected Actors") 'MWP
+    Case "ACTOR HIDE SELECTED": Call Ed.StatusText("Hide Selected Actors") 'MWP
+    Case "ACTOR HIDE UNSELECTED": Call Ed.StatusText("Drawing Region: Selected Actors") 'MWP
+    Case "ACTOR UNHIDE ALL": Call Ed.StatusText("Drawing Region: Off") 'MWP
+    Case "ACTOR CLIP Z": Call Ed.StatusText("Drawing Region: Clip Z") 'MWP
+    'Case "ACTOR CLIP XY": Call Ed.StatusText("Drawing Region: Clip XY") 'MWP:XXX
+    'Case "ACTOR CLIP XYZ": Call Ed.StatusText("Drawing Region: Clip XYZ") 'MWP:XXX
     Case "ACTOR SELECT ALL": Call Ed.StatusText("Select All Actors")
     Case "POLY SELECT ALL": Call Ed.StatusText("Select All Textures")
     Case "SELECT ALL": Call Ed.StatusText("Select All")
     Case "SELECT NONE": Call Ed.StatusText("Select None")
     Case "TRANSACTION UNDO": Call Ed.StatusText("Undo")
     Case "TRANSACTION REDO": Call Ed.StatusText("Redo")
-    Case "TEXTURE RESET": Call Ed.StatusText("Reset Textures")
-    Case "BRUSH RESET": Call Ed.StatusText("Reset Brush")
     Case "BRUSH ADD": Call Ed.StatusText("Add Brush To World")
     Case "BRUSH SUBTRACT": Call Ed.StatusText("Subtract Brush From World")
     Case "BRUSH FROM INTERSECTION": Call Ed.StatusText("Intersect Brush With World")
@@ -118,8 +116,18 @@ Property Get HiPic(ByVal Tool As String) As Object
     Dim V As Integer
     '
     Select Case (Tool)
+    Case "ACTOR SELECT INSIDE": V = 64 'MWP
+    Case "ACTOR SELECT INVERT": V = 65 'MWP
+    Case "ACTOR REPLACE BRUSH": V = 72 'MWP
+    Case "ACTOR REPLACE": V = 73 'MWP
+    Case "ACTOR HIDE SELECTED": V = 74 'MWP
+    Case "ACTOR HIDE UNSELECTED": V = 66 'MWP
+    Case "ACTOR UNHIDE ALL": V = 67 'MWP
+    Case "ACTOR CLIP Z": V = 68 'MWP
+    'Case "ACTOR CLIP XY": V = 69 'MWP:XXX
+    'Case "ACTOR CLIP XYZ": V = 70 'MWP:XXX
     Case "POLY SELECT ALL": V = 8
-    Case "ACTOR SELECT ALL": V = 9
+    Case "ACTOR SELECT ALL": V = 11 'MWP
     Case "SELECT NONE": V = 10
     Case "SELECT ALL": V = 11
     Case "TRANSACTION UNDO": V = 38
@@ -132,14 +140,9 @@ Property Get HiPic(ByVal Tool As String) As Object
     Case "BRUSH FROM HULL": V = 46
     Case "BRUSH FROM INTERIOR": V = 45
     Case "BRUSH RESTORE": V = 44
-    Case "BRUSH MIRROR": V = 28
     Case "BRUSH ADDMOVER": V = 62
-    Case "TEXTURE RESET": V = 20
-    Case "BRUSH RESET": V = 21
     Case "HELP": V = 37
     Case "TOOLS": V = 22
-    Case "TEXBROWSE": V = 58
-    Case "ACTBROWSE": V = 59
     End Select
     '
     Set HiPic = frmMain.HiPics.GraphicCell(V)
@@ -149,8 +152,18 @@ Property Get Pic(ByVal Tool As String) As Object
     Dim V As Integer
     '
     Select Case (Tool)
+    Case "ACTOR SELECT INSIDE": V = 64 'MWP
+    Case "ACTOR SELECT INVERT": V = 65 'MWP
+    Case "ACTOR REPLACE BRUSH": V = 72 'MWP
+    Case "ACTOR REPLACE": V = 73 'MWP
+    Case "ACTOR HIDE SELECTED": V = 74 'MWP
+    Case "ACTOR HIDE UNSELECTED": V = 66 'MWP
+    Case "ACTOR UNHIDE ALL": V = 67 'MWP
+    Case "ACTOR CLIP Z": V = 68 'MWP
+    'Case "ACTOR CLIP XY": V = 69 'MWP:XXX
+    'Case "ACTOR CLIP XYZ": V = 70 'MWP:XXX
     Case "POLY SELECT ALL": V = 8
-    Case "ACTOR SELECT ALL": V = 9
+    Case "ACTOR SELECT ALL": V = 11 'MWP
     Case "SELECT NONE": V = 10
     Case "SELECT ALL": V = 11
     Case "TRANSACTION UNDO": V = 38
@@ -163,28 +176,31 @@ Property Get Pic(ByVal Tool As String) As Object
     Case "BRUSH FROM HULL": V = 46
     Case "BRUSH FROM INTERIOR": V = 45
     Case "BRUSH RESTORE": V = 44
-    Case "BRUSH MIRROR": V = 28
     Case "BRUSH ADDMOVER": V = 62
-    Case "TEXTURE RESET": V = 20
-    Case "BRUSH RESET": V = 21
     Case "HELP": V = 37
     Case "TOOLS": V = 22
-    Case "TEXBROWSE": V = 58
-    Case "ACTBROWSE": V = 59
     End Select
     '
     Set Pic = frmMain.Pics.GraphicCell(V)
 End Property
 
 Public Sub InitTools(UnrealEdApp As UnrealEdApp)
+    Call UnrealEdApp.Tools.Register(Me, "ACTOR SELECT INSIDE", "Select actors inside brush", "") 'MWP
+    Call UnrealEdApp.Tools.Register(Me, "ACTOR SELECT INVERT", "Invert actor selection state", "") 'MWP
+    Call UnrealEdApp.Tools.Register(Me, "ACTOR REPLACE BRUSH", "Replace selected brushes", "") 'MWP
+    Call UnrealEdApp.Tools.Register(Me, "ACTOR REPLACE", "Replace selected non-brush actors", "")  'MWP
+    Call UnrealEdApp.Tools.Register(Me, "ACTOR HIDE SELECTED", "Hide Selected Actors", "") 'MWP
+    Call UnrealEdApp.Tools.Register(Me, "ACTOR HIDE UNSELECTED", "Drawing Region: Selected Actors", "") 'MWP
+    Call UnrealEdApp.Tools.Register(Me, "ACTOR UNHIDE ALL", "Drawing Region: Off", "") 'MWP
+    Call UnrealEdApp.Tools.Register(Me, "ACTOR CLIP Z", "Drawing Region: Brush Z (Depth)", "") 'MWP
+    'Call UnrealEdApp.Tools.Register(Me, "ACTOR CLIP XY", "Drawing Region: Brush XY", "") 'MWP
+    'Call UnrealEdApp.Tools.Register(Me, "ACTOR CLIP XYZ", "Drawing Region: Brush XYZ", "") 'MWP
     Call UnrealEdApp.Tools.Register(Me, "ACTOR SELECT ALL", "Select all actors", "")
     Call UnrealEdApp.Tools.Register(Me, "POLY SELECT ALL", "Select all polys", "")
     Call UnrealEdApp.Tools.Register(Me, "SELECT ALL", "Select all", "")
     Call UnrealEdApp.Tools.Register(Me, "SELECT NONE", "Select none", "")
     Call UnrealEdApp.Tools.Register(Me, "TRANSACTION UNDO", "Undo last operation", "")
     Call UnrealEdApp.Tools.Register(Me, "TRANSACTION REDO", "Redo operation", "")
-    Call UnrealEdApp.Tools.Register(Me, "TEXTURE RESET", "Reset textures", "Surface properties...")
-    Call UnrealEdApp.Tools.Register(Me, "BRUSH RESET", "Reset brush", "Resize/move brush...")
     Call UnrealEdApp.Tools.Register(Me, "BRUSH ADD", "Add brush to world", "")
     Call UnrealEdApp.Tools.Register(Me, "BRUSH SUBTRACT", "Subtract brush from world", "")
     Call UnrealEdApp.Tools.Register(Me, "BRUSH FROM INTERSECTION", "Brush intersection", "")
@@ -193,10 +209,7 @@ Public Sub InitTools(UnrealEdApp As UnrealEdApp)
     Call UnrealEdApp.Tools.Register(Me, "BRUSH FROM HULL", "Brush hull", "")
     Call UnrealEdApp.Tools.Register(Me, "BRUSH FROM INTERIOR", "Brush interior", "")
     Call UnrealEdApp.Tools.Register(Me, "BRUSH RESTORE", "Restore brush", "Resize/move brush...")
-    Call UnrealEdApp.Tools.Register(Me, "BRUSH MIRROR", "Mirror brush", "Resize/move brush...")
     Call UnrealEdApp.Tools.Register(Me, "BRUSH ADDMOVER", "Add movable brush", "")
-    Call UnrealEdApp.Tools.Register(Me, "TEXBROWSE", "Texture browser", "Surface properties...")
-    Call UnrealEdApp.Tools.Register(Me, "ACTBROWSE", "Actor Class browser", "Actor properties...")
     Call UnrealEdApp.Tools.Register(Me, "HELP", "Get Help", "")
     Call UnrealEdApp.Tools.Register(Me, "TOOLS", "Add-On Tools", "")
 End Sub

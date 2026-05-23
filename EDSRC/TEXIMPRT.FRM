@@ -2,7 +2,7 @@ VERSION 5.00
 Begin VB.Form frmTexImport 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Import Texture"
-   ClientHeight    =   3135
+   ClientHeight    =   3375
    ClientLeft      =   2295
    ClientTop       =   3015
    ClientWidth     =   4920
@@ -22,7 +22,7 @@ Begin VB.Form frmTexImport
    MaxButton       =   0   'False
    MinButton       =   0   'False
    PaletteMode     =   1  'UseZOrder
-   ScaleHeight     =   3135
+   ScaleHeight     =   3375
    ScaleWidth      =   4920
    ShowInTaskbar   =   0   'False
    Begin VB.CommandButton OkAll 
@@ -37,9 +37,9 @@ Begin VB.Form frmTexImport
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   1260
+      Left            =   1320
       TabIndex        =   2
-      Top             =   2700
+      Top             =   2940
       Width           =   1215
    End
    Begin VB.Frame Frame2 
@@ -56,7 +56,7 @@ Begin VB.Form frmTexImport
       Height          =   975
       Left            =   60
       TabIndex        =   13
-      Top             =   1620
+      Top             =   1860
       Width           =   4755
       Begin VB.CheckBox Blur 
          Caption         =   "Blur the texture"
@@ -131,7 +131,7 @@ Begin VB.Form frmTexImport
       End
    End
    Begin VB.Frame Frame1 
-      Caption         =   "Name"
+      Caption         =   "Texture"
       BeginProperty Font 
          Name            =   "Arial"
          Size            =   11.25
@@ -141,11 +141,30 @@ Begin VB.Form frmTexImport
          Italic          =   -1  'True
          Strikethrough   =   0   'False
       EndProperty
-      Height          =   1455
+      Height          =   1695
       Left            =   60
       TabIndex        =   8
       Top             =   120
       Width           =   4755
+      Begin VB.TextBox TexGroup 
+         BackColor       =   &H00FFFFFF&
+         BeginProperty Font 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         Height          =   285
+         Left            =   1320
+         MaxLength       =   15
+         TabIndex        =   16
+         Text            =   "TexGroup"
+         Top             =   900
+         Width           =   2295
+      End
       Begin VB.TextBox TexName 
          BackColor       =   &H00FFFFFF&
          BeginProperty Font 
@@ -158,12 +177,12 @@ Begin VB.Form frmTexImport
             Strikethrough   =   0   'False
          EndProperty
          Height          =   285
-         Left            =   2040
+         Left            =   1320
          MaxLength       =   15
          TabIndex        =   7
          Text            =   "TexName"
-         Top             =   660
-         Width           =   2415
+         Top             =   540
+         Width           =   2295
       End
       Begin VB.TextBox TexSet 
          BackColor       =   &H00FFFFFF&
@@ -177,12 +196,30 @@ Begin VB.Form frmTexImport
             Strikethrough   =   0   'False
          EndProperty
          Height          =   285
-         Left            =   2040
+         Left            =   1320
          MaxLength       =   15
          TabIndex        =   0
          Text            =   "TexFamily"
-         Top             =   1020
-         Width           =   2415
+         Top             =   1260
+         Width           =   2295
+      End
+      Begin VB.Label Label2 
+         Alignment       =   1  'Right Justify
+         Caption         =   "Group:"
+         BeginProperty Font 
+            Name            =   "MS Sans Serif"
+            Size            =   8.25
+            Charset         =   0
+            Weight          =   400
+            Underline       =   0   'False
+            Italic          =   0   'False
+            Strikethrough   =   0   'False
+         EndProperty
+         Height          =   255
+         Left            =   180
+         TabIndex        =   17
+         Top             =   900
+         Width           =   975
       End
       Begin VB.Label Label1 
          Alignment       =   1  'Right Justify
@@ -200,7 +237,7 @@ Begin VB.Form frmTexImport
          Left            =   120
          TabIndex        =   12
          Top             =   300
-         Width           =   735
+         Width           =   975
       End
       Begin VB.Label Fname 
          Caption         =   "Fname"
@@ -214,14 +251,14 @@ Begin VB.Form frmTexImport
             Strikethrough   =   0   'False
          EndProperty
          Height          =   255
-         Left            =   960
+         Left            =   1320
          TabIndex        =   11
          Top             =   300
-         Width           =   3495
+         Width           =   3315
       End
       Begin VB.Label Label3 
          Alignment       =   1  'Right Justify
-         Caption         =   "Texture Name:"
+         Caption         =   "Name:"
          BeginProperty Font 
             Name            =   "MS Sans Serif"
             Size            =   8.25
@@ -232,14 +269,14 @@ Begin VB.Form frmTexImport
             Strikethrough   =   0   'False
          EndProperty
          Height          =   255
-         Left            =   600
+         Left            =   60
          TabIndex        =   10
-         Top             =   660
-         Width           =   1335
+         Top             =   600
+         Width           =   1095
       End
       Begin VB.Label Label4 
          Alignment       =   1  'Right Justify
-         Caption         =   "Texture Set:"
+         Caption         =   "Package:"
          BeginProperty Font 
             Name            =   "MS Sans Serif"
             Size            =   8.25
@@ -250,10 +287,10 @@ Begin VB.Form frmTexImport
             Strikethrough   =   0   'False
          EndProperty
          Height          =   255
-         Left            =   480
+         Left            =   180
          TabIndex        =   9
-         Top             =   1020
-         Width           =   1455
+         Top             =   1260
+         Width           =   975
       End
    End
    Begin VB.CommandButton Command1 
@@ -269,9 +306,9 @@ Begin VB.Form frmTexImport
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   2580
+      Left            =   2640
       TabIndex        =   3
-      Top             =   2700
+      Top             =   2940
       Width           =   1095
    End
    Begin VB.CommandButton OK 
@@ -288,9 +325,9 @@ Begin VB.Form frmTexImport
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   60
+      Left            =   120
       TabIndex        =   1
-      Top             =   2700
+      Top             =   2940
       Width           =   1095
    End
    Begin VB.CommandButton Cancel 
@@ -307,9 +344,9 @@ Begin VB.Form frmTexImport
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   3720
+      Left            =   3780
       TabIndex        =   4
-      Top             =   2700
+      Top             =   2940
       Width           =   1095
    End
 End
@@ -377,9 +414,10 @@ Private Sub Ok_Click()
         If BumpMap.Value Then TexFlags = TexFlags + TF_BumpMap
         If Blur.Value Then TexFlags = TexFlags + TF_Blur
         Ed.BeginSlowTask "Importing Texture"
-        Ed.Server.Exec "TEXTURE IMPORT FILE=" & Quotes(TexFname) & _
+        Ed.ServerExec "TEXTURE IMPORT FILE=" & Quotes(TexFname) & _
             " NAME=" & Quotes(TexName) & _
-            " Set=" & Quotes(TexSet) & _
+            " PACKAGE=" & Quotes(TexSet) & _
+            " GROUP=" & Quotes(TexGroup) & _
             " MIPS=" & OnOff(Int(DoMips.Value)) & _
             " FLAGS=" & Trim(Str(IIf(DoMasked.Value, PF_MASKED, 0))) & _
             " TEXFLAGS=" & Trim(Str(TexFlags))

@@ -1,0 +1,15 @@
+[TopDir]
+SubDir0=System
+SubDir1=Help
+
+[System]
+file0=F:\Unreal\System\UnrealEd.exe
+fulldirectory=
+
+[General]
+Type=FILELIST
+Version=1.00.000
+
+[Help]
+fulldirectory=
+

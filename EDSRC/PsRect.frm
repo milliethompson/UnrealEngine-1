@@ -502,7 +502,7 @@ Private Sub Build_Click()
         Call MakeSymRectYZ(12, 4, -1, -HBreadth, HWidth, HHeight, Group, "WALL")
     End If
     '
-    Call SendBrush(Ed.Server)
+    Call SendBrush(0)
     Call Ed.StatusText("Built a Cube")
 End Sub
 

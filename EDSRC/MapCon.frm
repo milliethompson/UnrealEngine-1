@@ -1,5 +1,4 @@
 VERSION 5.00
-Object = "{0BA686C6-F7D3-101A-993E-0000C0EF6F5E}#1.0#0"; "THREED32.OCX"
 Begin VB.Form frmMapToolbar 
    BorderStyle     =   4  'Fixed ToolWindow
    Caption         =   "Map Toolbar"
@@ -40,7 +39,7 @@ Begin VB.Form frmMapToolbar
       EndProperty
       Height          =   3135
       Left            =   3240
-      TabIndex        =   21
+      TabIndex        =   16
       Top             =   120
       Width           =   1695
       Begin VB.Frame Frame5 
@@ -56,8 +55,8 @@ Begin VB.Form frmMapToolbar
          EndProperty
          Height          =   1095
          Left            =   120
-         TabIndex        =   33
-         Top             =   1200
+         TabIndex        =   19
+         Top             =   360
          Width           =   1455
          Begin VB.CommandButton SetStat 
             Caption         =   "Set"
@@ -72,7 +71,7 @@ Begin VB.Form frmMapToolbar
             EndProperty
             Height          =   255
             Left            =   840
-            TabIndex        =   37
+            TabIndex        =   23
             Tag             =   "Set type of selected brushes"
             Top             =   240
             Width           =   495
@@ -90,7 +89,7 @@ Begin VB.Form frmMapToolbar
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   36
+            TabIndex        =   22
             Top             =   720
             Width           =   1095
          End
@@ -107,7 +106,7 @@ Begin VB.Form frmMapToolbar
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   35
+            TabIndex        =   21
             Top             =   480
             Width           =   1095
          End
@@ -124,7 +123,7 @@ Begin VB.Form frmMapToolbar
             EndProperty
             Height          =   255
             Left            =   120
-            TabIndex        =   34
+            TabIndex        =   20
             Top             =   240
             Value           =   -1  'True
             Width           =   975
@@ -142,8 +141,8 @@ Begin VB.Form frmMapToolbar
          EndProperty
          Height          =   315
          Left            =   120
-         TabIndex        =   23
-         Top             =   2760
+         TabIndex        =   18
+         Top             =   1920
          Width           =   1455
       End
       Begin VB.CommandButton SetGrpName 
@@ -159,227 +158,10 @@ Begin VB.Form frmMapToolbar
          EndProperty
          Height          =   300
          Left            =   120
-         TabIndex        =   22
+         TabIndex        =   17
          Tag             =   "Set group name of selected brushes"
-         Top             =   2400
+         Top             =   1560
          Width           =   1455
-      End
-      Begin Threed.SSCommand SSCommand1 
-         Height          =   495
-         Left            =   1320
-         TabIndex        =   38
-         Tag             =   "Reset wireframe color to default"
-         Top             =   600
-         Width           =   255
-         _Version        =   65536
-         _ExtentX        =   450
-         _ExtentY        =   873
-         _StockProps     =   78
-         Caption         =   "X"
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-      End
-      Begin Threed.SSCommand C0 
-         Height          =   255
-         Left            =   240
-         TabIndex        =   32
-         Top             =   600
-         Width           =   255
-         _Version        =   65536
-         _ExtentX        =   450
-         _ExtentY        =   450
-         _StockProps     =   78
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   700
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         Picture         =   "MapCon.frx":030A
-      End
-      Begin Threed.SSCommand C7 
-         Height          =   255
-         Left            =   960
-         TabIndex        =   31
-         Top             =   840
-         Width           =   255
-         _Version        =   65536
-         _ExtentX        =   450
-         _ExtentY        =   450
-         _StockProps     =   78
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   700
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         Picture         =   "MapCon.frx":095C
-      End
-      Begin Threed.SSCommand C6 
-         Height          =   255
-         Left            =   720
-         TabIndex        =   30
-         Top             =   840
-         Width           =   255
-         _Version        =   65536
-         _ExtentX        =   450
-         _ExtentY        =   450
-         _StockProps     =   78
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   700
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         Picture         =   "MapCon.frx":0FAE
-      End
-      Begin Threed.SSCommand C5 
-         Height          =   255
-         Left            =   480
-         TabIndex        =   29
-         Top             =   840
-         Width           =   255
-         _Version        =   65536
-         _ExtentX        =   450
-         _ExtentY        =   450
-         _StockProps     =   78
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   700
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         Picture         =   "MapCon.frx":1600
-      End
-      Begin Threed.SSCommand C4 
-         Height          =   255
-         Left            =   240
-         TabIndex        =   28
-         Top             =   840
-         Width           =   255
-         _Version        =   65536
-         _ExtentX        =   450
-         _ExtentY        =   450
-         _StockProps     =   78
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   700
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         Picture         =   "MapCon.frx":1C52
-      End
-      Begin Threed.SSCommand C3 
-         Height          =   255
-         Left            =   960
-         TabIndex        =   27
-         Top             =   600
-         Width           =   255
-         _Version        =   65536
-         _ExtentX        =   450
-         _ExtentY        =   450
-         _StockProps     =   78
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   700
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         Picture         =   "MapCon.frx":22A4
-      End
-      Begin Threed.SSCommand C2 
-         Height          =   255
-         Left            =   720
-         TabIndex        =   26
-         Top             =   600
-         Width           =   255
-         _Version        =   65536
-         _ExtentX        =   450
-         _ExtentY        =   450
-         _StockProps     =   78
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   700
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         Picture         =   "MapCon.frx":28F6
-      End
-      Begin Threed.SSCommand C1 
-         Height          =   255
-         Left            =   480
-         TabIndex        =   25
-         Top             =   600
-         Width           =   255
-         _Version        =   65536
-         _ExtentX        =   450
-         _ExtentY        =   450
-         _StockProps     =   78
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   700
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         Picture         =   "MapCon.frx":2F48
-      End
-      Begin VB.Label Label3 
-         BackStyle       =   0  'Transparent
-         Caption         =   "Wireframe Color:"
-         BeginProperty Font 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         Height          =   255
-         Left            =   120
-         TabIndex        =   24
-         Top             =   360
-         Width           =   1335
       End
    End
    Begin VB.CommandButton Expand 
@@ -395,46 +177,10 @@ Begin VB.Form frmMapToolbar
       EndProperty
       Height          =   255
       Left            =   2880
-      TabIndex        =   20
+      TabIndex        =   15
       Tag             =   "See more options"
       Top             =   3000
       Width           =   255
-   End
-   Begin VB.CommandButton Help 
-      Caption         =   "&Help"
-      BeginProperty Font 
-         Name            =   "MS Sans Serif"
-         Size            =   8.25
-         Charset         =   0
-         Weight          =   400
-         Underline       =   0   'False
-         Italic          =   0   'False
-         Strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   2280
-      TabIndex        =   19
-      Tag             =   "Get help"
-      Top             =   3000
-      Width           =   495
-   End
-   Begin VB.CommandButton Done 
-      Caption         =   "&Done"
-      BeginProperty Font 
-         Name            =   "MS Sans Serif"
-         Size            =   8.25
-         Charset         =   0
-         Weight          =   400
-         Underline       =   0   'False
-         Italic          =   0   'False
-         Strikethrough   =   0   'False
-      EndProperty
-      Height          =   255
-      Left            =   1560
-      TabIndex        =   18
-      Tag             =   "Finish map-edit mode"
-      Top             =   3000
-      Width           =   615
    End
    Begin VB.Frame Frame1 
       Caption         =   "Copy"
@@ -506,7 +252,7 @@ Begin VB.Form frmMapToolbar
       EndProperty
       Height          =   975
       Left            =   120
-      TabIndex        =   13
+      TabIndex        =   11
       Top             =   120
       Width           =   1335
       Begin VB.CommandButton MapDupe 
@@ -524,7 +270,7 @@ Begin VB.Form frmMapToolbar
          EndProperty
          Height          =   255
          Left            =   120
-         TabIndex        =   15
+         TabIndex        =   13
          Tag             =   "Duplicates selected brushes"
          Top             =   600
          Width           =   1095
@@ -544,7 +290,7 @@ Begin VB.Form frmMapToolbar
          EndProperty
          Height          =   255
          Left            =   120
-         TabIndex        =   14
+         TabIndex        =   12
          Tag             =   "Deletes selected brushes"
          Top             =   360
          Width           =   1095
@@ -581,7 +327,7 @@ Begin VB.Form frmMapToolbar
          EndProperty
          Height          =   255
          Left            =   120
-         TabIndex        =   40
+         TabIndex        =   25
          Tag             =   "Select all non-solid brushes"
          Top             =   2400
          Width           =   1335
@@ -601,90 +347,10 @@ Begin VB.Form frmMapToolbar
          EndProperty
          Height          =   255
          Left            =   120
-         TabIndex        =   39
+         TabIndex        =   24
          Tag             =   "Select all semi-solid brushes"
          Top             =   2160
          Width           =   1335
-      End
-      Begin VB.CommandButton MapSelectNext 
-         Appearance      =   0  'Flat
-         BackColor       =   &H80000005&
-         Caption         =   "Next"
-         BeginProperty Font 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         Height          =   255
-         Left            =   120
-         TabIndex        =   10
-         Tag             =   "Select the next brush"
-         Top             =   1200
-         Width           =   1335
-      End
-      Begin VB.CommandButton MapSelectPrevious 
-         Appearance      =   0  'Flat
-         BackColor       =   &H80000005&
-         Caption         =   "Previous"
-         BeginProperty Font 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         Height          =   255
-         Left            =   120
-         TabIndex        =   12
-         Tag             =   "Select the previous brush"
-         Top             =   960
-         Width           =   1335
-      End
-      Begin VB.CommandButton MapSelectLast 
-         Appearance      =   0  'Flat
-         BackColor       =   &H80000005&
-         Caption         =   "Last"
-         BeginProperty Font 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         Height          =   255
-         Left            =   840
-         TabIndex        =   17
-         Tag             =   "Select the last-added brush"
-         Top             =   600
-         Width           =   615
-      End
-      Begin VB.CommandButton MapSelectFirst 
-         Appearance      =   0  'Flat
-         BackColor       =   &H80000005&
-         Caption         =   "First"
-         BeginProperty Font 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         Height          =   255
-         Left            =   840
-         TabIndex        =   16
-         Tag             =   "Select the first-added brush"
-         Top             =   360
-         Width           =   615
       End
       Begin VB.CommandButton MapSelectSubtracts 
          Appearance      =   0  'Flat
@@ -701,7 +367,7 @@ Begin VB.Form frmMapToolbar
          EndProperty
          Height          =   255
          Left            =   120
-         TabIndex        =   11
+         TabIndex        =   10
          Tag             =   "Select all subtractive brushes"
          Top             =   1920
          Width           =   1335
@@ -744,7 +410,7 @@ Begin VB.Form frmMapToolbar
          TabIndex        =   9
          Tag             =   "Unselect all brushes"
          Top             =   600
-         Width           =   615
+         Width           =   1335
       End
       Begin VB.CommandButton MapSelectAll 
          Appearance      =   0  'Flat
@@ -764,7 +430,7 @@ Begin VB.Form frmMapToolbar
          TabIndex        =   7
          Tag             =   "Select all brushes"
          Top             =   360
-         Width           =   615
+         Width           =   1335
       End
    End
    Begin VB.Frame Frame2 
@@ -824,6 +490,42 @@ Begin VB.Form frmMapToolbar
          Width           =   1095
       End
    End
+   Begin VB.CommandButton Command1 
+      Caption         =   "&Rebuild"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   2160
+      TabIndex        =   26
+      Tag             =   "Finish map-edit mode"
+      Top             =   3000
+      Width           =   735
+   End
+   Begin VB.CommandButton Done 
+      Caption         =   "&Close"
+      BeginProperty Font 
+         Name            =   "MS Sans Serif"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      Height          =   255
+      Left            =   1560
+      TabIndex        =   14
+      Tag             =   "Finish map-edit mode"
+      Top             =   3000
+      Width           =   615
+   End
 End
 Attribute VB_Name = "frmMapToolbar"
 Attribute VB_GlobalNameSpace = False
@@ -832,8 +534,8 @@ Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 
-Private Sub Done_Click()
-    Call Ed.Tools.Click("MAPEDIT")
+Private Sub Command1_Click()
+    frmRebuilder.Show
 End Sub
 
 Private Sub Help_Click()
@@ -879,11 +581,11 @@ Private Sub MapCopyToBrush_Click()
 End Sub
 
 Private Sub MapDel_Click()
-    Ed.Server.Exec "MAP DELETE"
+    Ed.Server.Exec "ACTOR DELETE"
 End Sub
 
 Private Sub MapDupe_Click()
-    Ed.Server.Exec "MAP DUPLICATE"
+    Ed.Server.Exec "ACTOR DUPLICATE"
 End Sub
 
 Private Sub MapOrderToBack_Click()
@@ -899,7 +601,7 @@ Private Sub MapSelectAdds_Click()
 End Sub
 
 Private Sub MapSelectAll_Click()
-    Ed.Server.Exec "MAP SELECT ALL"
+    Ed.Server.Exec "ACTOR SELECT ALL"
 End Sub
 
 Private Sub MapSelectFirst_Click()
@@ -915,7 +617,7 @@ Private Sub MapSelectNext_Click()
 End Sub
 
 Private Sub MapSelectNone_Click()
-    Ed.Server.Exec "MAP SELECT NONE"
+    Ed.Server.Exec "ACTOR SELECT NONE"
 End Sub
 
 Private Sub MapSelectNons_Click()
@@ -938,44 +640,8 @@ Private Sub SetGrpName_Click()
     Ed.Server.Exec "MAP SETBRUSH GROUP=" & GrpName.Text
 End Sub
 
-Private Sub C0_Click()
-    Ed.Server.Exec "MAP SETBRUSH COLOR=0"
-End Sub
-
-Private Sub C1_Click()
-    Ed.Server.Exec "MAP SETBRUSH COLOR=1"
-End Sub
-
-Private Sub C2_Click()
-    Ed.Server.Exec "MAP SETBRUSH COLOR=2"
-End Sub
-
-Private Sub C3_Click()
-    Ed.Server.Exec "MAP SETBRUSH COLOR=3"
-End Sub
-
-Private Sub C4_Click()
-    Ed.Server.Exec "MAP SETBRUSH COLOR=4"
-End Sub
-
-Private Sub C5_Click()
-    Ed.Server.Exec "MAP SETBRUSH COLOR=5"
-End Sub
-
-Private Sub C6_Click()
-    Ed.Server.Exec "MAP SETBRUSH COLOR=6"
-End Sub
-
-Private Sub C7_Click()
-    Ed.Server.Exec "MAP SETBRUSH COLOR=7"
-End Sub
-
-Private Sub SSCommand1_Click()
-    Ed.Server.Exec "MAP SETBRUSH COLOR=65535"
-End Sub
-
 Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
 End Sub
 
-
+        

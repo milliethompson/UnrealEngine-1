@@ -1,0 +1,9 @@
+[TopDir]
+file0=F:\Unreal\Install\Root\Autorun.inf
+file1=F:\Unreal\Install\Root\msvcrt.dll
+file2=F:\Unreal\Install\Root\_isauto.exe
+
+[General]
+Type=FILELIST
+Version=1.00.000
+

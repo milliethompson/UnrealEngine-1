@@ -348,8 +348,7 @@ Dim ct As Integer
     Next ct
 
     Brush.NumPolys = N
-    Call SendBrush(Ed.Server, 0)
+    Call SendBrush(0)
 
 End Sub
-
 

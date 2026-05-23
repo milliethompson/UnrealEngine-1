@@ -2,17 +2,17 @@ VERSION 5.00
 Begin VB.Form frmPopups2 
    BorderStyle     =   1  'Fixed Single
    Caption         =   "frmMorePopups"
-   ClientHeight    =   3975
+   ClientHeight    =   45
    ClientLeft      =   5460
    ClientTop       =   3390
-   ClientWidth     =   6690
+   ClientWidth     =   3390
    Icon            =   "Popups2.frx":0000
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
    PaletteMode     =   1  'UseZOrder
-   ScaleHeight     =   3975
-   ScaleWidth      =   6690
+   ScaleHeight     =   45
+   ScaleWidth      =   3390
    Begin VB.Menu ClassBrowser 
       Caption         =   "ClassBrowser"
       Begin VB.Menu ClassEditScript 
@@ -40,7 +40,7 @@ Begin VB.Form frmPopups2
    Begin VB.Menu ActorRtClick 
       Caption         =   "ActorRtClick"
       Begin VB.Menu arProps 
-         Caption         =   "Actor &Properties (3 selected)..."
+         Caption         =   "Actor &Properties (3 selected)"
       End
       Begin VB.Menu arMoverKeyframe 
          Caption         =   "Mover &Keyframe"
@@ -56,44 +56,107 @@ Begin VB.Form frmPopups2
          Begin VB.Menu arKey3 
             Caption         =   "Key &3"
          End
-      End
-      Begin VB.Menu arScriptMenu 
-         Caption         =   "S&cript"
-         Begin VB.Menu arScriptEdit 
-            Caption         =   "&Edit script..."
+         Begin VB.Menu arKey4 
+            Caption         =   "Key &4"
          End
-         Begin VB.Menu arScriptSubclass 
-            Caption         =   "&Subclass and edit new script..."
+         Begin VB.Menu arKey5 
+            Caption         =   "Key &5"
+         End
+         Begin VB.Menu arKey6 
+            Caption         =   "Key &6"
+         End
+         Begin VB.Menu arKey7 
+            Caption         =   "Key &7"
+         End
+      End
+      Begin VB.Menu ResetActor 
+         Caption         =   "&Reset"
+         Begin VB.Menu MoveToOrigin 
+            Caption         =   "&Move to origin"
+         End
+         Begin VB.Menu ResetRotation 
+            Caption         =   "Reset &rotation"
+         End
+         Begin VB.Menu ResetScaling 
+            Caption         =   "Reset &scaling"
+         End
+         Begin VB.Menu ResetAllPositioning 
+            Caption         =   "Reset &all positioning"
+         End
+      End
+      Begin VB.Menu Mirror 
+         Caption         =   "&Transform"
+         Begin VB.Menu MirrorX 
+            Caption         =   "Mirror about &X"
+         End
+         Begin VB.Menu MirrorY 
+            Caption         =   "Mirror about &Y"
+         End
+         Begin VB.Menu MirrorZ 
+            Caption         =   "Mirror about &Z (vertical)"
+         End
+         Begin VB.Menu Perm 
+            Caption         =   "&Transform permanently"
+         End
+      End
+      Begin VB.Menu Order 
+         Caption         =   "&Order"
+         Begin VB.Menu ToFirst 
+            Caption         =   "To &first"
+         End
+         Begin VB.Menu ToLast 
+            Caption         =   "To &last"
+         End
+      End
+      Begin VB.Menu CopyPolygons 
+         Caption         =   "&Copy polygons"
+         Begin VB.Menu ToBrush 
+            Caption         =   "&To brush"
+         End
+         Begin VB.Menu FromBrush 
+            Caption         =   "&From brush"
+         End
+      End
+      Begin VB.Menu Solidity 
+         Caption         =   "&Solidity"
+         Begin VB.Menu MakeSolid 
+            Caption         =   "Make Solid"
+         End
+         Begin VB.Menu MakeSemisolid 
+            Caption         =   "Make Semisolid"
+         End
+         Begin VB.Menu MakeNonsolid 
+            Caption         =   "Make Nonsolid"
          End
       End
       Begin VB.Menu ZACTA 
          Caption         =   "-"
       End
-      Begin VB.Menu arSelNone 
-         Caption         =   "Select &None"
-      End
       Begin VB.Menu arSelectAllOfType 
          Caption         =   "&Select all <type> actors"
       End
-      Begin VB.Menu arRememberClass 
-         Caption         =   "&Make this the current class"
+      Begin VB.Menu arSelAll 
+         Caption         =   "Select &all"
+      End
+      Begin VB.Menu arSelectNone 
+         Caption         =   "Select &none"
+      End
+      Begin VB.Menu SelectBrushes 
+         Caption         =   "Select &brushes"
+         Begin VB.Menu SelectAdds 
+            Caption         =   "&Adds"
+         End
+         Begin VB.Menu SelectSubtracts 
+            Caption         =   "&Subtracts"
+         End
+         Begin VB.Menu SelectSemisolids 
+            Caption         =   "S&emisolids"
+         End
+         Begin VB.Menu SelectNonsolids 
+            Caption         =   "&Nonsolids"
+         End
       End
       Begin VB.Menu ZARA 
-         Caption         =   "-"
-      End
-      Begin VB.Menu arFloor 
-         Caption         =   "Place on &Floor"
-      End
-      Begin VB.Menu arCeiling 
-         Caption         =   "&Place on Ceiling"
-      End
-      Begin VB.Menu arFloorAbove 
-         Caption         =   "Floor &Above"
-      End
-      Begin VB.Menu arBelow 
-         Caption         =   "Floor &Below"
-      End
-      Begin VB.Menu ZPIFFY 
          Caption         =   "-"
       End
       Begin VB.Menu arDuplicate 
@@ -102,11 +165,23 @@ Begin VB.Form frmPopups2
       Begin VB.Menu arDelete 
          Caption         =   "&Delete"
       End
+      Begin VB.Menu arScriptEdit 
+         Caption         =   "&Edit script"
+      End
    End
    Begin VB.Menu PolyRtClick 
       Caption         =   "PolyRtClick"
       Begin VB.Menu prProperties 
          Caption         =   "&Surface Properties (1 Selected)..."
+      End
+      Begin VB.Menu MXUJE 
+         Caption         =   "-"
+      End
+      Begin VB.Menu AddClassHere 
+         Caption         =   "&Add <class> here"
+      End
+      Begin VB.Menu AddLightHere 
+         Caption         =   "Add &Light here"
       End
       Begin VB.Menu ZORROW 
          Caption         =   "-"
@@ -134,6 +209,9 @@ Begin VB.Form frmPopups2
          Begin VB.Menu paUnalign 
             Caption         =   "&Unalign back to default"
          End
+      End
+      Begin VB.Menu SurfReset 
+         Caption         =   "&Reset"
       End
       Begin VB.Menu ZFG 
          Caption         =   "-"
@@ -195,8 +273,11 @@ Begin VB.Form frmPopups2
             Caption         =   "&Xor with memory (Shift-X)"
          End
       End
+      Begin VB.Menu poSelectAll 
+         Caption         =   "Select &all"
+      End
       Begin VB.Menu prSelectNone 
-         Caption         =   "Select &None"
+         Caption         =   "Select &none"
       End
       Begin VB.Menu ZOUST 
          Caption         =   "-"
@@ -212,6 +293,40 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
+
+Private Sub AddClassHere_Click()
+    Ed.ServerExec "ACTOR ADD CLASS=" & Ed.CurrentClass
+    Ed.ServerExec "POLY SELECT NONE"
+End Sub
+
+Private Sub AddLightHere_Click()
+    Ed.ServerExec "ACTOR ADD CLASS=LIGHT"
+    Ed.ServerExec "POLY SELECT NONE"
+End Sub
+
+Private Sub arKey4_Click()
+    Ed.ServerExec "ACTOR KEYFRAME NUM=4"
+End Sub
+
+Private Sub arKey5_Click()
+    Ed.ServerExec "ACTOR KEYFRAME NUM=5"
+End Sub
+
+Private Sub arKey6_Click()
+    Ed.ServerExec "ACTOR KEYFRAME NUM=6"
+End Sub
+
+Private Sub arKey7_Click()
+    Ed.ServerExec "ACTOR KEYFRAME NUM=7"
+End Sub
+
+Private Sub arSelAll_Click()
+    Ed.ServerExec "ACTOR SELECT ALL"
+End Sub
+
+Private Sub arSelectNone_Click()
+    Ed.ServerExec "SELECT NONE"
+End Sub
 
 '
 ' ClassBrowser
@@ -246,71 +361,39 @@ End Sub
 '
 
 Private Sub arProps_Click()
-    frmActorProperties.GetSelectedActors
+    Ed.ServerExec "HOOK ACTORPROPERTIES" ''xyzzy
 End Sub
 
 Private Sub arCeiling_Click()
-    Ed.Server.Exec "ACTOR MOVETO CEILING"
+    Ed.ServerExec "ACTOR MOVETO CEILING"
 End Sub
 
 Private Sub arDelete_Click()
-    Ed.Server.Exec "ACTOR DELETE"
+    Ed.ServerExec "ACTOR DELETE"
 End Sub
 
 Private Sub arDuplicate_Click()
-    Ed.Server.Exec "ACTOR DUPLICATE"
-End Sub
-
-Private Sub arFloor_Click()
-    Ed.Server.Exec "ACTOR MOVETO FLOOR"
+    Ed.ServerExec "ACTOR DUPLICATE"
 End Sub
 
 Private Sub arSelectAllOfType_Click()
-    Ed.Server.Exec "ACTOR SELECT OFCLASS CLASS=" & GPopupActorClass
-End Sub
-
-Private Sub arSelNone_Click()
-    Ed.Server.Exec "ACTOR SELECT NONE"
-End Sub
-
-Private Sub arBelow_Click()
-    Ed.Server.Exec "ACTOR MOVETO FLOORBELOW"
-End Sub
-
-Private Sub arFloorAbove_Click()
-    Ed.Server.Exec "ACTOR MOVETO FLOORABOVE"
-End Sub
-
-Private Sub arRememberClass_Click()
-    If GPopupActorClass <> "" Then
-        Ed.Server.Exec "ACTOR SET ADDCLASS=" & GPopupActorClass
-        frmMain.ActorCombo.List(0) = GPopupActorClass
-        frmMain.ActorCombo.ListIndex = 0
-    End If
+    Ed.ServerExec "ACTOR SELECT OFCLASS CLASS=" & GPopupActorClass
 End Sub
 
 Private Sub arKey0_Click()
-    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=0")
-    Call Ed.Server.Exec("LEVEL REDRAW")
-    frmActorProperties.NoteClassChange
+    Ed.ServerExec "ACTOR KEYFRAME NUM=0"
 End Sub
 
 Private Sub arKey1_Click()
-    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=1")
-    Call Ed.Server.Exec("LEVEL REDRAW")
-    frmActorProperties.NoteClassChange
+    Ed.ServerExec "ACTOR KEYFRAME NUM=1"
 End Sub
 
 Private Sub arKey2_Click()
-    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=2")
-    Call Ed.Server.Exec("LEVEL REDRAW")
-    frmActorProperties.NoteClassChange
+    Ed.ServerExec "ACTOR KEYFRAME NUM=2"
 End Sub
 
 Private Sub arKey3_Click()
-    Call Ed.Server.SetProp("Actor", "Properties", "KeyNum=3")
-    Call Ed.Server.Exec("LEVEL REDRAW")
-    frmActorProperties.NoteClassChange
+    Ed.ServerExec "ACTOR KEYFRAME NUM=3"
 End Sub
 
 Private Sub arScriptEdit_Click()
@@ -320,8 +403,54 @@ End Sub
 Private Sub arScriptSubclass_Click()
     Call frmClassBrowser.MakeSubclass(GPopupActorClass, False)
     If GResult = 1 Then
-        Ed.Server.Exec "ACTOR SUBCLASS NEWCLASS=" & Quotes(GString)
+        Ed.ServerExec "ACTOR SUBCLASS NEWCLASS=" & Quotes(GString)
     End If
+End Sub
+
+Private Sub FromBrush_Click()
+    Ed.ServerExec "MAP BRUSH PUT"
+End Sub
+
+Private Sub MakeNonsolid_Click()
+    Ed.ServerExec "MAP SETBRUSH" & _
+        " CLEARFLAGS=" & Trim(Str(PF_SEMISOLID + PF_NOTSOLID)) & _
+        " SETFLAGS=" & Trim(Str(PF_NOTSOLID))
+End Sub
+
+Private Sub MakeSemisolid_Click()
+    Ed.ServerExec "MAP SETBRUSH" & _
+        " CLEARFLAGS=" & Trim(Str(PF_SEMISOLID + PF_NOTSOLID)) & _
+        " SETFLAGS=" & Trim(Str(PF_SEMISOLID))
+End Sub
+
+Private Sub MakeSolid_Click()
+    Ed.ServerExec "MAP SETBRUSH" & _
+        " CLEARFLAGS=" & Trim(Str(PF_SEMISOLID + PF_NOTSOLID)) & _
+        " SETFLAGS=" & Trim(Str(0))
+End Sub
+
+Private Sub MirrorX_Click()
+    Ed.ServerExec "ACTOR MIRROR X=-1"
+End Sub
+
+Private Sub MirrorY_Click()
+    Ed.ServerExec "ACTOR MIRROR Y=-1"
+End Sub
+
+Private Sub MirrorZ_Click()
+    Ed.ServerExec "ACTOR MIRROR Z=-1"
+End Sub
+
+Private Sub MoveToOrigin_Click()
+    Ed.ServerExec "ACTOR RESET LOCATION"
+End Sub
+
+Private Sub Perm_Click()
+    Ed.ServerExec "BRUSH APPLYTRANSFORM"
+End Sub
+
+Private Sub poSelectAll_Click()
+    Ed.ServerExec "POLY SELECT ALL"
 End Sub
 
 '
@@ -337,7 +466,7 @@ Private Sub prSelect_Click()
 End Sub
 
 Private Sub prSelectNone_Click()
-    Ed.Server.Exec "POLY SELECT NONE"
+    Ed.ServerExec "SELECT NONE"
 End Sub
 
 Private Sub prAlignSelected_Click()
@@ -345,7 +474,7 @@ Private Sub prAlignSelected_Click()
 End Sub
 
 Private Sub prApplyTex_Click()
-    Ed.Server.Exec "POLY SET TEXTURE=" & frmMain.TextureCombo.List(0)
+    Ed.ServerExec "POLY SETTEXTURE"
 End Sub
 
 Private Sub prGrabTex_Click()
@@ -357,23 +486,23 @@ End Sub
 '
 
 Private Sub paFloorCeiling_Click()
-    Ed.Server.Exec "POLY TEXALIGN FLOOR"
+    Ed.ServerExec "POLY TEXALIGN FLOOR"
 End Sub
 
 Private Sub paOneTile_Click()
-    Ed.Server.Exec "POLY TEXALIGN ONETILE"
+    Ed.ServerExec "POLY TEXALIGN ONETILE"
 End Sub
 
 Private Sub paUnalign_Click()
-    Ed.Server.Exec "POLY TEXALIGN DEFAULT"
+    Ed.ServerExec "POLY TEXALIGN DEFAULT"
 End Sub
 
 Private Sub paWallDirection_Click()
-    Ed.Server.Exec "POLY TEXALIGN WALLDIR"
+    Ed.ServerExec "POLY TEXALIGN WALLDIR"
 End Sub
 
 Private Sub paWallPanning_Click()
-    Ed.Server.Exec "POLY TEXALIGN WALLPAN"
+    Ed.ServerExec "POLY TEXALIGN WALLPAN"
 End Sub
 
 
@@ -382,61 +511,107 @@ End Sub
 '
 
 Private Sub psAdjacentCoplanars_Click()
-    Ed.Server.Exec "POLY SELECT ADJACENT COPLANARS"
+    Ed.ServerExec "POLY SELECT ADJACENT COPLANARS"
 End Sub
 
 Private Sub psAdjacentFloorCeils_Click()
-    Ed.Server.Exec "POLY SELECT ADJACENT FLOORS"
+    Ed.ServerExec "POLY SELECT ADJACENT FLOORS"
 End Sub
 
 Private Sub psAdjacentSlants_Click()
-    Ed.Server.Exec "POLY SELECT ADJACENT SLANTS"
+    Ed.ServerExec "POLY SELECT ADJACENT SLANTS"
 End Sub
 
 Private Sub psAdjacentWalls_Click()
-    Ed.Server.Exec "POLY SELECT ADJACENT WALLS"
+    Ed.ServerExec "POLY SELECT ADJACENT WALLS"
 End Sub
 
 Private Sub psAllAdjacents_Click()
-    Ed.Server.Exec "POLY SELECT ADJACENT ALL"
+    Ed.ServerExec "POLY SELECT ADJACENT ALL"
 End Sub
 
 Private Sub psAndMemory_Click()
-    Ed.Server.Exec "POLY SELECT MEMORY UNION"
+    Ed.ServerExec "POLY SELECT MEMORY UNION"
 End Sub
 
 Private Sub psMatchingBrush_Click()
-    Ed.Server.Exec "POLY SELECT MATCHING BRUSH"
+    Ed.ServerExec "POLY SELECT MATCHING BRUSH"
 End Sub
 
 Private Sub psMatchingGroups_Click()
-    Ed.Server.Exec "POLY SELECT MATCHING GROUPS"
+    Ed.ServerExec "POLY SELECT MATCHING GROUPS"
 End Sub
 
 Private Sub psMatchingItems_Click()
-    Ed.Server.Exec "POLY SELECT MATCHING ITEMS"
+    Ed.ServerExec "POLY SELECT MATCHING ITEMS"
 End Sub
 
 Private Sub psMatchingTexture_Click()
-    Ed.Server.Exec "POLY SELECT MATCHING TEXTURE"
+    Ed.ServerExec "POLY SELECT MATCHING TEXTURE"
 End Sub
 
 Private Sub psMemorizeSet_Click()
-    Ed.Server.Exec "POLY SELECT MEMORY SET"
+    Ed.ServerExec "POLY SELECT MEMORY SET"
 End Sub
 
 Private Sub psOrMemory_Click()
-    Ed.Server.Exec "POLY SELECT MEMORY INTERSECTION"
+    Ed.ServerExec "POLY SELECT MEMORY INTERSECTION"
 End Sub
 
 Private Sub psRecallMemory_Click()
-    Ed.Server.Exec "POLY SELECT MEMORY RECALL"
+    Ed.ServerExec "POLY SELECT MEMORY RECALL"
 End Sub
 
 Private Sub psReverse_Click()
-    Ed.Server.Exec "POLY SELECT REVERSE"
+    Ed.ServerExec "POLY SELECT REVERSE"
 End Sub
 
 Private Sub psXorMemory_Click()
-    Ed.Server.Exec "POLY SELECT MEMORY XOR"
+    Ed.ServerExec "POLY SELECT MEMORY XOR"
+End Sub
+
+Private Sub ResetAllPositioning_Click()
+    Ed.ServerExec "ACTOR RESET ALL"
+End Sub
+
+Private Sub ResetRotation_Click()
+    Ed.ServerExec "ACTOR RESET ROTATION"
+End Sub
+
+Private Sub ResetScaling_Click()
+    Ed.ServerExec "ACTOR RESET SCALE"
+End Sub
+
+Private Sub SelectAdds_Click()
+    Ed.ServerExec "MAP SELECT ADDS"
+End Sub
+
+Private Sub SelectNonsolids_Click()
+    Ed.ServerExec "MAP SELECT NONSOLIDS"
+End Sub
+
+Private Sub SelectSemisolids_Click()
+    Ed.ServerExec "MAP SELECT SEMISOLIDS"
+End Sub
+
+Private Sub SelectSubtracts_Click()
+    Ed.ServerExec "MAP SELECT SUBTRACTS"
+End Sub
+
+Private Sub SurfReset_Click()
+    Ed.ServerExec "POLY TEXPAN RESET"
+    Ed.ServerExec "POLY TEXSCALE"
+    Ed.ServerExec "POLY TEXALIGN DEFAULT"
+End Sub
+
+Private Sub ToBrush_Click()
+    Ed.ServerExec "MAP BRUSH GET"
+End Sub
+
+Private Sub ToFirst_Click()
+    Ed.ServerExec "MAP SENDTO FIRST"
+End Sub
+
+Private Sub ToLast_Click()
+    Ed.ServerExec "MAP SENDTO LAST"
 End Sub

@@ -783,7 +783,7 @@ Private Sub Build_Click()
     End If 'End Hollow
 
     Brush.NumPolys = N
-    Call SendBrush(Ed.Server)
+    Call SendBrush(0)
     Call Ed.StatusText("Built a Tube")
 End Sub
 

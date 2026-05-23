@@ -31,7 +31,6 @@ Public Sub DoHelp(ByVal Tool As String, ByRef UnrealEdApp As Object)
     Case "2DEDITOR": ToolHelp (127) ' 2D editor overview
     Case "CURVEDSTAIR": ToolHelp (151)
     Case "SHEET": ToolHelp (330)
-    Case "LOAD": ToolHelp (401) ' Brush overview
     End Select
 End Sub
 
@@ -53,8 +52,7 @@ End Sub
 Public Sub DoClick(ByVal Tool As String, ByRef UnrealEdApp As Object)
     Dim BrushFname As String
     '
-    ' Uses a hack to trigger the solid form's "Build"
-    ' button:
+    ' Uses a hack to trigger the solid form's "Build" button.
     '
     Call Ed.Tools.Highlight(Tool, True)
     '
@@ -68,26 +66,6 @@ Public Sub DoClick(ByVal Tool As String, ByRef UnrealEdApp As Object)
     Case "LANDSCAPE": frmParSolHeightMap.Trigger = Count
     Case "CURVEDSTAIR": frmParSolCurvedStair.Trigger = Count
     Case "SHEET": frmPsSheet.Trigger = Count
-    Case "LOAD":
-        '
-        ' Dialog for "Open Brush":
-        '
-        On Error GoTo Skip
-        Ed.Server.Disable
-        frmDialogs.BrushOpen.filename = ""
-        frmDialogs.BrushOpen.ShowOpen
-        '
-        Call UpdateDialog(frmDialogs.BrushOpen)
-        If (frmDialogs.BrushOpen.filename <> "") Then
-            '
-            ' Load the brush
-            '
-            BrushFname = frmDialogs.BrushOpen.filename
-            Ed.Server.Exec "BRUSH LOAD FILE=" & Quotes(BrushFname)
-Skip:
-        Ed.Server.Enable
-        End If
-    Case "2DEDITOR": frmTwoDee.Show
     End Select
     '
     Call Ed.Tools.Highlight(Tool, False)
@@ -108,7 +86,6 @@ Property Get HiPic(ByVal Tool As String) As Object
     Case "2DEDITOR": V = 55 ' TEMPORARY
     Case "CURVEDSTAIR": V = 56
     Case "SHEET": V = 60
-    Case "LOAD": V = 57
     End Select
     '
     Set HiPic = frmMain.HiPics.GraphicCell(V)
@@ -128,7 +105,6 @@ Property Get Pic(ByVal Tool As String) As Object
     Case "2DEDITOR": V = 55 ' TEMPORARY
     Case "CURVEDSTAIR": V = 56
     Case "SHEET": V = 60
-    Case "LOAD": V = 57
     End Select
     '
     Set Pic = frmMain.Pics.GraphicCell(V)
@@ -145,6 +121,5 @@ Public Sub InitTools(ByRef UnrealEdApp As Object)
     Call UnrealEdApp.Tools.Register(Me, "2DEDITOR", "2D Shape Editor", "")
     Call UnrealEdApp.Tools.Register(Me, "CURVEDSTAIR", "Build a curved stair", "Curved Stair Properties...")
     Call UnrealEdApp.Tools.Register(Me, "SHEET", "Build a sheet", "Sheet Properties...")
-    Call UnrealEdApp.Tools.Register(Me, "LOAD", "Load a brush", "")
 End Sub
 

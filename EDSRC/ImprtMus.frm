@@ -156,7 +156,7 @@ Private Sub Ok_Click()
         MsgBox "Music name name must be given, and must be 1-15 characters", 16
     Else
         ' Tell the engine to import the specified resource
-        Ed.Server.Exec "MUSIC IMPORT FILE=" & Quotes(tmpFname) & _
+        Ed.ServerExec "MUSIC IMPORT FILE=" & Quotes(tmpFname) & _
             " NAME=" & Quotes(tmpName)
         DoNext
     End If

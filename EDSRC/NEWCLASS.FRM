@@ -1,14 +1,14 @@
 VERSION 5.00
 Begin VB.Form frmNewClass 
    Caption         =   "Create a new actor class"
-   ClientHeight    =   1755
+   ClientHeight    =   2175
    ClientLeft      =   3765
    ClientTop       =   8385
    ClientWidth     =   4590
    Icon            =   "NewClass.frx":0000
    LinkTopic       =   "Form1"
    PaletteMode     =   1  'UseZOrder
-   ScaleHeight     =   1755
+   ScaleHeight     =   2175
    ScaleWidth      =   4590
    ShowInTaskbar   =   0   'False
    Begin VB.Frame Frame1 
@@ -22,11 +22,18 @@ Begin VB.Form frmNewClass
          Italic          =   -1  'True
          Strikethrough   =   0   'False
       EndProperty
-      Height          =   1095
+      Height          =   1575
       Left            =   120
-      TabIndex        =   3
+      TabIndex        =   4
       Top             =   120
       Width           =   4335
+      Begin VB.TextBox NewPackageName 
+         Height          =   285
+         Left            =   2040
+         TabIndex        =   1
+         Top             =   1080
+         Width           =   2175
+      End
       Begin VB.TextBox NewClassName 
          Height          =   285
          Left            =   2040
@@ -34,11 +41,20 @@ Begin VB.Form frmNewClass
          Top             =   720
          Width           =   2175
       End
+      Begin VB.Label Label3 
+         Alignment       =   1  'Right Justify
+         Caption         =   "Package name:"
+         Height          =   255
+         Left            =   240
+         TabIndex        =   8
+         Top             =   1080
+         Width           =   1695
+      End
       Begin VB.Label ParentClassName 
          Caption         =   "ParentClassName"
          Height          =   255
          Left            =   2040
-         TabIndex        =   6
+         TabIndex        =   7
          Top             =   360
          Width           =   1695
       End
@@ -47,7 +63,7 @@ Begin VB.Form frmNewClass
          Caption         =   "New actor class name:"
          Height          =   255
          Left            =   240
-         TabIndex        =   5
+         TabIndex        =   6
          Top             =   720
          Width           =   1695
       End
@@ -56,7 +72,7 @@ Begin VB.Form frmNewClass
          Caption         =   "Parent class:"
          Height          =   255
          Left            =   360
-         TabIndex        =   4
+         TabIndex        =   5
          Top             =   360
          Width           =   1575
       End
@@ -66,8 +82,8 @@ Begin VB.Form frmNewClass
       Caption         =   "&Cancel"
       Height          =   375
       Left            =   3600
-      TabIndex        =   2
-      Top             =   1320
+      TabIndex        =   3
+      Top             =   1800
       Width           =   855
    End
    Begin VB.CommandButton Ok 
@@ -75,8 +91,8 @@ Begin VB.Form frmNewClass
       Default         =   -1  'True
       Height          =   375
       Left            =   120
-      TabIndex        =   1
-      Top             =   1320
+      TabIndex        =   2
+      Top             =   1800
       Width           =   1815
    End
 End
@@ -97,5 +113,6 @@ End Sub
 Private Sub Ok_Click()
     GResult = 1
     GString = NewClassName.Text
+    GPackage = NewPackageName.Text
     Unload Me
 End Sub

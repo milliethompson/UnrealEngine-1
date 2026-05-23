@@ -2,19 +2,50 @@ VERSION 5.00
 Begin VB.Form frmPolyFlags 
    BorderStyle     =   0  'None
    Caption         =   "frmPolyFlags"
-   ClientHeight    =   1965
+   ClientHeight    =   1995
    ClientLeft      =   3135
    ClientTop       =   4500
-   ClientWidth     =   4980
+   ClientWidth     =   5715
    Icon            =   "PolyFlgs.frx":0000
    LinkTopic       =   "Form2"
    MaxButton       =   0   'False
    MDIChild        =   -1  'True
    MinButton       =   0   'False
    PaletteMode     =   1  'UseZOrder
-   ScaleHeight     =   1965
-   ScaleWidth      =   4980
+   ScaleHeight     =   1995
+   ScaleWidth      =   5715
    ShowInTaskbar   =   0   'False
+   Begin VB.CheckBox PolyFlag 
+      Caption         =   "Bright Corners"
+      Height          =   255
+      Index           =   28
+      Left            =   1080
+      TabIndex        =   29
+      Tag             =   "&H80000"
+      Top             =   1440
+      Width           =   1635
+   End
+   Begin VB.CheckBox PolyFlag 
+      Caption         =   "Modulated"
+      Height          =   255
+      Index           =   27
+      Left            =   2760
+      TabIndex        =   28
+      Tag             =   "&H40"
+      Top             =   480
+      Width           =   1275
+   End
+   Begin VB.CheckBox PolyFlag 
+      Caption         =   "Mirror"
+      ForeColor       =   &H00000000&
+      Height          =   255
+      Index           =   26
+      Left            =   60
+      TabIndex        =   27
+      Tag             =   "&H8000000"
+      Top             =   960
+      Width           =   975
+   End
    Begin VB.CheckBox PolyFlag 
       Caption         =   "Gouraud"
       Height          =   255
@@ -22,16 +53,16 @@ Begin VB.Form frmPolyFlags
       Left            =   1080
       TabIndex        =   26
       Tag             =   "&H200000"
-      Top             =   480
+      Top             =   0
       Width           =   1635
    End
    Begin VB.CommandButton ClearAll 
       Caption         =   "&Clear All"
       Height          =   255
-      Left            =   4020
+      Left            =   4065
       TabIndex        =   15
-      Top             =   1680
-      Width           =   915
+      Top             =   1710
+      Width           =   810
    End
    Begin VB.CheckBox PolyFlag 
       Caption         =   "Dirty Shadows"
@@ -40,7 +71,7 @@ Begin VB.Form frmPolyFlags
       Left            =   1080
       TabIndex        =   19
       Tag             =   "&h40000"
-      Top             =   1680
+      Top             =   1200
       Width           =   1635
    End
    Begin VB.CheckBox PolyFlag 
@@ -50,17 +81,17 @@ Begin VB.Form frmPolyFlags
       Left            =   1080
       TabIndex        =   25
       Tag             =   "&h8000"
-      Top             =   1440
+      Top             =   960
       Width           =   1635
    End
    Begin VB.CheckBox PolyFlag 
       Caption         =   "Hurt"
       Height          =   255
       Index           =   23
-      Left            =   2760
+      Left            =   960
       TabIndex        =   24
-      Tag             =   "&H40"
-      Top             =   1680
+      Tag             =   "0"
+      Top             =   2580
       Width           =   915
    End
    Begin VB.CheckBox PolyFlag 
@@ -70,7 +101,7 @@ Begin VB.Form frmPolyFlags
       Left            =   1080
       TabIndex        =   23
       Tag             =   "&H100000"
-      Top             =   720
+      Top             =   240
       Width           =   1635
    End
    Begin VB.CheckBox PolyFlag 
@@ -112,10 +143,10 @@ Begin VB.Form frmPolyFlags
       Caption         =   "No Look"
       Height          =   255
       Index           =   17
-      Left            =   2760
+      Left            =   960
       TabIndex        =   18
-      Tag             =   "&H8000000"
-      Top             =   1440
+      Tag             =   "0"
+      Top             =   2340
       Width           =   1035
    End
    Begin VB.CheckBox PolyFlag 
@@ -125,7 +156,7 @@ Begin VB.Form frmPolyFlags
       Left            =   1080
       TabIndex        =   17
       Tag             =   "&H800000"
-      Top             =   1200
+      Top             =   720
       Width           =   1635
    End
    Begin VB.CheckBox PolyFlag 
@@ -135,17 +166,17 @@ Begin VB.Form frmPolyFlags
       Left            =   1080
       TabIndex        =   16
       Tag             =   "&H400000"
-      Top             =   960
+      Top             =   480
       Width           =   1635
    End
    Begin VB.CheckBox PolyFlag 
       Caption         =   "Ledge Block"
       Height          =   255
       Index           =   14
-      Left            =   2760
+      Left            =   960
       TabIndex        =   14
-      Tag             =   "&H80000"
-      Top             =   1200
+      Tag             =   "0"
+      Top             =   2100
       Width           =   1275
    End
    Begin VB.CheckBox PolyFlag 
@@ -209,7 +240,7 @@ Begin VB.Form frmPolyFlags
       Width           =   1995
    End
    Begin VB.CheckBox PolyFlag 
-      Caption         =   "Transparent"
+      Caption         =   "Translucent"
       Height          =   255
       Index           =   7
       Left            =   2760
@@ -245,7 +276,7 @@ Begin VB.Form frmPolyFlags
       Left            =   2760
       TabIndex        =   7
       Tag             =   "&H2000"
-      Top             =   720
+      Top             =   960
       Width           =   1275
    End
    Begin VB.CheckBox PolyFlag 
@@ -255,7 +286,7 @@ Begin VB.Form frmPolyFlags
       Left            =   2760
       TabIndex        =   6
       Tag             =   "&H1000"
-      Top             =   480
+      Top             =   720
       Width           =   1275
    End
    Begin VB.CheckBox PolyFlag 
@@ -272,20 +303,20 @@ Begin VB.Form frmPolyFlags
       Caption         =   "Fake Backdrop"
       Height          =   255
       Index           =   1
-      Left            =   1080
+      Left            =   2760
       TabIndex        =   4
       Tag             =   "&H80"
-      Top             =   0
+      Top             =   1200
       Width           =   1635
    End
    Begin VB.CheckBox PolyFlag 
       Caption         =   "Environment map"
       Height          =   255
       Index           =   0
-      Left            =   1080
+      Left            =   2760
       TabIndex        =   0
       Tag             =   "&H10"
-      Top             =   240
+      Top             =   1440
       Width           =   1635
    End
 End
@@ -295,7 +326,7 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
-Const NumFlags = 25
+Const NumFlags = 29
 Public HolderForm As Form
 Dim Updating As Integer
 
@@ -365,7 +396,7 @@ Private Sub Form_Unload(Cancel As Integer)
     Set HolderForm = Nothing
 End Sub
 
-Private Sub PolyFlag_Click(Index As Integer)
+Private Sub PolyFlag_Click(index As Integer)
     If Updating = 0 Then
         PolyFlagsUpdate
     End If

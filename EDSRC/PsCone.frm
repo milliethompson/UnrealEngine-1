@@ -1082,7 +1082,7 @@ Private Sub Build_Click()
         'Debug.Print
     Next N
 
-    Call SendBrush(Ed.Server)
+    Call SendBrush(0)
     Call Ed.StatusText("Built Cone")
 
 End Sub

@@ -19,7 +19,6 @@ Begin VB.Form frmDialogs
       Strikethrough   =   0   'False
    EndProperty
    ForeColor       =   &H80000008&
-   Icon            =   "Dialogs.frx":0000
    LinkTopic       =   "Form1"
    PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   6855
@@ -30,7 +29,7 @@ Begin VB.Form frmDialogs
       Top             =   4320
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "uax"
       DialogTitle     =   "Load Music"
@@ -43,11 +42,11 @@ Begin VB.Form frmDialogs
       Top             =   3360
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "uax"
       DialogTitle     =   "Save Music"
-      Filter          =   "Music resources (*.umx)|*.umx|All Files (*.*)|*.*"
+      Filter          =   "Unreal music (*.umx)|*.umx|All Files (*.*)|*.*"
       Flags           =   33280
       MaxFileSize     =   5000
    End
@@ -56,7 +55,7 @@ Begin VB.Form frmDialogs
       Top             =   4500
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "ufx"
       DialogTitle     =   "Export A Song"
@@ -68,37 +67,37 @@ Begin VB.Form frmDialogs
       Top             =   4320
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "ufx"
       DialogTitle     =   "Import music"
-      Filter          =   "Songs (*.s3m)|*.s3m|All Files (*.*)|*.*"
+      Filter          =   $"Dialogs.frx":0000
       Flags           =   2097664
       MaxFileSize     =   5000
    End
-   Begin MSComDlg.CommonDialog SoundLoadFamilyDlg 
+   Begin MSComDlg.CommonDialog SoundLoadDlg 
       Left            =   6000
       Top             =   3300
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "uax"
-      DialogTitle     =   "Load Sound Family"
-      Filter          =   "Unreal Sounds (*.uax)|*.uax|All Files (*.*)|*.*"
+      DialogTitle     =   "Load Sound Package"
+      Filter          =   "Unreal sound packages (*.uax)|*.uax|All Files (*.*)|*.*"
       Flags           =   524800
       MaxFileSize     =   5000
    End
-   Begin MSComDlg.CommonDialog SoundSaveFamilyDlg 
+   Begin MSComDlg.CommonDialog SoundSaveDlg 
       Left            =   4140
       Top             =   3300
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "uax"
-      DialogTitle     =   "Save Sound Family"
-      Filter          =   "Unreal Sounds (*.uax)|*.uax|All Files (*.*)|*.*"
+      DialogTitle     =   "Save Sound Package"
+      Filter          =   "Unreal sound package (*.uax)|*.uax"
       Flags           =   33280
       MaxFileSize     =   5000
    End
@@ -107,11 +106,11 @@ Begin VB.Form frmDialogs
       Top             =   3360
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "ufx"
       DialogTitle     =   "Export A Sound"
-      Filter          =   "Unreal sound effect (*.ufx)|*.ufx"
+      Filter          =   "Wave file (*.wav)|*.wav"
       Flags           =   2097152
    End
    Begin MSComDlg.CommonDialog SoundImportDlg 
@@ -119,11 +118,11 @@ Begin VB.Form frmDialogs
       Top             =   4320
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "ufx"
       DialogTitle     =   "Import sound"
-      Filter          =   "Unreal sound effect (*.ufx)|*.ufx|All Files (*.*)|*.*"
+      Filter          =   "Wave files (*.wav)|*.wav|All Files (*.*)|*.*"
       Flags           =   2097664
       MaxFileSize     =   5000
    End
@@ -132,7 +131,7 @@ Begin VB.Form frmDialogs
       Top             =   2100
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "bmp"
       DialogTitle     =   "Load Texture in Background"
@@ -143,7 +142,7 @@ Begin VB.Form frmDialogs
       Top             =   2100
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "u2d"
       DialogTitle     =   "Open 2D Shape"
@@ -155,7 +154,7 @@ Begin VB.Form frmDialogs
       Top             =   2040
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "u2d"
       DialogTitle     =   "Save 2D Shape"
@@ -167,11 +166,11 @@ Begin VB.Form frmDialogs
       Top             =   120
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "ucx"
       DialogTitle     =   "Load Actor Class File"
-      Filter          =   "Unreal Actor Class (*.ucx)|*.ucx|Actor class text files (*.u)|*.u|All Files (*.*)|*.*"
+      Filter          =   "UnrealScript Classes (*.u;*.uc)|*.u;*.uc|All Files (*.*)|*.*"
       Flags           =   524800
    End
    Begin MSComDlg.CommonDialog ClassSave 
@@ -179,11 +178,11 @@ Begin VB.Form frmDialogs
       Top             =   120
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "ucx"
       DialogTitle     =   "Save Actor Class File"
-      Filter          =   "Unreal Actor Class (*.ucx)|*.ucx|Actor class text file (*.u)|*.u|C++ header (*.h)|*.h"
+      Filter          =   "Unreal Actor Class (*.u)|*.u|Actor class text file (*.uc)|*.uc|C++ header (*.h)|*.h"
       Flags           =   2097154
    End
    Begin MSComDlg.CommonDialog ExportTex 
@@ -191,7 +190,7 @@ Begin VB.Form frmDialogs
       Top             =   120
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "pcx"
       DialogTitle     =   "Export A Texture"
@@ -203,11 +202,10 @@ Begin VB.Form frmDialogs
       Top             =   2100
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "unr"
       DialogTitle     =   "Load an UnrealEd file at startup"
-      Filter          =   $"Dialogs.frx":030A
       Flags           =   2129920
    End
    Begin MSComDlg.CommonDialog ToolHelp 
@@ -215,7 +213,7 @@ Begin VB.Form frmDialogs
       Top             =   2100
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       HelpCommand     =   1
       HelpContext     =   105
       HelpFile        =   "help\unrealed.hlp"
@@ -225,7 +223,7 @@ Begin VB.Form frmDialogs
       Top             =   2100
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       HelpCommand     =   1
       HelpContext     =   105
       HelpFile        =   "help\unrealed.hlp"
@@ -235,7 +233,7 @@ Begin VB.Form frmDialogs
       Top             =   2100
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       HelpCommand     =   1
       HelpContext     =   104
       HelpFile        =   "help\unrealed.hlp"
@@ -245,7 +243,7 @@ Begin VB.Form frmDialogs
       Top             =   2100
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       HelpCommand     =   11
       HelpFile        =   "help\unrealed.hlp"
    End
@@ -254,7 +252,7 @@ Begin VB.Form frmDialogs
       Top             =   1140
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "t3d"
       DialogTitle     =   "Import Map"
@@ -266,7 +264,7 @@ Begin VB.Form frmDialogs
       Top             =   1140
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "t3d"
       DialogTitle     =   "Export Map"
@@ -278,10 +276,10 @@ Begin VB.Form frmDialogs
       Top             =   120
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "utx"
-      DialogTitle     =   "Load Texture Set"
+      DialogTitle     =   "Load Texture Package"
       Filter          =   "Unreal Textures (*.utx)|*.utx|All Files (*.*)|*.*"
       Flags           =   524800
       MaxFileSize     =   5000
@@ -291,10 +289,10 @@ Begin VB.Form frmDialogs
       Top             =   120
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "utx"
-      DialogTitle     =   "Save Texture Set"
+      DialogTitle     =   "Save Texture Package"
       Filter          =   "Unreal Textures (*.utx)|*.utx|All Files (*.*)|*.*"
       Flags           =   2097154
    End
@@ -303,7 +301,7 @@ Begin VB.Form frmDialogs
       Top             =   120
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "pcx"
       DialogTitle     =   "Import A Texture"
@@ -316,7 +314,7 @@ Begin VB.Form frmDialogs
       Top             =   1200
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "u3d"
       DialogTitle     =   "Save Brush"
@@ -328,7 +326,7 @@ Begin VB.Form frmDialogs
       Top             =   1200
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "u3d"
       DialogTitle     =   "Open Brush"
@@ -340,11 +338,11 @@ Begin VB.Form frmDialogs
       Top             =   180
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "t3d"
       DialogTitle     =   "Export A Brush"
-      Filter          =   "Unreal Text (*.t3d)|*.t3d|DXF Files (*.dxf)|All Files (*.*)|*.*"
+      Filter          =   "Unreal Text (*.t3d)|*.t3d|All Files (*.*)|*.*"
       Flags           =   2097154
    End
    Begin MSComDlg.CommonDialog ImportBrush 
@@ -352,7 +350,7 @@ Begin VB.Form frmDialogs
       Top             =   120
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "t3d"
       DialogTitle     =   "Import A Brush"
@@ -364,7 +362,7 @@ Begin VB.Form frmDialogs
       Top             =   1200
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "unr"
       DialogTitle     =   "Save Map As"
@@ -376,7 +374,7 @@ Begin VB.Form frmDialogs
       Top             =   1200
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "unr"
       DialogTitle     =   "Open Map File"
@@ -388,7 +386,7 @@ Begin VB.Form frmDialogs
       Top             =   5640
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "pcx"
       DialogTitle     =   "Open Terra Height Map"
@@ -400,7 +398,7 @@ Begin VB.Form frmDialogs
       Top             =   5640
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "tra"
       DialogTitle     =   "Open Terra File"
@@ -412,7 +410,7 @@ Begin VB.Form frmDialogs
       Top             =   5640
       _ExtentX        =   847
       _ExtentY        =   847
-      _Version        =   327680
+      _Version        =   327681
       CancelError     =   -1  'True
       DefaultExt      =   "tra"
       DialogTitle     =   "Open Terra File"
@@ -541,7 +539,7 @@ Begin VB.Form frmDialogs
       Width           =   1215
    End
    Begin VB.Label Label30 
-      Caption         =   "SoundLoadFamilyDlg"
+      Caption         =   "SoundLoadDlg"
       BeginProperty Font 
          Name            =   "MS Sans Serif"
          Size            =   8.25
@@ -558,7 +556,7 @@ Begin VB.Form frmDialogs
       Width           =   1755
    End
    Begin VB.Label Label29 
-      Caption         =   "SoundSaveFamilyDlg"
+      Caption         =   "SoundSaveDlg"
       BeginProperty Font 
          Name            =   "MS Sans Serif"
          Size            =   8.25
@@ -1011,7 +1009,7 @@ Private Sub Form_Load()
     TwoDeeSave.Flags = SaveFlags
     MusicSaveDlg.Flags = SaveFlags
     SoundExportDlg.Flags = SaveFlags
-    SoundSaveFamilyDlg.Flags = SaveFlags
+    SoundSaveDlg.Flags = SaveFlags
     MusicExportDlg.Flags = SaveFlags
     FloorSave.Flags = SaveFlags
     
@@ -1023,15 +1021,15 @@ Private Sub Form_Load()
     TwoDeeOpen.Flags = LoadSingleFlags
     TwoDeeTexture.Flags = LoadSingleFlags
     AddFile.Flags = LoadSingleFlags
-    MusicImportDlg.Flags = LoadSingleFlags
-    MusicLoadDlg.Flags = LoadSingleFlags
     FloorOpen.Flags = LoadSingleFlags
     FHmapOpen.Flags = LoadSingleFlags
     
     ' Loading multiple files.
+    MusicLoadDlg.Flags = LoadMultiFlags
+    MusicImportDlg.Flags = LoadMultiFlags
     TexFamLoad.Flags = LoadMultiFlags
     TexImport.Flags = LoadMultiFlags
-    SoundLoadFamilyDlg.Flags = LoadMultiFlags
+    SoundLoadDlg.Flags = LoadMultiFlags
     SoundImportDlg.Flags = LoadMultiFlags
     
     ' Help.

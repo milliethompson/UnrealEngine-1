@@ -1,0 +1,11 @@
+[Glide]
+file0=F:\Unreal\Install\Glide\grtvgr.exe
+fulldirectory=F:\Unreal\Install\Glide
+
+[TopDir]
+SubDir0=Glide
+
+[General]
+Type=FILELIST
+Version=1.00.000
+

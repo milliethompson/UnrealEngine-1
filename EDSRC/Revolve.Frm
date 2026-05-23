@@ -20,6 +20,7 @@ Begin VB.Form frmRevolve
    Icon            =   "Revolve.frx":0000
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
    MinButton       =   0   'False
    PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1875
@@ -736,7 +737,7 @@ Sub btnLoft_Click()
     Next ct
 
     Brush.NumPolys = N
-    Call SendBrush(Ed.Server, 0)
+    Call SendBrush(0)
 
 
 End Sub

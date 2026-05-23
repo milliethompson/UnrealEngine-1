@@ -85,9 +85,9 @@ Private Sub Form_GotFocus()
 End Sub
 
 Private Sub Form_Load()
-    Dim h As Long
-    h = GetWindow(frmMain.hwnd, GW_CHILD)
-    Call SetWindowLong(hwnd, -8, h)
+    Dim H As Long
+    H = GetWindow(frmMain.hwnd, GW_CHILD)
+    Call SetWindowLong(hwnd, -8, H)
 End Sub
 
 '
@@ -97,7 +97,7 @@ End Sub
 Private Sub VBar_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
     ZOrder
     If Button = 1 Then
-        Ed.Server.Exec "CAMERA HIDESTANDARD"
+        Ed.ServerExec "CAMERA HIDESTANDARD"
         VBarHold = 1
         VDelta = X
     End If
@@ -134,7 +134,7 @@ End Sub
 
 Private Sub LBar_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
     If Button = 1 Then
-        Ed.Server.Exec "CAMERA HIDESTANDARD"
+        Ed.ServerExec "CAMERA HIDESTANDARD"
         LBarHold = 1
         HDelta = Y
     End If
@@ -167,7 +167,7 @@ End Sub
 
 Private Sub RBar_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
     If Button = 1 Then
-        Ed.Server.Exec "CAMERA HIDESTANDARD"
+        Ed.ServerExec "CAMERA HIDESTANDARD"
         RBarHold = 1
         HDelta = Y
     End If
@@ -200,7 +200,7 @@ End Sub
 
 Private Sub LBox_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
     If Button = 1 Then
-        Ed.Server.Exec "CAMERA HIDESTANDARD"
+        Ed.ServerExec "CAMERA HIDESTANDARD"
         LBoxHold = 1
         LBarHold = 1
         VBarHold = 1
@@ -231,7 +231,7 @@ End Sub
 
 Private Sub RBox_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
     If Button = 1 Then
-        Ed.Server.Exec "CAMERA HIDESTANDARD"
+        Ed.ServerExec "CAMERA HIDESTANDARD"
         RBoxHold = 1
         RBarHold = 1
         VBarHold = 1
@@ -260,8 +260,7 @@ End Sub
 '
 
 Public Sub OpenCameras(Reopen As Boolean)
-    ZOrder 1 '!!
-
+    ZOrder 1
     Call Ed.OpenCamera(Reopen, 0, 0, VBar.Left / Screen.TwipsPerPixelX, _
         LBar.Top / Screen.TwipsPerPixelY, _
         SHOW_NORMAL + SHOW_STANDARD_VIEW + SHOW_AS_CHILD + SHOW_MOVINGBRUSHES, _
@@ -274,7 +273,7 @@ Public Sub OpenCameras(Reopen As Boolean)
     Call Ed.OpenCamera(Reopen, 0, (LBar.Top + LBar.Height) / Screen.TwipsPerPixelY, _
         VBar.Left / Screen.TwipsPerPixelX, (CYL - LBar.Top - LBar.Height) / Screen.TwipsPerPixelY, _
         SHOW_NORMAL + SHOW_STANDARD_VIEW + SHOW_MENU + SHOW_AS_CHILD + SHOW_MOVINGBRUSHES, _
-        REN_PLAINTEX, "Standard3V")
+        REN_DYNLIGHT, "Standard3V")
     Call Ed.OpenCamera(Reopen, (VBar.Left + VBar.Width) / Screen.TwipsPerPixelX, _
         (RBar.Top + RBar.Height) / Screen.TwipsPerPixelY, _
         (CXL - VBar.Left - VBar.Width) / Screen.TwipsPerPixelX, _

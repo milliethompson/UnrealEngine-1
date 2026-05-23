@@ -53,7 +53,7 @@ Option Explicit
 Sub UpdateResults()
     
     Dim S As String, L As String
-    S = Ed.Server.GetProp("Text", "Results")
+    S = Ed.ServerGetProp("Text", "Results")
     
     Results.Clear
     L = GrabLine(S)

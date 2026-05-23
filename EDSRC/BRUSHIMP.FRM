@@ -118,7 +118,7 @@ End Sub
 
 Private Sub Ok_Click()
     Ed.BeginSlowTask "Importing brush"
-    Ed.Server.SlowExec "BRUSH IMPORT FILE=" & _
+    Ed.ServerExec "BRUSH IMPORT FILE=" & _
         Quotes(frmDialogs.ImportBrush.filename) & _
         " MERGE=" & OnOff(MergeCoplanars.Value) & _
         " FLAGS=" & IIf(Solid.Value, 0, PF_NOTSOLID)

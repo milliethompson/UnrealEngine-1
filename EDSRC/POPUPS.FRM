@@ -1,10 +1,10 @@
 VERSION 5.00
 Begin VB.Form frmPopups 
    Caption         =   "frmPopups"
-   ClientHeight    =   870
-   ClientLeft      =   4845
-   ClientTop       =   3615
-   ClientWidth     =   7560
+   ClientHeight    =   3240
+   ClientLeft      =   60
+   ClientTop       =   300
+   ClientWidth     =   4680
    BeginProperty Font 
       Name            =   "MS Sans Serif"
       Size            =   8.25
@@ -18,17 +18,9 @@ Begin VB.Form frmPopups
    Icon            =   "Popups.frx":0000
    LinkTopic       =   "Form1"
    PaletteMode     =   1  'UseZOrder
-   ScaleHeight     =   870
-   ScaleWidth      =   7560
+   ScaleHeight     =   3240
+   ScaleWidth      =   4680
    ShowInTaskbar   =   0   'False
-   Begin VB.Label Label1 
-      Caption         =   "Misc popup menus that are brought up when you left-click on stuff"
-      Height          =   495
-      Left            =   1230
-      TabIndex        =   0
-      Top             =   90
-      Width           =   3135
-   End
    Begin VB.Menu Toolbar 
       Caption         =   "Toolbar"
       Begin VB.Menu ToolbarProperties 
@@ -47,97 +39,76 @@ Begin VB.Form frmPopups
          Caption         =   "Do it"
       End
    End
-   Begin VB.Menu BrowserWin 
-      Caption         =   "Browser"
-      Begin VB.Menu BroStats 
-         Caption         =   "&Stats"
-      End
-      Begin VB.Menu BroProps 
-         Caption         =   "&Properties"
-      End
-      Begin VB.Menu BroRename 
-         Caption         =   "&Rename"
-      End
-      Begin VB.Menu BroDelete 
-         Caption         =   "&Delete"
-      End
-      Begin VB.Menu WUZNQA 
-         Caption         =   "-"
-      End
-      Begin VB.Menu BroSave 
-         Caption         =   "&Save"
-         Begin VB.Menu BroSaveThis 
-            Caption         =   "This resource"
-         End
-         Begin VB.Menu BroSaveHierarch 
-            Caption         =   "This hierarchy"
-         End
-      End
-      Begin VB.Menu BroExport 
-         Caption         =   "&Export..."
-      End
-   End
    Begin VB.Menu Window 
       Caption         =   "Window"
-      Begin VB.Menu Rebuilder 
-         Caption         =   "&Rebuilder"
+      Begin VB.Menu AddClassHere 
+         Caption         =   "&Add <class> here"
       End
-      Begin VB.Menu ResizeMvBrush 
-         Caption         =   "Resize/Move &Brush"
+      Begin VB.Menu AddLightHere 
+         Caption         =   "&Add Light here"
       End
-      Begin VB.Menu TwoDee 
-         Caption         =   "&2D Shape Editor"
-      End
-      Begin VB.Menu Prefs 
-         Caption         =   "Pr&eferences"
-      End
-      Begin VB.Menu ZOEEKW 
+      Begin VB.Menu AddDivider 
          Caption         =   "-"
       End
-      Begin VB.Menu TexProp 
-         Caption         =   "&Polygon Properties"
+      Begin VB.Menu Grid 
+         Caption         =   "&Grid"
+         Begin VB.Menu Grid1 
+            Caption         =   "1 unit"
+         End
+         Begin VB.Menu Grid2 
+            Caption         =   "2 units"
+         End
+         Begin VB.Menu Grid4 
+            Caption         =   "4 units"
+         End
+         Begin VB.Menu Grid8 
+            Caption         =   "8 units"
+         End
+         Begin VB.Menu Grid16 
+            Caption         =   "16 units"
+         End
+         Begin VB.Menu Grid32 
+            Caption         =   "32 units"
+         End
+         Begin VB.Menu Grid64 
+            Caption         =   "64 units"
+         End
+         Begin VB.Menu Grid128 
+            Caption         =   "128 units"
+         End
+         Begin VB.Menu Grid256 
+            Caption         =   "256 units"
+         End
+         Begin VB.Menu GridDisabled 
+            Caption         =   "Disabled"
+         End
+         Begin VB.Menu GridCustom 
+            Caption         =   "Custom..."
+         End
+      End
+      Begin VB.Menu Pivot 
+         Caption         =   "&Pivot"
+         Begin VB.Menu PivotSnapped 
+            Caption         =   "Place pivot &snapped here"
+         End
+         Begin VB.Menu PivotHere 
+            Caption         =   "Place pivot &here"
+         End
+      End
+      Begin VB.Menu GridDivider 
+         Caption         =   "-"
       End
       Begin VB.Menu ActProp 
          Caption         =   "&Actor Properties"
+         Shortcut        =   {F4}
       End
-      Begin VB.Menu ZUHWA 
-         Caption         =   "-"
+      Begin VB.Menu TexProp 
+         Caption         =   "&Surface Properties"
+         Shortcut        =   {F5}
       End
-      Begin VB.Menu TexBro 
-         Caption         =   "&Texture Browser"
-      End
-      Begin VB.Menu ClassBro 
-         Caption         =   "&Class Browser"
-      End
-   End
-   Begin VB.Menu ResetBrush 
-      Caption         =   "ResetBrush"
-      Begin VB.Menu ResetBrushRotation 
-         Caption         =   "Reset Brush &Rotation"
-      End
-      Begin VB.Menu ResetBrushScale 
-         Caption         =   "Reset Brush &Scale"
-      End
-      Begin VB.Menu ResetBrushPosition 
-         Caption         =   "Reset Brush &Position"
-      End
-      Begin VB.Menu ZZTRULZ 
-         Caption         =   "-"
-      End
-      Begin VB.Menu ResetBrushAll 
-         Caption         =   "&Reset All"
-      End
-   End
-   Begin VB.Menu MirrorBrush 
-      Caption         =   "&MirrorBrush"
-      Begin VB.Menu MirrorX 
-         Caption         =   "Mirror brush about &X Axis"
-      End
-      Begin VB.Menu MirrorY 
-         Caption         =   "Mirror brush about &Y Axis"
-      End
-      Begin VB.Menu MirrorZ 
-         Caption         =   "&Z Axis  (vertical)"
+      Begin VB.Menu Rebuilder 
+         Caption         =   "&Rebuilder"
+         Shortcut        =   {F8}
       End
    End
    Begin VB.Menu Help 
@@ -218,7 +189,15 @@ Private Sub About_Click()
 End Sub
 
 Private Sub ActProp_Click()
-    frmActorProperties.GetSelectedActors
+    Ed.ServerExec "HOOK ACTORPROPERTIES" ''xyzzy
+End Sub
+
+Private Sub AddClassHere_Click()
+    Ed.ServerExec "ACTOR ADD CLASS=" & Ed.CurrentClass
+End Sub
+
+Private Sub AddLightHere_Click()
+    Ed.ServerExec "ACTOR ADD CLASS=LIGHT"
 End Sub
 
 Private Sub BrowserHide_Click()
@@ -240,6 +219,55 @@ Private Sub ClassBro_Click()
     Ed.SetBrowserTopic ("Classes")
 End Sub
 
+Private Sub Grid1_Click()
+    Call Ed.SetGridSize(1, 1, 1)
+    Call Ed.SetGridMode(1)
+End Sub
+
+Private Sub Grid128_Click()
+    Call Ed.SetGridSize(128, 128, 128)
+    Call Ed.SetGridMode(1)
+End Sub
+
+Private Sub Grid16_Click()
+    Call Ed.SetGridSize(16, 16, 16)
+    Call Ed.SetGridMode(1)
+End Sub
+
+Private Sub Grid2_Click()
+    Call Ed.SetGridSize(2, 2, 2)
+    Call Ed.SetGridMode(1)
+End Sub
+
+Private Sub Grid256_Click()
+    Call Ed.SetGridSize(256, 256, 256)
+    Call Ed.SetGridMode(1)
+End Sub
+
+Private Sub Grid32_Click()
+    Call Ed.SetGridSize(32, 32, 32)
+    Call Ed.SetGridMode(1)
+End Sub
+
+Private Sub Grid4_Click()
+    Call Ed.SetGridSize(4, 4, 4)
+    Call Ed.SetGridMode(1)
+End Sub
+
+Private Sub Grid64_Click()
+    Call Ed.SetGridSize(64, 64, 64)
+    Call Ed.SetGridMode(1)
+End Sub
+
+Private Sub Grid8_Click()
+    Call Ed.SetGridSize(8, 8, 8)
+    Call Ed.SetGridMode(1)
+End Sub
+
+Private Sub GridDisabled_Click()
+    Call Ed.SetGridMode(0)
+End Sub
+
 Private Sub HelpCameras_Click()
     Call Ed.Tools.Handlers(Ed.ToolMode).DoHelp(Ed.ToolMode, Ed)
 End Sub
@@ -250,15 +278,15 @@ Private Sub HelpTopics_Click()
 End Sub
 
 Private Sub MirrorX_Click()
-    Ed.Server.Exec "BRUSH MIRROR X"
+    Ed.ServerExec "BRUSH MIRROR X"
 End Sub
 
 Private Sub MirrorY_Click()
-    Ed.Server.Exec "BRUSH MIRROR Y"
+    Ed.ServerExec "BRUSH MIRROR Y"
 End Sub
 
 Private Sub MirrorZ_Click()
-    Ed.Server.Exec "BRUSH MIRROR Z"
+    Ed.ServerExec "BRUSH MIRROR Z"
 End Sub
 
 Private Sub MoveToolbar_Click()
@@ -266,40 +294,37 @@ Private Sub MoveToolbar_Click()
     frmMain.ResizeAll (True)
 End Sub
 
-Private Sub Prefs_Click()
-   frmPreferences.Show
+Private Sub PivotHere_Click()
+    Ed.ServerExec "PIVOT HERE"
+End Sub
+
+Private Sub PivotSnapped_Click()
+    Ed.ServerExec "PIVOT SNAPPED"
 End Sub
 
 Private Sub Rebuilder_Click()
     frmRebuilder.Show ' Rebuild dialog
+    frmRebuilder.SetFocus
 End Sub
 
 Private Sub ReleaseNotes_Click()
     frmDialogs.RelNotes.ShowHelp
 End Sub
 
-Private Sub ResBro_Click()
-    frmResBrowse.Show
-End Sub
-
 Private Sub ResetBrushAll_Click()
-    Ed.Server.Exec "BRUSH RESET"
+    Ed.ServerExec "BRUSH RESET"
 End Sub
 
 Private Sub ResetBrushPosition_Click()
-    Ed.Server.Exec "BRUSH MOVETO X=0 Y=0 Z=0"
+    Ed.ServerExec "BRUSH MOVETO X=0 Y=0 Z=0"
 End Sub
 
 Private Sub ResetBrushRotation_Click()
-    Ed.Server.Exec "BRUSH ROTATETO PITCH=0 YAW=0 ROLL=0"
+    Ed.ServerExec "BRUSH ROTATETO PITCH=0 YAW=0 ROLL=0"
 End Sub
 
 Private Sub ResetBrushScale_Click()
-    Ed.Server.Exec "BRUSH SCALE RESET"
-End Sub
-
-Private Sub ResizeMvBrush_Click()
-    frmBrush.Show
+    Ed.ServerExec "BRUSH SCALE RESET"
 End Sub
 
 Private Sub TexBro_Click()

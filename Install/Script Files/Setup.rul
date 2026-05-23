@@ -1,0 +1,503 @@
+////////////////////////////////////////////////////////////////////////////////
+// Umreal InstallShield 5.1 installer.
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// Includes.
+//
+#include "sdlang.h"
+#include "sddialog.h"
+#include "Directx.h"
+
+//
+// Log file name.
+//
+#define UNINST_LOGFILE_NAME      "Uninst.isu"
+
+//
+// Prototypes.
+//
+prototype ShowDialogs();
+prototype MoveFileData();
+prototype HandleMoveDataError( NUMBER );
+prototype ProcessBeforeDataMove();
+prototype ProcessAfterDataMove();
+prototype CleanUpInstall();
+prototype SetupInstall();
+prototype SetupScreen();
+prototype CheckRequirements();
+
+//
+// Global variables.
+//
+BOOL        bWinNT, bIsShellExplorer, bInstallAborted, bIs32BitSetup;
+BOOL        bInstallDirectX;
+STRING      svDir;
+STRING      svName, svCompany, svSerial;
+STRING      svDefGroup;
+STRING      szAppPath;
+STRING      svLogFile;
+STRING      szUninstallProgram;
+NUMBER      B1, B2, nResult;
+
+///////////////////////////////////////////////////////////////////////////////
+// Main program.
+///////////////////////////////////////////////////////////////////////////////
+
+program
+	// Start.
+    Disable( BACKGROUND );
+    CheckRequirements();
+
+	// Setup install.
+    Enable( CORECOMPONENTHANDLING );
+    bInstallAborted = FALSE;
+    svDir = @DEFAULT_INSTALL_PATH;
+    TARGETDIR  = svDir;
+    SdProductName( @PRODUCT_NAME );
+    Enable( DIALOGCACHE );
+
+	// Setup screen.
+    Enable( FULLWINDOWMODE );
+    Enable( INDVFILESTATUS );
+    SetTitle( @TITLE_MAIN, 24, WHITE );
+    SetTitle( @TITLE_CAPTIONBAR, 0, BACKGROUNDCAPTION );
+    SetColor( BACKGROUND, RGB(0,0,64) | BK_SMOOTH );
+    Enable( BACKGROUND );
+
+	// Do all dialogs.
+    if( ShowDialogs()<0 )
+    	goto end_install;
+
+    // Perform all setting up.
+    if( ProcessBeforeDataMove()<0 )
+    	goto end_install;
+    if( MoveFileData()<0 )
+    	goto end_install;
+
+    // Prevent uninstall if program is running.
+    DeinstallSetReference( svDir ^ @PRODUCT_KEY );
+
+    // Setup registry.
+    if( CreateRegistrySet( "Game" )<0 )
+    	goto end_install;
+    if( ComponentIsItemSelected(MEDIA,"Editor") ) then
+    	if( CreateRegistrySet( "Editor" )<0 )
+    		goto end_install;
+    endif;
+
+    // Setup the .ini file.
+    if( !ComponentIsItemSelected(MEDIA,"Content") ) then
+   		WriteProfString( TARGETDIR ^ "System" ^ "Default.ini", "Core.System", "Paths[12]", SRCDIR ^ "Maps\\*.unr"     );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Default.ini", "Core.System", "Paths[13]", SRCDIR ^ "Sounds\\*.uax"   );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Default.ini", "Core.System", "Paths[14]", SRCDIR ^ "Textures\\*.utx" );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Default.ini", "Core.System", "Paths[15]", SRCDIR ^ "Music\\*.umx"    );
+
+   		WriteProfString( TARGETDIR ^ "System" ^ "Unreal.ini", "Core.System", "Paths[12]", SRCDIR ^ "Maps\\*.unr"     );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Unreal.ini", "Core.System", "Paths[13]", SRCDIR ^ "Sounds\\*.uax"   );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Unreal.ini", "Core.System", "Paths[14]", SRCDIR ^ "Textures\\*.utx" );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Unreal.ini", "Core.System", "Paths[15]", SRCDIR ^ "Music\\*.umx"    );
+   	else
+   		WriteProfString( TARGETDIR ^ "System" ^ "Default.ini", "Core.System", "Paths[12]", "" );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Default.ini", "Core.System", "Paths[13]", "" );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Default.ini", "Core.System", "Paths[14]", "" );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Default.ini", "Core.System", "Paths[15]", "" );
+
+   		WriteProfString( TARGETDIR ^ "System" ^ "Unreal.ini", "Core.System", "Paths[12]", "" );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Unreal.ini", "Core.System", "Paths[13]", "" );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Unreal.ini", "Core.System", "Paths[14]", "" );
+    	WriteProfString( TARGETDIR ^ "System" ^ "Unreal.ini", "Core.System", "Paths[15]", "" );
+   	endif;
+    WriteProfString( TARGETDIR ^ "System" ^ "Default.ini", "Engine.Engine", "CdPath", SRCDIR );
+    WriteProfString( TARGETDIR ^ "System" ^ "Unreal.ini",  "Engine.Engine", "CdPath", SRCDIR );
+
+    // Setup folders.
+    if( CreateShellObjects( "" )<0 )
+    	goto end_install;
+    ProgDefGroupType( COMMON );
+    szUninstallProgram = FOLDER_PROGRAMS ^ @APP_SHORTCUT_FOLDER;
+    LongPathToQuote( szUninstallProgram, TRUE );
+	AddFolderIcon( szUninstallProgram, @APP_SHORTCUT_UNINSTALL, UNINST + " -f" + svLogFile, WINDIR, "", 0, "", REPLACE );
+
+    // Ask about setting up DirectX.
+	if( bInstallDirectX ) then
+ 		nResult = ISDXDirectXInstallation();
+  		if( nResult = DSETUPERR_SUCCESS_RESTART ) then
+      		BATCH_INSTALL = TRUE;
+   		elseif ( nResult != DSETUPERR_SUCCESS ) then
+      		bInstallAborted = TRUE;
+      		goto end_install;
+   		endif;
+   	endif;
+
+	// Finish installation.
+    end_install:
+	B1=TRUE;
+	B2=FALSE;
+    if( !bInstallAborted ) then
+    	if( BATCH_INSTALL ) then
+    		SdFinishReboot( "", "", SYS_BOOTMACHINE, "", 0 );
+    		CommitSharedFiles(0);
+   		else
+        	SdFinish( "", "", "", "Read the release notes (recommended)", "", B1, B2 );
+        	if( B1 ) then
+        		LaunchApp( WINDIR ^ "Notepad.exe", TARGETDIR ^ "Help\\ReadMe.txt" );
+        	endif;
+    	endif;
+    endif;
+
+	// Handle unrecoverable errors.
+    if( bInstallAborted ) then
+        abort;
+
+	// Success.
+    endif;
+endprogram
+
+///////////////////////////////////////////////////////////////////////////////
+// Show all dialogs.
+///////////////////////////////////////////////////////////////////////////////
+
+function ShowDialogs()
+    NUMBER  nResult;
+begin
+
+	// Welcome.
+    Dlg_Start:
+    Dlg_SdWelcome:
+    nResult = SdWelcome( "", "" );
+    if( nResult = BACK )
+    	goto Dlg_Start;
+
+	// License.
+    Dlg_SdLicense:
+    nResult = SdLicense( "", "", "", SUPPORTDIR ^ "FullLicense.txt" );
+    if( nResult = BACK )
+    	goto Dlg_SdWelcome;
+
+	// Destination path.
+    Dlg_SdAskDestPath:
+    nResult = SdAskDestPath( "", "", svDir, 0 );
+    TARGETDIR = svDir;
+    if( nResult = BACK )
+    	goto Dlg_SdLicense;
+
+	// Component list.
+    Dlg_SdComponentDialog2:
+	ComponentSetupTypeSet( MEDIA, "Custom" );
+    nResult  = SdComponentDialog2( "", "", svDir, "" );
+    if( nResult = BACK )
+    	goto Dlg_SdAskDestPath;
+
+	// Cull dummy components.
+	bInstallDirectX = ComponentIsItemSelected(MEDIA,"DirectX");
+	ComponentSelectItem( MEDIA, "DirectX", FALSE );
+
+    return 0;
+end;
+
+///////////////////////////////////////////////////////////////////////////////
+// DirectX.
+///////////////////////////////////////////////////////////////////////////////
+
+//
+// Check for service pack.
+//
+function ISDXCheckServicePack( szServicePack )
+    NUMBER nvResult;
+    STRING svResult;
+begin
+    GetSystemInfo( OS, nvResult, svResult );
+    if( nvResult = IS_WINDOWSNT ) then
+    	// Running Windows NT. Check to see if NT 4.
+        if (GetSystemInfo( OSMAJOR, nvResult, svResult ) = 0) then
+            if( nvResult < 4 ) then
+                return 0;
+            endif;
+        endif;
+    else
+        return 0;
+    endif;
+    nvResult = (ISCompareServicePack( szServicePack ) );
+    if( nvResult < 0 ) then
+        return ISDX_ERRNO_GETSERVPACK;
+    else
+        return nvResult;
+    endif;
+end;
+
+//
+// Handle DirectX error.
+//
+function ISDXHandleDXError( nErr )
+begin
+    if( nErr >= 0 ) then
+        return nErr;
+    endif;
+    switch( nErr )
+       case DSETUPERR_BADWINDOWSVERSION:
+            MessageBox( @ISDX_ERR_BADWINDOWSVERSION, SEVERE );
+            return nErr;
+
+        case DSETUPERR_SOURCEFILENOTFOUND:
+            MessageBox( @ISDX_ERR_SOURCEFILENOTFOUND, SEVERE );
+            return nErr;
+
+        case DSETUPERR_BADSOURCESIZE:
+            MessageBox( @ISDX_ERR_BADSOURCESIZE, SEVERE );
+            return nErr;
+
+        case DSETUPERR_BADSOURCETIME:
+            MessageBox( @ISDX_ERR_BADSOURCETIME, SEVERE );
+            return nErr;
+
+        case DSETUPERR_NOCOPY:
+            MessageBox( @ISDX_ERR_NOCOPY, SEVERE );
+            return nErr;
+
+        case DSETUPERR_OUTOFDISKSPACE:
+            MessageBox( @ISDX_ERR_OUTOFDISKSPACE, SEVERE );
+            return nErr;
+
+        case DSETUPERR_CANTFINDINF:
+            MessageBox( @ISDX_ERR_CANTFINDINF, SEVERE );
+            return nErr;
+
+        case DSETUPERR_CANTFINDDIR:
+            MessageBox( @ISDX_ERR_CANTFINDDIR, SEVERE );
+            return nErr;
+
+        case DSETUPERR_INTERNAL:
+            MessageBox( @ISDX_ERR_INTERNAL, SEVERE );
+            return nErr;
+
+        case DSETUPERR_NOTPREINSTALLEDONNT:
+            MessageBox( @ISDX_ERR_NOTPREINSTALLEDONNT, SEVERE );
+            return nErr;
+
+        case DSETUPERR_UNKNOWNOS:
+            MessageBox( @ISDX_ERR_UNKNOWNOS, SEVERE );
+            return nErr;
+
+        case DSETUPERR_USERHITCANCEL:
+            MessageBox( @ISDX_ERR_USERHITCANCEL, SEVERE );
+            return nErr;
+
+        case ISDX_ERRNO_NOTENOUGHSPACE:
+            MessageBox( @ISDX_ERR_NOTENOUGHSPACE, SEVERE );
+            return nErr;
+
+        case ISDX_ERRNO_SERVICEPACKNUM:
+            MessageBox( @ISDX_ERR_SERVICEPACKNUM, SEVERE );
+            return nErr;
+
+        default:
+             MessageBox( "DirectX installation failed", SEVERE );
+             return nErr;
+	endswitch;
+end;
+
+//
+// Try to install DirectX components.
+//
+function ISDXInstallDirectX ( szDllPath, szRootPathISDX, lOptionsISDX )
+    HWND hwnd;
+    NUMBER nResult;
+begin
+
+    // Get Window handle to pass to DirectXSetupA.
+    hwnd = GetWindowHandle( HWND_INSTALL );
+
+    // Note: This MUST be done BEFORE calling UseDLL.
+    ChangeDirectory( szDllPath );
+
+    // Load DSETUP.DLL into memory-necessary for DirectXSetupA
+    if( UseDLL( szDllPath ^ ISDX_DSETUPDLL ) < 0 ) then
+        return ISDX_ERRNO_LOADINGDLL;
+    endif;
+
+    // Calling of Microsoft function to install DirectX 5
+    nResult = DirectXSetupA( hwnd, szRootPathISDX, lOptionsISDX );
+
+    // Unload DSETUP.DLL from memory
+    UnUseDLL ( szDllPath ^ ISDX_DSETUPDLL );
+    return nResult;
+end;
+
+//
+// Full DirectX installation.
+//
+function ISDXDirectXInstallation ( )
+    NUMBER nResult;
+begin
+    szRootPathISDX = SRCDIR ^ "DirectX";
+    lOptionsISDX = DSETUP_DIRECTX;
+
+    Enable( HOURGLASS );
+
+    // Check if there is enough space on target machine to install DirectX 5
+    nResult = GetDiskSpace( TARGETDISK );
+    if( ( nResult/1000 ) < 5 ) then
+        ISDXHandleDXError( ISDX_ERRNO_NOTENOUGHSPACE );
+        Disable ( HOURGLASS );
+        return ISDX_ERRNO_NOTENOUGHSPACE;
+    endif;
+
+    // Check if at least service pack ISDX_SERVICEPACK is present on NT 4.0.
+    nResult = ISDXCheckServicePack( ISDX_SERVICEPACK );
+    if( nResult < 0 ) then
+        ISDXHandleDXError ( ISDX_ERRNO_SERVICEPACKNUM );
+        Disable( HOURGLASS );
+        return ISDX_ERRNO_SERVICEPACKNUM;
+    endif;
+
+   	nResult = ISDXInstallDirectX( SUPPORTDIR, szRootPathISDX, lOptionsISDX );
+   	ISDXHandleDXError ( nResult );
+
+    Disable( HOURGLASS );
+
+    return nResult;
+end;
+
+///////////////////////////////////////////////////////////////////////////////
+// File moving.
+///////////////////////////////////////////////////////////////////////////////
+
+//
+// Performs any necessary operations prior to the
+// actual file transfer.
+//
+function ProcessBeforeDataMove()
+    NUMBER nResult;
+begin
+
+  	// Create app information, uninstallation, and App Paths registry keys.
+    InstallationInfo( @COMPANY_NAME, @PRODUCT_NAME, @PRODUCT_VERSION, @PRODUCT_KEY );
+    svLogFile = UNINST_LOGFILE_NAME;
+
+    nResult = DeinstallStart( svDir ^ "System", svLogFile, @UNINST_KEY, 0 );
+    if (nResult < 0) then
+        MessageBox( @ERROR_UNINSTSETUP, WARNING );
+    endif;
+
+    szAppPath = TARGETDIR; // TO DO : if your application .exe is in a subfolder
+                           // of TARGETDIR then add subfolder
+
+    if( (bIs32BitSetup) && (bIsShellExplorer) ) then
+        RegDBSetItem( REGDB_APPPATH, szAppPath );
+        RegDBSetItem( REGDB_APPPATH_DEFAULT, szAppPath ^ @PRODUCT_KEY );
+        RegDBSetItem( REGDB_UNINSTALL_NAME, @UNINST_DISPLAY_NAME );
+    endif;
+
+    // TO DO : any other tasks you want to perform before file transfer.
+    return 0;
+end;
+
+//
+// Handle file transfer.
+//
+function MoveFileData()
+    NUMBER nResult, nDisk;
+begin
+
+    nDisk = 1;
+    SetStatusWindow( 0, "" );
+    Disable( DIALOGCACHE );
+    Enable( STATUS );
+    StatusUpdate( ON, 100 );
+	Enable( SELFREGISTERBATCH );
+    nResult = ComponentMoveData( MEDIA, nDisk, 0 );
+    HandleMoveDataError( nResult );
+    Disable( STATUS );
+    if Do( SELFREGISTRATIONPROCESS ) < 0 then
+      	MessageBox( "File(s) failed to self-register:  \n" + ERRORFILENAME, WARNING );
+   	endif;
+    return nResult;
+end;
+
+//
+// Handle file transfer errors.
+//
+function HandleMoveDataError( nResult )
+    STRING szErrMsg, svComponent , svFileGroup , svFile;
+begin
+    svComponent = "";
+    svFileGroup = "";
+    svFile = "";
+    switch( nResult )
+        case 0:
+            return 0;
+        default:
+            ComponentError ( MEDIA , svComponent , svFileGroup , svFile , nResult );
+            szErrMsg = @ERROR_MOVEDATA  + "\n\n" +
+                @ERROR_COMPONENT + " " + svComponent + "\n" +
+                @ERROR_FILEGROUP + " " + svFileGroup + "\n" +
+                @ERROR_FILE      + " " + svFile;
+            SprintfBox( SEVERE, @TITLE_CAPTIONBAR, szErrMsg, nResult );
+            bInstallAborted = TRUE;
+            return nResult;
+    endswitch;
+end;
+
+//
+// Check system requirements.
+//
+function CheckRequirements()
+    NUMBER  nvDx, nvDy, nvResult;
+    STRING  svResult;
+begin
+    bWinNT = FALSE;
+    bIsShellExplorer = FALSE;
+
+    // Check screen resolution.
+    GetExtents( nvDx, nvDy );
+
+    if (nvDy < 480) then
+        MessageBox( @ERROR_VGARESOLUTION, WARNING );
+        abort;
+    endif;
+
+    // Set 'setup' operation mode.
+    bIs32BitSetup = TRUE;
+    GetSystemInfo( ISTYPE, nvResult, svResult );
+    if( nvResult = 16 ) then
+        bIs32BitSetup = FALSE; // running 16-bit setup
+        return 0; // no additional information required
+    endif;
+
+    // Determine the target system's operating system.
+    GetSystemInfo( OS, nvResult, svResult );
+
+    if( nvResult =  IS_WINDOWSNT ) then
+        // Running Windows NT.
+        bWinNT = TRUE;
+
+        // Check to see if the shell being used is EXPLORER shell.
+        if (GetSystemInfo( OSMAJOR, nvResult, svResult ) = 0) then
+            if (nvResult >= 4) then
+                bIsShellExplorer = TRUE;
+            endif;
+        endif;
+
+    elseif (nvResult = IS_WINDOWS95 ) then
+        bIsShellExplorer = TRUE;
+
+    endif;
+end;
+
+///////////////////////////////////////////////////////////////////////////////
+// Included scripts.
+///////////////////////////////////////////////////////////////////////////////
+
+#include "sddialog.rul"
+
+///////////////////////////////////////////////////////////////////////////////
+// End.
+///////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+

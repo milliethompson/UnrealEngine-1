@@ -967,7 +967,7 @@ Private Sub Build_Click()
     
     
     Brush.NumPolys = N
-    Call SendBrush(Ed.Server, 0)
+    Call SendBrush(0)
     Call Ed.StatusText("Built a Curved Stair")
 
 End Sub

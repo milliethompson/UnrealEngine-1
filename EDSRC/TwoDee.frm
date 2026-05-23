@@ -3,10 +3,10 @@ Begin VB.Form frmTwoDee
    Appearance      =   0  'Flat
    BackColor       =   &H00000000&
    Caption         =   "2D Editor"
-   ClientHeight    =   5430
+   ClientHeight    =   5445
    ClientLeft      =   2310
    ClientTop       =   2655
-   ClientWidth     =   7515
+   ClientWidth     =   7755
    BeginProperty Font 
       Name            =   "MS Sans Serif"
       Size            =   8.25
@@ -19,11 +19,10 @@ Begin VB.Form frmTwoDee
    ForeColor       =   &H80000008&
    HelpContextID   =   127
    LinkTopic       =   "Form4"
-   MinButton       =   0   'False
    PaletteMode     =   1  'UseZOrder
-   ScaleHeight     =   5424.373
+   ScaleHeight     =   5439.357
    ScaleMode       =   0  'User
-   ScaleWidth      =   7512.791
+   ScaleWidth      =   7752.72
    Visible         =   0   'False
    Begin VB.CommandButton Command2 
       Appearance      =   0  'Flat
@@ -63,8 +62,8 @@ Begin VB.Form frmTwoDee
       Visible         =   0   'False
       X1              =   960.717
       X2              =   2160.365
-      Y1              =   2399.511
-      Y2              =   2399.511
+      Y1              =   2399.51
+      Y2              =   2399.51
    End
    Begin VB.Line Origin1 
       BorderColor     =   &H0000FF00&
@@ -77,8 +76,8 @@ Begin VB.Form frmTwoDee
       BorderColor     =   &H0000FF00&
       X1              =   2655.219
       X2              =   2855.16
-      Y1              =   2159.76
-      Y2              =   2159.76
+      Y1              =   2159.759
+      Y2              =   2159.759
    End
    Begin VB.Shape VertexMarker 
       BackColor       =   &H0000FFFF&
@@ -594,8 +593,8 @@ Begin VB.Form frmTwoDee
       Visible         =   0   'False
       X1              =   5759.306
       X2              =   10559.89
-      Y1              =   7440.282
-      Y2              =   7440.282
+      Y1              =   7440.281
+      Y2              =   7440.281
    End
    Begin VB.Image Grid1 
       Appearance      =   0  'Flat
@@ -750,6 +749,7 @@ Option Explicit
 Const GWW_HWNDPARENT = (-8)
 Dim TwoDeeWord As Integer
 Dim Po
+Dim Resizing As Boolean
 
 '
 ' Most Declarations moved to
@@ -1410,7 +1410,7 @@ Private Sub ExtrudePoint_Click()
 '    Next ct
 '
 '    Brush.NumPolys = N
-'    Call SendBrush(Ed.Server, 0)
+'    Call SendBrush(0)
 '
 End Sub
 
@@ -1646,10 +1646,19 @@ Private Sub Form_MouseUp(Button As Integer, Shift As Integer, X As Single, Y As 
 End Sub
 
 Private Sub Form_Resize()
-
-    'Set and redraw everything
-    SetViewPort
-    DrawAll
+    If Not Resizing Then
+        Resizing = True
+        If WindowState = 1 Then
+            ' Minimized.
+            Show
+            SetFocus
+        Else
+            ' Set and redraw everything.
+            SetViewPort
+            DrawAll
+        End If
+        Resizing = False
+    End If
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
@@ -1660,7 +1669,6 @@ End Sub
 Private Sub GridSnap_Click()
     GridSnap.Checked = Not GridSnap.Checked
     Grid = (GridSnap.Checked)
-    
 End Sub
 
 Private Sub HideDebug()
@@ -1762,7 +1770,7 @@ Private Sub LoadImage_Click()
 Dim TexturePic As String
     '
     On Error GoTo Skip
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.TwoDeeTexture.filename = ""
     frmDialogs.TwoDeeTexture.ShowOpen
     '
@@ -1779,7 +1787,7 @@ Dim TexturePic As String
       
     End If
 Skip:
-    Ed.Server.Enable
+    Ed.ServerEnable
     Exit Sub
 
 ErrHand:
@@ -1838,10 +1846,10 @@ Private Sub Open2D_Click()
     Dim Trash As String
     '
     On Error GoTo Skip
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.TwoDeeOpen.filename = ""
     frmDialogs.TwoDeeOpen.ShowOpen 'Modal File-Open Box
-    Ed.Server.Enable
+    Ed.ServerEnable
     '
     On Error GoTo ErrHand
     If (frmDialogs.TwoDeeOpen.filename <> "") Then
@@ -2008,11 +2016,11 @@ Private Sub Save2D_Click()
     '
     If (Fname = "") Then
         On Error GoTo Skip
-        Ed.Server.Disable
+        Ed.ServerDisable
         frmDialogs.TwoDeeSave.Flags = 2 'Prompt if overwrite
         frmDialogs.TwoDeeSave.ShowSave 'Modal Save-As Box
         Fname = frmDialogs.TwoDeeSave.filename
-        Ed.Server.Enable
+        Ed.ServerEnable
     End If
     '
     On Error GoTo SaveErrHand
@@ -2083,7 +2091,7 @@ SaveErrHand:
     MsgBox "Couldn't save 2D Shape", 48
     Exit Sub
 Skip:
-    Ed.Server.Enable
+    Ed.ServerEnable
 End Sub
 
 Private Sub SaveAs2D_Click()
@@ -2407,7 +2415,7 @@ Private Sub Sheet2D_Click()
     
     Brush.NumPolys = N
     
-    Call SendBrush(Ed.Server)
+    Call SendBrush(0)
     Call Ed.StatusText("Built a Sheet")
     
 

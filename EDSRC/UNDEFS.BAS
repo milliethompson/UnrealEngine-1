@@ -144,30 +144,23 @@ Global Const TOP_BROWSER = 1
 Global Const TOP_PANEL = 2
 
 '
-' Values for GActorPropsAction
-'
-Global Const AP_None = 0        ' Window not open
-Global Const AP_Selected = 1    ' Selected actors
-Global Const AP_Class = 2       ' Class default actor
-Global Const AP_Level = 3       ' Level properties
-
-'
 ' Ed callback codes:
 '
 Global Const EDC_GENERAL = 0         ' Nothing
 Global Const EDC_CURTEXCHANGE = 10   ' Change in current texture
-Global Const EDC_CURCLASSCHANGE = 11 ' Change in current actor class
 Global Const EDC_SELPOLYCHANGE = 20  ' Poly selection set changed
-Global Const EDC_SELACTORCHANGE = 21 ' Selected actor set changed
-Global Const EDC_SELBRUSHCHANGE = 22 ' Selected brush set changed
+Global Const EDC_SELCHANGE = 21      ' Selection set changed
 Global Const EDC_RTCLICKTEXTURE = 23 ' Right clicked on a picture
 Global Const EDC_RTCLICKPOLY = 24    ' Right clicked on a polygon
 Global Const EDC_RTCLICKACTOR = 25   ' Right clicked on an actor
 Global Const EDC_RTCLICKWINDOW = 26  ' Right clicked on camera window
+Global Const EDC_RTCLICKWINDOWCANADD = 27 ' Right clicked on camera window
 Global Const EDC_MODECHANGE = 40     ' Mode has changed, Param=new mode index
 Global Const EDC_BRUSHCHANGE = 41    ' Brush settings changed
 Global Const EDC_MAPCHANGE = 42      ' Change in map, bsp
 Global Const EDC_ACTORCHANGE = 43    ' Change in actors
+Global Const EDC_BROWSE = 1
+Global Const EDC_USECURRENT = 2
 
 ' SetWindowPos Flags
 Public Const SWP_NOSIZE = &H1
@@ -415,7 +408,7 @@ Global hWndTop As Long
 ' a really big brush, you'll have to do this because
 ' Visual Basic variables are limited to 64K.
 '
-Sub SendBrush(UnrealEdServer As Object, Optional More As Variant)
+Sub SendBrush(More As Boolean)
     '
     Dim Text As String ' Really big string
     Dim i As Integer, j As Integer
@@ -464,9 +457,7 @@ Sub SendBrush(UnrealEdServer As Object, Optional More As Variant)
     Next i
     Text = Text & "END POLYLIST" & CR
     '
-    Ed.BeginSlowTask "Sending brush"
-    UnrealEdServer.SlowExec Text
-    Ed.EndSlowTask
+    Ed.ServerExec Text
 End Sub
 
 '

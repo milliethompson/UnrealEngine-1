@@ -5,7 +5,7 @@ Begin VB.Form frmMeshViewer
    ClientHeight    =   5460
    ClientLeft      =   945
    ClientTop       =   3150
-   ClientWidth     =   7035
+   ClientWidth     =   6915
    Icon            =   "MeshView.frx":0000
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
@@ -13,7 +13,7 @@ Begin VB.Form frmMeshViewer
    MinButton       =   0   'False
    PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   5460
-   ScaleWidth      =   7035
+   ScaleWidth      =   6915
    ShowInTaskbar   =   0   'False
    Begin VB.Frame Frame2 
       Caption         =   "Texture"
@@ -121,7 +121,7 @@ Begin VB.Form frmMeshViewer
          Strikethrough   =   0   'False
       EndProperty
       Height          =   5355
-      Left            =   4560
+      Left            =   4440
       TabIndex        =   1
       Top             =   60
       Width           =   2415
@@ -136,6 +136,7 @@ Begin VB.Form frmMeshViewer
       End
       Begin VB.CommandButton Command6 
          Caption         =   "Home"
+         Enabled         =   0   'False
          Height          =   255
          Left            =   1500
          TabIndex        =   41
@@ -144,6 +145,7 @@ Begin VB.Form frmMeshViewer
       End
       Begin VB.CheckBox ShowSelection 
          Caption         =   "Show selection"
+         Enabled         =   0   'False
          Height          =   255
          Left            =   120
          TabIndex        =   40
@@ -151,6 +153,7 @@ Begin VB.Form frmMeshViewer
          Width           =   1755
       End
       Begin VB.CommandButton PanDown 
+         Enabled         =   0   'False
          BeginProperty Font 
             Name            =   "MS Sans Serif"
             Size            =   8.25
@@ -167,6 +170,7 @@ Begin VB.Form frmMeshViewer
          Width           =   255
       End
       Begin VB.CommandButton PanRight 
+         Enabled         =   0   'False
          BeginProperty Font 
             Name            =   "MS Sans Serif"
             Size            =   8.25
@@ -183,6 +187,7 @@ Begin VB.Form frmMeshViewer
          Width           =   255
       End
       Begin VB.CommandButton PanLeft 
+         Enabled         =   0   'False
          BeginProperty Font 
             Name            =   "MS Sans Serif"
             Size            =   8.25
@@ -199,6 +204,7 @@ Begin VB.Form frmMeshViewer
          Width           =   255
       End
       Begin VB.CommandButton PanUp 
+         Enabled         =   0   'False
          BeginProperty Font 
             Name            =   "MS Sans Serif"
             Size            =   8.25
@@ -216,6 +222,7 @@ Begin VB.Form frmMeshViewer
       End
       Begin VB.OptionButton ModeView 
          Caption         =   "View It"
+         Enabled         =   0   'False
          Height          =   255
          Left            =   120
          TabIndex        =   33
@@ -225,6 +232,7 @@ Begin VB.Form frmMeshViewer
       End
       Begin VB.OptionButton ModeTexture 
          Caption         =   "Texture It"
+         Enabled         =   0   'False
          Height          =   255
          Left            =   1200
          TabIndex        =   32
@@ -234,6 +242,7 @@ Begin VB.Form frmMeshViewer
       End
       Begin VB.CheckBox RotateAround 
          Caption         =   "Rotate Around"
+         Enabled         =   0   'False
          Height          =   255
          Left            =   120
          TabIndex        =   31
@@ -381,6 +390,7 @@ Begin VB.Form frmMeshViewer
       End
       Begin VB.Label Label6 
          Caption         =   "Mode:"
+         Enabled         =   0   'False
          Height          =   255
          Left            =   120
          TabIndex        =   34
@@ -430,14 +440,14 @@ Begin VB.Form frmMeshViewer
    End
    Begin VB.PictureBox MeshCamHolder 
       BackColor       =   &H00000000&
-      Height          =   5310
-      Left            =   45
-      ScaleHeight     =   350
+      Height          =   5430
+      Left            =   0
+      ScaleHeight     =   358
       ScaleMode       =   3  'Pixel
-      ScaleWidth      =   290
+      ScaleWidth      =   292
       TabIndex        =   0
-      Top             =   120
-      Width           =   4410
+      Top             =   0
+      Width           =   4440
    End
 End
 Attribute VB_Name = "frmMeshViewer"
@@ -469,45 +479,42 @@ End Sub
 Private Sub Form_Load()
     Dim S As String
     Call Ed.SetOnTop(Me, "MeshViewer", TOP_PANEL)
-    UpdateMeshList
+    UpdateMeshList "Open"
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
     Call Ed.EndOnTop(Me)
-    Ed.Server.Exec "CAMERA CLOSE NAME=MeshViewCam"
+    Ed.ServerExec "CAMERA CLOSE NAME=MeshViewCam"
 End Sub
 
 '
 ' List refreshing
 '
 
-Sub UpdateMeshList()
+Sub UpdateMeshList(Cmd As String)
     Dim Result As String, S As String
     MeshCombo.Clear
-    Result = Ed.Server.GetProp("Res", "Query Type=Mesh")
+    Result = Ed.ServerGetProp("OBJ", "Query Type=Mesh")
     Do
-        S = Trim(GrabCommaString(Result))
+        S = GrabString(Result)
         If S = "" Then Exit Do
-        S = Trim(Mid(S, InStr(S, " ")))
-        S = Trim(Left(S, InStr(S, "|") - 1))
-        
         MeshCombo.AddItem S
     Loop
     If MeshCombo.ListCount > 0 Then MeshCombo.ListIndex = 0
-    UpdateFrameList
+    UpdateFrameList Cmd
 End Sub
 
-Sub UpdateFrameList()
+Sub UpdateFrameList(Cmd As String)
     Dim i As Integer
     Dim N As Integer
     Dim S As String
     '
     AnimSeqCombo.Clear
     If MeshCombo.ListIndex >= 0 Then
-        N = Val(Ed.Server.GetProp("MESH", "NUMANIMSEQS" & _
+        N = Val(Ed.ServerGetProp("MESH", "NUMANIMSEQS" & _
             " NAME=" & Quotes(MeshCombo.List(MeshCombo.ListIndex))))
         For i = 0 To N - 1
-            S = Trim(Ed.Server.GetProp("MESH", "ANIMSEQ" & _
+            S = Trim(Ed.ServerGetProp("MESH", "ANIMSEQ" & _
                 " NAME=" & Quotes(MeshCombo.List(MeshCombo.ListIndex)) & _
                 " NUM=" & Trim(Str(i))))
             If S <> "" Then
@@ -516,20 +523,27 @@ Sub UpdateFrameList()
         Next i
         If AnimSeqCombo.ListCount > 0 Then AnimSeqCombo.ListIndex = 0
     End If
-    UpdateFrame
+    UpdateFrame Cmd
 End Sub
 
-Sub UpdateFrame()
+Sub UpdateFrame(Cmd As String)
     FramePos = 0
     If AnimSeqCombo.ListCount > 0 Then
         NumFrames = Val(Right(AnimSeqCombo.Text, 3))
     Else
         NumFrames = 0
     End If
-    UpdateFrameCaption
+    UpdateFrameCaption Cmd
 End Sub
 
-Sub UpdateFrameCaption()
+Sub UpdateFrameCaption(Cmd As String)
+    Dim Tmp As String
+    
+    If UCase(Cmd) = "OPEN" Then
+        Tmp = " XR=" & Trim(Str(MeshCamHolder.ScaleWidth)) & _
+            " YR=" & Trim(Str(MeshCamHolder.ScaleHeight))
+    End If
+    
     If Playing Then
         FrameLabel.Caption = "Playing " & Trim(Str(NumFrames)) & " frames..."
     Else
@@ -537,18 +551,17 @@ Sub UpdateFrameCaption()
     End If
     
     If MeshCombo.ListCount <= 0 Then
-        Ed.Server.Exec "CAMERA CLOSE NAME=MeshViewCam"
+        Ed.ServerExec "CAMERA CLOSE NAME=MeshViewCam"
     Else
-        Ed.Server.Exec "CAMERA OPEN " & _
-            " NAME=MeshViewCam X=0 Y=0 FOV=75" & _
-            " XR=" & Trim(Str(MeshCamHolder.ScaleWidth)) & _
-            " YR=" & Trim(Str(MeshCamHolder.ScaleHeight)) & _
+        Ed.ServerExec "CAMERA " & Cmd & _
+            " NAME=MeshViewCam X=0 Y=0" & _
             " MESH=" & Quotes(MeshCombo.Text) & _
             " REN=" & Trim(Str(REN_MESHVIEW)) & _
             " FLAGS=" & Trim(Str(SHOW_AS_CHILD + SHOW_NOBUTTONS + IIf(Playing, SHOW_BACKDROP, 0) + IIf(Playing = 1 Or AutoDolly.Value, SHOW_REALTIME, 0) + IIf(AutoDolly.Value, SHOW_BRUSH, 0) + IIf(ViewPolys.Value, SHOW_COORDS, 0))) & _
             " HWND=" & Trim(Str(MeshCamHolder.hwnd)) & _
             " MISC1=" & Trim(Left(Right(AnimSeqCombo.Text, 7), 3)) & _
-            " MISC2=" & Trim(Str(FramePos))
+            " MISC2=" & Trim(Str(FramePos)) & _
+            Tmp
     End If
 End Sub
 
@@ -570,37 +583,37 @@ Private Sub FramePlay_Click()
         FramePlus.Enabled = False
         Playing = 1
     End If
-    UpdateFrameCaption
+    UpdateFrameCaption "Update"
 End Sub
 
 Private Sub FrameZero_Click()
     FramePos = 0
-    UpdateFrameCaption
+    UpdateFrameCaption "Update"
 End Sub
 
 Private Sub FrameMinus_Click()
     FramePos = FramePos - 1
     If FramePos < 0 Then FramePos = NumFrames - 1
     If FramePos < 0 Then FramePos = 0
-    UpdateFrameCaption
+    UpdateFrameCaption "Update"
 End Sub
 
 Private Sub FramePlus_Click()
     FramePos = FramePos + 1
     If FramePos >= NumFrames Then FramePos = 0
-    UpdateFrameCaption
+    UpdateFrameCaption "Update"
 End Sub
 
 Private Sub Refresh_Click()
-    UpdateMeshList
+    UpdateMeshList "Update"
 End Sub
 
 Private Sub MeshCombo_Click()
-    UpdateFrameList
+    UpdateFrameList "Update"
 End Sub
 
 Private Sub AnimSeqCombo_Click()
-    UpdateFrame
+    UpdateFrame "Update"
 End Sub
 
 Private Sub MeshMinus_Click()
@@ -644,18 +657,18 @@ Private Sub SeqPlus_Click()
 End Sub
 
 Private Sub ViewPolys_Click()
-    UpdateFrameCaption
+    UpdateFrameCaption "Update"
 End Sub
 
 Private Sub ViewTextured_Click()
-    UpdateFrameCaption
+    UpdateFrameCaption "Update"
 End Sub
 
 Private Sub ViewWire_Click()
-    UpdateFrameCaption
+    UpdateFrameCaption "Update"
 End Sub
 
 Private Sub AutoDolly_Click()
-    UpdateFrameCaption
+    UpdateFrameCaption "Update"
 End Sub
 

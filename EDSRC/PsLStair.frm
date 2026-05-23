@@ -870,7 +870,7 @@ Private Sub Build_Click()
 
     
     Brush.NumPolys = N
-    Call SendBrush(Ed.Server)
+    Call SendBrush(0)
     Call Ed.StatusText("Built a Stair")
 '
 End Sub

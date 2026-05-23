@@ -1,7 +1,7 @@
 VERSION 5.00
 Object = "{0BA686C6-F7D3-101A-993E-0000C0EF6F5E}#1.0#0"; "THREED32.OCX"
 Object = "{27395F88-0C0C-101B-A3C9-08002B2F49FB}#1.1#0"; "PICCLP32.OCX"
-Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "COMCTL32.OCX"
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.2#0"; "COMCTL32.OCX"
 Begin VB.MDIForm frmMain 
    AutoShowChildren=   0   'False
    BackColor       =   &H00000000&
@@ -15,312 +15,62 @@ Begin VB.MDIForm frmMain
    ScrollBars      =   0   'False
    Visible         =   0   'False
    WindowState     =   2  'Maximized
-   Begin Threed.SSPanel MainBar 
+   Begin Threed.SSPanel SSPanel1 
       Align           =   1  'Align Top
-      Height          =   435
+      Height          =   255
       Left            =   0
-      TabIndex        =   1
+      TabIndex        =   9
       Top             =   0
-      Visible         =   0   'False
       Width           =   15960
       _Version        =   65536
       _ExtentX        =   28152
-      _ExtentY        =   767
+      _ExtentY        =   450
       _StockProps     =   15
-      ForeColor       =   16777215
-      BackColor       =   -2147483633
+      BackColor       =   12632256
       BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
          Name            =   "MS Sans Serif"
          Size            =   8.25
          Charset         =   0
-         Weight          =   700
+         Weight          =   400
          Underline       =   0   'False
          Italic          =   0   'False
          Strikethrough   =   0   'False
       EndProperty
-      BorderWidth     =   0
-      FloodColor      =   0
-      ShadowColor     =   1
-      Begin VB.PictureBox ProgressHolder 
-         Height          =   495
-         Left            =   0
-         ScaleHeight     =   435
-         ScaleWidth      =   15195
-         TabIndex        =   24
-         Top             =   0
-         Visible         =   0   'False
-         Width           =   15255
-         Begin VB.TextBox ProgressText 
-            Appearance      =   0  'Flat
-            BackColor       =   &H8000000F&
-            BorderStyle     =   0  'None
-            Height          =   285
-            Left            =   3720
-            TabIndex        =   26
-            Text            =   "Text1"
-            Top             =   100
-            Width           =   11415
-         End
-         Begin ComctlLib.ProgressBar ProgressBar 
-            Height          =   195
-            Left            =   120
-            TabIndex        =   25
-            Top             =   105
-            Width           =   3495
-            _ExtentX        =   6165
-            _ExtentY        =   344
-            _Version        =   327680
-            Appearance      =   0
-         End
-      End
-      Begin VB.TextBox Callback 
-         Height          =   345
-         Left            =   5520
-         MultiLine       =   -1  'True
-         TabIndex        =   20
-         Text            =   "Main.frx":030A
-         Top             =   45
-         Visible         =   0   'False
-         Width           =   345
-      End
-      Begin VB.ComboBox CalcText 
-         BackColor       =   &H00C0C0C0&
-         Height          =   315
-         HelpContextID   =   328
-         Left            =   3360
-         TabIndex        =   14
-         TabStop         =   0   'False
-         Tag             =   "Enter calculation here, ex. 1+2*3"
-         Text            =   "0"
-         Top             =   60
-         Width           =   2265
-      End
-      Begin VB.ComboBox ModeCombo 
-         BackColor       =   &H00C0C0C0&
-         Height          =   315
-         HelpContextID   =   111
-         Left            =   6480
-         Style           =   2  'Dropdown List
-         TabIndex        =   10
-         TabStop         =   0   'False
-         Tag             =   "Editing Mode"
-         Top             =   60
-         Width           =   2055
-      End
-      Begin VB.Timer Timer 
-         Interval        =   60000
-         Left            =   5640
-         Top             =   0
-      End
-      Begin VB.ComboBox TextureCombo 
-         BackColor       =   &H00C0C0C0&
-         Height          =   315
-         HelpContextID   =   123
-         Left            =   13440
-         Style           =   2  'Dropdown List
-         TabIndex        =   7
-         TabStop         =   0   'False
-         Tag             =   "Current texture"
-         Top             =   60
-         Width           =   1815
-      End
-      Begin VB.ComboBox GridCombo 
-         BackColor       =   &H00C0C0C0&
-         Height          =   315
-         HelpContextID   =   111
-         Left            =   9000
-         Style           =   2  'Dropdown List
-         TabIndex        =   5
-         TabStop         =   0   'False
-         Tag             =   "Grid Size"
-         Top             =   60
-         Width           =   855
-      End
-      Begin VB.ComboBox ActorCombo 
-         BackColor       =   &H00C0C0C0&
-         Height          =   315
-         Left            =   10920
-         Style           =   2  'Dropdown List
-         TabIndex        =   2
-         TabStop         =   0   'False
-         Tag             =   "Actor class for adding new actors"
-         Top             =   60
-         Width           =   1695
-      End
-      Begin Threed.SSCommand CalcZero 
+      Begin VB.TextBox ProgressText 
+         BackColor       =   &H8000000F&
+         BorderStyle     =   0  'None
          Height          =   285
-         HelpContextID   =   328
-         Left            =   2475
-         TabIndex        =   13
-         Tag             =   "Zero the calculator value"
-         Top             =   75
-         Width           =   210
-         _Version        =   65536
-         _ExtentX        =   370
-         _ExtentY        =   503
-         _StockProps     =   78
-         Caption         =   "0"
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         RoundedCorners  =   0   'False
-      End
-      Begin Threed.SSCommand CalcButton 
-         Default         =   -1  'True
-         Height          =   285
-         HelpContextID   =   328
-         Left            =   2760
-         TabIndex        =   12
-         Tag             =   "Perform calculation"
-         Top             =   75
-         Width           =   495
-         _Version        =   65536
-         _ExtentX        =   873
-         _ExtentY        =   503
-         _StockProps     =   78
-         Caption         =   "Calc"
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         RoundedCorners  =   0   'False
-      End
-      Begin Threed.SSCommand HelpButton 
-         Height          =   285
-         Left            =   840
-         TabIndex        =   9
-         Tag             =   "Help"
-         Top             =   75
-         Width           =   615
-         _Version        =   65536
-         _ExtentX        =   1085
-         _ExtentY        =   503
-         _StockProps     =   78
-         Caption         =   "Help"
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         RoundedCorners  =   0   'False
-         AutoSize        =   1
-      End
-      Begin Threed.SSCommand EpicButton 
-         Height          =   285
-         Left            =   1560
-         TabIndex        =   8
-         Tag             =   "Visit Epic's Web page"
-         Top             =   75
-         Width           =   615
-         _Version        =   65536
-         _ExtentX        =   1085
-         _ExtentY        =   503
-         _StockProps     =   78
-         Caption         =   "Epic"
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         RoundedCorners  =   0   'False
-      End
-      Begin Threed.SSCommand PlayButton 
-         Height          =   285
-         Left            =   120
-         TabIndex        =   23
-         Tag             =   "Help"
-         Top             =   75
-         Width           =   615
-         _Version        =   65536
-         _ExtentX        =   1085
-         _ExtentY        =   503
-         _StockProps     =   78
-         Caption         =   "Play"
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         RoundedCorners  =   0   'False
-         AutoSize        =   1
-      End
-      Begin VB.Label ModeLabel 
-         Alignment       =   1  'Right Justify
-         BackStyle       =   0  'Transparent
-         Caption         =   "Mode: "
-         Height          =   210
-         Left            =   5880
+         Left            =   3000
+         Locked          =   -1  'True
          TabIndex        =   11
-         Top             =   105
-         Width           =   615
+         Top             =   30
+         Visible         =   0   'False
+         Width           =   8655
       End
-      Begin VB.Label TextureLabel 
-         Alignment       =   1  'Right Justify
-         Caption         =   "Texture: "
+      Begin ComctlLib.ProgressBar ProgressBar 
          Height          =   255
-         Left            =   12600
-         TabIndex        =   6
-         Top             =   120
-         Width           =   855
-      End
-      Begin VB.Label GridLabel 
-         Alignment       =   1  'Right Justify
-         Caption         =   "Grid: "
-         Height          =   210
-         Left            =   8520
-         TabIndex        =   4
-         Top             =   105
-         Width           =   495
-      End
-      Begin VB.Label ActorLabel 
-         Alignment       =   1  'Right Justify
-         Caption         =   "Actor Class: "
-         Height          =   195
-         Left            =   9960
-         TabIndex        =   3
-         Top             =   105
-         Width           =   975
+         Left            =   0
+         TabIndex        =   10
+         Top             =   0
+         Visible         =   0   'False
+         Width           =   2895
+         _ExtentX        =   5106
+         _ExtentY        =   450
+         _Version        =   327682
+         Appearance      =   1
       End
    End
    Begin Threed.SSPanel Toolbar 
       Align           =   3  'Align Left
-      Height          =   7695
+      Height          =   7875
       Left            =   0
-      TabIndex        =   15
-      Top             =   435
+      TabIndex        =   1
+      Top             =   255
       Visible         =   0   'False
       Width           =   2070
       _Version        =   65536
       _ExtentX        =   3651
-      _ExtentY        =   13573
+      _ExtentY        =   13891
       _StockProps     =   15
       BackColor       =   -2147483633
       BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
@@ -332,20 +82,35 @@ Begin VB.MDIForm frmMain
          Italic          =   0   'False
          Strikethrough   =   0   'False
       EndProperty
+      Begin VB.Timer Timer 
+         Interval        =   60000
+         Left            =   600
+         Top             =   120
+      End
+      Begin VB.TextBox Callback 
+         Height          =   345
+         Left            =   120
+         MultiLine       =   -1  'True
+         TabIndex        =   8
+         Text            =   "Main.frx":030A
+         Top             =   120
+         Visible         =   0   'False
+         Width           =   345
+      End
       Begin VB.PictureBox Holder 
          BackColor       =   &H00808080&
          Height          =   4695
          Left            =   0
          ScaleHeight     =   4635
          ScaleWidth      =   1755
-         TabIndex        =   17
+         TabIndex        =   3
          Top             =   1080
          Width           =   1815
          Begin Threed.SSRibbon ToolIcons 
             Height          =   615
             Index           =   0
             Left            =   0
-            TabIndex        =   18
+            TabIndex        =   4
             Top             =   0
             Visible         =   0   'False
             Width           =   615
@@ -365,7 +130,7 @@ Begin VB.MDIForm frmMain
             Caption         =   "Status"
             Height          =   495
             Left            =   0
-            TabIndex        =   19
+            TabIndex        =   5
             Top             =   600
             Width           =   1695
          End
@@ -373,7 +138,7 @@ Begin VB.MDIForm frmMain
       Begin VB.VScrollBar Scroller 
          Height          =   5775
          Left            =   1800
-         TabIndex        =   16
+         TabIndex        =   2
          Top             =   0
          Visible         =   0   'False
          Width           =   245
@@ -381,15 +146,15 @@ Begin VB.MDIForm frmMain
    End
    Begin Threed.SSPanel BrowserPanel 
       Align           =   4  'Align Right
-      Height          =   7695
+      Height          =   7875
       Left            =   13530
       TabIndex        =   0
-      Top             =   435
+      Top             =   255
       Visible         =   0   'False
       Width           =   2430
       _Version        =   65536
       _ExtentX        =   4286
-      _ExtentY        =   13573
+      _ExtentY        =   13891
       _StockProps     =   15
       BackColor       =   -2147483633
       BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
@@ -407,7 +172,7 @@ Begin VB.MDIForm frmMain
          Height          =   315
          Left            =   810
          Style           =   2  'Dropdown List
-         TabIndex        =   21
+         TabIndex        =   6
          Tag             =   "Various resources you can browse"
          Top             =   45
          Width           =   1605
@@ -425,30 +190,30 @@ Begin VB.MDIForm frmMain
          EndProperty
          Height          =   300
          Left            =   75
-         TabIndex        =   22
+         TabIndex        =   7
          Top             =   75
          Width           =   735
       End
    End
-   Begin PicClip.PictureClip Pics 
-      Left            =   2160
-      Top             =   600
+   Begin PicClip.PictureClip HiPics 
+      Left            =   6600
+      Top             =   480
       _ExtentX        =   7408
-      _ExtentY        =   7408
-      _Version        =   327680
-      Rows            =   8
+      _ExtentY        =   9260
+      _Version        =   327681
+      Rows            =   10
       Cols            =   8
       Picture         =   "Main.frx":0313
    End
-   Begin PicClip.PictureClip HiPics 
-      Left            =   2820
-      Top             =   1020
+   Begin PicClip.PictureClip Pics 
+      Left            =   2280
+      Top             =   480
       _ExtentX        =   7408
-      _ExtentY        =   7408
-      _Version        =   327680
-      Rows            =   8
+      _ExtentY        =   9260
+      _Version        =   327681
+      Rows            =   10
       Cols            =   8
-      Picture         =   "Main.frx":139A5
+      Picture         =   "Main.frx":18437
    End
    Begin VB.Menu File 
       Caption         =   "&File"
@@ -494,19 +259,18 @@ Begin VB.MDIForm frmMain
       Caption         =   "&Edit"
       Begin VB.Menu EditCut 
          Caption         =   "Cu&t"
-         Visible         =   0   'False
+         Shortcut        =   ^X
       End
       Begin VB.Menu EditCopy 
          Caption         =   "&Copy"
-         Visible         =   0   'False
+         Shortcut        =   ^C
       End
       Begin VB.Menu EditPaste 
          Caption         =   "&Paste"
-         Visible         =   0   'False
+         Shortcut        =   ^V
       End
       Begin VB.Menu EditDivider1 
          Caption         =   "-"
-         Visible         =   0   'False
       End
       Begin VB.Menu EditUndo 
          Caption         =   "&Undo"
@@ -607,12 +371,6 @@ Begin VB.MDIForm frmMain
             Caption         =   "Xor with Memory (Shift-X)"
          End
       End
-      Begin VB.Menu ZEDITZ 
-         Caption         =   "-"
-      End
-      Begin VB.Menu MapEditMode 
-         Caption         =   "&Map Edit Mode"
-      End
    End
    Begin VB.Menu ScriptMenu 
       Caption         =   "&Script"
@@ -674,16 +432,9 @@ Begin VB.MDIForm frmMain
          Begin VB.Menu ParSolSphereDome 
             Caption         =   "Sphere/Dome"
          End
-         Begin VB.Menu ParSolHeightMap 
-            Caption         =   "Height Map"
-            Visible         =   0   'False
-         End
       End
       Begin VB.Menu ZGYM 
          Caption         =   "-"
-      End
-      Begin VB.Menu Resize 
-         Caption         =   "&Resize/Move..."
       End
       Begin VB.Menu BrushReset 
          Caption         =   "R&eset"
@@ -768,14 +519,24 @@ Begin VB.MDIForm frmMain
    End
    Begin VB.Menu Options 
       Caption         =   "&Options"
+      Begin VB.Menu ActorProperties 
+         Caption         =   "&Actor properties..."
+         Shortcut        =   {F4}
+      End
+      Begin VB.Menu SurfaceProperties 
+         Caption         =   "&Surface properties..."
+         Shortcut        =   {F5}
+      End
       Begin VB.Menu Project 
-         Caption         =   "&Level"
+         Caption         =   "&Level properties..."
+         Shortcut        =   {F6}
       End
       Begin VB.Menu Rebuild 
          Caption         =   "&Rebuild..."
+         Shortcut        =   {F8}
       End
       Begin VB.Menu Preferences 
-         Caption         =   "&Preferences"
+         Caption         =   "&Preferences..."
       End
       Begin VB.Menu ValidateLevel 
          Caption         =   "&Validate Level"
@@ -789,21 +550,17 @@ Begin VB.MDIForm frmMain
       Begin VB.Menu MeshViewer 
          Caption         =   "&Mesh Viewer"
       End
-      Begin VB.Menu TwoDee 
-         Caption         =   "&2D Shape Editor"
-      End
-      Begin VB.Menu FloorLofter 
-         Caption         =   "Floor Lofter (Experimental)"
-      End
-      Begin VB.Menu WorldBrowser 
-         Caption         =   "Resource &Browser"
-      End
       Begin VB.Menu WindowLog 
          Caption         =   "&Log"
       End
       Begin VB.Menu ScriptResults 
          Caption         =   "&Results"
-         Shortcut        =   {F5}
+      End
+      Begin VB.Menu TwoDee 
+         Caption         =   "&2D Shape Editor (Experimental)"
+      End
+      Begin VB.Menu FloorLofter 
+         Caption         =   "Floor Lofter (Experimental)"
       End
       Begin VB.Menu ZFUS 
          Caption         =   "-"
@@ -891,36 +648,31 @@ Private Sub About_Click()
     frmDialogs.About.ShowHelp ' WinHelp
 End Sub
 
-Private Sub ActorCombo_Click()
-    If Ed.Startup Then
-        ' Disregard
-    ElseIf ActorCombo.ListIndex <> 0 Then
-        ActorCombo.ListIndex = 0
-        Ed.SetBrowserTopic ("Classes")
-    End If
-End Sub
-
 Private Sub AddCutFirst_Click()
     Ed.BeginSlowTask "Adding brush to world"
-    Ed.Server.SlowExec "BRUSH ADD CUTFIRST"
+    Ed.ServerExec "BRUSH ADD CUTFIRST"
     Ed.EndSlowTask
+End Sub
+
+Private Sub ActorProperties_Click()
+    Ed.ServerExec "HOOK ACTORPROPERTIES" ''xyzzy
 End Sub
 
 Private Sub AddCutaway_Click()
     Ed.BeginSlowTask "Adding Cutaway Zone"
-    Ed.Server.SlowExec "BRUSH ADD CUTAWAY"
+    Ed.ServerExec "BRUSH ADD CUTAWAY"
     Ed.EndSlowTask
 End Sub
 
 Private Sub AddMovableBrush_Click()
-    Ed.BeginSlowTask "Adding movable brush to world"
-    Ed.Server.SlowExec "BRUSH ADDMOVABLE"
-    Ed.EndSlowTask
+    'Ed.BeginSlowTask "Adding movable brush to world"
+    Ed.ServerExec "BRUSH ADDMOVABLE"
+    'Ed.EndSlowTask
 End Sub
 
 Private Sub AddNoCut_Click()
     Ed.BeginSlowTask "Adding No-Cut Zone"
-    Ed.Server.SlowExec "BRUSH ADD NOCUT"
+    Ed.ServerExec "BRUSH ADD NOCUT"
     Ed.EndSlowTask
     '
     Call MsgBox("A no-cut zone will be added.  This will take effect the next time you rebuild geometry.", 64, "Adding No-Cut Zone")
@@ -947,15 +699,15 @@ Private Sub BrowserTopicCombo_Click()
 End Sub
 
 Private Sub BrushAdd_Click()
-    Ed.BeginSlowTask "Adding brush to world"
-    Ed.Server.SlowExec "BRUSH ADD"
-    Ed.EndSlowTask
+    'Ed.BeginSlowTask "Adding brush to world"
+    Ed.ServerExec "BRUSH ADD"
+    'Ed.EndSlowTask
 End Sub
 
 Private Sub BrushDeintersect_Click()
-    Ed.BeginSlowTask "Deintersecting brush"
-    Ed.Server.SlowExec "BRUSH FROM DEINTERSECTION"
-    Ed.EndSlowTask
+    'Ed.BeginSlowTask "Deintersecting brush"
+    Ed.ServerExec "BRUSH FROM DEINTERSECTION"
+    'Ed.EndSlowTask
 End Sub
 
 Private Sub BrushExport_Click()
@@ -965,17 +717,17 @@ Private Sub BrushExport_Click()
     ' Prompt for filename
     '
     On Error GoTo Skip
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.ExportBrush.ShowSave 'Modal Save-As Box
     ExportFname = frmDialogs.ExportBrush.filename
     '
     Call UpdateDialog(frmDialogs.ExportBrush)
     If (ExportFname <> "") Then
         Ed.BeginSlowTask "Exporting brush"
-        Ed.Server.SlowExec "BRUSH EXPORT FILE=" & Quotes(ExportFname)
+        Ed.ServerExec "BRUSH EXPORT FILE=" & Quotes(ExportFname)
         Ed.EndSlowTask
     End If
-Skip: Ed.Server.Enable
+Skip: Ed.ServerEnable
 End Sub
 
 Private Sub BrushImport_Click()
@@ -983,7 +735,7 @@ Private Sub BrushImport_Click()
     ' Dialog for "Brush Import":
     '
     On Error GoTo Skip
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.ImportBrush.filename = ""
     frmDialogs.ImportBrush.DefaultExt = "t3d"
     frmDialogs.ImportBrush.ShowOpen 'Modal File-Open Box
@@ -992,109 +744,63 @@ Private Sub BrushImport_Click()
     If (frmDialogs.ImportBrush.filename <> "") Then
         frmBrushImp.Show 1
     End If
-Skip: Ed.Server.Enable
+Skip: Ed.ServerEnable
 End Sub
 
 Private Sub BrushIntersect_Click()
-    Ed.BeginSlowTask "Intersecting brush"
-    Ed.Server.SlowExec "BRUSH FROM INTERSECTION"
-    Ed.EndSlowTask
+    'Ed.BeginSlowTask "Intersecting brush"
+    Ed.ServerExec "BRUSH FROM INTERSECTION"
+    'Ed.EndSlowTask
 End Sub
 
 Private Sub BrushReset_Click()
-    Ed.Server.Exec "BRUSH RESET"
+    Ed.ServerExec "BRUSH RESET"
 End Sub
 
 Private Sub BrushSliceTex_Click()
     Ed.BeginSlowTask "Adding No-Terrain Zone"
-    Ed.Server.SlowExec "BRUSH ADD NOTERRAIN"
+    Ed.ServerExec "BRUSH ADD NOTERRAIN"
     Ed.EndSlowTask
     '
     Call MsgBox("A No-Terrain zone will be added.  This will take effect the next time you rebuild geometry.  See the terrain help for complete information on using No-Terrain zones in UnrealEd.", 64, "Adding No-Terrain Zone")
 End Sub
 
 Private Sub BrushSubtract_Click()
-    Ed.BeginSlowTask "Subtracting brush from world"
-    Ed.Server.SlowExec "BRUSH SUBTRACT"
-    Ed.EndSlowTask
+    'Ed.BeginSlowTask "Subtracting brush from world"
+    Ed.ServerExec "BRUSH SUBTRACT"
+    'Ed.EndSlowTask
 End Sub
 
 Private Sub CameraAhead_Click()
-    Ed.Server.Exec "CAMERA LOOK AHEAD"
+    Ed.ServerExec "CAMERA LOOK AHEAD"
 End Sub
 
 Private Sub CameraDown_Click()
-    Ed.Server.Exec "CAMERA LOOK DOWN"
+    Ed.ServerExec "CAMERA LOOK DOWN"
 End Sub
 
 Private Sub CameraEast_Click()
-    Ed.Server.Exec "CAMERA LOOK EAST"
+    Ed.ServerExec "CAMERA LOOK EAST"
 End Sub
 
 Private Sub CameraEntire_Click()
-    Ed.Server.Exec "CAMERA LOOK ENTIREMAP"
+    Ed.ServerExec "CAMERA LOOK ENTIREMAP"
 End Sub
 
 Private Sub CameraNorth_Click()
-    Ed.Server.Exec "CAMERA LOOK NORTH"
+    Ed.ServerExec "CAMERA LOOK NORTH"
 End Sub
 
 Private Sub CameraSouth_Click()
-    Ed.Server.Exec "CAMERA LOOK SOUTH"
+    Ed.ServerExec "CAMERA LOOK SOUTH"
 End Sub
 
 Private Sub CameraUp_Click()
-    Ed.Server.Exec "CAMERA LOOK UP"
+    Ed.ServerExec "CAMERA LOOK UP"
 End Sub
 
 Private Sub CameraWest_Click()
-    Ed.Server.Exec "CAMERA LOOK WEST"
-End Sub
-
-Private Sub CalcButton_Click()
-    Dim Result As Double
-    Dim OrigStr As String
-    '
-    OrigStr = CalcText.Text
-    If Eval(CalcText.Text, Result) Then
-        CalcText.ForeColor = &H80000008
-        If Trim(OrigStr) <> "0" Then
-            If Trim(OrigStr) <> CalcText.List(0) Then
-                CalcText.AddItem OrigStr, 0
-            End If
-        End If
-        '
-        If Result <> 0 Then
-            If Trim(Str(Result)) <> CalcText.List(0) Then
-                CalcText.AddItem Trim(Str(Result)), 0
-            End If
-        End If
-        CalcText.Text = Trim(Str(Result))
-        CalcText.SetFocus
-        SendKeys "{HOME}+{END}" ' Select all
-    Else
-        CalcText.ForeColor = &HC0&
-        CalcText.SetFocus
-        SendKeys "{End}"
-    End If
-End Sub
-
-Private Sub CalcText_Click()
-    If CalcText.Text = "Reset" Then
-        CalcText.Clear
-        CalcText.AddItem "Reset"
-        CalcText.Text = "0"
-        CalcText.SetFocus
-        SendKeys "{HOME}+{END}" ' Select all
-    End If
-    CalcText.ForeColor = &H80000008
-End Sub
-
-Private Sub CalcZero_Click()
-    CalcText.Text = "0"
-    CalcText.ForeColor = &H80000008
-    CalcText.SetFocus
-    SendKeys "{HOME}+{END}" ' Select all
+    Ed.ServerExec "CAMERA LOOK WEST"
 End Sub
 
 Private Sub ClassBrows_Click()
@@ -1110,12 +816,12 @@ Private Sub CamAllViews_Click()
 End Sub
 
 Private Sub CamCloseAllFree_Click()
-    Ed.Server.Exec "CAMERA CLOSE FREE"
+    Ed.ServerExec "CAMERA CLOSE FREE"
 End Sub
 
 
 Private Sub CameraResetAll_Click()
-    Ed.Server.Exec "CAMERA CLOSE ALL"
+    Ed.ServerExec "CAMERA CLOSE ALL"
     Ed.CameraVertRatio = 0.66
     Ed.CameraLeftRatio = 0.5
     Ed.CameraRightRatio = 0.5
@@ -1154,29 +860,33 @@ End Sub
 
 Private Sub Delete_Click()
     If MsgBox("Are you sure you want to delete?", vbOKCancel) = vbOK Then
-        Ed.Server.Exec "DELETE"
+        Ed.ServerExec "DELETE"
     End If
 End Sub
 
 Private Sub Directories_Click()
-   'Ed.Server.Disable
+   'Ed.ServerDisable
    'frmDirectories.Show 1
-   'Ed.Server.Enable
+   'Ed.ServerEnable
 End Sub
 
 Private Sub Duplicate_Click()
-    Ed.Server.Exec "DUPLICATE"
+    Ed.ServerExec "DUPLICATE"
 End Sub
 
 Private Sub EditCopy_Click()
     If hwndScript <> 0 Then
         ScriptForm.EditCopy_Click
+    Else
+        Ed.ServerExec "EDIT COPY"
     End If
 End Sub
 
 Private Sub EditCut_Click()
     If hwndScript <> 0 Then
         ScriptForm.EditCut_Click
+    Else
+        Ed.ServerExec "EDIT CUT"
     End If
 End Sub
 
@@ -1195,15 +905,17 @@ End Sub
 Private Sub EditPaste_Click()
     If hwndScript <> 0 Then
         ScriptForm.EditPaste_Click
+    Else
+        Ed.ServerExec "EDIT PASTE"
     End If
 End Sub
 
 Private Sub EpicButton_Click()
-    Ed.Server.Exec "LAUNCH WEB"
+    Ed.ServerExec "LAUNCH WEB"
 End Sub
 
 Private Sub EpicWeb_Click()
-    Ed.Server.Exec "LAUNCH WEB"
+    Ed.ServerExec "LAUNCH WEB"
 End Sub
 
 Private Sub Exit_Click()
@@ -1217,7 +929,7 @@ Private Sub ExportLevel_Click()
     ' Prompt for filename
     '
     On Error GoTo Skip
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.ExportMap.ShowSave
     ExportFname = frmDialogs.ExportMap.filename
     '
@@ -1225,32 +937,15 @@ Private Sub ExportLevel_Click()
     If (ExportFname <> "") Then
         PreSaveAll
         Ed.BeginSlowTask "Exporting map"
-        Ed.Server.SlowExec "MAP EXPORT FILE=" & Quotes(ExportFname)
+        Ed.ServerExec "MAP EXPORT FILE=" & Quotes(ExportFname)
         Ed.EndSlowTask
     End If
     '
-Skip: Ed.Server.Enable
+Skip: Ed.ServerEnable
 End Sub
 
 Private Sub FloorLofter_Click()
     frmFloorLofter.Show
-End Sub
-
-Private Sub GridCombo_Click()
-    Dim S As Integer
-    '
-    If Ed.Startup Then
-        ' Disregard
-    ElseIf GridCombo.Text = "Off" Then
-        Call Ed.SetGridMode(0)
-    ElseIf GridCombo.Text = "Custom" Then
-        frmGrid.Show
-        Call Ed.SetGridMode(1)
-    Else
-        S = Val(GridCombo.Text)
-        Call Ed.SetGridSize(S, S, S)
-        Call Ed.SetGridMode(1)
-    End If
 End Sub
 
 Private Sub HelpButton_Click()
@@ -1283,7 +978,7 @@ Private Sub ImportLevel_Click()
     ' Dialog for "Map Import"
     '
     On Error GoTo Skip
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.ImportMap.filename = ""
     frmDialogs.ImportMap.ShowOpen 'Modal File-Open Box
     '
@@ -1295,16 +990,15 @@ Private Sub ImportLevel_Click()
         If GResult Then
             Ed.BeginSlowTask "Importing map"
             If GImportExisting Then ' Import new map
-                Ed.Server.SlowExec "MAP IMPORTADD FILE=" & Quotes(frmDialogs.ImportMap.filename)
+                Ed.ServerExec "MAP IMPORTADD FILE=" & Quotes(frmDialogs.ImportMap.filename)
             Else ' Add to existing map
-                Ed.Server.SlowExec "MAP IMPORT FILE=" & Quotes(frmDialogs.ImportMap.filename)
+                Ed.ServerExec "MAP IMPORT FILE=" & Quotes(frmDialogs.ImportMap.filename)
             End If
             Ed.EndSlowTask
-            If Ed.MapEdit Then Call Ed.Tools.Click("MAPEDIT")
             PostLoad
         End If
     End If
-Skip: Ed.Server.Enable
+Skip: Ed.ServerEnable
 End Sub
 
 Private Sub LoadBrush_Click()
@@ -1312,7 +1006,7 @@ Private Sub LoadBrush_Click()
     ' Dialog for "Load Brush":
     '
     On Error GoTo Skip
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.BrushOpen.filename = ""
     frmDialogs.BrushOpen.ShowOpen 'Modal Brush-Open Box
     '
@@ -1323,65 +1017,65 @@ Private Sub LoadBrush_Click()
         '
         Call UpdateDialog(frmDialogs.BrushOpen)
         Ed.BrushFname = frmDialogs.BrushOpen.filename
-        Ed.Server.Exec "BRUSH LOAD FILE=" & Quotes(Ed.BrushFname)
+        Ed.ServerExec "BRUSH LOAD FILE=" & Quotes(Ed.BrushFname)
     End If
-Skip: Ed.Server.Enable
+Skip: Ed.ServerEnable
 End Sub
 
 Private Sub Map320x200_Click()
-    Ed.Server.Exec "CAMERA SIZE XR=320 YR=200"
+    Ed.ServerExec "CAMERA SIZE XR=320 YR=200"
 End Sub
 
 Private Sub Map400x300_Click()
-    Ed.Server.Exec "CAMERA SIZE XR=400 YR=300"
+    Ed.ServerExec "CAMERA SIZE XR=400 YR=300"
 End Sub
 
 Private Sub Map480x360_Click()
-    Ed.Server.Exec "CAMERA SIZE XR=480 YR=360"
+    Ed.ServerExec "CAMERA SIZE XR=480 YR=360"
 End Sub
 
 Private Sub Map560x420_Click()
-    Ed.Server.Exec "CAMERA SIZE XR=560 YR=420"
+    Ed.ServerExec "CAMERA SIZE XR=560 YR=420"
 End Sub
 
 Private Sub Map640x480_Click()
-    Ed.Server.Exec "CAMERA SIZE XR=640 YR=480"
+    Ed.ServerExec "CAMERA SIZE XR=640 YR=480"
 End Sub
 
 Private Sub MapFlat_Click()
-    Ed.Server.Exec "CAMERA SET MODE=FLAT"
+    Ed.ServerExec "CAMERA SET MODE=FLAT"
 End Sub
 
 Private Sub MapFlatNorms_Click()
-    Ed.Server.Exec "CAMERA SET MODE=FLATNORMS"
+    Ed.ServerExec "CAMERA SET MODE=FLATNORMS"
 End Sub
 
 Private Sub MapIllum_Click()
-    Ed.Server.Exec "CAMERA SET MODE=ILLUM"
+    Ed.ServerExec "CAMERA SET MODE=ILLUM"
 End Sub
 
 Private Sub MapLight_Click()
-    Ed.Server.Exec "CAMERA SET MODE=SHADE"
+    Ed.ServerExec "CAMERA SET MODE=SHADE"
 End Sub
 
 Private Sub MapPersp_Click()
-    Ed.Server.Exec "CAMERA SET MODE=MAP3D"
+    Ed.ServerExec "CAMERA SET MODE=MAP3D"
 End Sub
 
 Private Sub MapTextures_Click()
-    Ed.Server.Exec "CAMERA SET MODE=TEXTURES"
+    Ed.ServerExec "CAMERA SET MODE=TEXTURES"
 End Sub
 
 Private Sub MapXY_Click()
-    Ed.Server.Exec "CAMERA SET MODE=MAPXY"
+    Ed.ServerExec "CAMERA SET MODE=MAPXY"
 End Sub
 
 Private Sub MapXZ_Click()
-    Ed.Server.Exec "CAMERA SET MODE=MAPXZ"
+    Ed.ServerExec "CAMERA SET MODE=MAPXZ"
 End Sub
 
 Private Sub MapYZ_Click()
-    Ed.Server.Exec "CAMERA SET MODE=MAPYZ"
+    Ed.ServerExec "CAMERA SET MODE=MAPYZ"
 End Sub
 
 Private Sub MDIForm_Load()
@@ -1413,63 +1107,12 @@ Private Sub MDIForm_Load()
     frmMain.Caption = Ed.EditorAppName
     frmMain.Show
     '
-    ' Stick values in combo boxes
-    '
-    If Screen.Width <= 640 * Screen.TwipsPerPixelX Then
-        EpicButton.Visible = False
-        ModeLabel.Visible = False
-        ModeCombo.Visible = False
-    End If
-    '
-    If Screen.Width < 1024 * Screen.TwipsPerPixelX Then
-        CalcButton.Visible = False
-        CalcText.Visible = False
-        CalcZero.Visible = False
-    End If
-    '
-    ModeCombo.AddItem "Move Camera/Brush"
-    ModeCombo.AddItem "Zoom Camera/Brush"
-    ModeCombo.AddItem "Brush Rotate"
-    ModeCombo.AddItem "Brush Scale"
-    ModeCombo.AddItem "Brush Sheer"
-    ModeCombo.AddItem "Brush Stretch"
-    ModeCombo.AddItem "Brush SnapScale"
-    ModeCombo.AddItem "Add Actor"
-    ModeCombo.AddItem "Add Light"
-    ModeCombo.AddItem "Move Actor/Light"
-    ModeCombo.AddItem "Set/Pan/Scale Textures"
-    ModeCombo.AddItem "Rotate Textures"
-    ModeCombo.AddItem "Terraform"
-    ModeCombo.ListIndex = 0
-    '
-    GridCombo.AddItem "Off"
-    GridCombo.AddItem "1"
-    GridCombo.AddItem "2"
-    GridCombo.AddItem "4"
-    GridCombo.AddItem "8"
-    GridCombo.AddItem "16"
-    GridCombo.AddItem "32"
-    GridCombo.AddItem "64"
-    GridCombo.AddItem "128"
-    GridCombo.AddItem "256"
-    GridCombo.AddItem "Custom"
-    GridCombo.ListIndex = 5
-    '
-    ActorCombo.AddItem "Light"
-    ActorCombo.AddItem "Show Browser..."
-    ActorCombo.ListIndex = 0
-    '
-    TextureCombo.AddItem "Default"
-    TextureCombo.AddItem "Show Browser..."
-    TextureCombo.ListIndex = 0
-    '
     ' Launch UnrealServer.  There is only
     ' one of these per instance.
     '
     Ed.GetProfile
-    Ed.LaunchServer (frmMain.hwnd)
-    If Ed.Licensed = 0 Then frmLicense.Show 1 ' Show license info
-    Call Ed.Server.Init(frmMain.hwnd, frmMain.Callback.hwnd) ' Initialize the server
+    Call Ed.InitServer(frmMain.hwnd, frmMain.Callback.hwnd)
+    'If Ed.Licensed = 0 Then frmLicense.Show 1 ' Show license info
     '
     ' Set help file dirs:
     '
@@ -1485,15 +1128,14 @@ Private Sub MDIForm_Load()
     Ed.Startup = 0
     GInitialResized = 1
     '
-    Ed.Server.Exec "APP HIDE"
-    Ed.Server.Exec "APP SET PROGRESSBAR=" & Trim(Str(ProgressBar.hwnd)) & " PROGRESSTEXT=" & Trim(Str(ProgressText.hwnd))
+    Ed.ServerExec "APP HIDE"
     '
     ' Set server parameters to the defaults the
     ' editor expects:
     '
-    Ed.Server.Exec "MAP GRID X=16 Y=16 Z=16 BASE=ABSOLUTE SHOW2D=ON SHOW3D=OFF"
-    Ed.Server.Exec "MAP ROTGRID PITCH=4 YAW=4 ROLL=4"
-    Ed.Server.Exec "MODE CAMERAMOVE GRID=ON ROTGRID=ON SHOWVERTICES=ON SNAPTOPIVOT=ON SNAPDIST=10"
+    Ed.ServerExec "MAP GRID X=16 Y=16 Z=16 BASE=ABSOLUTE SHOW2D=ON SHOW3D=OFF"
+    Ed.ServerExec "MAP ROTGRID PITCH=4 YAW=4 ROLL=4"
+    Ed.ServerExec "MODE CAMERAMOVE GRID=ON ROTGRID=ON SNAPTOPIVOT=ON SNAPDIST=10"
     '
     ResizeAll (False)
     '
@@ -1501,38 +1143,6 @@ Private Sub MDIForm_Load()
     ' for palette to come out right):
     '
     InitToolbar
-    '
-    ' Load initial resources, if any
-    '
-    If Ed.InitialFiles <> "" Then
-        Open "UnrealEd.tmp" For Append As #1
-        If LOF(1) <> 0 Then
-            Close #1
-            Call MsgBox("It appears that UnrealEd did not start up successfully the last time it was run.  This may be due to invalid startup files that were specified.  You may want to remove them from the Preferences dialog.", _
-                0, "Possible UnrealEd startup problem")
-            Kill "UnrealEd.tmp"
-            frmPreferences.Show 1
-        Else
-            Print #1, "UnrealEd"
-            Close #1
-            S = Ed.InitialFiles
-            Do
-                If InStr(S, " ") Then
-                    T = Trim(Left(S, InStr(S, " ") - 1))
-                    S = Trim(Mid(S, InStr(S, " ") + 1))
-                Else
-                    T = S
-                    S = ""
-                End If
-                If T <> "" Then
-                    Ed.BeginSlowTask "Loading file"
-                    Ed.Server.SlowExec "RES LOAD FILE=" & Quotes(T)
-                    Ed.EndSlowTask
-                End If
-            Loop Until T = ""
-            Kill "UnrealEd.tmp"
-        End If
-    End If
     
     Ed.StatusText "UnrealEd is ready to go"
     '
@@ -1541,17 +1151,6 @@ Private Sub MDIForm_Load()
     Call Ed.RegisterBrowserTopic(frmSoundFXBrowser, "SoundFX")
     Call Ed.RegisterBrowserTopic(frmMusicBrowser, "Music")
     Call Ed.SetBrowserTopic(Ed.InitialBrowserTopic)
-    '
-    ' Browsers that no longer exist:
-    'Call Ed.RegisterBrowserTopic(frmBrushBrowser, "Brushes")
-    'Call Ed.RegisterBrowserTopic(frmAmbientBrowser, "Ambient")
-    '
-    If CalcText.Visible Then
-        CalcText.AddItem "Reset"
-        CalcText.Text = "0"
-        CalcButton.SetFocus
-        SendKeys "{HOME}+{END}" ' Select all
-    End If
     
     PreferencesChange
     
@@ -1564,7 +1163,7 @@ Private Sub MDIForm_Load()
             Temp = App.Path + "\" + Temp
         End If
         Ed.BeginSlowTask "Loading " & Temp
-        Ed.Server.Exec "MAP LOAD FILE=" & Quotes(Temp)
+        Ed.ServerExec "MAP LOAD FILE=" & Quotes(Temp)
         Ed.EndSlowTask
         '
         Ed.MapFname = Temp
@@ -1577,7 +1176,7 @@ End Sub
 
 Private Sub MDIForm_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
     If (Button And 2) <> 0 Then ' Right click
-        PopupMenu frmPopups.Window
+        PopupMenu frmPopups.WIndow
     End If
 End Sub
 
@@ -1601,67 +1200,40 @@ Private Sub MDIForm_Unload(Cancel As Integer)
     ' called their EndOnTop's.
     Ed.SaveProfile
    
-   ' End the program, in case any stray objects
-   ' are still hanging around in memory.
+    ' End the program, in case any stray objects
+    ' are still hanging around in memory.
+    Ed.ExitServer
    End
-End Sub
-
-Private Sub MapEditMode_Click()
-    Ed.Tools.Click "MAPEDIT"
 End Sub
 
 Private Sub MeshViewer_Click()
     frmMeshViewer.Show
 End Sub
 
-Private Sub ModeCombo_Click()
-    If Ed.Startup <> 0 Or GSettingMode <> 0 Then
-        ' Disregard
-    Else
-        GSettingMode = 1
-        Select Case ModeCombo.List(ModeCombo.ListIndex)
-        Case "Move Camera/Brush": Ed.Tools.Click "CAMERAMOVE"
-        Case "Zoom Camera/Brush": Ed.Tools.Click "CAMERAZOOM"
-        Case "Brush Rotate": Ed.Tools.Click "BRUSHROTATE"
-        Case "Brush Scale": Ed.Tools.Click "BRUSHSCALE"
-        Case "Brush Sheer": Ed.Tools.Click "BRUSHSHEER"
-        Case "Brush Stretch": Ed.Tools.Click "BRUSHSTRETCH"
-        Case "Brush SnapScale": Ed.Tools.Click "BRUSHSNAP"
-        Case "Add Actor": Ed.Tools.Click "ADDACTOR"
-        Case "Add Light": Ed.Tools.Click "ADDLIGHT"
-        Case "Move Actor/Light": Ed.Tools.Click "MOVEACTOR"
-        Case "Set/Pan/Scale Textures": Ed.Tools.Click "TEXTUREPAN"
-        Case "Rotate Textures": Ed.Tools.Click "TEXTUREROTATE"
-        Case "Terraform": Ed.Tools.Click "TERRAFORM"
-        End Select
-        GSettingMode = 0
-    End If
-    Call Ed.StatusText("Set mode to " & ModeCombo.List(ModeCombo.ListIndex))
-End Sub
-
 Private Sub New_Click()
-    Ed.Server.Disable
+    Ed.ServerDisable
     If MsgBox("Are you sure you want to create a new map?", _
         vbOKCancel) = vbOK Then
-       
+
         ' New map.
         Ed.MapFname = ""
         frmMain.Caption = Ed.EditorAppName
-        Ed.Server.Exec "MAP NEW"
+        Ed.ServerExec "MAP NEW"
         PostLoad
+
     End If
-    Ed.Server.Enable
+    Ed.ServerEnable
 End Sub
 
 Private Sub ObjectProperties_Click()
-   frmActorProperties.Show
+    Ed.ServerExec "HOOK ACTORPROPERTIES" ''xyzzy
 End Sub
 
 Private Sub Open_Click()
     
     ' Dialog for "Open Map".
     On Error GoTo Skip
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.MapOpen.filename = ""
     frmDialogs.MapOpen.ShowOpen
     
@@ -1674,16 +1246,15 @@ Private Sub Open_Click()
         Caption = Ed.EditorAppName + " - " + Ed.MapFname
         
         Ed.BeginSlowTask "Loading map"
-        Ed.Server.SlowExec "MAP LOAD FILE=" & _
+        Ed.ServerExec "MAP LOAD FILE=" & _
             Quotes(Ed.MapFname) & " REDRAW=OFF"
         Ed.EndSlowTask
         
-        If Ed.MapEdit Then Call Ed.Tools.Click("MAPEDIT")
         Ed.LoadParamsFromLevel
         ResizeAll (True)
         PostLoad
     End If
-Skip: Ed.Server.Enable
+Skip: Ed.ServerEnable
 End Sub
 
 Private Sub PanelHolder_Mousedown(Button As Integer, Shift As Integer, X As Single, Y As Single)
@@ -1729,24 +1300,23 @@ Private Sub PlayButton_Click()
 End Sub
 
 Private Sub Preferences_Click()
-   Ed.Server.Disable
-   frmPreferences.Show 1
-   Ed.Server.Enable
+    Ed.ServerExec "HOOK PREFERENCES" ''xyzzy
 End Sub
 
 Private Sub Project_Click()
-    frmActorProperties.GetLevelProperties
+    Ed.ServerExec "HOOK LEVELPROPERTIES" ''xyzzy
 End Sub
 
 Private Sub Rebuild_Click()
     frmRebuilder.Show ' Rebuild dialog
+    frmRebuilder.SetFocus
 End Sub
 
 Private Sub EditRedo_Click()
     If hwndScript <> 0 Then
         ScriptForm.EditRedo_Click
     Else
-        Ed.Server.Exec "TRANSACTION REDO"
+        Ed.ServerExec "TRANSACTION REDO"
     End If
 End Sub
 
@@ -1755,23 +1325,19 @@ Private Sub RelNotes_Click()
 End Sub
 
 Private Sub ResetAll_Click()
-    Ed.Server.Exec "BRUSH RESET"
+    Ed.ServerExec "BRUSH RESET"
 End Sub
 
 Private Sub ResetPosition_Click()
-    Ed.Server.Exec "BRUSH MOVETO X=0 Y=0 Z=0"
+    Ed.ServerExec "BRUSH MOVETO X=0 Y=0 Z=0"
 End Sub
 
 Private Sub ResetRotation_Click()
-    Ed.Server.Exec "BRUSH ROTATETO PITCH=0 YAW=0 ROLL=0"
+    Ed.ServerExec "BRUSH ROTATETO PITCH=0 YAW=0 ROLL=0"
 End Sub
 
 Private Sub ResetScale_Click()
-    Ed.Server.Exec "BRUSH SCALE X=1 Y=1 Z=1 SHEER=0"
-End Sub
-
-Private Sub Resize_Click()
-    frmBrush.Show
+    Ed.ServerExec "BRUSH SCALE X=1 Y=1 Z=1 SHEER=0"
 End Sub
 
 Private Sub Save_Click()
@@ -1780,10 +1346,10 @@ Private Sub Save_Click()
         '
         ' Prompt for filename
         '
-        Ed.Server.Disable
+        Ed.ServerDisable
         frmDialogs.MapSaveAs.ShowSave 'Modal Save-As Box
         Ed.MapFname = frmDialogs.MapSaveAs.filename
-        Ed.Server.Enable
+        Ed.ServerEnable
         Call UpdateDialog(frmDialogs.MapSaveAs)
     End If
     '
@@ -1795,10 +1361,10 @@ Private Sub Save_Click()
         Caption = Ed.EditorAppName + " - " + Ed.MapFname
         Ed.BeginSlowTask ("Saving map")
         Ed.SaveParamsToLevel
-        Ed.Server.SlowExec "MAP SAVE FILE=" & Quotes(Ed.MapFname)
+        Ed.ServerExec "MAP SAVE FILE=" & Quotes(Ed.MapFname)
         Ed.EndSlowTask
     End If
-Skip: Ed.Server.Enable
+Skip: Ed.ServerEnable
 End Sub
 
 Private Sub SaveAs_Click()
@@ -1816,7 +1382,7 @@ Private Sub SaveBrush_Click()
         '
         ' Prompt for filename
         '
-        Ed.Server.Disable
+        Ed.ServerDisable
         frmDialogs.BrushSave.ShowSave
         Ed.BrushFname = frmDialogs.BrushSave.filename
         Call UpdateDialog(frmDialogs.BrushSave)
@@ -1826,9 +1392,9 @@ Private Sub SaveBrush_Click()
         '
         ' Save the brush
         '
-        Ed.Server.Exec "BRUSH SAVE FILE=" & Quotes(Ed.BrushFname)
+        Ed.ServerExec "BRUSH SAVE FILE=" & Quotes(Ed.BrushFname)
     End If
-Skip: Ed.Server.Enable
+Skip: Ed.ServerEnable
 End Sub
 
 Private Sub SaveBrushAs_Click()
@@ -1844,20 +1410,18 @@ Private Sub ScriptEditDefaults_Click()
     ScriptForm.ScriptEditDefaults_Click
 End Sub
 
-Private Sub ScriptMakeAll_Click()
+Public Sub ScriptMakeAll_Click()
     Ed.BeginSlowTask "Compiling all scripts"
     PreSaveAll
-    Ed.Server.Exec "SCRIPT MAKE ALL"
-    frmActorProperties.NoteClassChange
+    Ed.ServerExec "SCRIPT MAKE ALL"
     Ed.EndSlowTask
     frmClassBrowser.ProcessResults
 End Sub
 
-Private Sub ScriptMakeChanged_Click()
+Public Sub ScriptMakeChanged_Click()
     Ed.BeginSlowTask "Compiling changed scripts"
     PreSaveAll
-    Ed.Server.Exec "SCRIPT MAKE"
-    frmActorProperties.NoteClassChange
+    Ed.ServerExec "SCRIPT MAKE"
     Ed.EndSlowTask
     frmClassBrowser.ProcessResults
 End Sub
@@ -1867,87 +1431,87 @@ Private Sub ScriptResults_Click()
 End Sub
 
 Private Sub SelAdjFloors_Click()
-    Ed.Server.Exec "POLY SELECT ADJACENT FLOORS"
+    Ed.ServerExec "POLY SELECT ADJACENT FLOORS"
 End Sub
 
 Private Sub SelAdjSlants_Click()
-    Ed.Server.Exec "POLY SELECT ADJACENT SLANTS"
+    Ed.ServerExec "POLY SELECT ADJACENT SLANTS"
 End Sub
 
 Private Sub SelAdjWalls_Click()
-    Ed.Server.Exec "POLY SELECT ADJACENT WALLS"
+    Ed.ServerExec "POLY SELECT ADJACENT WALLS"
 End Sub
 
 Private Sub SelAllAdj_Click()
-    Ed.Server.Exec "POLY SELECT ADJACENT ALL"
+    Ed.ServerExec "POLY SELECT ADJACENT ALL"
 End Sub
 
 Private Sub SelCoplAdj_Click()
-    Ed.Server.Exec "POLY SELECT ADJACENT COPLANARS"
+    Ed.ServerExec "POLY SELECT ADJACENT COPLANARS"
 End Sub
 
 Private Sub SelectAll_Click()
-    Ed.Server.Exec "SELECT ALL"
+    Ed.ServerExec "SELECT ALL"
 End Sub
 
 Private Sub SelectNone_Click()
-    Ed.Server.Exec "SELECT NONE"
+    Ed.ServerExec "SELECT NONE"
 End Sub
 
 Private Sub SelIntersection_Click()
-    Ed.Server.Exec "POLY SELECT MEMORY INTERSECTION"
+    Ed.ServerExec "POLY SELECT MEMORY INTERSECTION"
 End Sub
 
 Private Sub SelMatchBrush_Click()
-    Ed.Server.Exec "POLY SELECT MATCHING BRUSH"
+    Ed.ServerExec "POLY SELECT MATCHING BRUSH"
 End Sub
 
 Private Sub SelMatchGroups_Click()
-    Ed.Server.Exec "POLY SELECT MATCHING GROUPS"
+    Ed.ServerExec "POLY SELECT MATCHING GROUPS"
 End Sub
 
 Private Sub SelMatchItems_Click()
-    Ed.Server.Exec "POLY SELECT MATCHING ITEMS"
+    Ed.ServerExec "POLY SELECT MATCHING ITEMS"
 End Sub
 
 Private Sub SelMatchTex_Click()
-    Ed.Server.Exec "POLY SELECT MATCHING TEXTURE"
+    Ed.ServerExec "POLY SELECT MATCHING TEXTURE"
 End Sub
 
 Private Sub SelMemorize_Click()
-    Ed.Server.Exec "POLY SELECT MEMORY SET"
+    Ed.ServerExec "POLY SELECT MEMORY SET"
 End Sub
 
 Private Sub SelRecall_Click()
-    Ed.Server.Exec "POLY SELECT MEMORY RECALL"
+    Ed.ServerExec "POLY SELECT MEMORY RECALL"
 End Sub
 
 Private Sub SelReverse_Click()
-    Ed.Server.Exec "POLY SELECT REVERSE"
+    Ed.ServerExec "POLY SELECT REVERSE"
 End Sub
 
 Private Sub SelUnion_Click()
-    Ed.Server.Exec "POLY SELECT MEMORY UNION"
+    Ed.ServerExec "POLY SELECT MEMORY UNION"
 End Sub
 
 Private Sub SelXor_Click()
-    Ed.Server.Exec "POLY SELECT MEMORY XOR"
+    Ed.ServerExec "POLY SELECT MEMORY XOR"
 End Sub
 
 Private Sub ShowBackdrop_Click()
-    Ed.Server.Exec "CAMERA SET BACKDROP=TOGGLE"
+    Ed.ServerExec "CAMERA SET BACKDROP=TOGGLE"
 End Sub
 
 Private Sub ShowBrush_Click()
-    Ed.Server.Exec "CAMERA SET BRUSH=TOGGLE"
+    Ed.ServerExec "CAMERA SET BRUSH=TOGGLE"
 End Sub
 
 Private Sub ShowGrid_Click()
-    Ed.Server.Exec "CAMERA SET GRID=TOGGLE"
+    Ed.ServerExec "CAMERA SET GRID=TOGGLE"
 End Sub
 
 Private Sub ShowOcclusion_Click()
-    Ed.Server.Exec "CAMERA SET OCCLUSION=TOGGLE"
+    Ed.ServerExec "CAMERA SET OCCLUSION=TOGGLE"
 End Sub
 
 Private Sub SSPanel5_Click()
@@ -1963,42 +1527,12 @@ Private Sub TexPalette_Click()
     ResizeAll (False)
 End Sub
 
-Private Sub TextureCombo_Click()
-    If Ed.Startup Then
-        ' Disregard
-    ElseIf TextureCombo.ListIndex = 1 Then
-        If Ed.BrowserPos = 2 Then
-            Ed.BrowserPos = 0
-            ResizeAll (True)
-        End If
-        Call Ed.SetBrowserTopic("Textures")
-        TextureCombo.ListIndex = 0
-    End If
+Private Sub SurfaceProperties_Click()
+   frmSurfaceProps.Show
 End Sub
 
 Private Sub Timer_Timer()
-    Dim Name As String
-    Ed.AutoSaveCountup = Ed.AutoSaveCountup + 1
-    If (Ed.AutoSaveCountup > Ed.AutoSaveTime) And _
-        (Ed.AutoSaveTime <> 0) Then
-        '
-        Ed.AutoSaveCountup = 0
-        Ed.BeginSlowTask ("Saving map")
-        '
-        If Ed.AutoUnique <> 0 Then
-            Name = "Auto" & Trim(Str(Ed.AutoCounter))
-        Else
-            Name = "Autosave"
-        End If
-        '
-        Ed.Server.SlowExec "MAP SAVE FILE=" & Quotes(Ed.BaseDir + Ed.MapDir + "\" + Name + ".unr")
-        Ed.EndSlowTask
-        '
-        If Ed.AutoUnique <> 0 Then
-            Ed.AutoCounter = (Ed.AutoCounter + 1) Mod 20
-            Ed.SaveProfile
-        End If
-    End If
+    Ed.ServerExec "MaybeAutoSave"
 End Sub
 
 Private Sub TWODEE_Click()
@@ -2009,7 +1543,7 @@ Private Sub EditUndo_Click()
     If hwndScript <> 0 Then
         ScriptForm.EditUndo_Click
     Else
-        Ed.Server.Exec "TRANSACTION UNDO"
+        Ed.ServerExec "TRANSACTION UNDO"
     End If
 End Sub
 
@@ -2019,14 +1553,14 @@ End Sub
 
 Private Sub ValidateLevel_Click()
     Call frmResults.UpdateStatus("Validating level:")
-    Ed.Server.Exec "LEVEL VALIDATE"
+    Ed.ServerExec "LEVEL VALIDATE"
     frmResults.UpdateResults
     frmResults.Results_DblClick
 End Sub
 
 Public Sub ViewLevelLinks_Click()
     Call frmResults.UpdateStatus("Level links:")
-    Ed.Server.Exec "LEVEL LINKS"
+    Ed.ServerExec "LEVEL LINKS"
     frmResults.UpdateResults
     frmResults.Results_DblClick
 End Sub
@@ -2047,7 +1581,7 @@ Private Sub WinBrowserRight_Click()
 End Sub
 
 Private Sub WindowLog_Click()
-    Ed.Server.Exec "APP SHOW"
+    Ed.ServerExec "SHOWLOG"
 End Sub
 
 Private Sub WinToolbarLeft_Click()
@@ -2058,10 +1592,6 @@ End Sub
 Private Sub WinToolbarRight_Click()
     Ed.ToolbarPos = 1 ' right
     ResizeAll (True)
-End Sub
-
-Private Sub WorldBrowser_Click()
-    frmResBrowse.Show
 End Sub
 
 '---------------------------------'
@@ -2126,7 +1656,6 @@ Private Sub InitToolbar()
     Ed.RotGridMode = 1
     Ed.SpeedMode = 1
     Ed.SnapVertex = 1
-    Ed.ShowVertices = 1
     '
     ' Build grid
     '
@@ -2159,30 +1688,31 @@ Private Sub InitToolbar()
     ToolIcons(7).Tag = "BRUSHSTRETCH"
     '
     ToolIcons(9).Tag = "BRUSHSNAP"
-    ToolIcons(10).Tag = "MOVEACTOR"
+    ToolIcons(10).Tag = "POLY SELECT ALL" 'MWP
     '
-    ToolIcons(12).Tag = "ADDLIGHT"
-    ToolIcons(13).Tag = "ADDACTOR"
+    ToolIcons(12).Tag = "ACTOR SELECT ALL"
+    ToolIcons(13).Tag = "ACTOR SELECT INSIDE" 'MWP
     '
-    ToolIcons(15).Tag = "SELECT ALL"
-    ToolIcons(16).Tag = "SELECT NONE"
+    ToolIcons(15).Tag = "SELECT NONE"
+    ToolIcons(16).Tag = "ACTOR SELECT INVERT" 'MWP
     '
-    ToolIcons(18).Tag = "TRANSACTION UNDO"
-    ToolIcons(19).Tag = "TRANSACTION REDO"
+    ToolIcons(18).Tag = "ACTOR REPLACE BRUSH" 'MWP
+    ToolIcons(19).Tag = "ACTOR REPLACE" 'MWP
     '
-    ToolIcons(21).Tag = "TEXTURE RESET"
-    ToolIcons(22).Tag = "BRUSH RESET"
+    ToolIcons(21).Tag = "TRANSACTION UNDO" 'MWP
+    ToolIcons(22).Tag = "TRANSACTION REDO" 'MWP
     '
     ToolIcons(24).Tag = "TEXTUREPAN"
     ToolIcons(25).Tag = "TEXTUREROTATE"
     '
-    ToolIcons(27).Tag = "BROKEN"
-    ToolIcons(28).Tag = "BRUSH MIRROR"
+    ToolIcons(27).Tag = "ACTOR HIDE UNSELECTED" 'MWP
+    ToolIcons(28).Tag = "ACTOR UNHIDE ALL" 'MWP
     '
-    ToolIcons(30).Tag = "MAPEDIT"
-    ToolIcons(31).Tag = "TERRAFORM"
+    ToolIcons(30).Tag = "ACTOR HIDE SELECTED" 'MWP
+    ToolIcons(31).Tag = "ACTOR CLIP Z" 'MWP
+    'ToolIcons(31).Tag = "ACTOR CLIP XY" 'MWP:XXX
     '
-    ToolIcons(33).Tag = "SHOWVERTICES"
+    'ToolIcons(33).Tag = "ACTOR CLIP XYZ" 'MWP:XXX
     ToolIcons(34).Tag = "SNAPVERTEX"
     '
     ToolIcons(36).Tag = "HELP"
@@ -2190,9 +1720,6 @@ Private Sub InitToolbar()
     '
     ToolIcons(39).Tag = "GRID"
     ToolIcons(40).Tag = "ROTGRID"
-    '
-    ToolIcons(42).Tag = "ACTBROWSE"
-    ToolIcons(43).Tag = "TEXBROWSE"
     '
     ' Brush tools:
     '
@@ -2210,7 +1737,6 @@ Private Sub InitToolbar()
     ToolIcons(35).Tag = "SPIRAL"
     ToolIcons(38).Tag = "CURVEDSTAIR"
     ToolIcons(41).Tag = "SHEET"
-    ToolIcons(44).Tag = "LOAD"
     '
     GToolClicking = 1
     For N = 0 To ToolbarCount - 1
@@ -2299,7 +1825,6 @@ Public Sub ResizeAll(Reopen As Boolean)
     
     ' Set visibility and positions.
     frmCameraHolder.Visible = False
-    MainBar.Visible = True
         
     If Ed.BrowserPos = 2 Then ' Hide.
         BrowserPanel.Visible = False
@@ -2329,22 +1854,6 @@ Public Sub ResizeAll(Reopen As Boolean)
     Toolbar.Visible = True
     ResizeToolbar
     
-    ' Position combo boxes.
-    X = MainBar.Width - (TextureCombo.Left + _
-        TextureCombo.Width + _
-        8 * Screen.TwipsPerPixelX)
-    CalcText.Left = CalcText.Left + X
-    CalcButton.Left = CalcButton.Left + X
-    CalcZero.Left = CalcZero.Left + X
-    ModeLabel.Left = ModeLabel.Left + X
-    ModeCombo.Left = ModeCombo.Left + X
-    TextureLabel.Left = TextureLabel.Left + X
-    TextureCombo.Left = TextureCombo.Left + X
-    ActorLabel.Left = ActorLabel.Left + X
-    ActorCombo.Left = ActorCombo.Left + X
-    GridLabel.Left = GridLabel.Left + X
-    GridCombo.Left = GridCombo.Left + X
-    
     ' Camera holder.
     frmCameraHolder.SetPos
     frmCameraHolder.OpenCameras (Reopen)
@@ -2360,71 +1869,108 @@ End Sub
 ' UnrealEdServer callback dispatcher
 '
 Private Sub Callback_KeyPress(KeyAscii As Integer)
-    '
     Dim N As Integer
     Dim S As String
-    '
+    Dim IsMover As Boolean
+    Dim IsBrush As Boolean
+    Dim Cur As String
+    Dim Class As String
+    
     Select Case KeyAscii - 32
-    Case EDC_GENERAL:
+    Case EDC_BROWSE:
+        Class = Ed.ServerGetProp("OBJ", "BROWSECLASS")
+        Select Case UCase(Class)
+            Case "PALETTE":
+                Ed.SetBrowserTopic ("Textures")
+            Case "TEXTURE":
+                Ed.SetBrowserTopic ("Textures")
+            Case "CLASS":
+                Ed.SetBrowserTopic ("Classes")
+            Case "MUSIC":
+                Ed.SetBrowserTopic ("Music")
+            Case "SOUND":
+                Ed.SetBrowserTopic ("SoundFX")
+            Case "MESH":
+                frmMeshViewer.Show
+        End Select
+    Case EDC_USECURRENT:
+        Class = Ed.ServerGetProp("OBJ", "BROWSECLASS")
+        Select Case UCase(Class)
+            Case "PALETTE":
+                Cur = Ed.ServerGetProp("TEXTURE", "PALETTE TEXTURE=" & Ed.GetBrowserCurrentItem("Textures"))
+            Case "TEXTURE":
+                Cur = Ed.GetBrowserCurrentItem("Textures")
+            Case "CLASS":
+                Cur = Ed.CurrentClass
+            Case "SOUND":
+                Cur = Ed.GetBrowserCurrentItem("SoundFX")
+            Case "MUSIC":
+                Cur = Ed.GetBrowserCurrentItem("Music")
+            Case "MESH":
+                Cur = frmMeshViewer.GetCurrent()
+        End Select
+        If Cur <> "" Then
+            Call Ed.ServerSetProp("OBJ", "NOTECURRENT", "CLASS=" & Class & " OBJECT=" & Cur)
+        End If
     Case EDC_CURTEXCHANGE:
-        frmMain.TextureCombo.List(0) = Ed.Server.GetProp("ED", "CURTEX")
-        frmMain.TextureCombo.ListIndex = 0
         frmTexBrowser.BrowserRefresh
-    Case EDC_CURCLASSCHANGE:
-        frmMain.ActorCombo.List(0) = Ed.Server.GetProp("ED", "CURCLASS")
-        frmMain.ActorCombo.ListIndex = 0
-    Case EDC_SELPOLYCHANGE:
+    Case EDC_SELCHANGE:
         If GPolyPropsAction = 1 Then
             frmSurfaceProps.GetSelectedPolys
         End If
-    Case EDC_SELACTORCHANGE:
-        If GActorPropsAction = AP_Selected Then
-            frmActorProperties.GetSelectedActors
-        ElseIf GActorPropsAction = AP_Class Then
-            frmActorProperties.NoteClassChange
-        End If
-    Case EDC_SELBRUSHCHANGE:
     Case EDC_RTCLICKTEXTURE:
-        frmMain.TextureCombo.List(0) = Ed.Server.GetProp("ED", "CURTEX")
-        frmMain.TextureCombo.ListIndex = 0
         frmTexBrowser.BrowserRefresh
         Call frmTexBrowser.TextureList_MouseDown(2, 0, 0, 0)
     Case EDC_RTCLICKPOLY:
-        frmPopups2.prProperties.Caption = "Surface &Properties (" & Ed.Server.GetProp("Polys", "NumSelected") & " selected)..."
-        frmPopups2.prApplyTex.Caption = "Apply &Texture " & frmMain.TextureCombo.List(0)
+        frmPopups2.prProperties.Caption = "Surface &Properties (" & Ed.ServerGetProp("Polys", "NumSelected") & " selected)..."
+        frmPopups2.prApplyTex.Caption = "Apply &Texture " & frmTexBrowser.GetCurrent()
+        frmPopups2.AddClassHere.Visible = Ed.CurrentClass <> "Light"
+        frmPopups2.AddClassHere.Caption = "&Add " & Ed.CurrentClass & " here"
         PopupMenu frmPopups2.PolyRtClick
     Case EDC_RTCLICKACTOR:
-        N = Val(Ed.Server.GetProp("Actor", "NumSelected"))
-        GPopupActorClass = Ed.Server.GetProp("Actor", "ClassSelected")
-        '
-        frmPopups2.arMoverKeyframe.Visible = _
-            (Val(Ed.Server.GetProp("Actor", "ISKINDOF CLASS=MOVER")) = 1)
+        N = Val(Ed.ServerGetProp("Actor", "NumSelected"))
+        GPopupActorClass = Ed.ServerGetProp("Actor", "ClassSelected")
+        
+        IsBrush = Ed.ServerGetProp("Actor", "ISKINDOF CLASS=BRUSH") <> 0
+        frmPopups2.Mirror.Visible = IsBrush
+        frmPopups2.Order.Visible = IsBrush
+        frmPopups2.CopyPolygons.Visible = IsBrush
+        frmPopups2.Solidity.Visible = IsBrush
+        frmPopups2.SelectBrushes.Visible = IsBrush
+
+        IsMover = Ed.ServerGetProp("Actor", "ISKINDOF CLASS=MOVER") <> 0
+        frmPopups2.arMoverKeyframe.Visible = IsMover
+        
         If GPopupActorClass <> "" Then
             frmPopups2.arProps.Caption = GPopupActorClass & " &Properties (" & Trim(Str(N)) & " selected)..."
             frmPopups2.arSelectAllOfType.Caption = "Select all " & GPopupActorClass & " actors"
             frmPopups2.arSelectAllOfType.Visible = True
-            frmPopups2.arRememberClass.Visible = True
-            frmPopups2.arScriptMenu.Visible = True
+            frmPopups2.arScriptEdit.Visible = True
         Else
             frmPopups2.arProps.Caption = "Actor &Properties (" & Trim(Str(N)) & " selected)..."
             frmPopups2.arSelectAllOfType.Visible = False
-            frmPopups2.arRememberClass.Visible = False
-            frmPopups2.arScriptMenu.Visible = False
+            frmPopups2.arScriptEdit.Visible = False
         End If
-        '
+
         PopupMenu frmPopups2.ActorRtClick
-    Case EDC_MODECHANGE:
-    Case EDC_BRUSHCHANGE:
-    Case EDC_MAPCHANGE:
-    Case EDC_ACTORCHANGE:
+    Case EDC_RTCLICKWINDOWCANADD:
+        frmPopups.AddClassHere.Visible = True
+        frmPopups.AddClassHere.Visible = Ed.CurrentClass <> "Light"
+        frmPopups.AddClassHere.Caption = "&Add " & Ed.CurrentClass & " here"
+        frmPopups.AddLightHere.Visible = True
+        frmPopups.AddDivider.Visible = True
+        frmPopups.Pivot.Visible = True
+        PopupMenu frmPopups.WIndow
     Case EDC_RTCLICKWINDOW:
-        PopupMenu frmPopups.Window
+        frmPopups.AddClassHere.Visible = False
+        frmPopups.AddLightHere.Visible = False
+        frmPopups.AddDivider.Visible = False
+        frmPopups.Pivot.Visible = False
+        PopupMenu frmPopups.WIndow
     End Select
-    '
 End Sub
 
 Public Sub PreferencesChange()
-    WorldBrowser.Visible = Ed.GodMode
 End Sub
 
 '
@@ -2433,12 +1979,6 @@ End Sub
 
 Private Sub PlayLevel_Click()
     PreSaveAll
-    Ed.BeginSlowTask ("Saving map for play")
-    Ed.Server.SlowExec "MAP SAVE FILE=" & Quotes(Ed.BaseDir & Ed.MapDir & "\Autoplay.unr")
-    Ed.EndSlowTask
-    Call Shell(Ed.BaseDir + "\Unreal " & _
-        "FILE=" & Quotes(Ed.BaseDir & Ed.MapDir & "\Autoplay.unr") & _
-        " HWND=" & Trim(Str(hwnd)), _
-        vbNormalFocus)
+    Ed.ServerExec "HOOK PLAYMAP"
 End Sub
 

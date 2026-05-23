@@ -23,9 +23,9 @@ Global GImportExisting As Integer
 Global GSettingMode As Integer
 Global GResizingAll As Integer
 Global GString As String
+Global GPackage As String
 Global GNumMiscForms As Integer
 Global GPopupActorClass As String
-Global GActorPropsAction As Integer
 Global GPolyPropsAction As Integer
 Global GMiscForms(100) As Variant
 Global ScriptEdTop As Integer
@@ -144,7 +144,6 @@ Sub PostLoad()
     For i = 0 To GNumMiscForms - 1
         Call GMiscForms(i).PostLoad
     Next i
-    frmActorProperties.NoteClassChange
 End Sub
 
 Sub UpdateDialog(c As Control)
@@ -156,5 +155,6 @@ Sub UpdateDialog(c As Control)
         Wend
         c.InitDir = S
     End If
+    ChDir Ed.BaseDir
 End Sub
 

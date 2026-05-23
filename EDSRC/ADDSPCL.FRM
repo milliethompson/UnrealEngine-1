@@ -224,7 +224,7 @@ Private Sub Add_Click()
     End If
     '
     Ed.BeginSlowTask "Adding special brush to world"
-    Ed.Server.SlowExec "BRUSH ADD FLAGS=" & Trim(Str(Flags))
+    Ed.ServerExec "BRUSH ADD FLAGS=" & Trim(Str(Flags))
     Ed.EndSlowTask
 End Sub
 
@@ -268,7 +268,7 @@ Private Sub Settings_Click()
         Regular.Value = True
         ZonePortal.Value = 1
         Transparent.Value = 0
-        Invisible.Value = 0
+        Invisible.Value = 1
         NonSolid.Value = True
         TwoSided.Value = True
     Case "Semisolid Pillar":

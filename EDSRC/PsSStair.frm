@@ -1384,9 +1384,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -1444,9 +1444,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             
             NumSent = 1
@@ -1538,9 +1538,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -1959,9 +1959,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             
             NumSent = 1
@@ -2264,9 +2264,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -2320,9 +2320,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -2391,9 +2391,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -2443,9 +2443,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -2549,9 +2549,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -2598,9 +2598,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -2710,9 +2710,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -2790,9 +2790,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -2895,9 +2895,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -2944,9 +2944,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -3056,9 +3056,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -3136,9 +3136,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -3216,9 +3216,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -3272,9 +3272,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -3325,9 +3325,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -3377,9 +3377,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -3435,9 +3435,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -3497,9 +3497,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -3548,9 +3548,9 @@ Private Sub Build_Click()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
             
             NumSent = 1
@@ -3588,9 +3588,9 @@ Private Sub Build_Click()
             MousePointer = 0
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server)
+                Call SendBrush(0)
             End If
 
 

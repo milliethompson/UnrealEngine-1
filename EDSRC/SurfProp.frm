@@ -90,7 +90,7 @@ Begin VB.Form frmSurfaceProps
       Width           =   5295
       _ExtentX        =   9340
       _ExtentY        =   4260
-      _Version        =   327680
+      _Version        =   327681
       Style           =   1
       Tabs            =   6
       TabsPerRow      =   6
@@ -107,68 +107,51 @@ Begin VB.Form frmSurfaceProps
       EndProperty
       TabCaption(0)   =   "Effects"
       TabPicture(0)   =   "SurfProp.frx":030A
-      Tab(0).ControlCount=   1
       Tab(0).ControlEnabled=   -1  'True
       Tab(0).Control(0)=   "PolyFlagsHolder"
       Tab(0).Control(0).Enabled=   0   'False
+      Tab(0).ControlCount=   1
       TabCaption(1)   =   "Rotate "
       TabPicture(1)   =   "SurfProp.frx":0326
-      Tab(1).ControlCount=   1
       Tab(1).ControlEnabled=   0   'False
       Tab(1).Control(0)=   "Frame6"
-      Tab(1).Control(0).Enabled=   0   'False
+      Tab(1).ControlCount=   1
       TabCaption(2)   =   "Pan "
-      Tab(2).ControlCount=   3
+      TabPicture(2)   =   "SurfProp.frx":0342
       Tab(2).ControlEnabled=   0   'False
-      Tab(2).Control(0)=   "Frame4"
-      Tab(2).Control(0).Enabled=   0   'False
+      Tab(2).Control(0)=   "PanReset"
       Tab(2).Control(1)=   "Frame3"
-      Tab(2).Control(1).Enabled=   0   'False
-      Tab(2).Control(2)=   "PanReset"
-      Tab(2).Control(2).Enabled=   -1  'True
+      Tab(2).Control(2)=   "Frame4"
+      Tab(2).ControlCount=   3
       TabCaption(3)   =   "Align "
-      Tab(3).ControlCount=   13
+      TabPicture(3)   =   "SurfProp.frx":035E
       Tab(3).ControlEnabled=   0   'False
       Tab(3).Control(0)=   "Label3"
-      Tab(3).Control(0).Enabled=   0   'False
       Tab(3).Control(1)=   "Label8"
-      Tab(3).Control(1).Enabled=   0   'False
       Tab(3).Control(2)=   "Label7"
-      Tab(3).Control(2).Enabled=   0   'False
       Tab(3).Control(3)=   "Label6"
-      Tab(3).Control(3).Enabled=   0   'False
       Tab(3).Control(4)=   "Label5"
-      Tab(3).Control(4).Enabled=   0   'False
       Tab(3).Control(5)=   "Label9"
-      Tab(3).Control(5).Enabled=   0   'False
       Tab(3).Control(6)=   "ColumnTexels"
-      Tab(3).Control(6).Enabled=   -1  'True
       Tab(3).Control(7)=   "AlignWall"
-      Tab(3).Control(7).Enabled=   -1  'True
       Tab(3).Control(8)=   "Unalign"
-      Tab(3).Control(8).Enabled=   -1  'True
       Tab(3).Control(9)=   "WallColumn"
-      Tab(3).Control(9).Enabled=   -1  'True
       Tab(3).Control(10)=   "AlignGrade"
-      Tab(3).Control(10).Enabled=   -1  'True
       Tab(3).Control(11)=   "OneTile"
-      Tab(3).Control(11).Enabled=   -1  'True
       Tab(3).Control(12)=   "WallPan"
-      Tab(3).Control(12).Enabled=   -1  'True
+      Tab(3).ControlCount=   13
       TabCaption(4)   =   "Scale"
-      Tab(4).ControlCount=   2
+      TabPicture(4)   =   "SurfProp.frx":037A
       Tab(4).ControlEnabled=   0   'False
       Tab(4).Control(0)=   "Frame5"
-      Tab(4).Control(0).Enabled=   0   'False
       Tab(4).Control(1)=   "Frame2"
-      Tab(4).Control(1).Enabled=   0   'False
+      Tab(4).ControlCount=   2
       TabCaption(5)   =   "Editor"
-      Tab(5).ControlCount=   2
+      TabPicture(5)   =   "SurfProp.frx":0396
       Tab(5).ControlEnabled=   0   'False
-      Tab(5).Control(0)=   "Frame1"
-      Tab(5).Control(0).Enabled=   0   'False
-      Tab(5).Control(1)=   "Frame7"
-      Tab(5).Control(1).Enabled=   0   'False
+      Tab(5).Control(0)=   "Frame7"
+      Tab(5).Control(1)=   "Frame1"
+      Tab(5).ControlCount=   2
       Begin VB.Frame Frame1 
          Caption         =   "Surface Stats"
          BeginProperty Font 
@@ -1189,18 +1172,19 @@ Public Sub GetSelectedPolys()
     Dim OnFlags As Long, OffFlags As Long
     Dim N As Integer, L As Integer
     
-    OnFlags = Val(Ed.Server.GetProp("Polys", "SelectedSetFlags"))
-    OffFlags = Val(Ed.Server.GetProp("Polys", "SelectedClearFlags"))
+    OnFlags = Val(Ed.ServerGetProp("Polys", "SelectedSetFlags"))
+    OffFlags = Val(Ed.ServerGetProp("Polys", "SelectedClearFlags"))
+    N = Val(Ed.ServerGetProp("Polys", "NumSelected"))
     
     Call PolyFlagsForm.SetFlagBits(OnFlags, OffFlags)
     Caption = "Surface properties (" & Trim(Str(N)) & " selected)"
     
-    StaticLights.Caption = Ed.Server.GetProp("Polys", "StaticLights")
-    DynamicLights.Caption = Ed.Server.GetProp("Polys", "DynamicLights")
-    SurfCache.Caption = Ed.Server.GetProp("Polys", "Meshels")
-    MeshSize.Caption = Ed.Server.GetProp("Polys", "MeshSize")
+    StaticLights.Caption = Ed.ServerGetProp("Polys", "StaticLights")
+    DynamicLights.Caption = Ed.ServerGetProp("Polys", "DynamicLights")
+    SurfCache.Caption = Ed.ServerGetProp("Polys", "Meshels")
+    MeshSize.Caption = Ed.ServerGetProp("Polys", "MeshSize")
 
-    N = Val(Ed.Server.GetProp("Polys", "NumSelected"))
+    N = Val(Ed.ServerGetProp("Polys", "NumSelected"))
     If N = 0 Then
         PropsTab.Enabled = False
     Else
@@ -1211,7 +1195,7 @@ Public Sub GetSelectedPolys()
 End Sub
 
 Public Sub PolyFlagsUpdate(NewOnFlags As Long, NewOffFlags As Long)
-    Ed.Server.Exec "POLY SET SETFLAGS=" & Trim(Str(NewOnFlags)) & " CLEARFLAGS=" & Trim(Str(NewOffFlags))
+    Ed.ServerExec "POLY SET SETFLAGS=" & Trim(Str(NewOnFlags)) & " CLEARFLAGS=" & Trim(Str(NewOffFlags))
 End Sub
 
 '
@@ -1219,15 +1203,15 @@ End Sub
 '
 
 Private Sub AlignFloor_Click()
-    Ed.Server.Exec "POLY TEXALIGN FLOOR"
+    Ed.ServerExec "POLY TEXALIGN FLOOR"
 End Sub
 
 Private Sub AlignGrade_Click()
-    Ed.Server.Exec "POLY TEXALIGN FLOOR"
+    Ed.ServerExec "POLY TEXALIGN FLOOR"
 End Sub
 
 Private Sub AlignWall_Click()
-    Ed.Server.Exec "POLY TEXALIGN WALLDIR"
+    Ed.ServerExec "POLY TEXALIGN WALLDIR"
 End Sub
 
 Private Sub Close_Click()
@@ -1243,9 +1227,9 @@ Private Sub Form_Unload(Cancel As Integer)
 End Sub
 
 Private Sub ResetAll_Click()
-    Ed.Server.Exec "POLY TEXPAN RESET"
-    Ed.Server.Exec "POLY TEXSCALE"
-    Ed.Server.Exec "POLY TEXALIGN DEFAULT"
+    Ed.ServerExec "POLY TEXPAN RESET"
+    Ed.ServerExec "POLY TEXSCALE"
+    Ed.ServerExec "POLY TEXALIGN DEFAULT"
 End Sub
 
 Private Sub Help_Click()
@@ -1253,31 +1237,31 @@ Private Sub Help_Click()
 End Sub
 
 Private Sub Rot45_Click()
-    Ed.Server.Exec "POLY TEXMULT UU=" & Sqr2 & " VV=" & Sqr2 & _
+    Ed.ServerExec "POLY TEXMULT UU=" & Sqr2 & " VV=" & Sqr2 & _
     " UV=" & Sqr2 & " VU=-" & Sqr2
 End Sub
 
 Private Sub RotD_Click()
-    Ed.Server.Exec "POLY TEXMULT UU=1 VV=1 UV=-1 VU=1"
+    Ed.ServerExec "POLY TEXMULT UU=1 VV=1 UV=-1 VU=1"
 End Sub
 
 Private Sub RotM45_Click()
-    Ed.Server.Exec "POLY TEXMULT UU=" & Sqr2 & " VV=" & Sqr2 & _
+    Ed.ServerExec "POLY TEXMULT UU=" & Sqr2 & " VV=" & Sqr2 & _
     " UV=-" & Sqr2 & " VU=" & Sqr2
 End Sub
 
 Private Sub RotMD_Click()
-    Ed.Server.Exec "POLY TEXMULT UU=0.5 VV=0.5 UV=-0.5 VU=0.5"
+    Ed.ServerExec "POLY TEXMULT UU=0.5 VV=0.5 UV=-0.5 VU=0.5"
 End Sub
 
 Private Sub WallColumn_Click()
     Dim Temp As Double
     If Not Eval(ColumnTexels, Temp) Then Exit Sub
-    Ed.Server.Exec "POLY TEXALIGN WALLCOLUMN TEXELS=" & Trim(Str(Int(Temp)))
+    Ed.ServerExec "POLY TEXALIGN WALLCOLUMN TEXELS=" & Trim(Str(Int(Temp)))
 End Sub
 
 Private Sub WallPan_Click()
-    Ed.Server.Exec "POLY TEXALIGN WALLPAN"
+    Ed.ServerExec "POLY TEXALIGN WALLPAN"
 End Sub
 
 Private Sub Command5_Click()
@@ -1287,7 +1271,7 @@ Private Sub Command5_Click()
     If Eval(U.Text, UU) Then
         If Eval(V.Text, VV) Then
             If (UU <> 0) And (VV <> 0) Then
-                Ed.Server.Exec "POLY TEXSCALE UU=" & Trim(Str(1# / UU)) & " VV=" & Trim(Str(1# / V))
+                Ed.ServerExec "POLY TEXSCALE UU=" & Trim(Str(1# / UU)) & " VV=" & Trim(Str(1# / V))
             End If
         End If
     End If
@@ -1296,7 +1280,7 @@ End Sub
 Private Sub Command7_Click()
     U.Text = "1.0"
     V.Text = "1.0"
-    Ed.Server.Exec "POLY TEXSCALE UU=1 VV=1"
+    Ed.ServerExec "POLY TEXSCALE UU=1 VV=1"
 End Sub
 
 Private Sub Command8_Click()
@@ -1304,27 +1288,27 @@ Private Sub Command8_Click()
 End Sub
 
 Private Sub CutHideAll_Click()
-    Ed.Server.Exec "CUTAWAY HIDE ALL"
+    Ed.ServerExec "CUTAWAY HIDE ALL"
 End Sub
 
 Private Sub CutHideSel_Click()
-   Ed.Server.Exec "CUTAWAY HIDE SELECTED"
+   Ed.ServerExec "CUTAWAY HIDE SELECTED"
 End Sub
 
 Private Sub CutShowAll_Click()
-    Ed.Server.Exec "CUTAWAY SHOW ALL"
+    Ed.ServerExec "CUTAWAY SHOW ALL"
 End Sub
 
 Private Sub CutShowSel_Click()
-   Ed.Server.Exec "CUTAWAY SHOW SELECTED"
+   Ed.ServerExec "CUTAWAY SHOW SELECTED"
 End Sub
 
 Private Sub FlipU_Click()
-    Ed.Server.Exec "POLY TEXMULT UU=-1 VV=1"
+    Ed.ServerExec "POLY TEXMULT UU=-1 VV=1"
 End Sub
 
 Private Sub FlipV_Click()
-    Ed.Server.Exec "POLY TEXMULT UU=1 VV=-1"
+    Ed.ServerExec "POLY TEXMULT UU=1 VV=-1"
 End Sub
 
 Private Sub Form_Load()
@@ -1355,11 +1339,11 @@ Private Sub Form_Load()
 End Sub
 
 Private Sub OneTile_Click()
-    Ed.Server.Exec "POLY TEXALIGN ONETILE"
+    Ed.ServerExec "POLY TEXALIGN ONETILE"
 End Sub
 
 Private Sub PanReset_Click()
-    Ed.Server.Exec "POLY TEXPAN RESET"
+    Ed.ServerExec "POLY TEXPAN RESET"
 End Sub
 
 Private Function PanStr() As String
@@ -1370,27 +1354,27 @@ Private Function PanStr() As String
 End Function
 
 Private Sub PanU_Click()
-    Ed.Server.Exec "POLY TEXPAN U=" & PanStr()
+    Ed.ServerExec "POLY TEXPAN U=" & PanStr()
 End Sub
 
 Private Sub PanUM_Click()
-    Ed.Server.Exec "POLY TEXPAN U=-" & PanStr()
+    Ed.ServerExec "POLY TEXPAN U=-" & PanStr()
 End Sub
 
 Private Sub PanV_Click()
-    Ed.Server.Exec "POLY TEXPAN V=" & PanStr()
+    Ed.ServerExec "POLY TEXPAN V=" & PanStr()
 End Sub
 
 Private Sub PanVM_Click()
-    Ed.Server.Exec "POLY TEXPAN V=-" & PanStr()
+    Ed.ServerExec "POLY TEXPAN V=-" & PanStr()
 End Sub
 
 Private Sub Rot90_Click()
-    Ed.Server.Exec "POLY TEXMULT UU=0 VV=0 UV=1 VU=-1"
+    Ed.ServerExec "POLY TEXMULT UU=0 VV=0 UV=1 VU=-1"
 End Sub
 
 Private Sub RotM90_Click()
-    Ed.Server.Exec "POLY TEXMULT UU=0 VV=0 UV=-1 VU=1"
+    Ed.ServerExec "POLY TEXMULT UU=0 VV=0 UV=-1 VU=1"
 End Sub
 
 Private Sub ScaleList_Click()
@@ -1399,12 +1383,12 @@ Private Sub ScaleList_Click()
         If Eval(ScaleList.Text, V) Then
             If V <> 0 Then
                 V = 1# / V
-                Ed.Server.Exec "POLY TEXSCALE UU=" & Trim(Str(V)) & " VV=" & Trim(Str(V))
+                Ed.ServerExec "POLY TEXSCALE UU=" & Trim(Str(V)) & " VV=" & Trim(Str(V))
             End If
         End If
     End If
 End Sub
 
 Private Sub Unalign_Click()
-    Ed.Server.Exec "POLY TEXALIGN DEFAULT"
+    Ed.ServerExec "POLY TEXALIGN DEFAULT"
 End Sub

@@ -8,6 +8,7 @@ Begin VB.Form frmFloorLofter
    ClientWidth     =   10230
    ForeColor       =   &H00000000&
    LinkTopic       =   "Form2"
+   MDIChild        =   -1  'True
    MinButton       =   0   'False
    PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   5790
@@ -677,10 +678,10 @@ Private Sub Open2D_Click()
     '
     
     
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.FloorOpen.filename = ""
     frmDialogs.FloorOpen.Action = 1 'Modal File-Open Box
-    Ed.Server.Enable
+    Ed.ServerEnable
     '
     On Error GoTo ErrHand
     If (frmDialogs.FloorOpen.filename <> "") Then
@@ -769,11 +770,11 @@ Private Sub Save2D_Click()
     Dim i, j, k As Integer
     '
     If (Fname = "") Then
-        Ed.Server.Disable
+        Ed.ServerDisable
         frmDialogs.FloorSave.Flags = 2 'Prompt if overwrite
         frmDialogs.FloorSave.Action = 2 'Modal Save-As Box
         Fname = frmDialogs.FloorSave.filename
-        Ed.Server.Enable
+        Ed.ServerEnable
     End If
     '
     On Error GoTo SaveErrHand
@@ -938,9 +939,9 @@ Public Sub SendFloor()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server, 0)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -981,9 +982,9 @@ Public Sub SendFloor()
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server, 0)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -1025,9 +1026,9 @@ Public Sub SendFloor()
         If N > 50 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server, 0)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -1065,9 +1066,9 @@ Public Sub SendFloor()
         If N > 50 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server, 0)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -1111,15 +1112,15 @@ Public Sub SendFloor()
     Brush.NumPolys = N
     
         If NumSent > 0 Then
-            Call SendBrush(Ed.Server, 1)
+            Call SendBrush(1)
         Else
-            Call SendBrush(Ed.Server, 0)
+            Call SendBrush(0)
         End If
         
     
 '    Brush.NumPolys = N
 '    Debug.Print "N = ", N
-'    Call SendBrush(Ed.Server, 0)
+'    Call SendBrush(0)
     
 
 End Sub
@@ -1389,9 +1390,9 @@ RenderScale = Val(Me.txtRendScale.Text)
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server, 0)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -1457,9 +1458,9 @@ RenderScale = Val(Me.txtRendScale.Text)
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server, 0)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -1525,9 +1526,9 @@ RenderScale = Val(Me.txtRendScale.Text)
         If N > 100 Then
             Brush.NumPolys = N
             If NumSent > 0 Then
-                Call SendBrush(Ed.Server, 1)
+                Call SendBrush(1)
             Else
-                Call SendBrush(Ed.Server, 0)
+                Call SendBrush(0)
             End If
             NumSent = 1
             N = 0
@@ -1701,10 +1702,10 @@ Private Sub ReadPCX()
     Dim Trash As String
     '
     On Error GoTo UserCanceled
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.FHmapOpen.filename = ""
     frmDialogs.FHmapOpen.Action = 1 'Modal File-Open Box
-    Ed.Server.Enable
+    Ed.ServerEnable
     '
     'On Error GoTo ErrHand
     If (frmDialogs.FHmapOpen.filename <> "") Then
@@ -1766,7 +1767,7 @@ ErrHand:
     Exit Sub
 
 UserCanceled:
-    Ed.Server.Enable
+    Ed.ServerEnable
     Exit Sub
 
 End Sub

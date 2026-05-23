@@ -358,7 +358,7 @@ Private Sub SheetBuild_Click()
     End If
     Brush.Polys(1).Flags = PF_NOTSOLID
     '
-    Call SendBrush(Ed.Server)
+    Call SendBrush(0)
     Call Ed.StatusText("Built a Sheet")
 End Sub
 

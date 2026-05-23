@@ -1,0 +1,317 @@
+Microsoft Developer Studio Workspace File, Format Version 5.00
+# WARNING: DO NOT EDIT OR DELETE THIS WORKSPACE FILE!
+
+###############################################################################
+
+Project: "Core"=.\Core\Src\Core.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/Core", EAAAAAAA
+    .\Core
+    end source code control
+}}}
+
+Package=<4>
+{{{
+}}}
+
+###############################################################################
+
+Project: "Editor"=.\Editor\Src\Editor.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/Editor", BBAAAAAA
+    .\Editor
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Engine
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Window
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "Engine"=.\Engine\Src\Engine.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/Engine", FAAAAAAA
+    .\Engine
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "Fire"=.\Fire\Src\Fire.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/Fire", IAAAAAAA
+    .\Fire
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Engine
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "Galaxy"=.\Galaxy\Src\Galaxy.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/Galaxy", ZIBAAAAA
+    .\galaxy
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Engine
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "GlideDrv"=.\GlideDrv\Src\GlideDrv.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/GlideDrv", KNBAAAAA
+    .\glidedrv
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Engine
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "IpDrv"=.\IpDrv\Src\IpDrv.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/IpDrv", BBAAAAAA
+    .\IpDrv
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Engine
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "Launch"=.\Launch\Src\Launch.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/Launch", BBAAAAAA
+    .\Launch
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Engine
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Window
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "Render"=.\Render\Src\Render.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/Render", GAAAAAAA
+    .\Render
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Engine
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "SGLDrv"=.\SglDrv\Src\Sgldrv.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/SglDrv/Src", LYFAAAAA
+    .\sgldrv\src
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Engine
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "SoftDrv"=.\SoftDrv\Src\SoftDrv.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/SoftDrv", IYBAAAAA
+    .\SoftDrv
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Editor
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "UnrealI"=.\UnrealI\Src\UnrealI.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/UnrealI", JAAAAAAA
+    .\UnrealI
+    end source code control
+}}}
+
+Package=<4>
+{{{
+}}}
+
+###############################################################################
+
+Project: "WinDrv"=.\WinDrv\Src\WinDrv.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/WinDrv", BBAAAAAA
+    .\WinDrv
+    end source code control
+}}}
+
+Package=<4>
+{{{
+    Begin Project Dependency
+    Project_Dep_Name Core
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Engine
+    End Project Dependency
+    Begin Project Dependency
+    Project_Dep_Name Window
+    End Project Dependency
+}}}
+
+###############################################################################
+
+Project: "Window"=.\Window\Src\Window.dsp - Package Owner=<4>
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal/Window", EAAAAAAA
+    .\Window
+    end source code control
+}}}
+
+Package=<4>
+{{{
+}}}
+
+###############################################################################
+
+Global:
+
+Package=<5>
+{{{
+    begin source code control
+    "$/Unreal", BAAAAAAA
+    .
+    end source code control
+}}}
+
+Package=<3>
+{{{
+}}}
+
+###############################################################################
+

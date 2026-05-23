@@ -20,6 +20,7 @@ Begin VB.Form frmExtrude
    Icon            =   "Extrude.frx":0000
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
+   MDIChild        =   -1  'True
    MinButton       =   0   'False
    PaletteMode     =   1  'UseZOrder
    ScaleHeight     =   1860
@@ -420,7 +421,7 @@ Dim ct As Integer
         Next i
     Next ct
     Brush.NumPolys = N
-    Call SendBrush(Ed.Server, 0)
+    Call SendBrush(0)
 
 End Sub
 

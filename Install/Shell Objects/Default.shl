@@ -1,0 +1,238 @@
+[Shortcut0]
+Target=<TARGETDIR>\System\Unreal.exe
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+IconIndex=0
+Replace=Yes
+FileGroup=Engine
+StartIn=
+IconFile=<TARGETDIR>\System\Unreal.exe
+InternetShortcut=No
+DisplayText=APP_SHORTCUT_NAME
+Comments=
+
+[Shortcut1]
+Target=<TARGETDIR>\System\Unreal.exe
+Parameters=-nosound -noddraw -nodsound -nohard readini=default.ini
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+IconIndex=0
+Replace=Yes
+FileGroup=Engine
+StartIn=
+IconFile=<TARGETDIR>\System\Unreal.exe
+InternetShortcut=No
+DisplayText=APP_SHORTCUT_SAFEMODE
+Comments=
+
+[Folder4]
+Type=Common
+Comments=
+DisplayText=APP_SHORTCUT_FOLDER
+
+[Shortcut2]
+Target=<TARGETDIR>\System\UnrealEd.exe
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+IconIndex=0
+Replace=Yes
+FileGroup=Editor
+StartIn=
+IconFile=<TARGETDIR>\System\UnrealEd.exe
+InternetShortcut=No
+DisplayText=APP_SHORTCUT_EDITOR
+Comments=
+
+[Folder5]
+Type=Common
+DisplayText=APP_SHORTCUT_CD
+Comments=
+
+[Shortcut3]
+Target=<WINDIR>Notepad.exe
+Parameters=<TARGETDIR>\Help\ReadMe.txt
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+FileGroup=
+Replace=Yes
+IconIndex=
+StartIn=
+InternetShortcut=No
+IconFile=
+Comments=
+DisplayText=APP_SHORTCUT_RELEASENOTES
+
+[Folder6]
+Type=Common
+Comments=
+DisplayText=APP_SHORTCUT_INFO
+
+[Shortcut4]
+Target=http://www.unreal.com/
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+FileGroup=
+Replace=Yes
+IconIndex=
+StartIn=
+InternetShortcut=Yes
+IconFile=
+Comments=
+DisplayText=APP_SHORTCUT_WEB
+
+[Shortcut5]
+Target=<SRCDIR>\DirectX\DxSetup.exe
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+IconIndex=
+Replace=Yes
+FileGroup=DirectX
+StartIn=
+IconFile=
+InternetShortcut=No
+DisplayText=Install DirectX
+Comments=
+
+[Shortcut6]
+Target=<SRCDIR>\Glide\GrtVgr.exe
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+IconIndex=
+Replace=Yes
+FileGroup=3dfx Glide
+StartIn=
+IconFile=
+InternetShortcut=No
+DisplayText=Install Glide (for 3dfx owners)
+Comments=
+
+[Shortcut10]
+Target=<SRCDIR>\Heat\Katalyst.exe
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+FileGroup=Heat
+Replace=Yes
+IconIndex=
+StartIn=
+InternetShortcut=No
+IconFile=
+Comments=
+DisplayText=Heat
+
+[Shortcut7]
+Target=<SRCDIR>\MPath\MPlayer\Setup.exe
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+FileGroup=MPath
+Replace=Yes
+IconIndex=
+StartIn=
+InternetShortcut=No
+IconFile=
+Comments=
+DisplayText=MPlayer
+
+[Shortcut8]
+Target=<SRCDIR>\WorldNet\IeStuff\Setup.exe
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+FileGroup=WorldNet
+Replace=Yes
+IconIndex=
+StartIn=
+InternetShortcut=No
+IconFile=
+Comments=
+DisplayText=AT&T WorldNet (Internet Explorer 4.0)
+
+[Shortcut11]
+Target=http://www.unreal.com/serverlist
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+IconIndex=
+Replace=Yes
+FileGroup=
+StartIn=
+IconFile=
+InternetShortcut=Yes
+DisplayText=APP_SHORTCUT_SERVERS
+Comments=
+
+[Shortcut12]
+Target=http://www.gamespy.com/
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+FileGroup=
+Replace=Yes
+IconIndex=
+StartIn=
+InternetShortcut=Yes
+IconFile=
+Comments=
+DisplayText=GameSpy for Unreal
+
+[Shortcut9]
+Target=<SRCDIR>\WorldNet\NsStuff\Setup.exe
+Parameters=
+ShortcutKey=
+SeparateMemorySpace=No
+Run=Normal Window
+FileGroup=WorldNet
+Replace=Yes
+IconIndex=
+StartIn=
+InternetShortcut=No
+IconFile=
+Comments=
+DisplayText=AT&T WorldNet (Netscape 4.0)
+
+[Data]
+Shortcut0=Folder4\Unreal
+Folder3=<FOLDER_STARTUP>
+Shortcut1=Folder4\Unreal Safe Mode
+Folder4=Folder2\Unreal
+Group0=Main
+Shortcut2=Folder4\Unreal Editor
+Folder5=Folder4\Install Stuff From CD
+Group1=Startup
+Shortcut3=Folder6\Release Notes
+Folder6=Folder4\Information
+Shortcut4=Folder6\Unreal Home Page
+Shortcut5=Folder5\DirectX
+Shortcut6=Folder5\3dfx Glide
+Shortcut10=Folder5\Heat
+Shortcut7=Folder5\MPlayer
+Shortcut8=Folder5\AT&T WorldNet (Internet Explorer 4.0)
+Shortcut11=Folder6\Unreal Server List
+Shortcut12=Folder6\GameSpy for Unreal
+Shortcut9=Folder5\AT&T WorldNet (Netscape 4.0)
+Folder0=<FOLDER_DESKTOP>
+Folder1=<FOLDER_STARTMENU>
+Folder2=<FOLDER_PROGRAMS>
+
+[Info]
+Type=ShellObject
+Version=1.00.000
+

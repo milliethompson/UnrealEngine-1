@@ -35,26 +35,24 @@ Option Explicit
 ' Embedded objects
 '
 Public Tools As UnrealTools
-Public Server As UnrealEdServer
 
 '
 ' App names
 '
-Public ServerAppName As String ' "Unreal"
-Public EditorAppName As String ' "UnrealEd"
+Public EditorAppName As String
 
 '
 ' Filenames
 '
-Public MapFname As String ' Map filename
-Public BrushFname As String ' Brush filename
-Public Startup As Integer ' 1 when loading
-Public AutoSaveCountup As Integer
+Public MapFname As String
+Public BrushFname As String
+Public Startup As Integer
 
 '
 ' State info
 '
 Public Version As String
+Public GameCommandLine As String
 Public Licensed As Integer
 Public GodMode As Integer
 Public hWndEditor As Long
@@ -68,8 +66,6 @@ Public GridMode As Boolean
 Public RotGridMode As Boolean
 Public SpeedMode As Integer
 Public SnapVertex As Boolean
-Public ShowVertices As Boolean
-Public MapEdit As Integer
 Public ToolbarPos As Integer  '0=left, 1=rt
 Public BrowserPos As Integer  '0=right, 1=left, 2=hide
 Public PanelButton As Integer
@@ -78,15 +74,11 @@ Public BrowserButton As Integer
 Public GridX As Integer
 Public GridY As Integer
 Public GridZ As Integer
-Public AutoSaveTime As Integer ' Minutes
-Public AutoUnique As Integer
-Public AutoCounter As Integer
-Public InitialFiles As String
 
 Public CameraVertRatio As Single
 Public CameraLeftRatio As Single
 Public CameraRightRatio As Single
-Public FOV As Single
+Public CurrentClass As String
 
 '
 ' Profile directories
@@ -107,12 +99,22 @@ Public MusicDir    As String ' Music
 '-----------------
 
 '
+' Extern.
+'
+Private Declare Sub EdInitServer Lib "Editor.dll" Alias "_EdInitServer@8" (ByVal hWndMain As Long, ByVal hWndCallback As Long)
+Private Declare Sub EdExitServer Lib "Editor.dll" Alias "_EdExitServer@0" ()
+Private Declare Sub EdExec Lib "Editor.dll" Alias "_EdExec@4" (ByVal Cmd As String)
+Private Declare Sub EdSetProp Lib "Editor.dll" Alias "_EdSetProp@12" (ByVal Topic As String, ByVal Item As String, ByVal Value As String)
+Private Declare Function EdGetProp Lib "Editor.dll" Alias "_EdGetProp@8" (ByVal Topic As String, ByVal Item As String) As String
+
+'
 ' Default camera start locations to prevent newly
 ' opened cameras from being on top of old ones.
 '
 Private DefCamX As Integer
 Private DefCamY As Integer
 Private SettingGrid As Integer
+Public Gridding As Boolean
 Private Const GWW_HWNDPARENT As Integer = -8 ' For SetWindowWord
 
 Private Type WindowRec
@@ -154,7 +156,6 @@ Private Sub Class_Initialize()
     ' Initialize globals:
     '
     Version = "0.48"
-    ServerAppName = "Unreal"
     EditorAppName = "UnrealEd"
     hWndEditor = 0
     '
@@ -164,21 +165,11 @@ Private Sub Class_Initialize()
     GridMode = False
     RotGridMode = False
     SnapVertex = True
-    ShowVertices = True
-    MapEdit = False
+    CurrentClass = "Light"
     '
     GridX = 10
     GridY = 10
     GridZ = 10
-End Sub
-
-'
-' Launch the UnrealServer
-'
-Public Sub LaunchServer(hWndMain As Long)
-    Set Server = New UnrealEdServer
-    Server.Exec "APP SET HWND=" & Trim(Str(hWndMain))
-    hWndEditor = hWndMain
 End Sub
 
 '
@@ -232,7 +223,6 @@ Public Sub OpenCamera(Reopen As Boolean, _
     Cmd = Cmd & " Y=" & Trim(Str(Y))
     Cmd = Cmd & " XR=" & Trim(Str(XR))
     Cmd = Cmd & " YR=" & Trim(Str(YR))
-    Cmd = Cmd & " FOV=" & Trim(Str(Ed.FOV))
     '
     If Not Reopen Then
         Cmd = Cmd & " FLAGS=" & Trim(Str(Flags))
@@ -243,7 +233,7 @@ Public Sub OpenCamera(Reopen As Boolean, _
         Cmd = Cmd & " NAME=" & Quotes(Name)
     End If
     '
-    Server.Exec Cmd
+    ServerExec Cmd
     '
 End Sub
 
@@ -279,109 +269,44 @@ End Sub
 '
 ' Set the editor's grid size
 '
-Sub SetGridSize(X As Integer, Y As Integer, _
-    Z As Integer)
-    '
-    Server.Exec "MAP GRID X=" & Trim(Str(X)) & " Y=" & Trim(Str(Y)) & " Z=" & Trim(Str(Z))
-    '
-    GridX = X
-    GridY = Y
-    GridZ = Z
-    '
-    Call ResetGridSize
-End Sub
-
-'
-' Update the user interface to reflect the current
-' grid size
-'
-Sub ResetGridSize()
-    If SettingGrid = 0 Then
-        SettingGrid = 1
-        '
-        If Not GridMode Then frmMain.GridCombo.ListIndex = 0
-        '
-        If GridX = GridY And GridX = GridZ Then
-            Select Case GridX
-                Case 1:
-                    frmGrid.G1.Value = True
-                    If GridMode Then frmMain.GridCombo.ListIndex = 1
-                Case 2:
-                    frmGrid.G2.Value = True
-                    If GridMode Then frmMain.GridCombo.ListIndex = 2
-                Case 4:
-                    frmGrid.G4.Value = True
-                    If GridMode Then frmMain.GridCombo.ListIndex = 3
-                Case 8:
-                    frmGrid.G8.Value = True
-                    If GridMode Then frmMain.GridCombo.ListIndex = 4
-                Case 16:
-                    frmGrid.G16.Value = True
-                    If GridMode Then frmMain.GridCombo.ListIndex = 5
-                Case 32:
-                    frmGrid.G32.Value = True
-                    If GridMode Then frmMain.GridCombo.ListIndex = 6
-                Case 64:
-                    frmGrid.G64.Value = True
-                    If GridMode Then frmMain.GridCombo.ListIndex = 7
-                Case 128:
-                    frmGrid.G128.Value = True
-                    If GridMode Then frmMain.GridCombo.ListIndex = 8
-                Case 256:
-                    frmGrid.G256.Value = True
-                    If GridMode Then frmMain.GridCombo.ListIndex = 9
-                Case Else:
-                    frmGrid.Option2.Value = True
-                    frmGrid.Size.Text = Trim(GridX)
-                    If GridMode Then frmMain.GridCombo.ListIndex = 10
-            End Select
-        Else
-            frmGrid.Option6.Value = True
-            frmGrid.SX.Text = Trim(GridX)
-            frmGrid.SY.Text = Trim(GridY)
-            frmGrid.SZ.Text = Trim(GridZ)
-            frmMain.GridCombo.ListIndex = 10
-        End If
-        SettingGrid = 0
-     End If
+Sub SetGridSize(X As Integer, Y As Integer, Z As Integer)
+    If Not Gridding Then
+        Gridding = True
+        ServerExec "MAP GRID X=" & Trim(Str(X)) & " Y=" & Trim(Str(Y)) & " Z=" & Trim(Str(Z))
+        GridX = X
+        GridY = Y
+        GridZ = Z
+        Gridding = False
+    End If
 End Sub
 
 '
 ' Turn grid on or off
 '
 Sub SetGridMode(OnOff As Boolean)
-    If GridMode <> OnOff Then
+    If GridMode <> OnOff And Not Gridding Then
+        Gridding = True
         Call Tools.Handlers("GRID").DoClick("GRID", Ed)
-    Else
-        Call ResetGridSize
+        Gridding = False
     End If
 End Sub
 
 '
-' Begin a slow task.  Sets the mouse cursor
-' to the hourglass shape and raises the OLE
-' timeout period.
+' Begin a slow task.
 '
 Public Sub BeginSlowTask(Descr As String)
-    frmMain.ProgressText.Text = Descr
-    frmMain.ProgressHolder.Top = 0
-    frmMain.ProgressHolder.Width = frmMain.MainBar.Width
-    frmMain.ProgressHolder.Visible = 1
-    frmMain.ProgressHolder.Refresh
+    frmMain.ProgressBar.Visible = True
+    frmMain.ProgressText.Visible = True
     Screen.MousePointer = 11
-    App.OleRequestPendingTimeout = 5# * 60# * 1000#
-    App.OleServerBusyTimeout = 5# * 60# * 1000#
 End Sub
 
 '
-' End a slow task.  Restores the mouse cursor
-' and OLE timeout period.
+' End a slow task.
 '
 Public Sub EndSlowTask()
-    frmMain.ProgressHolder.Visible = 0
+    frmMain.ProgressBar.Visible = False
+    frmMain.ProgressText.Visible = False
     Screen.MousePointer = 0
-    App.OleRequestPendingTimeout = 5# * 1000#
-    App.OleServerBusyTimeout = 5# * 1000#
 End Sub
 
 Public Sub SaveProfile()
@@ -393,11 +318,10 @@ Public Sub SaveProfile()
     '
     OpenReg ("UnrealEd")
     '
-    SetUserHeading ("Directories")
+    SetUserHeading ("NewDirectoriesDirectories")
     Call SetUserInfo("Maps", MapDir)
     Call SetUserInfo("Textures", TextureDir)
     Call SetUserInfo("Tools", ToolDir)
-    Call SetUserInfo("Classes", ClassDir)
     Call SetUserInfo("Shapes", ShapeDir)
     Call SetUserInfo("Brushes", BrushDir)
     Call SetUserInfo("Models", ModelDir)
@@ -405,10 +329,6 @@ Public Sub SaveProfile()
     Call SetUserInfo("Music", MusicDir)
     '
     Call SetUserHeading("Preferences")
-    Call SetUserInfo("AutoSaveTime", Str(AutoSaveTime))
-    Call SetUserInfo("AutoUnique", Str(AutoUnique))
-    Call SetUserInfo("AutoCounter", Str(AutoCounter))
-    Call SetUserInfo("InitialFiles060", InitialFiles)
     Call SetUserInfo("ToolbarPos", Str(ToolbarPos))
     Call SetUserInfo("BrowserPos", Str(BrowserPos))
     Call SetUserInfo("PanelButton", Str(PanelButton))
@@ -416,9 +336,9 @@ Public Sub SaveProfile()
     Call SetUserInfo("CameraVertRatio", Str(CameraVertRatio))
     Call SetUserInfo("CameraLeftRatio", Str(CameraLeftRatio))
     Call SetUserInfo("CameraRightRatio", Str(CameraRightRatio))
-    Call SetUserInfo("FOV", Str(FOV))
     Call SetUserInfo("BrowserTopic", InitialBrowserTopic)
     Call SetUserInfo("GodMode", Str(GodMode))
+    Call SetUserInfo("GameCommandLine", GameCommandLine)
     '
     S = ""
     Call SetUserHeading("Windows")
@@ -468,23 +388,18 @@ Public Sub GetProfile()
         Licensed = 1
     End If
     '
-    SetUserHeading ("Directories")
-    MapDir = GetUserInfo("Maps", "Maps")
-    TextureDir = GetUserInfo("Textures", "Textures")
-    ToolDir = GetUserInfo("Tools", "Tools")
-    ClassDir = GetUserInfo("Classes", "Classes")
-    ShapeDir = GetUserInfo("Shapes", "Shapes")
-    BrushDir = GetUserInfo("Brushes", "Brushes")
-    ModelDir = GetUserInfo("Models", "Models")
-    SoundDir = GetUserInfo("Sounds", "Sounds")
-    MusicDir = GetUserInfo("Music", "Music")
+    SetUserHeading ("NewDirectories")
+    MapDir = GetUserInfo("Maps", "..\Maps")
+    TextureDir = GetUserInfo("Textures", "..\Textures")
+    ToolDir = GetUserInfo("Tools", "..\Tools")
+    ShapeDir = GetUserInfo("Shapes", "..\Shapes")
+    BrushDir = GetUserInfo("Brushes", "..\Brushes")
+    ModelDir = GetUserInfo("Models", "..\Models")
+    SoundDir = GetUserInfo("Sounds", "..\Sounds")
+    MusicDir = GetUserInfo("Music", "..\Music")
     '
     SetUserHeading ("Preferences")
-    AutoSaveTime = Val(GetUserInfo("AutoSaveTime", "10"))
-    AutoUnique = Val(GetUserInfo("AutoUnique", "0"))
-    AutoCounter = Val(GetUserInfo("AutoCounter", "0"))
-    InitialFiles = GetUserInfo("InitialFiles075", "")
-    'InitialFiles = GetUserInfo("InitialFiles075", BaseDir + "Textures\Wood.utx")
+    GameCommandLine = GetUserInfo("GameCommandLine", "")
     ToolbarPos = Val(GetUserInfo("ToolbarPos", "0"))
     BrowserPos = Val(GetUserInfo("BrowserPos", "0"))
     PanelButton = Val(GetUserInfo("PanelButton", "2"))
@@ -492,7 +407,6 @@ Public Sub GetProfile()
     CameraVertRatio = Val(GetUserInfo("CameraVertRatio", "0.66"))
     CameraLeftRatio = Val(GetUserInfo("CameraLeftRatio", "0.5"))
     CameraRightRatio = Val(GetUserInfo("CameraRightRatio", "0.5"))
-    FOV = Val(GetUserInfo("FOV", "95"))
     InitialBrowserTopic = GetUserInfo("BrowserTopic", "Textures")
     GodMode = Val(GetUserInfo("GodMode", "0"))
     '
@@ -539,8 +453,6 @@ DoneSettings:
     '
     frmDialogs.ExportBrush.InitDir = Ed.BaseDir + Ed.BrushDir
     frmDialogs.ImportBrush.InitDir = Ed.BaseDir + Ed.BrushDir
-    frmDialogs.ClassLoad.InitDir = Ed.BaseDir + Ed.ClassDir
-    frmDialogs.ClassSave.InitDir = Ed.BaseDir + Ed.ClassDir
     frmDialogs.TexFamLoad.InitDir = Ed.BaseDir + Ed.TextureDir
     frmDialogs.TexFamSave.InitDir = Ed.BaseDir + Ed.TextureDir
     frmDialogs.TexImport.InitDir = Ed.BaseDir + Ed.TextureDir
@@ -556,8 +468,8 @@ DoneSettings:
     frmDialogs.AddFile.InitDir = Ed.BaseDir
     frmDialogs.SoundImportDlg.InitDir = Ed.BaseDir + Ed.SoundDir
     frmDialogs.SoundExportDlg.InitDir = Ed.BaseDir + Ed.SoundDir
-    frmDialogs.SoundSaveFamilyDlg.InitDir = Ed.BaseDir + Ed.SoundDir
-    frmDialogs.SoundLoadFamilyDlg.InitDir = Ed.BaseDir + Ed.SoundDir
+    frmDialogs.SoundSaveDlg.InitDir = Ed.BaseDir + Ed.SoundDir
+    frmDialogs.SoundLoadDlg.InitDir = Ed.BaseDir + Ed.SoundDir
     frmDialogs.MusicImportDlg.InitDir = Ed.BaseDir + Ed.MusicDir
     frmDialogs.MusicExportDlg.InitDir = Ed.BaseDir + Ed.MusicDir
     frmDialogs.MusicSaveDlg.InitDir = Ed.BaseDir + Ed.MusicDir
@@ -708,7 +620,7 @@ End Function
 Public Sub SaveParamsToLevel()
     Dim Params As String
     Params = MakeParams()
-    Call Ed.Server.SetProp("Lev", "6", Params)
+    Call Ed.ServerSetProp("Lev", "6", Params)
 End Sub
 
 Public Sub SetParams(Params As String)
@@ -720,7 +632,7 @@ End Sub
 
 Public Sub LoadParamsFromLevel()
     Dim Params As String
-    Params = Ed.Server.GetProp("Lev", "6")
+    Params = Ed.ServerGetProp("Lev", "6")
     SetParams (Params)
 End Sub
 
@@ -730,26 +642,28 @@ Public Sub EndOnTop(F As Variant) ' F = form
     '
     ' See if we've recorded a position for it:
     '
-    For i = 1 To NumWindowRecs
-        If F.Tag = WindowRecs(i).Name Then
-            If WindowRecs(i).Loaded = 1 Then
-                '
-                WindowRecs(i).TheForm.Hide
-                Call SetParent(F.hwnd, 0)
-                Call GetWindowRect(F.hwnd, R)
-                '
-                WindowRecs(i).Left = R.Left * Screen.TwipsPerPixelX
-                WindowRecs(i).Top = R.Top * Screen.TwipsPerPixelY
-                WindowRecs(i).Height = (R.Bottom - R.Top) * Screen.TwipsPerPixelY
-                WindowRecs(i).Width = (R.Right - R.Left) * Screen.TwipsPerPixelX
-                '
-                Set WindowRecs(i).TheForm = Nothing
-                '
-                WindowRecs(i).Loaded = 0
+    If F.WindowState <> 1 Then
+        For i = 1 To NumWindowRecs
+            If F.Tag = WindowRecs(i).Name Then
+                If WindowRecs(i).Loaded = 1 Then
+                    '
+                    WindowRecs(i).TheForm.Hide
+                    Call SetParent(F.hwnd, 0)
+                    Call GetWindowRect(F.hwnd, R)
+                    '
+                    WindowRecs(i).Left = R.Left * Screen.TwipsPerPixelX
+                    WindowRecs(i).Top = R.Top * Screen.TwipsPerPixelY
+                    WindowRecs(i).Height = (R.Bottom - R.Top) * Screen.TwipsPerPixelY
+                    WindowRecs(i).Width = (R.Right - R.Left) * Screen.TwipsPerPixelX
+                    '
+                    Set WindowRecs(i).TheForm = Nothing
+                    '
+                    WindowRecs(i).Loaded = 0
+                End If
+                Exit Sub
             End If
-            Exit Sub
-        End If
-    Next i
+        Next i
+    End If
     Debug.Print "EndOnTop: Form " & F.Caption & " not found!"
 End Sub
 
@@ -827,5 +741,43 @@ Public Function GetBrowserCurrentItem(TopicName As String) As String
             End If
         Next i
     End If
+End Function
+
+Public Sub ServerEnable()
+    'ServerExec "ENABLE"
+    ChDir Ed.BaseDir
+End Sub
+
+Public Sub ServerDisable()
+    'ServerExec "DISABLE"
+End Sub
+
+'
+' Server functions.
+'
+Public Sub InitServer(hWndMain As Long, hWndCallback As Long)
+    Dim S As String
+    Call EdInitServer(hWndMain, hWndCallback)
+    ServerExec "HIDELOG"
+    ServerExec "APP SET" & _
+        " ProgressBar=" & Trim(Str(frmMain.ProgressBar.hwnd)) & _
+        " ProgressText=" & Trim(Str(frmMain.ProgressText.hwnd))
+    hWndEditor = hWndMain
+End Sub
+
+Public Sub ExitServer()
+    Call EdExitServer
+End Sub
+
+Public Sub ServerExec(S As String)
+    Call EdExec(S)
+End Sub
+
+Public Sub ServerSetProp(Topic As String, Item As String, Value As String)
+    Call EdSetProp(Topic, Item, Value)
+End Sub
+
+Public Function ServerGetProp(Topic As String, Item As String) As String
+    ServerGetProp = EdGetProp(Topic, Item)
 End Function
 

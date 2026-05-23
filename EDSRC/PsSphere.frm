@@ -632,7 +632,7 @@ Private Sub Build_Click()
     Next i
     '
     Brush.NumPolys = N
-    Call SendBrush(Ed.Server)
+    Call SendBrush(0)
     Call Ed.StatusText("Built a Sphere")
 End Sub
 

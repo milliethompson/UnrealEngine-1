@@ -21,29 +21,29 @@ Begin VB.Form frmClassBrowser
       Caption         =   "Only show Actor classes"
       Height          =   255
       Left            =   180
-      TabIndex        =   11
+      TabIndex        =   8
       Top             =   60
       Value           =   1  'Checked
       Width           =   2295
    End
    Begin VB.PictureBox ClassHolder 
       BackColor       =   &H00C0C0C0&
-      Height          =   4650
+      Height          =   5010
       Left            =   0
-      ScaleHeight     =   4590
+      ScaleHeight     =   4950
       ScaleWidth      =   2370
       TabIndex        =   0
       Top             =   360
       Width           =   2430
       Begin MSOutl.Outline Classes 
-         Height          =   4575
+         Height          =   3135
          Left            =   0
          TabIndex        =   1
          Top             =   0
          Width           =   2415
          _Version        =   65536
          _ExtentX        =   4260
-         _ExtentY        =   8070
+         _ExtentY        =   5530
          _StockProps     =   77
          ForeColor       =   -2147483640
          BackColor       =   12632256
@@ -63,14 +63,14 @@ Begin VB.Form frmClassBrowser
       End
    End
    Begin Threed.SSPanel ClassPanel 
-      Height          =   1395
+      Height          =   1155
       Left            =   0
       TabIndex        =   2
-      Top             =   5040
+      Top             =   5400
       Width           =   2475
       _Version        =   65536
       _ExtentX        =   4366
-      _ExtentY        =   2461
+      _ExtentY        =   2037
       _StockProps     =   15
       BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
          Name            =   "MS Sans Serif"
@@ -81,77 +81,85 @@ Begin VB.Form frmClassBrowser
          Italic          =   0   'False
          Strikethrough   =   0   'False
       EndProperty
-      Begin VB.CommandButton Make 
-         Caption         =   "&Make All"
+      Begin VB.CommandButton Delete 
+         Caption         =   "Delete"
          Height          =   255
-         Left            =   1140
-         TabIndex        =   3
-         Top             =   1140
-         Width           =   1275
-      End
-      Begin VB.CommandButton Refresh 
-         Caption         =   "&Refresh"
-         Height          =   255
-         Left            =   60
-         TabIndex        =   9
-         Tag             =   "Refresh the class list"
-         Top             =   1140
-         Width           =   1095
+         Left            =   1500
+         TabIndex        =   10
+         Top             =   780
+         Width           =   900
       End
       Begin VB.CommandButton SaveClass 
-         Caption         =   "&Save/Export"
+         Caption         =   "&Save"
          Height          =   255
-         Left            =   1140
-         TabIndex        =   4
+         Left            =   780
+         TabIndex        =   3
          Tag             =   "Save actor classes"
-         Top             =   900
-         Width           =   1275
+         Top             =   780
+         Width           =   735
       End
       Begin VB.CommandButton LoadClass 
-         Caption         =   "&Load/Import"
+         Caption         =   "&Load"
          Height          =   255
-         Left            =   60
-         TabIndex        =   5
+         Left            =   0
+         TabIndex        =   4
          Tag             =   "Load actor classes"
-         Top             =   900
-         Width           =   1095
+         Top             =   780
+         Width           =   795
+      End
+      Begin VB.CommandButton ExportAll 
+         Caption         =   "Export All"
+         Height          =   255
+         Left            =   1500
+         TabIndex        =   12
+         Tag             =   "Save actor classes"
+         Top             =   540
+         Width           =   900
+      End
+      Begin VB.CommandButton Export 
+         Caption         =   "Export"
+         Height          =   255
+         Left            =   780
+         TabIndex        =   9
+         Tag             =   "Save actor classes"
+         Top             =   540
+         Width           =   720
       End
       Begin VB.CommandButton NewClass 
-         Caption         =   "Create &New Class Below"
+         Caption         =   "&New..."
          Height          =   255
-         Left            =   60
-         TabIndex        =   6
+         Left            =   0
+         TabIndex        =   5
          Tag             =   "Creates a new actor class"
-         Top             =   660
-         Width           =   2355
+         Top             =   540
+         Width           =   795
       End
       Begin VB.CommandButton EditDefActor 
-         Caption         =   "&Default Props"
+         Caption         =   "&Defaults"
          Height          =   255
-         Left            =   1080
-         TabIndex        =   7
+         Left            =   1200
+         TabIndex        =   6
          Tag             =   "Edit this class's default actor"
-         Top             =   420
-         Width           =   1335
+         Top             =   300
+         Width           =   1200
       End
       Begin VB.CommandButton EditScript 
-         Caption         =   "&Edit Script"
+         Caption         =   "&Edit Code"
          Height          =   255
-         Left            =   60
-         TabIndex        =   8
+         Left            =   0
+         TabIndex        =   7
          Tag             =   "Edit this class's script"
-         Top             =   420
-         Width           =   1035
+         Top             =   300
+         Width           =   1215
       End
       Begin VB.Label ClassDescr 
          Alignment       =   2  'Center
-         BackStyle       =   0  'Transparent
-         Caption         =   "This class is built-in."
-         Height          =   285
-         Left            =   0
-         TabIndex        =   10
-         Top             =   180
-         Width           =   2415
+         Caption         =   "This class is scripted"
+         Height          =   255
+         Left            =   60
+         TabIndex        =   11
+         Top             =   60
+         Width           =   2355
       End
    End
 End
@@ -172,6 +180,22 @@ Private Sub ActorsOnly_Click()
     Classes.Expand(0) = True
 End Sub
 
+Private Sub Export_Click()
+    Dim All As Boolean
+    If MsgBox("This option will export all modified classes to text .uc files which can later be rebuilt. Do you want to do this?", vbYesNo, "Export classes to *.uc files") = vbYes Then
+        PreSaveAll
+        Ed.ServerExec "CLASS SPEW"
+    End If
+End Sub
+
+Private Sub ExportAll_Click()
+    Dim All As Boolean
+    If MsgBox("This option will export all classes to text .uc files which can later be rebuilt. Do you want to do this?", vbYesNo, "Export classes to *.uc files") = vbYes Then
+        PreSaveAll
+        Ed.ServerExec "CLASS SPEW ALL"
+    End If
+End Sub
+
 '
 ' Public (Browser Interface)
 '
@@ -179,13 +203,13 @@ End Sub
 Private Sub Form_Load()
     Call Ed.SetOnTop(Me, "ClassBrowser", TOP_BROWSER)
     ClassPanel.Top = Height - ClassPanel.Height
-    ClassHolder.Height = Height - ClassPanel.Height
-    Classes.Height = Height - ClassPanel.Height
+    ClassHolder.Height = Height - ClassPanel.Height - ClassHolder.Top
+    Classes.Height = ClassHolder.Height
     Refresh_Click
     Classes.Expand(0) = True
-    If Ed.GodMode = 0 Then
-        ActorsOnly.Enabled = False
-    End If
+    'If Ed.GodMode = 0 Then
+    '    ActorsOnly.Enabled = False
+    'End If
 End Sub
 
 Public Sub BrowserShow()
@@ -212,12 +236,18 @@ Public Function GetCurrent() As String
     GetCurrent = Trim(Result)
 End Function
 
+Public Function GetCurrentPackage() As String
+    Dim c As String
+    c = GetCurrent()
+    GetCurrentPackage = Ed.ServerGetProp("Class", "Package Class=" & c)
+End Function
+
 '
 ' Public (other)
 '
 
 Public Sub EditDefActor_Click()
-    frmActorProperties.GetClassDefaultActor (GetCurrent())
+    Ed.ServerExec "HOOK CLASSPROPERTIES CLASS=" & GetCurrent() ''xyzzy
 End Sub
 
 Public Sub LaunchScriptEd( _
@@ -229,38 +259,42 @@ Public Sub LaunchScriptEd( _
 
     ' Locals.
     Dim F As frmScriptEd
-    Dim Package As String
+    Dim Package As String, Caption As String
     Dim Editable As Boolean
     Dim S As String
     Dim i As Long, j As Long
 
+    ' Find package name.
+    Package = Ed.ServerGetProp("CLASS", "PACKAGE CLASS=" & ClassName)
+    Caption = Package & "." & ClassName
+    
     ' Make sure the script exists.
-    If Ed.Server.GetProp("TEXTPOS", ClassName) <> "" Then
+    If Ed.ServerGetProp("SCRIPTPOS", ClassName) <> "" Then
         For i = 0 To GNumMiscForms - 1
-            If GMiscForms(i).Caption = ClassName Then
+            If GMiscForms(i).Caption = Caption Then
                 Set F = GMiscForms(i)
                 GoTo HaveIt
             End If
         Next i
 
         Set F = New frmScriptEd
-        F.Caption = ClassName
         Call AddMiscForm(F)
+        F.Caption = Caption
 
         If NewText <> "" Then
             ' Creating a new script.
-            Call Ed.Server.SetProp("TEXT", ClassName, NewText)
-            Call Ed.Server.SetProp("TEXTPOS", ClassName, Str(Cursor))
+            Call Ed.ServerSetProp("SCRIPT", ClassName, NewText)
+            Call Ed.ServerSetProp("SCRIPTPOS", ClassName, Str(Cursor))
         End If
-        
+
         ' Bring up script.
         F.LoadAll
         F.ResetUndo
 
 HaveIt:
         ' Make read-only if it's not editable.
-        Package = UCase(Ed.Server.GetProp("CLASS", "PACKAGE CLASS=" & ClassName))
-        Editable = Ed.GodMode Or (Package <> "UNENGINE" And Package <> "UNEDITOR" And Package <> "UNGAME")
+        'Editable = Ed.GodMode Or (UCase(Package) <> "UNENGINE" And UCase(Package) <> "UNEDITOR" And UCase(Package) <> "UNREALI")
+        Editable = True ''!!
         F.EditBox.Locked = Not Editable
 
         ' Go to error.
@@ -301,23 +335,23 @@ Private Sub Classes_DblClick()
 End Sub
 
 Public Sub Delete_Click()
-    If ClassIsEditable() Then
-        If MsgBox("Deleting class " & GetCurrent() & _
-            " will delete all actors belonging to the class, " & _
-            " as well as all child classes.  Are you sure you " & _
-            " want to delete it?", 4, _
-            "Delete Class " & GetCurrent()) = 6 Then
-            Ed.Server.Exec "CLASS DELETE NAME=" & GetCurrent()
-            Refresh_Click
-        End If
+    Dim Result As String
+    Dim Cur As String
+    Cur = GetCurrent()
+    Ed.ServerExec "SETCURRENTCLASS Class=Light"
+    Result = Ed.ServerGetProp("Obj", "Delete Class=Class Object=" & Cur)
+    If Result = "" Then
+        Refresh_Click
+    Else
+        Call MsgBox(Result, , "Can't delete class")
     End If
 End Sub
 
 Private Sub Classes_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
     If Button = 2 Then
+        frmPopups2.ClassEditScript.Caption = "&Edit " & GetCurrent() & " Script"
         If ClassIsEditable() Then
             frmPopups2.cbDelete.Visible = True
-            frmPopups2.ClassEditScript.Caption = "&Edit " & GetCurrent() & " Script"
         Else
             frmPopups2.cbDelete.Visible = False
         End If
@@ -325,12 +359,6 @@ Private Sub Classes_MouseDown(Button As Integer, Shift As Integer, X As Single, 
         frmPopups2.ClassCreateNew.Caption = "Create new class below " & GetCurrent()
         PopupMenu frmPopups2.ClassBrowser
     End If
-End Sub
-
-Private Sub Command1_Click()
-    Dim R As RECT
-    Call GetClientRect(frmGeneric.hwnd, R)
-    Call SetWindowPos(Me.hwnd, 0, 0, 0, R.Right - R.Left, R.Bottom - R.Top, 0)
 End Sub
 
 Private Sub SelOpt_Click()
@@ -352,9 +380,8 @@ Private Sub Classes_Click()
     '
     Temp = GetCurrent()
     If Temp <> "" Then
-        frmMain.ActorCombo.List(0) = Temp
-        frmMain.ActorCombo.ListIndex = 0
-        Ed.Server.Exec "ACTOR SET ADDCLASS=" & Temp
+        Ed.CurrentClass = Temp
+        Ed.ServerExec "SETCURRENTCLASS CLASS=" & Ed.CurrentClass
     End If
     SetActorCaption
 End Sub
@@ -365,20 +392,21 @@ Private Sub Classes_Expand(ListIndex As Integer)
     Text = Classes.List(ListIndex)
     ClassName = GrabString(Text)
     If Left(ClassName, 1) = "*" Then ClassName = Mid(ClassName, 2)
-    Call ExpandOutline(Classes, Ed.Server.GetProp( _
+    Call ExpandOutline(Classes, Ed.ServerGetProp( _
         "Class", "Query PARENT=" & ClassName), ListIndex, False)
 End Sub
 
 Public Sub LoadClass_Click()
-    Dim Fnames As String
-    Dim Fname As String
+    Dim Fnames As String, Fname As String, Pkg As String, PkgDef As String, NameDef As String
+    Dim i As Integer
 
     ' Dialog for "Load Class".
     On Error GoTo Skip
-    Ed.Server.Disable
+    Ed.ServerDisable
     frmDialogs.ClassLoad.filename = ""
+    frmDialogs.ClassSave.InitDir = Ed.BaseDir
     frmDialogs.ClassLoad.ShowOpen
-    
+
     Call UpdateDialog(frmDialogs.ClassLoad)
     If (frmDialogs.ClassLoad.filename <> "") Then
         Ed.BeginSlowTask "Loading and compiling classes"
@@ -386,23 +414,30 @@ Public Sub LoadClass_Click()
         Fnames = Trim(frmDialogs.ClassLoad.filename)
         While (Fnames <> "")
             Fname = GrabFname(Fnames)
-            Ed.Server.Exec "CLASS LOAD FILE=" & Quotes(Fname)
+            PkgDef = ""
+            i = InStr(Fname, "\Classes")
+            If i > 0 Then
+                Pkg = Left(Fname, i - 1)
+                While InStr(Pkg, "\") > 0
+                    Pkg = Mid(Pkg, InStr(Pkg, "\") + 1)
+                Wend
+                If Pkg <> "" Then PkgDef = " PACKAGE=" & Pkg
+
+                NameDef = Mid(Fname, i + 9)
+                If InStr(NameDef, ".") > 0 Then NameDef = Left(NameDef, InStr(NameDef, ".") - 1)
+                If NameDef <> "" Then NameDef = " NAME=" & NameDef
+            End If
+            Ed.ServerExec "CLASS LOAD FILE=" & Quotes(Fname) & PkgDef & NameDef
         Wend
-        Make_Click
+        frmMain.ScriptMakeChanged_Click
         Refresh_Click
+        Classes.Expand(0) = True
         PostLoad
         Screen.MousePointer = 0
         Ed.EndSlowTask
     End If
 Skip:
-    Ed.Server.Enable
-End Sub
-
-Private Sub Make_Click()
-    Ed.BeginSlowTask "Making all classes"
-    Ed.Server.Exec "SCRIPT MAKE ALL"
-    frmResults.UpdateResults
-    Ed.EndSlowTask
+    Ed.ServerEnable
 End Sub
 
 Public Sub MakeSubclass(ParentClass As String, Browser As Boolean)
@@ -411,17 +446,18 @@ Public Sub MakeSubclass(ParentClass As String, Browser As Boolean)
     ' Show create-new-class dialog
     frmNewClass.ParentClassName = ParentClass
     frmNewClass.NewClassName = "My" & ParentClass
-    Ed.Server.Disable
+    frmNewClass.NewPackageName = "MyLevel" ' !!fix
+    Ed.ServerDisable
     frmNewClass.Show 1
-    Ed.Server.Enable
+    Ed.ServerEnable
     
     If GResult = 1 Then
-        If Val(Ed.Server.GetProp("CLASS", "EXISTS NAME=" & Quotes(GString))) = 1 Then
+        If Val(Ed.ServerGetProp("CLASS", "EXISTS NAME=" & Quotes(GString))) = 1 Then
             
             ' This class already exists.
             If MsgBox( _
                 "An actor class named " & GString & _
-                " Already exists.  Do you want to replace it?  Replacing an " & _
+                " already exists.  Do you want to replace it?  Replacing an " & _
                 "existing class causes all of its child classes to be copied " & _
                 "over to the new class.", 4, _
                 "Class already exists") = 7 Then
@@ -431,17 +467,17 @@ Public Sub MakeSubclass(ParentClass As String, Browser As Boolean)
         End If
 
         ' Create the new class.
-        Ed.Server.Exec "CLASS NEW NAME=" & Quotes(GString) & " PARENT=" & Quotes(ParentClass)
+        Ed.ServerExec "CLASS NEW NAME=" & GString & " PACKAGE=" & GPackage & " PARENT=" & ParentClass
 
         ' Expand the outline.
         If Browser Then
-            Call ExpandOutline(Classes, Ed.Server.GetProp( _
+            Call ExpandOutline(Classes, Ed.ServerGetProp( _
                 "Class", "Query Parent=" & GetCurrent()), frmClassBrowser.Classes.ListIndex, True)
         End If
 
-        ' Make this the current text.
-        frmMain.ActorCombo.List(0) = GString
-        Ed.Server.Exec "ACTOR SET ADDCLASS=" & GString
+        ' Make this the current class.
+        Ed.CurrentClass = GString
+        Ed.ServerExec "SETCURRENTCLASS CLASS=" & Ed.CurrentClass
         Call SetCurrent
 
         ' Set starting script text.
@@ -482,8 +518,7 @@ Private Sub Refresh_Click()
     Classes.ListIndex = 0
     '
     QuerySource = Classes.ListIndex
-    Call UpdateOutline(Classes, _
-        Ed.Server.GetProp("Class", "Query Parent=" & BaseClass))
+    Call UpdateOutline(Classes, Ed.ServerGetProp("Class", "Query Parent=" & BaseClass))
     SetCurrent
 End Sub
 
@@ -491,11 +526,11 @@ Sub SetCurrent()
     Dim N As Integer
     Dim i As Integer
     '
-    N = Len(frmMain.ActorCombo.Text)
+    N = Len(Ed.CurrentClass)
     For i = 0 To Classes.ListCount - 1
-        If Mid(Classes.List(i), 1, N) = frmMain.ActorCombo.Text Then
+        If Mid(Classes.List(i), 1, N) = Ed.CurrentClass Then
             Classes.ListIndex = i
-        ElseIf Mid(Classes.List(i), 2, N) = frmMain.ActorCombo.Text Then
+        ElseIf Mid(Classes.List(i), 2, N) = Ed.CurrentClass Then
             Classes.ListIndex = i
         End If
     Next i
@@ -507,20 +542,23 @@ Function ClassIsEditable() As Boolean
         ClassIsEditable = False
     ElseIf Left(Classes.List(Classes.ListIndex), 1) <> "*" Then
         ClassIsEditable = True
-    ElseIf Ed.GodMode Then
+    Else 'If Ed.GodMode Then
         ClassIsEditable = True
-    Else
-        ClassIsEditable = False
+    'Else
+    '    ClassIsEditable = False
     End If
 End Function
 
 Sub SetActorCaption()
+    Dim c As String
+    
+    c = Ed.ServerGetProp("CLASS", "PACKAGE CLASS=" & GetCurrent()) & "." & GetCurrent()
     If ClassIsEditable() Then
         EditScript.Enabled = True
-        ClassDescr.Caption = "This class is scripted."
+        ClassDescr.Caption = c & " (scripted)"
     Else
         EditScript.Enabled = False
-        ClassDescr.Caption = "This class is built-in."
+        ClassDescr.Caption = c & " (built-in)"
     End If
 End Sub
 
@@ -528,59 +566,26 @@ Public Sub SaveClass_Click()
     Dim CurClass As String
     Dim Fname As String
     '
-    PreSaveAll
     CurClass = GetCurrent()
-    If CurClass = "" Then Exit Sub
-    '
-    frmSaveClass.Caption = "Save " & CurClass & " and all child classes"
-    frmSaveClass.ClassName = CurClass
-    Ed.Server.Disable
-    frmSaveClass.Show 1
-    Ed.Server.Enable
-    If GlobalAbortedModal Then Exit Sub
-    '
-    If InStr(CurClass, " ") > 0 Then
-        Fname = Left(CurClass, InStr(CurClass, " ") - 1)
-    Else
-        Fname = CurClass
-    End If
-    '
-    If frmDialogs.ClassSave.FilterIndex = 1 Then
-        frmDialogs.ClassSave.filename = Trim(Fname) & ".ucx"
-    ElseIf frmDialogs.ClassSave.FilterIndex = 2 Then
-        frmDialogs.ClassSave.filename = Trim(Fname) & ".u"
-    Else
-        frmDialogs.ClassSave.filename = Trim(Fname) & ".h"
-    End If
-    On Error GoTo BadFilename
-TryAgain:
-    On Error GoTo Skip
-    Ed.Server.Disable
-    frmDialogs.ClassSave.DialogTitle = "Save " & CurClass & " actor class"
-    frmDialogs.ClassSave.ShowSave
-    Ed.Server.Enable
-    '
-    Call UpdateDialog(frmDialogs.ClassSave)
-    On Error GoTo 0
-    Fname = frmDialogs.ClassSave.filename
-    If (Fname <> "") Then
+    If CurClass <> "" Then
+        frmSaveClass.Caption = "Save class package to *.u file"
+        frmSaveClass.ClassName = CurClass
+        Ed.ServerDisable
+        frmSaveClass.Show 1
+        Ed.ServerEnable
+        If GlobalAbortedModal Then Exit Sub
+        '
         PreSaveAll
-        Ed.Server.Exec "CLASS SAVEBELOW NAME=" & Quotes(CurClass) & " FILE=" & Quotes(Fname)
+        Ed.ServerExec "OBJ SAVEPACKAGE" & _
+            " PACKAGE=" & GString & _
+            " FILE=" & Quotes(GString & ".u")
     End If
-    Exit Sub
-BadFilename: ' Bad filename handler:
-    Fname = ""
-    frmDialogs.ClassSave.filename = ""
-    On Error GoTo 0
-    GoTo TryAgain
-Skip:
-    Ed.Server.Enable
 End Sub
 
 ' Process results after compiling a script.
 Public Sub ProcessResults()
     Dim S As String, T As String, i As Long, Line As Long, Msg As String
-    S = Ed.Server.GetProp("Text", "Results")
+    S = Ed.ServerGetProp("Text", "Results")
     If Left(S, 9) = "Error in " And InStr(S, ":") > 0 Then
         ' Script compiler error.
         Msg = Mid(S, InStr(S, ":") + 1)

@@ -53,7 +53,7 @@ Begin VB.Form frmScriptEd
       Width           =   7935
       _ExtentX        =   13996
       _ExtentY        =   10186
-      _Version        =   327680
+      _Version        =   327681
       BackColor       =   4194304
       Enabled         =   -1  'True
       ScrollBars      =   2
@@ -112,10 +112,10 @@ Public Sub LoadAll()
     DisableRedraw (EditBox.hwnd)
 
     If Visible Then EditBox.SetFocus
-    EditBox.TextRTF = Ed.Server.GetProp("RTF", Caption)
-    EditBox.SelStart = CLng(Ed.Server.GetProp("TEXTPOS", Caption))
+    EditBox.TextRTF = Ed.ServerGetProp("RTF", Caption)
+    EditBox.SelStart = CLng(Ed.ServerGetProp("SCRIPTPOS", Caption))
     Call SendMessage(EditBox.hwnd, EM_SCROLLCARET, 0, 0)
-    SetTop (CLng(Ed.Server.GetProp("TEXTTOP", Caption)))
+    SetTop (CLng(Ed.ServerGetProp("SCRIPTTOP", Caption)))
 
     EnableRedraw (EditBox.hwnd)
     EditBox.Refresh
@@ -126,9 +126,9 @@ End Sub
 ' Save everything.
 Public Sub PreSave()
     MarkUndo
-    Call Ed.Server.SetProp("TEXT", Caption, EditBox.Text)
-    Call Ed.Server.SetProp("TEXTPOS", Caption, Str(EditBox.SelStart))
-    Call Ed.Server.SetProp("TEXTTOP", Caption, Str(SendMessage(EditBox.hwnd, EM_GETFIRSTVISIBLELINE, 0, 0)))
+    Call Ed.ServerSetProp("SCRIPT", Caption, EditBox.Text)
+    Call Ed.ServerSetProp("SCRIPTPOS", Caption, Str(EditBox.SelStart))
+    Call Ed.ServerSetProp("SCRIPTTOP", Caption, Str(SendMessage(EditBox.hwnd, EM_GETFIRSTVISIBLELINE, 0, 0)))
 End Sub
 
 ' Set selection start, end, and length.
@@ -142,13 +142,9 @@ End Sub
 
 ' Set script editable flag.
 Private Sub SetScriptControls(Flag As Boolean, EditFlag As Boolean)
-    frmMain.EditCopy.Visible = Flag
     frmMain.EditFind.Visible = Flag
     frmMain.EditFindNext.Visible = Flag
-    frmMain.EditDivider1.Visible = Flag
     frmMain.EditDivider2.Visible = Flag
-    frmMain.EditCut.Visible = EditFlag
-    frmMain.EditPaste.Visible = EditFlag
 End Sub
 
 Private Sub EditBox_Change()
@@ -177,7 +173,7 @@ Private Sub Form_Deactivate()
 End Sub
 
 Public Sub ScriptEditDefaults_Click()
-    frmActorProperties.GetClassDefaultActor (Caption)
+    Ed.ServerExec "HOOK CLASSPROPERTIES CLASS=" & Caption ''xyzzy
 End Sub
 
 Private Sub SaveState(index As Long)
@@ -279,7 +275,6 @@ Private Sub Editbox_KeyDown(KeyCode As Integer, Shift As Integer)
     Dim T As String
     Dim N As Long, S As Long
     Dim Pre As String
-
     If KeyCode = 13 And Not EditBox.Locked Then
         ' Enter.
         S = EditBox.SelStart
@@ -308,6 +303,10 @@ Done:
     ElseIf KeyCode = 46 Then
         ' Del.
         MarkUndo
+    ElseIf KeyCode = 86 And (Shift And vbCtrlMask) Then
+        ' Ctrl-V
+        EditPaste_Click
+        KeyCode = 0
     ElseIf KeyCode = 90 And (Shift And vbCtrlMask) Then
         ' Ctrl-Z.
         EditUndo_Click
@@ -529,7 +528,7 @@ Public Sub PostLoad()
     
     DisableRedraw (EditBox.hwnd)
     Call GotoText(0, Len(EditBox.Text))
-    EditBox.TextRTF = Ed.Server.GetProp("RTF", Caption)
+    EditBox.TextRTF = Ed.ServerGetProp("RTF", Caption)
     Call GotoText(0, 0)
     EnableRedraw (EditBox.hwnd)
     

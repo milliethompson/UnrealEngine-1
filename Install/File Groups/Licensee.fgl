@@ -1,0 +1,12 @@
+[Maps]
+file0=F:\Unreal\Maps\Entry.unr
+file1=F:\Unreal\Maps\Unreal.unr
+fulldirectory=
+
+[TopDir]
+SubDir0=Maps
+
+[General]
+Type=FILELIST
+Version=1.00.000
+
