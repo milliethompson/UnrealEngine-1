@@ -37,6 +37,34 @@ struct PActor : public PMessageParms
 	}
 };
 
+// Trigger.
+struct PTrigger : public PMessageParms
+{
+	AActor *Actor;
+	APawn  *Instigator;
+	PTrigger( AActor* InActor, APawn* InInstigator )
+	: Actor( InActor ), Instigator( InInstigator )
+	{}
+	static PTrigger* Get( void *Parms )
+	{
+		return (PTrigger*)Parms;
+	}
+};
+
+// Actor query.
+struct PActorBool : public PMessageParms
+{
+	AActor *Actor;
+	DWORD  Result;
+	PActorBool( AActor *InActor )
+	: Actor( InActor ), Result( 0 )
+	{}
+	static PActorBool* Get(void *Parms)
+	{
+		return (PActorBool*)Parms;
+	}
+};
+
 // Player tick.
 struct PPlayerTick : public PMessageParms
 {
@@ -155,7 +183,7 @@ struct PFloat : public PMessageParms
 	{}
 };
 
-//Vector
+// Vector.
 struct PVector : public PMessageParms
 {
 	FVector Vec;
@@ -166,19 +194,6 @@ struct PVector : public PMessageParms
 	PVector( FVector &InVec )
 	:	Vec( InVec )
 	{}
-};
-
-// KeyMoveTo.
-struct PKeyMove : public PMessageParms
-{
-	BYTE KeyNum; // Keyframe number to move to.
-	PKeyMove( BYTE InKeyNum )
-	: KeyNum( InKeyNum )
-	{}
-	static PKeyMove* Get( void *Parms )
-	{
-		return (PKeyMove*)Parms;
-	}
 };
 
 // A reference to a name.

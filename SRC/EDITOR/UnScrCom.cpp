@@ -275,10 +275,10 @@ void FScriptCompiler::EmitConstant( FToken &Token )
 //
 // Emit the function corresponding to a stack node link.
 //
-void FScriptCompiler::EmitStackNodeLinkFunction( FStackNodeLink &Link, BOOL ForceFinal )
+void FScriptCompiler::EmitStackNodeLinkFunction( FStackNodePtr Link, BOOL ForceFinal )
 {
 	guard(FScriptCompiler::EmitStackNodeFunction);
-	FStackNode &Node = Link.Node();
+	FStackNode &Node = *Link;
 	BOOL IsIntrinsic = (Node.StackNodeFlags & SNODE_IntrinsicFunc);
 	BOOL IsFinal     = (Node.StackNodeFlags & SNODE_FinalFunc) || ForceFinal;
 
@@ -514,7 +514,7 @@ void FToken::InitPropertyData
 		}
 		case CPT_Vector:
 		{
-			FVector V = GMath.ZeroVector;
+			FVector V = FVector(0,0,0);
 			if( ConstValue && !ConstValue->GetConstVector(V) )
 				throwf("Bad Vector initializer");
 			((FVector *)Data)[i] = V;
@@ -522,7 +522,7 @@ void FToken::InitPropertyData
 		}
 		case CPT_Rotation:
 		{
-			FRotation R = GMath.ZeroRotation;
+			FRotation R = FRotation(0,0,0);
 			if( ConstValue && !ConstValue->GetConstRotation(R) )
 				throwf("Bad Rotation initializer");
 			((FRotation *)Data)[i] = R;
@@ -663,11 +663,6 @@ int FScriptCompiler::GetToken( FToken &Token, const FProperty *Hint, INT NoConst
 			Token.SetConstInt(TypeToken.Enum->Num);
 			return 1;
 		}
-		if( Token.TokenName==NAME_NoName && !NoConsts )
-		{
-			Token.SetConstName(NAME_None);
-			return 1;
-		}
 		if( Token.Matches("None") && !NoConsts )
 		{
 			Token.SetConstObject( NULL, NULL );
@@ -700,7 +695,7 @@ int FScriptCompiler::GetToken( FToken &Token, const FProperty *Hint, INT NoConst
 			{
 				// This is an object constant.
 				FToken NameToken;
-				if( !GetIdentifier(NameToken) )
+				if( !GetIdentifier(NameToken,1) )
 					throwf( "Missing %s name", Type->GetName() );
 				UObject *Ob = GObj.FindObject( NameToken.Identifier, Type, FIND_Optional );
 				if( Ob == NULL )
@@ -1223,7 +1218,6 @@ int FScriptCompiler::CompileVariableExpr
 		// Set class context.
 		if( !ClassContext )
 			ClassContext = Class;
-		FRetryPoint LowRetry; InitRetry(LowRetry);
 
 		// Handle variable.
 		int IsArrayElement = 0;
@@ -1238,41 +1232,9 @@ int FScriptCompiler::CompileVariableExpr
 
 		// Make sure the variable is accessible.
 		if( ResultType.Flags & CPF_Private )
-			throwf( "Variable '%s' is internal to the engine and can't be accessed", ResultType.Name() );
+			throwf( "Variable '%s' is internal and can't be accessed", ResultType.Name() );
 
-		// Intercept member selection operator and get member offset.
-		WORD wOffset = ResultType.Offset;
-		if( PeekSymbol(".") )
-		{
-			// Consider impact of member selection on offset.
-			if( ResultType.Type==CPT_Vector )
-			{
-				// Handle vector members.
-				MatchSymbol(".");
-				FToken Tag; GetToken(Tag);
-				if     ( Tag.Matches(NAME_X) ) wOffset += 0;
-				else if( Tag.Matches(NAME_Y) ) wOffset += 4;
-				else if( Tag.Matches(NAME_Z) ) wOffset += 8;
-				else throwf( "Unrecognized vector component" );
-				ResultType.Init(ResultType.Bin,CPT_Float);
-			}
-			else if( ResultType.Type==CPT_Rotation )
-			{
-				// Handle rotation members.
-				MatchSymbol(".");
-				FToken Tag; GetToken(Tag);
-				if     ( Tag.Matches(NAME_Pitch) ) wOffset += 0;
-				else if( Tag.Matches(NAME_Yaw  ) ) wOffset += 4;
-				else if( Tag.Matches(NAME_Roll ) ) wOffset += 8;
-				else throwf( "Unrecognized rotation component" );
-				ResultType.Init(ResultType.Bin,CPT_Int);
-			}
-		}
-
-		// Emit the variable info.
-		EmitSimpleVariable( ResultType, wOffset, DefaultSpecifier );
-
-		// Handle array closing.
+		FRetryPoint LowRetry; InitRetry(LowRetry);
 		if( IsArrayElement )
 		{
 			checkLogic(MAX_ARRAY_SIZE<256);
@@ -1288,6 +1250,42 @@ int FScriptCompiler::CompileVariableExpr
 			*Script << ElementSize;
 			*Script << ArrayDim;
 		}
+
+		// Intercept member selection operator and get member offset.
+		WORD wOffset = ResultType.Offset;
+		if( PeekSymbol(".") )
+		{
+			// Consider impact of member selection on offset.
+			if( ResultType.Type==CPT_Vector )
+			{
+				// Handle vector members.
+				MatchSymbol(".");
+				FToken Tag; GetToken(Tag);
+				if     ( Tag.Matches(NAME_X) ) wOffset += 0;
+				else if( Tag.Matches(NAME_Y) ) wOffset += 4;
+				else if( Tag.Matches(NAME_Z) ) wOffset += 8;
+				else throwf( "Unrecognized vector component" );
+				ResultType.Init( ResultType.Bin, CPT_Float, ResultType.Flags & CPF_PropagateFromStruct );
+			}
+			else if( ResultType.Type==CPT_Rotation )
+			{
+				// Handle rotation members.
+				MatchSymbol(".");
+				FToken Tag; GetToken(Tag);
+				if     ( Tag.Matches(NAME_Pitch) ) wOffset += 0;
+				else if( Tag.Matches(NAME_Yaw  ) ) wOffset += 4;
+				else if( Tag.Matches(NAME_Roll ) ) wOffset += 8;
+				else throwf( "Unrecognized rotation component" );
+				ResultType.Init( ResultType.Bin, CPT_Int, ResultType.Flags & CPF_PropagateFromStruct );
+			}
+		}
+
+		// Emit the variable info.
+		FRetryPoint HighRetry; InitRetry(HighRetry);
+		EmitSimpleVariable( ResultType, wOffset, DefaultSpecifier );
+
+		// Switch array info and variable info.
+		CodeSwitcheroo( LowRetry, HighRetry );
 
 		// Note that the resulting type is an l-value.
 		ResultType.Flags |= CPF_OutParm;
@@ -1445,7 +1443,7 @@ int FScriptCompiler::CompileFunctionExpr
 	guard(FScriptCompiler::CompileFunctionExpr);
 	FRetryPoint Retry; InitRetry(Retry);
 
-	FStackNodeLink *Link      = NULL;
+	FStackNodePtr Link(NULL,0);
 	UClass         *CallClass = NULL;
 	BOOL           ForceFinal = 0;
 	BOOL           CallGlobal = 0;
@@ -1462,9 +1460,9 @@ int FScriptCompiler::CompileFunctionExpr
 			ForceFinal = 1;
 			CallGlobal = 1;
 			IsFunction = 1;
-			RequireSymbol(".","'CallGlobal'");
+			RequireSymbol( ".", "'CallGlobal'" );
 			if( ClassContext )
-				throwf("Can only use 'CallGlobal' with self, not with other actors");
+				throwf( "Can only use 'CallGlobal' with self, not with other actors" );
 		}
 		else if( Token.Matches(NAME_CallParent) )
 		{
@@ -1473,9 +1471,9 @@ int FScriptCompiler::CompileFunctionExpr
 			Accept     = 0;
 			CallParent = 1;
 			CallClass  = Class->ParentClass;
-			RequireSymbol(".","'CallParent'");
+			RequireSymbol( ".", "'CallParent'" );
 			if( ClassContext )
-				throwf("Can only use 'CallParent' with self, not with other actors");
+				throwf( "Can only use 'CallParent' with self, not with other actors" );
 		}
 		else if( Token.Matches(NAME_CallClass) )
 		{
@@ -1493,7 +1491,7 @@ int FScriptCompiler::CompileFunctionExpr
 			RequireSymbol(")","'CallClass'");
 			RequireSymbol(".","'CallClass'");
 			if( ClassContext )
-				throwf("Can only use 'CallClass' with self, not with other actors");
+				throwf( "Can only use 'CallClass' with self, not with other actors" );
 		}
 		else break;
 		GetToken(Token);
@@ -1514,25 +1512,23 @@ int FScriptCompiler::CompileFunctionExpr
 		throwf( "Class '%s' is not scripted",ClassContext->GetName() );
 
 	// Find the stack node link for this function.
-	for( int i = (ClassContext||CallGlobal) ? 1 : NestLevel-1; i>=1 && Link==NULL; i-- )
+	for( int i = (ClassContext||CallGlobal) ? 1 : NestLevel-1; i>=1 && Link.Class==NULL; i-- )
 	{
-		FStackNodeLink *TestLink = ClassContext
-		?	&ClassContext->StackTree->Element(0).ChildFunctions
-		:	&Nest[i].Node()->ChildFunctions;
-		while( TestLink->Class!=NULL && Link==NULL )
+		FStackNodePtr TestLink = ClassContext
+		?	ClassContext->StackTree->Element(0).ChildFunctions
+		:	Nest[i].Node()->ChildFunctions;
+		while( TestLink.Class!=NULL && Link.Class==NULL )
 		{
-			FStackNode &Node = TestLink->Node();
-			Accept           = Accept || TestLink->Class==CallClass || (CallParent && TestLink->Class!=Class);
+			FStackNode &Node = *TestLink;
+			Accept           = Accept || TestLink.Class==CallClass || (CallParent && TestLink.Class!=Class);
 			if( Node.Name==Token.TokenName && Node.NestType==NEST_Function && Accept )
-			{
 				Link = TestLink;
-			}
-			TestLink = &Node.Next;
+			TestLink = TestLink->Next;
 		}
 	}
 
 	// Found a matching function?
-	if( Link == NULL )
+	if( Link.Class == NULL )
 	{
 		if( IsFunction )
 			throwf( "Unknown function '%s'", Token.Identifier );
@@ -1541,16 +1537,29 @@ int FScriptCompiler::CompileFunctionExpr
 	}
 
 	// Get node.
-	FStackNode &Node = Link->Node();
+	FStackNode &Node = *Link;
 
-	// Don't allow calling private functions.
+	// Verify that the function is callable here.
 	if( Node.StackNodeFlags & SNODE_PrivateFunc )
 		throwf( "Function '%s' is Private", Node.Name() );
 	if( Node.StackNodeFlags & SNODE_LatentFunc )
 		CheckAllow( Node.Name(), ALLOW_StateCmd );
-
+	if( (Node.StackNodeFlags & SNODE_IteratorFunc) && !AllowIterator )
+		throwf( "Can't call iterator functions here" );
+	if( Node.StackNodeFlags & SNODE_IteratorFunc )
+		GotIterator = 1;
+	
 	// Emit the function call.
-	EmitStackNodeLinkFunction( *Link, ForceFinal );
+	EmitStackNodeLinkFunction( Link, ForceFinal );
+
+	// See if this is an iterator with automatic casting of parm 2 object to the parm 1 class.
+	BOOL IsIteratorCast =
+	(	(Node.StackNodeFlags & SNODE_IteratorFunc)
+	&&	(Node.NumParms>=2)
+	&&	(Link.Class->Element(Node.iFirstProperty+0).Type==CPT_Object)
+	&&	(Link.Class->Element(Node.iFirstProperty+0).Class->IsA("Class"))
+	&&	(Link.Class->Element(Node.iFirstProperty+1).Type==CPT_Object ));
+	UClass* IteratorClass = NULL;
 
 	// Parse all parameters except for return type; the parameters are emitted to 
 	// code as a series of non-empty expressions terminated by EX_EndFunctionParms.
@@ -1561,10 +1570,14 @@ int FScriptCompiler::CompileFunctionExpr
 	FToken ParmToken[MAX_FUNC_PARMS];
 	for( int j=0; j<Node.NumParms; j++ )
 	{
-		// Done with list of parameters?
-		FProperty &Parm = Link->Class->Element( j + Node.iFirstProperty );
+		// Get parameter.
+		FProperty Parm = Link.Class->Element( j + Node.iFirstProperty );
 		if( Parm.Flags & CPF_ReturnParm )
 			break;
+
+		// If this is an iterator, automatically adjust the second parameter's type.
+		if( j==1 && IteratorClass )
+			Parm.Class = IteratorClass;
 
 		// Get comma parameter delimiter.
 		if( j!=0 && !MatchSymbol(",") )
@@ -1593,10 +1606,12 @@ int FScriptCompiler::CompileFunctionExpr
 			else
 				*Script << EX_Nothing;
 		}
+		else if( IsIteratorCast && j==0 )
+			ParmToken[j].GetConstObject( UClass::GetBaseClass(), *(UObject**)&IteratorClass );
 	}
-	for( ; j<Node.NumParms && !(Link->Class->Element(j + Node.iFirstProperty).Flags & CPF_ReturnParm); j++ )
+	for( ; j<Node.NumParms && !(Link.Class->Element(j + Node.iFirstProperty).Flags & CPF_ReturnParm); j++ )
 	{
-		checkState(Link->Class->Element(j + Node.iFirstProperty).Flags & CPF_OptionalParm);
+		checkState(Link.Class->Element(j + Node.iFirstProperty).Flags & CPF_OptionalParm);
 		*Script << EX_Nothing;
 	}
 
@@ -1608,7 +1623,7 @@ int FScriptCompiler::CompileFunctionExpr
 
 	// Emit end-of-function-parms tag.
 	*Script << EX_EndFunctionParms;
-	FProperty &Return = Link->Class->Element( Node.iFirstProperty + Node.NumParms - 1 );
+	FProperty &Return = Link.Class->Element( Node.iFirstProperty + Node.NumParms - 1 );
 
 	// Spawn special case: Make return type the same as a constant class passed to it.
 	if( Token.Matches(NAME_Spawn) )
@@ -1733,7 +1748,7 @@ int FScriptCompiler::CompileDynamicCast( FToken Token, FToken &ResultType )
 		UClass *DestClass = new( Token.Identifier, FIND_Optional )UClass;
 		if( DestClass )
 		{
-			// Compile the enclosed object class name.
+			// Compile the enclosed expression to cast.
 			char Tag[80]; sprintf( Tag, "'%s' cast", DestClass->GetName() );
 			FProperty RequiredType( CPT_Object, UObject::GetBaseClass() );
 			CompileExpr( RequiredType, Tag, &ResultType );
@@ -1773,7 +1788,7 @@ int FScriptCompiler::CompileDynamicCast( FToken Token, FToken &ResultType )
 		else
 		{
 			// Not an actor class.
-			PerformRetry(LowRetry);
+			PerformRetry( LowRetry );
 			return 0;
 		}
 	}
@@ -1874,10 +1889,11 @@ int FScriptCompiler::CompileExpr
 		// We successfully parsed a function-call expression.
 		Token.Flags &= ~CPF_OutParm;
 	}
+#if 0
 	else if( RequiredType.Type==CPT_Name && Token.TokenName!=NAME_None )
 	{
 		// This is a name constant, recognized after variables and functions.
-		Token.SetConstName(Token.TokenName);
+		Token.SetConstName( Token.TokenName );
 		Token.Flags &= ~CPF_OutParm;
 		EmitConstant(Token);
 	}
@@ -1888,6 +1904,7 @@ int FScriptCompiler::CompileExpr
 		Token.Flags &= ~CPF_OutParm;
 		EmitConstant(Token);
 	}
+#endif
 	else
 	{
 		// This doesn't match an expression, so put it back.  It might be some kind of
@@ -1918,7 +1935,7 @@ int FScriptCompiler::CompileExpr
 		// Get the context variable or expression.
 		FToken TempToken;
 		GetToken(TempToken);
-		
+
 		// Get ready to compile expr.
 		FRetryPoint ContextStart; InitRetry(ContextStart);
 
@@ -1938,7 +1955,7 @@ int FScriptCompiler::CompileExpr
 	Test:
 	FToken OperToken;
 	INT NumOperLinks=0, Precedence=0, BestMatch=0, Matches=0, NumParms=3;
-	FStackNodeLink *OperLinks[16], *BestOperLink;
+	FStackNodePtr OperLinks[16], BestOperLink;
 	INT RequiredStackNodeFlags = Token.Type==CPT_None ? SNODE_PreOperatorFunc : 0;
 	if( GetToken(OperToken,NULL,1) )
 	{
@@ -1947,10 +1964,10 @@ int FScriptCompiler::CompileExpr
 			// Build a list of matching operators.
 			for( int i = NestLevel-1; i>=1; i-- )
 			{
-				FStackNodeLink *TestLink = &Nest[i].Node()->ChildFunctions;
-				while( TestLink->Class != NULL )
+				FStackNodePtr TestLink = Nest[i].Node()->ChildFunctions;
+				while( TestLink.Class != NULL )
 				{
-					FStackNode &Node = TestLink->Node();
+					FStackNode &Node = *TestLink;
 					if
 					(
 						Node.Name              == OperToken.TokenName
@@ -1964,7 +1981,7 @@ int FScriptCompiler::CompileExpr
 						NumParms                  = Min(NumParms,(int)Node.NumParms);
 						checkState(NumOperLinks < ARRAY_COUNT(OperLinks));
 					}
-					TestLink = &Node.Next;
+					TestLink = Node.Next;
 				}
 			}
 
@@ -1985,20 +2002,20 @@ int FScriptCompiler::CompileExpr
 				}
 
 				// Figure out which operator overload is best.
-				BestOperLink = NULL;
+				BestOperLink.Class = NULL;
 				//AddResultText("Oper %s:\r\n",OperLinks[0]->Node().Name());
 				BOOL AnyLeftValid=0, AnyRightValid=0;
 				for( int i=0; i<NumOperLinks; i++ )
 				{
 					// See how good a match the first parm is.
-					FStackNode  &Node     = OperLinks[i]->Node();
+					FStackNode  &Node     = *OperLinks[i];
 					INT			ThisMatch = 0;
 					INT			iParm     = 0;
 
 					if( Node.NumParms==3 || RequiredStackNodeFlags!=SNODE_PreOperatorFunc )
 					{
 						// Check match of first parm.
-						FProperty &Parm1 = OperLinks[i]->Class->Element(Node.iFirstProperty + iParm++);
+						FProperty &Parm1 = OperLinks[i].Class->Element(Node.iFirstProperty + iParm++);
 						//AddResultText("Left  (%s->%s): ",FName(Token.Type)(),FName(Parm1.Type)());
 						INT Cost         = ConversionCost(Parm1,Token);
 						ThisMatch        = Cost;
@@ -2008,14 +2025,14 @@ int FScriptCompiler::CompileExpr
 					if( Node.NumParms == 3 || RequiredStackNodeFlags==SNODE_PreOperatorFunc )
 					{
 						// Check match of second parm.
-						FProperty &Parm2 = OperLinks[i]->Class->Element(Node.iFirstProperty + iParm++);
+						FProperty &Parm2 = OperLinks[i].Class->Element(Node.iFirstProperty + iParm++);
 						//AddResultText("Right (%s->%s): ",FName(NewResultType.Type)(),FName(Parm2.Type)());
 						INT Cost         = ConversionCost(Parm2,NewResultType);
 						ThisMatch        = Max(ThisMatch,Cost);
 						AnyRightValid    = AnyRightValid || Cost!=MAXINT;
 					}
 
-					if( (BestOperLink==NULL || ThisMatch<BestMatch) && (Node.NumParms==NumParms) )
+					if( (BestOperLink.Class==NULL || ThisMatch<BestMatch) && (Node.NumParms==NumParms) )
 					{
 						// This is the best match.
 						BestOperLink = OperLinks[i];
@@ -2049,12 +2066,11 @@ int FScriptCompiler::CompileExpr
 				//
 
 				// Get operator parameter pointers.
-				checkState(BestOperLink!=NULL);
-				checkState(BestOperLink->Class!=NULL);
-				FStackNode &Node = BestOperLink->Class->StackTree->Element(BestOperLink->iNode);
-				FProperty &OperParm1  = BestOperLink->Class->Element(Node.iFirstProperty + 0);
-				FProperty &OperParm2  = BestOperLink->Class->Element(Node.iFirstProperty + (RequiredStackNodeFlags!=SNODE_PreOperatorFunc));
-				FProperty &OperReturn = BestOperLink->Class->Element(Node.iFirstProperty + Node.NumParms - 1);
+				checkState(BestOperLink.Class!=NULL);
+				FStackNode &Node = BestOperLink.Class->StackTree->Element(BestOperLink.iNode);
+				FProperty &OperParm1  = BestOperLink.Class->Element(Node.iFirstProperty + 0);
+				FProperty &OperParm2  = BestOperLink.Class->Element(Node.iFirstProperty + (RequiredStackNodeFlags!=SNODE_PreOperatorFunc));
+				FProperty &OperReturn = BestOperLink.Class->Element(Node.iFirstProperty + Node.NumParms - 1);
 				checkState(OperReturn.Flags & CPF_ReturnParm);
 
 				// Convert Expr2 if necessary.
@@ -2102,7 +2118,7 @@ int FScriptCompiler::CompileExpr
 
 				// Emit the operator function call.			
 				FRetryPoint HighRetry; InitRetry(HighRetry);
-				EmitStackNodeLinkFunction(*BestOperLink,1);
+				EmitStackNodeLinkFunction( BestOperLink, 1 );
 				CodeSwitcheroo(LowRetry,HighRetry);
 
 				// End of call.
@@ -2219,11 +2235,11 @@ void FScriptCompiler::ExitMake(int Success)
 	if( Success )
 	{
 		if( LinesCompiled ) AddResultText("Success: Compiled %i line(s), %i statement(s).\r\n",LinesCompiled,StatementsCompiled);
-		else AddResultText("Success: Everything is up to date");
+		else AddResultText( "Success: Everything is up to date" );
 	}
 	else
 	{
-		AddResultText("Script compilation failed.\r\n");
+		//!!AddResultText("Script compilation failed.\r\n");
 	}
 	unguard;
 }
@@ -2249,6 +2265,7 @@ const char *FScriptCompiler::NestTypeName(ENestType NestType)
 		case NEST_Loop:		return "Loop";
 		case NEST_Switch:	return "Switch";
 		case NEST_For:		return "For";
+		case NEST_ForEach:	return "ForEach";
 		default:			return "Unknown";
 	}
 	unguard;
@@ -2303,9 +2320,8 @@ void FScriptCompiler::PushNest( ENestType NestType, const char *Name, INT iNode 
 	// Update pointer to top nesting level.
 	TopNest					= &Nest[NestLevel++];
 	TopNode					= NULL;
-	TopNest->Class			= Class;
+	TopNest->Link			= FStackNodePtr(Class,iNode);
 	TopNest->NestType		= NestType;
-	TopNest->iNode			= iNode;
 	TopNest->iCodeChain		= INDEX_NONE;
 	TopNest->SwitchType		= FProperty(CPT_None);
 	TopNest->FixupList		= NULL;
@@ -2325,22 +2341,24 @@ void FScriptCompiler::PushNest( ENestType NestType, const char *Name, INT iNode 
 	{
 		if( Pass == 1 )
 		{
-			if( !IsNewNode ) TopNest->iNode = TopNest[-1].iNode;
-			TopNode = TopNest[ 0].Node();
+			if( !IsNewNode )
+				TopNest->Link = TopNest[-1].Link;
+			TopNode = TopNest[0].Node();
 		}
 		else
 		{
 			if( IsNewNode )
 			{	
 				// Create a new stack node.
-				TopNest->iNode				= Class->StackTree->Add();
+				TopNest->Link				= FStackNodePtr( Class, Class->StackTree->Add() );
 				TopNode						= TopNest->Node();
 
 				// Init links.
-				TopNode->Parent				= FStackNodeLink(0);
-				TopNode->ChildFunctions		= FStackNodeLink(0);
-				TopNode->ChildStates		= FStackNodeLink(0);
-				TopNode->Next				= FStackNodeLink(0);
+				TopNode->ParentItem         = FStackNodePtr(NULL,0);
+				TopNode->ParentNest			= FStackNodePtr(NULL,0);
+				TopNode->ChildFunctions		= FStackNodePtr(NULL,0);
+				TopNode->ChildStates		= FStackNodePtr(NULL,0);
+				TopNode->Next				= FStackNodePtr(NULL,0);
 
 				// Init general info.
 				TopNode->Name				= ThisName;
@@ -2357,6 +2375,7 @@ void FScriptCompiler::PushNest( ENestType NestType, const char *Name, INT iNode 
 					// Init class/state info.
 					TopNode->ProbeMask			= 0;
 					TopNode->IgnoreMask			= ~(QWORD)0;
+					TopNode->VfHash             = NULL;
 				}
 				else
 				{
@@ -2366,6 +2385,7 @@ void FScriptCompiler::PushNest( ENestType NestType, const char *Name, INT iNode 
 					TopNode->iIntrinsic			= 0;
 					TopNode->iFirstProperty		= MAXWORD;
 					TopNode->NumProperties		= 0;
+					TopNode->HashNext           = FStackNodePtr(NULL,0);
 
 					// Init the temporary locals bin.
 					Class->Bins[PROPBIN_PerFunction]->Num = 0;
@@ -2374,8 +2394,8 @@ void FScriptCompiler::PushNest( ENestType NestType, const char *Name, INT iNode 
 			else
 			{
 				// Use the existing stack node.
-				TopNest->iNode				= TopNest[-1].iNode;
-				TopNode						= &Class->StackTree->Element(TopNest->iNode);
+				TopNest->Link = TopNest[-1].Link;
+				TopNode		  = &Class->StackTree->Element(TopNest->Link.iNode);
 			}
 		}
 		checkState(TopNode!=NULL);
@@ -2394,17 +2414,18 @@ void FScriptCompiler::PushNest( ENestType NestType, const char *Name, INT iNode 
 		case NEST_Class:
 			checkState(ThisName!=NAME_None);
 			checkState(PrevNode==NULL);
-			TopNest->Allow			 	 = ALLOW_VarDecl | ALLOW_Function | ALLOW_State | ALLOW_Ignores;
+			TopNest->Allow = ALLOW_VarDecl | ALLOW_Function | ALLOW_State | ALLOW_Ignores;
 			break;
 
 		case NEST_State:
 			checkState(ThisName!=NAME_None);
 			checkState(PrevNode!=NULL);
-			TopNest->Allow				 = ALLOW_Function | ALLOW_Label | ALLOW_StateCmd | ALLOW_Ignores;
+			TopNest->Allow = ALLOW_Function | ALLOW_Label | ALLOW_StateCmd | ALLOW_Ignores;
 			if( Pass==0 )
 			{
+				TopNode->ParentNest      = TopNest[-1].Link;
 				TopNode->Next			 = PrevNode->ChildStates;
-				PrevNode->ChildStates    = FStackNodeLink( Class, TopNest->iNode );
+				PrevNode->ChildStates    = TopNest->Link;
 			}
 			break;
 
@@ -2415,8 +2436,9 @@ void FScriptCompiler::PushNest( ENestType NestType, const char *Name, INT iNode 
 			if( Pass==0 )
 			{
 				TopNode->iFirstProperty  = Class->Num;
+				TopNode->ParentNest      = TopNest[-1].Link;
 				TopNode->Next			 = PrevNode->ChildFunctions;
-				PrevNode->ChildFunctions = FStackNodeLink( Class, TopNest->iNode );
+				PrevNode->ChildFunctions = TopNest->Link;
 			}
 			break;
 
@@ -2427,8 +2449,9 @@ void FScriptCompiler::PushNest( ENestType NestType, const char *Name, INT iNode 
 			if( Pass==0 )
 			{
 				TopNode->iFirstProperty  = Class->Num;
+				TopNode->ParentNest      = TopNest[-1].Link;
 				TopNode->Next			 = PrevNode->ChildFunctions;
-				PrevNode->ChildFunctions = FStackNodeLink( Class, TopNest->iNode );
+				PrevNode->ChildFunctions = TopNest->Link;
 			}
 			break;
 
@@ -2441,7 +2464,7 @@ void FScriptCompiler::PushNest( ENestType NestType, const char *Name, INT iNode 
 		case NEST_Loop:
 			checkState(ThisName==NAME_None);
 			checkState(PrevNode!=NULL);
-			TopNest->Allow = ALLOW_Until | ALLOW_Break | (PrevAllow & (ALLOW_Cmd|ALLOW_Label|ALLOW_Break|ALLOW_StateCmd|ALLOW_Return));
+			TopNest->Allow = ALLOW_Break | (PrevAllow & (ALLOW_Cmd|ALLOW_Label|ALLOW_Break|ALLOW_StateCmd|ALLOW_Return));
 			break;
 
 		case NEST_Switch:
@@ -2453,7 +2476,13 @@ void FScriptCompiler::PushNest( ENestType NestType, const char *Name, INT iNode 
 		case NEST_For:
 			checkState(ThisName==NAME_None);
 			checkState(PrevNode!=NULL);
-			TopNest->Allow = ALLOW_Break | ALLOW_Next | (PrevAllow & (ALLOW_Cmd|ALLOW_Label|ALLOW_Break|ALLOW_StateCmd|ALLOW_Return));
+			TopNest->Allow = ALLOW_Break | (PrevAllow & (ALLOW_Cmd|ALLOW_Label|ALLOW_Break|ALLOW_StateCmd|ALLOW_Return));
+			break;
+
+		case NEST_ForEach:
+			checkState(ThisName==NAME_None);
+			checkState(PrevNode!=NULL);
+			TopNest->Allow = ALLOW_Break | (PrevAllow & (ALLOW_Cmd|ALLOW_Label|ALLOW_Break|ALLOW_Return));
 			break;
 
 		default:
@@ -2524,29 +2553,6 @@ void FScriptCompiler::PopNest( ENestType NestType, const char *Descr )
 				FLabelEntry Entry(NAME_None,MAXWORD);
 				*Script << Entry;
 			}
-
-			// Make sure a Begin label exists somewhere.
-			BOOL FoundBegin=0;
-			FStackNodeLink Link( Class, TopNest->iNode );
-			while( Link.Class )
-			{
-				if( Link.Node().CodeLabelOffset != MAXWORD )
-				{
-					FLabelEntry *Entry = (FLabelEntry *)&Link.Class->Script->Element(Link.Node().CodeLabelOffset);
-					while( Entry->Name != NAME_None )
-					{
-						if( Entry->Name==NAME_Begin )
-						{
-							FoundBegin=1;
-							break;
-						}
-						Entry++;
-					}
-				}
-				Link = Link.Node().Parent;
-			}
-			if( !FoundBegin )
-				throwf( "State '%s': missing required label 'Begin:'", TopNode->Name() );
 		}
 		else if( NestType==NEST_Function || NestType==NEST_Operator )
 		{
@@ -2643,30 +2649,39 @@ void FScriptCompiler::PopNest( ENestType NestType, const char *Descr )
 			// Here's the end of the loop.
 			TopNest->SetFixup(FIXUP_ForEnd,Script->Num);
 		}
+		else if( NestType==NEST_ForEach )
+		{
+			// Perform next iteration.
+			*Script << EX_IteratorNext;
+
+			// Here's the end of the loop.
+			TopNest->SetFixup( FIXUP_IteratorEnd, Script->Num );
+			*Script << EX_IteratorPop;
+		}
 		else if( NestType==NEST_Loop )
 		{
 			if( MatchIdentifier("Until") )
 			{
 				// Jump back to start of loop.
 				*Script << EX_JumpIfNot;
-				EmitAddressToFixupLater(TopNest,FIXUP_LoopStart,NAME_None);
+				EmitAddressToFixupLater( TopNest, FIXUP_LoopStart, NAME_None );
 
 				// Compile boolean expression.
-				RequireSymbol("(","'Until'");
+				RequireSymbol( "(", "'Until'" );
 				CompileExpr( FProperty(CPT_Bool), "'Until'" );
-				RequireSymbol(")","'Until'");
+				RequireSymbol( ")", "'Until'" );
 
 				// Here's the end of the loop.
-				TopNest->SetFixup(FIXUP_LoopEnd,Script->Num);
+				TopNest->SetFixup( FIXUP_LoopEnd, Script->Num );
 			}
 			else
 			{
 				// Jump back to start of loop.
 				*Script << EX_Jump;
-				EmitAddressToFixupLater(TopNest,FIXUP_LoopStart,NAME_None);
+				EmitAddressToFixupLater( TopNest, FIXUP_LoopStart, NAME_None );
 
 				// Here's the end of the loop.
-				TopNest->SetFixup(FIXUP_LoopEnd,Script->Num);
+				TopNest->SetFixup( FIXUP_LoopEnd, Script->Num );
 			}
 		}
 
@@ -2677,13 +2692,15 @@ void FScriptCompiler::PopNest( ENestType NestType, const char *Descr )
 			{
 				// Fixup a local label.
 				for( FLabelRecord *LabelRecord = TopNest->LabelList; LabelRecord; LabelRecord=LabelRecord->Next )
+				{
 					if( LabelRecord->Name == Fixup->Name )
 					{
 						*(WORD *)&Script->Element(Fixup->iCode) = LabelRecord->iCode;
 						break;
 					}
+				}
 				if( LabelRecord == NULL )
-					throwf( "Undefined label '%s'", Fixup->Name() );
+					throwf( "Label '%s' not found in this block of code", Fixup->Name() );
 			}
 			else
 			{
@@ -2702,7 +2719,7 @@ void FScriptCompiler::PopNest( ENestType NestType, const char *Descr )
 	NestType = TopNest->NestType;
 	NestLevel--;
 	TopNest--;
-	TopNode	= TopNest->iNode==INDEX_NONE ? NULL : &Class->StackTree->Element(TopNest->iNode);
+	TopNode	= TopNest->Node();
 
 	// Update allow-flags.
 	if( NestType == NEST_Function )
@@ -2856,6 +2873,11 @@ int FScriptCompiler::GetVarType
 		else if( Specifier.Matches(NAME_Transient) )
 		{
 			Flags      |= CPF_Transient;
+			IsVariable  = 1;
+		}
+		else if( Specifier.Matches(NAME_Intrinsic) )
+		{
+			Flags      |= CPF_Intrinsic;
 			IsVariable  = 1;
 		}
 		else if( Specifier.Matches(NAME_Out) )
@@ -3013,8 +3035,8 @@ int FScriptCompiler::GetVarType
 	// Validate combinations.
 	if( VarProperty.Type==CPT_Object && VarProperty.Bin==PROPBIN_PerClass && VarProperty.Class->IsChildOf("Actor") )
 		throwf("Static actor variables are not allowed");
-	if( (VarProperty.Flags & CPF_Transient) && VarProperty.Bin!=PROPBIN_PerObject )
-		throwf("Static and local variables may not be transient");
+	if( (VarProperty.Flags & (CPF_Transient|CPF_Intrinsic)) && VarProperty.Bin!=PROPBIN_PerObject )
+		throwf("Static and local variables may not be transient or intrinsic");
 
 	return 1;
 	unguard;
@@ -3345,12 +3367,12 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 		}
 
 		// Copy parent's stack node links if parent is scripted.
-		if( Class->ParentClass && Class->ParentClass->StackTree )//!!
+		if( Class->ParentClass && Class->ParentClass->StackTree )
 		{
 			checkState(Class->ParentClass->StackTree!=NULL);
-			FStackNode &ParentNode	= Class->ParentClass->StackTree->Element(0);
-			TopNode->ChildFunctions	= ParentNode.ChildFunctions;
-			TopNode->ChildStates	= ParentNode.ChildStates;
+			TopNode->ParentItem     = FStackNodePtr( Class->ParentClass, 0 );
+			TopNode->ChildFunctions	= TopNode->ParentItem->ChildFunctions;
+			TopNode->ChildStates	= TopNode->ParentItem->ChildStates;
 		}
 		unguard;
 	}
@@ -3361,9 +3383,10 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 	||	Token.Matches(NAME_PostOperator) 
 	||	Token.Matches(NAME_Intrinsic) 
 	||	Token.Matches(NAME_Final) 
-	||	Token.Matches(NAME_Engine) 
 	||	Token.Matches(NAME_Private) 
 	||	Token.Matches(NAME_Latent)
+	||	Token.Matches(NAME_Iterator)
+	||	Token.Matches(NAME_Singular)
 	)
 	{
 		// Function or operator.
@@ -3380,7 +3403,7 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 				// Get function name.
 				FuncInfo.NestType		= NEST_Function;
 				FuncInfo.NoDefaults		= 0;
-				CheckAllow("'Function'",ALLOW_Function);
+				CheckAllow( "'Function'",ALLOW_Function);
 			}
 			else if( Token.Matches(NAME_Operator) )
 			{
@@ -3419,7 +3442,7 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 			else if( Token.Matches(NAME_Intrinsic) )
 			{
 				// Intrinsic override.
-				FuncInfo.StackNodeFlags |=  SNODE_IntrinsicFunc;
+				FuncInfo.StackNodeFlags |= SNODE_IntrinsicFunc;
 
 				// Get internal id.
 				if( !MatchSymbol("(") )
@@ -3428,15 +3451,14 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 					throwf( "Missing intrinsic id" );
 				else if( !MatchSymbol(")") )
 					throwf( "Missing ')' after internal id" );
-
-				// Warn if intrinsic doesn't actually exist.
-				if( FuncInfo.iIntrinsic<EX_FirstIntrinsic || FuncInfo.iIntrinsic>EX_Max || GIntrinsics[FuncInfo.iIntrinsic]==execUndefined )
-					AddResultText( "Warning: Bad intrinsic id %i\r\n",FuncInfo.iIntrinsic);
 			}
-			else if( Token.Matches(NAME_Engine) )
+			else if( Token.Matches(NAME_Iterator) )
 			{
-				// This is a2n engine generated function.
-				FuncInfo.StackNodeFlags |= SNODE_EngineFunc;
+				FuncInfo.StackNodeFlags |= SNODE_IteratorFunc;
+			}
+			else if( Token.Matches(NAME_Singular) )
+			{
+				FuncInfo.StackNodeFlags |= SNODE_SingularFunc;
 			}
 			else if( Token.Matches(NAME_Latent) )
 			{
@@ -3462,6 +3484,11 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 		if( FuncInfo.NestType == NEST_None )
 			throwf( "Missing 'Function' or 'Operator'" );
 
+		// Warn if intrinsic doesn't actually exist.
+		if( FuncInfo.iIntrinsic!=0 )
+			if( FuncInfo.iIntrinsic<EX_FirstIntrinsic || FuncInfo.iIntrinsic>EX_Max || GIntrinsics[FuncInfo.iIntrinsic]==execUndefined )
+				debugf( "Warning: Bad intrinsic id %i\r\n",FuncInfo.iIntrinsic);//!!
+
 		// Get return type.
 		FRetryPoint Start; InitRetry(Start);
 		FProperty ReturnType;
@@ -3478,8 +3505,13 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 			throwf("Missing %s name",NestTypeName(FuncInfo.NestType));
 
 		// Validate flag combinations.
-		if( (FuncInfo.StackNodeFlags & SNODE_LatentFunc) && FuncInfo.iIntrinsic==0 )
-			throwf( "Only intrinsic functions may be 'Latent'" );
+		if( !(FuncInfo.StackNodeFlags & SNODE_IntrinsicFunc) )
+		{
+			if( FuncInfo.StackNodeFlags & SNODE_LatentFunc  )
+				throwf( "Only intrinsic functions may use 'Latent'" );
+			if( FuncInfo.StackNodeFlags & SNODE_IteratorFunc )
+				throwf( "Only intrinsic functions may use 'Iterator'" );
+		}
 
 		// Allocate local property frame, push nesting level and verify 
 		// uniqueness at this scope level.
@@ -3537,15 +3569,7 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 		{
 			ReturnType.Flags |= CPF_Parm | CPF_OutParm | CPF_ReturnParm;
 			TopNode->NumParms++;
-			FProperty &ReturnProperty = GetVarNameAndDim
-			(
-				ReturnType,
-				1,
-				0,
-				1,
-				"ReturnValue",
-				"Function return type"
-			);
+			FProperty &ReturnProperty = GetVarNameAndDim( ReturnType, 1, 0, 1, "ReturnValue", "Function return type" );
 			TopNode->CodeLabelOffset = ReturnProperty.Offset;
 		}
 
@@ -3575,11 +3599,8 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 		// Detect whether the function is being defined or declared.
 		if( PeekSymbol(";") )
 		{
-			checkState( (TopNode->StackNodeFlags & SNODE_DefinedFunc)==0 );
-
 			// Function is just being declared, not defined.
-			if( !(TopNode->StackNodeFlags & (SNODE_IntrinsicFunc|SNODE_EngineFunc)) )
-				throwf( "Only Intrinsic and Engine functions may be declared" );
+			checkState( (TopNode->StackNodeFlags & SNODE_DefinedFunc)==0 );
 		}
 		else
 		{
@@ -3601,11 +3622,11 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 		// function, if any, that it overrides.
 		for( int i=NestLevel-2; i>=1; i-- )
 		{
-			checkState(Nest[i].iNode!=INDEX_NONE);
-			FStackNodeLink *Link = &Nest[i].Node()->ChildFunctions;
-			while( Link->Class )
+			checkState(Nest[i].Link.iNode!=INDEX_NONE);//!!
+			FStackNodePtr Link = Nest[i].Node()->ChildFunctions;
+			while( Link.Class )
 			{
-				FStackNode *Node = &Link->Node();
+				FStackNode *Node = &*Link;
 				INT IsServer     = IsServerVariation && stricmp(Node->Name(),"SERVER")==0;
 
 				// If the other function's name matches this one's, process it.
@@ -3631,13 +3652,13 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 					if
 					(	(TopNode->NumParms != Node->NumParms)
 					||	((TopNode->NumParms>0) && 
-						((Class(TopNode->iFirstProperty+TopNode->NumParms-1).Flags ^ Link->Class->Element(Node->iFirstProperty+Node->NumParms-1).Flags) & CPF_ReturnParm)!=0) )
+						((Class(TopNode->iFirstProperty+TopNode->NumParms-1).Flags ^ Link.Class->Element(Node->iFirstProperty+Node->NumParms-1).Flags) & CPF_ReturnParm)!=0) )
 						throwf( "Redefinition of '%s %s' differs from %s", NestTypeName(FuncInfo.NestType), FuncInfo.Function.Identifier, Differ );
 
 					// Check all individual parameters.
 					for( int j=0; j<TopNode->NumParms; j++ )
 					{
-						if( !Class(TopNode->iFirstProperty + j).MatchesType(Link->Class->Element(Node->iFirstProperty + j), 1) )
+						if( !Class(TopNode->iFirstProperty + j).MatchesType(Link.Class->Element(Node->iFirstProperty + j), 1) )
 						{
 							if( Class(TopNode->iFirstProperty + j).Flags & CPF_ReturnParm )
 								throwf( "Redefinition of %s %s differs only by return type", NestTypeName(FuncInfo.NestType), FuncInfo.Function.Identifier );
@@ -3652,7 +3673,7 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 						throwf( "Function '%s' specifiers differ from original", Node->Name() );
 
 					// Are we overriding a function?
-					if( (i == NestLevel-2) && (Class == Link->Class) )
+					if( (i == NestLevel-2) && (Class == Link.Class) )
 					{
 						// Duplicate.
 						if( !IsServer )
@@ -3670,10 +3691,13 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 							throwf( "%s: Can't override a 'Final' function", Node->Name() );
 						}
 					}
+
+					// Here we have found the original.
+					TopNode->ParentItem = Link;
 					goto Found;
 				}
 				Next:
-				Link = &Node->Next;
+				Link = Link->Next;
 			}
 		}
 		Found:
@@ -3771,8 +3795,7 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 	}
 	else if
 	(	Token.Matches(NAME_State)
-	||	Token.Matches(NAME_Auto)
-	||	Token.Matches(NAME_Settable) )
+	||	Token.Matches(NAME_Auto) )
 	{
 		// State block.
 		guard(State);
@@ -3783,9 +3806,17 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 		// Process all specifiers.
 		for( ;; )
 		{
-			if		( Token.Matches(NAME_State   ) ) GotState=1;
-			else if ( Token.Matches(NAME_Auto    ) ) StackNodeFlags |= SNODE_AutoState;
-			else if ( Token.Matches(NAME_Settable) ) StackNodeFlags |= SNODE_EditableState;
+			if( Token.Matches(NAME_State) )
+			{
+				GotState=1;
+				if( MatchSymbol("(") )
+					RequireSymbol( ")", "'State'" );
+				StackNodeFlags |= SNODE_EditableState;
+			}
+			else if( Token.Matches(NAME_Auto) )
+			{
+				StackNodeFlags |= SNODE_AutoState;
+			}
 			else
 			{
 				UngetToken(Token);
@@ -3800,11 +3831,10 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 		if( !GetIdentifier(NameToken) )
 			throwf( "Missing state name" );
 
-		// Make sure this state doesn't duplicate an existing state on the same nest level.
-		FStackNodeLink Link = TopNode->ChildStates;
-		while( Link.Class )
+		// Find parent state and make sure this state doesn't duplicate an existing state on the same nest level.
+		for( FStackNodePtr Link = TopNode->ChildStates; Link.Class; Link = Link->Next )
 		{
-			if( stricmp(Link.Node().Name(),NameToken.Identifier) == 0 )
+			if( stricmp( Link->Name(), NameToken.Identifier ) == 0 )
 			{
 				if( Link.Class == Class )
 				{
@@ -3817,7 +3847,24 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 					break;
 				}
 			}
-			Link = Link.Node().Next;			
+		}
+
+		// Check for 'expands' keyword.
+		if( MatchIdentifier("Expands") )
+		{
+			FToken ParentToken;
+			if( Link.Class != NULL )
+				throwf( "'Expands' not allowed here: state '%s' overrides version in parent class", NameToken.Identifier );
+			if( !GetIdentifier(ParentToken) )
+				throwf( "Missing parent state name" );
+
+			// Find the overridden state.
+			for( Link = TopNode->ChildStates; Link.Class; Link = Link->Next )
+				if( stricmp( Link->Name(), ParentToken.Identifier ) == 0 )
+					break;
+
+			if( !Link.Class )
+				throwf( "'Expands': Parent state '%s' not found", ParentToken.Identifier );
 		}
 
 		// Begin the state block.
@@ -3830,10 +3877,9 @@ int FScriptCompiler::CompileDeclaration( FToken &Token, BOOL &NeedSemicolon )
 		if( Link.Class )
 		{
 			// Copy the overridden stack node's child, next, and state links to this node.
-			TopNode->ChildFunctions = Link.Node().ChildFunctions;
-			TopNode->ChildStates    = Link.Node().ChildStates;
-			TopNode->Parent         = Link;
-			checkState(Link.Class != Class );
+			TopNode->ChildFunctions = Link->ChildFunctions;
+			TopNode->ChildStates    = Link->ChildStates;
+			TopNode->ParentItem     = Link;
 		}
 		unguard;
 	}
@@ -3960,8 +4006,12 @@ void FScriptCompiler::CompileCommand( FToken &Token, BOOL &NeedSemicolon )
 		guard(Return);
 		CheckAllow( "'Return'", ALLOW_Return );
 		for( int i=NestLevel-1; i>0; i-- )
+		{
 			if( Nest[i].NestType==NEST_Function || Nest[i].NestType==NEST_Operator )
 				break;
+			else if( Nest[i].NestType==NEST_ForEach )
+				*Script << EX_IteratorPop;
+		}
 		if( i <= 0 )
 			throwf( "Internal consistency error on 'Return'" );
 		for( int j=0; j<Nest[i].Node()->NumParms; j++ )
@@ -4065,18 +4115,17 @@ void FScriptCompiler::CompileCommand( FToken &Token, BOOL &NeedSemicolon )
 		
 		// Find the nearest For or Loop.
 		INT iNest = FindNest(NEST_Loop);
-		iNest     = Max(iNest,FindNest(NEST_For));
-		iNest     = Max(iNest,FindNest(NEST_Switch));
+		iNest     = Max(iNest,FindNest(NEST_For    ));
+		iNest     = Max(iNest,FindNest(NEST_ForEach));
+		iNest     = Max(iNest,FindNest(NEST_Switch ));
 		checkState(iNest>0);
 
 		// Jump to the loop's end.
 		*Script << EX_Jump;
-		if( Nest[iNest].NestType == NEST_Loop )
-			EmitAddressToFixupLater(&Nest[iNest],FIXUP_LoopEnd,NAME_None);
-		else if( Nest[iNest].NestType == NEST_For )
-			EmitAddressToFixupLater(&Nest[iNest],FIXUP_ForEnd,NAME_None);
-		else
-			EmitAddressToFixupLater(TopNest,FIXUP_SwitchEnd,NAME_None);
+		if     ( Nest[iNest].NestType == NEST_Loop    ) EmitAddressToFixupLater( &Nest[iNest], FIXUP_LoopEnd,     NAME_None );
+		else if( Nest[iNest].NestType == NEST_For     ) EmitAddressToFixupLater( &Nest[iNest], FIXUP_ForEnd,      NAME_None );
+		else if( Nest[iNest].NestType == NEST_ForEach ) EmitAddressToFixupLater( &Nest[iNest], FIXUP_IteratorEnd, NAME_None );
+		else                                            EmitAddressToFixupLater(TopNest,FIXUP_SwitchEnd,NAME_None);
 
 		unguard;
 	}
@@ -4110,6 +4159,39 @@ void FScriptCompiler::CompileCommand( FToken &Token, BOOL &NeedSemicolon )
 		}
 		unguard;
 	}
+	else if( Token.Matches(NAME_ForEach) )
+	{
+		guard(ForEach);
+		CheckAllow( "'ForEach'", ALLOW_Cmd );
+		PushNest(NEST_ForEach,"");
+
+		// Compile iterator function call.
+		AllowIterator = 1;
+		GotIterator   = 0;
+
+		// Emit iterator token.
+		*Script << EX_Iterator;
+
+		// Compile the iterator expression.
+		FToken TypeToken;
+		if( !CompileExpr( FProperty(CPT_None), "'ForEach'" ) )
+			throwf( "'ForEach': Missing iterator expression" );
+		if( !GotIterator )
+			throwf( "'ForEach': An iterator expression is required" );
+		AllowIterator = 0;
+
+		// Emit end offset.
+		EmitAddressToFixupLater( TopNest, FIXUP_IteratorEnd, NAME_None );
+
+		// Handle statements.
+		NeedSemicolon = 0;
+		if( !MatchSymbol("{") )
+		{
+			CompileStatement();
+			PopNest( NEST_ForEach, "'ForEach'" );
+		}
+		unguard;
+	}
 	else if( Token.Matches(NAME_Assert) )
 	{
 		guard(Assert);
@@ -4124,18 +4206,24 @@ void FScriptCompiler::CompileCommand( FToken &Token, BOOL &NeedSemicolon )
 	{
 		guard(Goto);
 		CheckAllow( "'Goto'", ALLOW_Label );
-		FNestInfo *LabelNest = &Nest[2];
-		checkState(LabelNest->NestType==NEST_State || LabelNest->NestType==NEST_Function);
 
 		// All state gotos are virtual; all function labels are final.
 		if( TopNest->Allow & ALLOW_StateCmd )
 		{
-			// Virtual goto.
+			// Emit virtual goto.
 			*Script << EX_GotoLabel;
 			CompileExpr( FProperty(CPT_Name), "'Goto'" );
 		}
 		else
 		{
+			// Get label list for this nest level.
+			for( int iNest=NestLevel-1; iNest>=2; iNest-- )
+				if( Nest[iNest].NestType==NEST_State || Nest[iNest].NestType==NEST_Function || Nest[iNest].NestType==NEST_ForEach )
+					break;
+			if( iNest < 2 )
+				throwf( "Goto is not allowed here" );
+			FNestInfo *LabelNest = &Nest[iNest];
+
 			// Get label.
 			FToken Label;
 			if( !GetToken(Label) )
@@ -4145,7 +4233,7 @@ void FScriptCompiler::CompileCommand( FToken &Token, BOOL &NeedSemicolon )
 			if( Label.TokenName == NAME_None )
 				throwf( "Invalid label '%s'", Label.Identifier );
 
-			// Final goto.
+			// Emit final goto.
 			*Script << EX_Jump;
 			EmitAddressToFixupLater( LabelNest, FIXUP_Label, Label.TokenName );
 		}
@@ -4241,8 +4329,6 @@ void FScriptCompiler::CompileCommand( FToken &Token, BOOL &NeedSemicolon )
 		// A label.
 		guard(Label);
 		CheckAllow( "Label", ALLOW_Label );
-		FNestInfo *LabelNest = &Nest[2];
-		checkState(LabelNest->NestType==NEST_State || LabelNest->NestType==NEST_Function);
 
 		// Validate label name.
 		if( Token.TokenName == NAME_None )
@@ -4257,8 +4343,17 @@ void FScriptCompiler::CompileCommand( FToken &Token, BOOL &NeedSemicolon )
 			checkState(TopNode->iCode==MAXWORD);
 			checkState(TopNode->NestType==NEST_State);
 			TopNest->Allow     |= ALLOW_Cmd;
+			TopNest->Allow     &= ~(ALLOW_Function | ALLOW_VarDecl);
 			TopNode->iCode      = Script->Num;
 		}
+
+		// Get label list for this nest level.
+		for( int iNest=NestLevel-1; iNest>=2; iNest-- )
+			if( Nest[iNest].NestType==NEST_State || Nest[iNest].NestType==NEST_Function || Nest[iNest].NestType==NEST_ForEach )
+				break;
+		if( iNest < 2 )
+			throwf( "Labels are not allowed here" );
+		FNestInfo *LabelNest = &Nest[iNest];
 
 		// Make sure the label is unique here.
 		for( FLabelRecord *LabelRec = LabelNest->LabelList; LabelRec; LabelRec=LabelRec->Next )
@@ -4340,24 +4435,20 @@ int FScriptCompiler::CompileStatement()
 //
 // Generate probe bitmask for a script.
 //
-void FScriptCompiler::PrecomputeProbeMasks( const FStackNodeLink &Link  )
+void FScriptCompiler::PrecomputeProbeMasks( FStackNodePtr Link  )
 {
 	guard(FScriptCompiler::PrecomputeProbeMasks);
 
 	// Accumulate probe masks based on all functions in this state.
-	for( FStackNodeLink StateLink = Link.Node().ChildFunctions; StateLink.Class; StateLink=StateLink.Node().Next )
+	for( FStackNodePtr FuncLink = Link->ChildFunctions; FuncLink.Class; FuncLink=FuncLink->Next )
 		if
-		(	(StateLink.Node().Name.GetIndex() >= PROBE_MIN)
-		&&	(StateLink.Node().Name.GetIndex() <  PROBE_MAX)
-		&&  (StateLink.Node().StackNodeFlags & SNODE_DefinedFunc)
-		)
-		{
-			//AddResultText("Probing %s\r\n",StateLink.Node().Name());
-			Link.Node().ProbeMask |= (QWORD)1 << (StateLink.Node().Name.GetIndex() - PROBE_MIN);
-		}
+		(	(FuncLink->Name.GetIndex() >= PROBE_MIN)
+		&&	(FuncLink->Name.GetIndex() <  PROBE_MAX)
+		&&  (FuncLink->StackNodeFlags & SNODE_DefinedFunc) )
+			Link->ProbeMask |= (QWORD)1 << (FuncLink->Name.GetIndex() - PROBE_MIN);
 
 	// Recurse with all child states in this class.
-	for( StateLink = Link.Node().ChildStates; StateLink.Class; StateLink=StateLink.Node().Next )
+	for( FStackNodePtr StateLink = Link->ChildStates; StateLink.Class; StateLink=StateLink->Next )
 		if( StateLink.Class == Class )
 			PrecomputeProbeMasks( StateLink  );
 
@@ -4399,20 +4490,19 @@ void FScriptCompiler::CompileSecondPass( INDEX iStackNode )
 	// Restore code pointer to where it was saved in the parsing pass.
 	FStackNode &Node          = Class->StackTree->Element(iStackNode);
 	INT        StartNestLevel = NestLevel;
-	//AddResultText("Second passing %s\r\n",Node.Name());
 
 	// Push this new nesting level.
 	PushNest( (ENestType)Node.NestType, Node.Name(), iStackNode );
 	checkState(TopNode==&Node);
 
-	// Compile all child functions in this class.
-	for( FStackNodeLink *Link = &Node.ChildFunctions; Link->Class==Class; Link=&Link->Node().Next )
-		CompileSecondPass( Link->iNode );
+	// Compile all child functions in this class or state.
+	for( FStackNodePtr Link = Node.ChildFunctions; Link.Class==Class; Link=Link->Next )
+		CompileSecondPass( Link.iNode );
 	checkState(TopNode==&Node);
 
 	// Compile all child states in this class.
-	for( Link = &Node.ChildStates; Link->Class==Class; Link=&Link->Node().Next )
-		CompileSecondPass( Link->iNode );
+	for( Link = Node.ChildStates; Link.Class==Class; Link=Link->Next )
+		CompileSecondPass( Link.iNode );
 	checkState(TopNode==&Node);
 
 	// Remember input positions.
@@ -4438,12 +4528,19 @@ void FScriptCompiler::CompileSecondPass( INDEX iStackNode )
 				if( !(Property.Flags & CPF_ReturnParm) )
 				{
 					// Emit parm size into code stream.
-					BYTE bSize = Property.Size();
-					if( bSize != Property.Size() )
+					INT Size = Property.Size();
+					if( i+1 < TopNode->NumParms )
+					{
+						FProperty &Next = Class( TopNode->iFirstProperty + i + 1);
+						if( !(Next.Flags & CPF_ReturnParm) )
+							Size += Next.Offset - (Property.Offset + Property.Size());
+					}
+					BYTE bSize = Size;
+					if( bSize != Size )
 						throwf( "Parameter '%s' is too large",Property.Name() );
 					checkState(bSize!=0);
 					*Script << bSize;
-					
+
 					// Emit outparm flag into code stream.
 					BYTE bOutParm = (Property.Flags & CPF_OutParm) ? 1 : 0;
 					*Script << bOutParm;
@@ -4475,7 +4572,7 @@ void FScriptCompiler::CompileSecondPass( INDEX iStackNode )
 		PopNest( (ENestType)Node.NestType, NestTypeName((ENestType)Node.NestType) );
 	}
 	LinesCompiled += InputLine;
-	unguard;
+	unguardf(("(%s)",Class->StackTree->Element(iStackNode).Name()));
 }
 
 //
@@ -4492,15 +4589,15 @@ int FScriptCompiler::CompileScript
 )
 {
 	guard(FScriptCompiler::CompileScript);
-	Booting      = InBooting;
-	Class        = CompileClass;
-	Pass	     = InPass;
-	Mem          = MemStack;
-	BOOL Success = 0;
+	Booting       = InBooting;
+	Class         = CompileClass;
+	Pass	      = InPass;
+	Mem           = MemStack;
+	BOOL Success  = 0;
 
 	// Message.
 	guard(InitMessage);
-	AddResultText( "%s %s...\r\n",Pass ? "Compiling" : "Parsing", Class->GetName() );
+	//AddResultText( "%s %s...\r\n",Pass ? "Compiling" : "Parsing", Class->GetName() );
 	GApp->StatusUpdatef( "%s %s...", 0, 0, Pass ? "Compiling" : "Parsing", Class->GetName() );
 	unguard;
 
@@ -4582,13 +4679,14 @@ int FScriptCompiler::CompileScript
 	// Init compiler variables.
 	guard(InitCompiler);
 	Class->ScriptText->Lock(LOCK_Read);
-	Script      = Class->Script;
-	Input		= &Class->ScriptText->Element(0);
-	InputSize	= Class->ScriptText->Num;
-	InputPos	= 0;
-	InputLine	= 1;
-	PrevPos		= 0;
-	PrevLine	= 1;
+	Script        = Class->Script;
+	AllowIterator = 0;
+	Input		  = &Class->ScriptText->Element(0);
+	InputSize	  = Class->ScriptText->Num;
+	InputPos	  = 0;
+	InputLine	  = 1;
+	PrevPos		  = 0;
+	PrevLine	  = 1;
 	unguard;
 
 	// Init nesting.
@@ -4616,7 +4714,7 @@ int FScriptCompiler::CompileScript
 				Class->AllPropertyFlags |= It().Flags;
 
 			// Precompute info for runtime optimization.
-			PrecomputeProbeMasks( FStackNodeLink(Class,0) );
+			PrecomputeProbeMasks( FStackNodePtr(Class,0) );
 			LinesCompiled += InputLine;
 
 			// Stub out the script.
@@ -4665,6 +4763,8 @@ int FScriptCompiler::CompileScript
 			);
 			ActorPropertiesBuffer->Unlock(LOCK_ReadWrite);
 		}
+		if( Class->IsChildOf("Actor") )
+			Class->GetDefaultActor().SetClass( Class );
 		unguard;
 
 		// Kill temporary locals bin.
@@ -4689,7 +4789,7 @@ int FScriptCompiler::CompileScript
 			appErrorf("Error in script %s, Line %i: %s",Class->GetName(),InputLine,ErrorMsg);
 
 		// Handle compiler error.
-		AddResultText("Error in %s, Line %i: %s\r\n",Class->GetName(),InputLine,ErrorMsg);
+		AddResultText( "Error in %s, Line %i: %s\r\n", Class->GetName(), InputLine, ErrorMsg );
 
 		// Restore the class to its precompiled state.
 		Class->Pop(SavedClass);
@@ -4815,16 +4915,12 @@ void DowngradeClasses()
 				if( Parent->StackTree==NULL && Parent->ScriptText!=NULL )//!!
 				{
 					debugf("   Parent unparsed: %s",Class->GetName());
+
 					if( Class->StackTree )
-					{
-						//old: Class->StackTree->Kill();
 						Class->StackTree = NULL;
-					}
+
 					if( Class->Script )
-					{
-						//old: Class->Script->Kill();
 						Class->Script = NULL;
-					}
 				}
 			}
 		}
@@ -4887,8 +4983,8 @@ int FGlobalEditor::MakeScripts( int MakeAll )
 	FScriptCompiler	Compiler;
 	Compiler.InitMake();
 
-	if( MakeAll )	Compiler.AddResultText("Making all scripts.\r\n");	
-	else			Compiler.AddResultText("Making changed scripts.\r\n");
+	//!!if( MakeAll )	Compiler.AddResultText("Compiling all scripts.\r\n");	
+	//!!else			Compiler.AddResultText("Compiling changed scripts.\r\n");
 
 	// Hierarchically first-pass compile all classes.
 	int Success = ParseScripts( Compiler, new(TOP_CLASS_NAME,FIND_Existing)UClass, MakeAll );
@@ -5005,14 +5101,14 @@ int FGlobalEditor::CheckScripts( UClass *Class, FOutputDevice &Out )
 	// Make sure this class is parsed.
 	if( Class->StackTree==NULL )
 	{
-		Out.Logf("Class %s is unparsed",Class->GetName());
+		Out.Logf( "Class %s is unparsed",Class->GetName() );
 		return 0;
 	}
 
 	// Make sure this class is compiled.
 	if( Class->Script==NULL )
 	{
-		Out.Logf("Class %s is uncompiled",Class->GetName());
+		Out.Logf( "Class %s is uncompiled", Class->GetName() );
 		return 0;
 	}
 
@@ -5022,11 +5118,11 @@ int FGlobalEditor::CheckScripts( UClass *Class, FOutputDevice &Out )
 		if( !Class->Dependencies(i).IsUpToDate() )
 		{
 			if( i==0 )
-				Out.Logf( "Class %s is out of date",Class->GetName() );
+				Out.Logf( "Class %s is out of date", Class->GetName() );
 			else if( i==1 && Class->ParentClass )
-				Out.Logf( "Class %s's parent is out of date",Class->GetName() );
+				Out.Logf( "Class %s's parent is out of date", Class->GetName() );
 			else
-				Out.Logf( "Class %s's dependency %s is out of date",Class->GetName(),Class->Dependencies(i).Class->GetName() );
+				Out.Logf( "Class %s's dependency %s is out of date", Class->GetName(), Class->Dependencies(i).Class->GetName() );
 			return 0;
 		}
 	}
@@ -5155,7 +5251,6 @@ FProperty *FScriptCompiler::DecompileExpr
 )
 {
 	guard(DecompileExpr);
-	static FProperty SelfProperty;
 
 	Redo:
 	EExprToken E = (EExprToken)*Code++;
@@ -5281,32 +5376,23 @@ FProperty *FScriptCompiler::DecompileExpr
 			checkState(ContextClass!=NULL);
 			checkState(iContextNode!=MAXWORD);
 			Recheck:
-			FStackNodeLink *Link = &ContextClass->StackTree->Element(iContextNode).ChildFunctions;
-			while( Link->Class != NULL )
+			FStackNodePtr Link = ContextClass->StackTree->Element(iContextNode).ChildFunctions;
+			while( Link.Class != NULL )
 			{
-				FStackNode &Node = Link->Node();
-				if( Node.Name == FuncName )
+				if( Link->Name == FuncName )
 				{
-					DecompileFunctionCallParms
-					(
-						ScriptClass,
-						iScriptNode,
-						Link->Class,
-						Link->iNode,
-						Out,
-						Code 
-					);
+					DecompileFunctionCallParms( ScriptClass, iScriptNode, Link.Class, Link.iNode, Out, Code  );
 					break;
 				}
-				Link = &Node.Next;
+				Link = Link->Next;
 			}
-			if( Link->Class == NULL )
+			if( Link.Class == NULL )
 			{
-				if( iContextNode != 0 )
+				FStackNodePtr Link = FStackNodePtr(ContextClass,iContextNode)->ParentNest;
+				if( Link.Class != NULL )
 				{
-					// This isn't general - it doesn't handle functions that exist only in a
-					// state and are overridden there, etc!
-					iContextNode = 0;
+					ContextClass = Link.Class;
+					iContextNode = Link.iNode;
 					goto Recheck;
 				}
 				throwf( "Failed to chase down function '%s' in class '%s', node %i", FuncName(), ContextClass->GetName(), iContextNode );
@@ -5316,7 +5402,7 @@ FProperty *FScriptCompiler::DecompileExpr
 		}
 		case EX_FinalFunction:
 		{
-			FStackNodeLink DefiningLink = *(FStackNodeLink*)Code; Code += sizeof(FStackNodeLink);
+			FStackNodePtr DefiningLink = *(FStackNodePtr*)Code; Code += sizeof(FStackNodePtr);
 			checkState(DefiningLink.Class!=NULL);
 			checkState(DefiningLink.Class->StackTree!=NULL);
 			Out.Logf("%s(",DefiningLink.Class->StackTree->Element(DefiningLink.iNode).Name());
@@ -5424,8 +5510,8 @@ FProperty *FScriptCompiler::DecompileExpr
 		case EX_Self:
 		{
 			Out.Logf("Self");
-			SelfProperty = FProperty(CPT_Object,ScriptClass);
-			return &SelfProperty;
+			FProperty *Property = new(GMem)FProperty(CPT_Object,ScriptClass);
+			return Property;
 		}
 		case EX_ResizeString:
 		{
@@ -5437,10 +5523,18 @@ FProperty *FScriptCompiler::DecompileExpr
 		case EX_ActorCast:
 		{
 			UClass *Class = *(UClass **)Code; Code+=sizeof(UClass*);
-			Out.Logf("%s(",Class->GetName());
-			DecompileExpr( ScriptClass, iScriptNode, ScriptClass, iScriptNode, Out, Code, sizeof(INDEX) );
+			Out.Logf( "%s(", Class->GetName() );
+			FProperty *ReturnedProperty = DecompileExpr( ScriptClass, iScriptNode, ScriptClass, iScriptNode, Out, Code, sizeof(INDEX) );
+			FProperty *Property = NULL;
+			if( ReturnedProperty )
+			{
+				checkState(ReturnedProperty->Type==CPT_Object && ReturnedProperty->Class!=NULL);
+				Property = new(GMem)FProperty;
+				*Property = *ReturnedProperty;
+				Property->Class = Class;
+			}
 			Out.Logf(")");
-			return NULL;
+			return Property;
 		}
 		case EX_Skip:
 		{
@@ -5489,27 +5583,27 @@ FProperty *FScriptCompiler::DecompileExpr
 			else if( E >= EX_ExtendedIntrinsic ) iIntrinsic = 256*(INT)(E - EX_ExtendedIntrinsic) + *Code++;
 			else                                 throwf("Bad token %02X",E);
 			Recheck1:
-			FStackNodeLink *Link = &ContextClass->StackTree->Element(iContextNode).ChildFunctions;
-			while( Link->Class != NULL )
+			FStackNodePtr Link = ContextClass->StackTree->Element(iContextNode).ChildFunctions;
+			while( Link.Class != NULL )
 			{
-				FStackNode &Node = Link->Node();
-				if( Link->Node().iIntrinsic == iIntrinsic )
+				FStackNode &Node = *Link;
+				if( Link->iIntrinsic == iIntrinsic )
 				{
-					Out.Logf("%s(",Link->Node().Name());
+					Out.Logf( "%s(", Link->Name() );
 					DecompileFunctionCallParms
 					(
 						ScriptClass,
 						iScriptNode,
-						Link->Class,
-						Link->iNode,
+						Link.Class,
+						Link.iNode,
 						Out,
 						Code
 					);
 					break;
 				}
-				Link = &Link->Node().Next;
+				Link = Link->Next;
 			}
-			if( Link->Class == NULL )
+			if( Link.Class == NULL )
 			{
 				if( iContextNode != 0 )
 				{
@@ -5572,7 +5666,7 @@ void FScriptCompiler::DecompileStackNode
 			if( Class->ParentClass ) Out.Logf(" Expands %s",Class->ParentClass->GetName());
 			if( Class->ClassFlags & CLASS_Intrinsic ) Out.Logf(" Intrinsic");
 			if( Class->PackageName != NAME_None )
-				Out.Logf(" Package(%s)", Class->PackageName );
+				Out.Logf(" Package(%s)", Class->PackageName() );
 			Out.Logf("; {\r\n");
 
 			Out.Logf("    :%sUses ",spc(Indent));
@@ -5606,8 +5700,8 @@ void FScriptCompiler::DecompileStackNode
 				Out.Logf("Final ");
 			if( Node.StackNodeFlags & SNODE_PrivateFunc )
 				Out.Logf("Private ");
-			if( Node.StackNodeFlags & SNODE_EngineFunc )
-				Out.Logf("Engine ");
+			if( Node.StackNodeFlags & SNODE_IteratorFunc )
+				Out.Logf("Iterator ");
 			if( Node.StackNodeFlags & SNODE_LatentFunc )
 				Out.Logf("Latent ");
 
@@ -5627,12 +5721,13 @@ void FScriptCompiler::DecompileStackNode
 			{
 				Out.Logf("PostOperator ");
 			}
-
-			Out.Logf("%s(",Node.Name());
+			Out.Logf( "%s(", Node.Name() );
 			FProperty *Property = &Class->Element(iStart);
 			while( iStart<iEnd && (Property->Flags & (CPF_Parm|CPF_ReturnParm))==CPF_Parm )
 			{
-				if( !First ) Out.Logf(", ");
+				if( !First )
+					Out.Logf(", ");
+				Out.Logf("[%i]",Property->Offset);
 				Property->ExportU
 				(
 					Out,
@@ -5642,7 +5737,7 @@ void FScriptCompiler::DecompileStackNode
 				Property++;
 				iStart++;
 			}
-			Out.Logf(")");
+			Out.Logf( ")" );
 			if( iStart<iEnd && (Property->Flags & CPF_ReturnParm) )
 			{
 				Out.Logf(" ");
@@ -5653,13 +5748,12 @@ void FScriptCompiler::DecompileStackNode
 				);
 				iStart++;
 			}
-			Out.Logf(" {\r\n");
-
+			Out.Logf( " {\r\n" );
 			break;
 		}
 		default:
 		{
-			throwf("Unknown nest type %i\r\n",spc(Indent),Node.NestType);
+			throwf( "Unknown nest type %i\r\n", spc(Indent), Node.NestType );
 			break;
 		}
 	}
@@ -5742,6 +5836,11 @@ void FScriptCompiler::DecompileStackNode
 					Out.Logf("%sEndCode;\r\n",spc(Indent));
 					break;
 				}
+				case EX_IteratorPop:
+				{
+					Out.Logf("%sIteratorPop;\r\n",spc(Indent));
+					break;
+				}
 				case EX_Switch:
 				{
 					SwitchLength = *Code++;
@@ -5765,12 +5864,17 @@ void FScriptCompiler::DecompileStackNode
 					Out.Logf("%sJump.%04x;\r\n",spc(Indent),W);
 					break;
 				}
+				case EX_IteratorNext:
+				{
+					Out.Logf("%sIteratorNext;\r\n",spc(Indent));
+					break;
+				}
 				case EX_JumpIfNot:
 				{
 					WORD W = *(WORD*)Code; Code+=2;
 					Out.Logf("%sJumpIfNot.%04x (",spc(Indent),W);
-					DecompileExpr(Class,iNode,Class,iNode,Out,Code,sizeof(DWORD));
-					Out.Logf(");\r\n");
+					DecompileExpr( Class, iNode, Class, iNode, Out, Code, sizeof(DWORD) );
+					Out.Logf( ");\r\n" );
 					break;
 				}
 				case EX_Let:
@@ -5831,34 +5935,42 @@ void FScriptCompiler::DecompileStackNode
 				}
 				case EX_Broadcast:
 				{
-					UClass *ClassContext = new("Actor",FIND_Existing)UClass;
-					Out.Logf("%sBroadcast(",spc(Indent));
-					DecompileExpr(Class,iNode,Class,iNode,Out,Code,sizeof(FName));
-					Out.Logf(",");
+					UClass *ClassContext = new( "Actor", FIND_Existing )UClass;
+					Out.Logf( "%sBroadcast(", spc(Indent) );
+					DecompileExpr( Class, iNode, Class, iNode, Out, Code, sizeof(FName) );
+					Out.Logf( "," );
 
 					// If a class constant was specified, we can broadcast to its class context.
 					if( *Code == EX_ObjectConst )
 						ClassContext = *(UClass **)(Code+1);
 
-					DecompileExpr(Class,iNode,Class,iNode,Out,Code,sizeof(UObject*));
-					Out.Logf(").");
+					DecompileExpr( Class, iNode, Class, iNode, Out, Code, sizeof(UObject*) );
+					Out.Logf( ")." );
 
 					WORD wSkip = *(WORD*)Code; Code+=2;
 
-					DecompileExpr(Class,iNode,ClassContext,0,Out,Code,0);
+					DecompileExpr( Class, iNode, ClassContext, 0, Out, Code, 0 );
+					Out.Logf( ";\r\n" );
+					break;
+				}
+				case EX_Iterator:
+				{
+					Out.Logf( "%sForEach ", spc(Indent) );
+					DecompileExpr( Class, iNode, Class, iNode, Out, Code, 0 );
 					Out.Logf(";\r\n");
+					WORD W = *(WORD*)Code; Code+=2;
 					break;
 				}
 				default:
 				{
-					Out.Logf("%s",spc(Indent));
+					Out.Logf( "%s", spc(Indent) );
 					Code--;
-					DecompileExpr(Class,iNode,Class,iNode,Out,Code,0);
-					Out.Logf(";\r\n");
+					DecompileExpr( Class, iNode, Class, iNode, Out, Code, 0 );
+					Out.Logf( ";\r\n" );
 					break;
 				}
 			}
-		} while( B!=EX_EndCode );
+		} while( B != EX_EndCode );
 		Indent -= 4;
 	}
 

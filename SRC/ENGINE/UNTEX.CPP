@@ -171,7 +171,7 @@ void UTexture::DoRemap(BYTE *Remap)
 // Remap a texture's palette from its current palette to
 // the specified destination palette.
 //
-void UTexture::Remap(UPalette *SourcePalette, UPalette *DestPalette)
+void UTexture::Remap( UPalette *SourcePalette, UPalette *DestPalette )
 {
 	guard(UTexture::Remap);
 	BYTE Remap[UPalette::NUM_PAL_COLORS];
@@ -180,11 +180,22 @@ void UTexture::Remap(UPalette *SourcePalette, UPalette *DestPalette)
 	// Don't remap any colors to zero (black).
 	SourcePalette->Lock(LOCK_Read);
 
-	if (PolyFlags & PF_Masked)	Remap[0] = 0;
-	else						Remap[0] = DestPalette->BestMatch(SourcePalette->Element(0));
+	if( PolyFlags & PF_Masked )
+	{
+		Remap[0] = 0;
+	}
+	else
+	{
+		Remap[0] = DestPalette->BestMatch(SourcePalette->Element(0));
+	}
 
 	for( int i=1; i<UPalette::NUM_PAL_COLORS; i++ )
-		Remap[i] = DestPalette->BestMatch(SourcePalette->Element(i));
+	{
+		if( (PolyFlags & PF_Masked) && (SourcePalette->Element(i) == FColor(0,0,0)) )
+			Remap[i] = 0;
+		else
+			Remap[i] = DestPalette->BestMatch(SourcePalette->Element(i));
+	}
 
 	SourcePalette->Unlock(LOCK_Read);
 
@@ -227,12 +238,18 @@ void UTexture::InitHeader()
 	UDatabase::InitHeader();
 
 	// Init UTexture info.
+	BumpMap			= NULL;
+	DetailTexture	= NULL;
+	MacroTexture	= NULL;
+	AnimNext		= NULL;
+
 	Palette			= (UPalette *)NULL;
 
 	DiffuseC		= 1.0;
 	SpecularC		= 0.0;
-	FrictionC		= 0.5;
 	ReflectivityC	= 0.5;
+
+	FrictionC		= 0.5;
 
 	FootstepSound	= NULL;
 	HitSound		= NULL;
@@ -590,13 +607,11 @@ void UTexture::CreateMips(int FullMips)
 			Mark.Pop();
 		}
 
-		memmove(&Element(Max - USize*VSize),&Element(0),USize*VSize);
-		memset(&Element(0),3,Max - USize*VSize);
+		memmove( &Element(Max - USize*VSize ),&Element(0), USize*VSize );
 
 		// Build each mip from the next-larger mip.
-		ThisUSize		= USize;
-		ThisVSize		= VSize;
-
+		ThisUSize = USize;
+		ThisVSize = VSize;
 		for( MipLevel=1; MipLevel<MAX_MIPS && Mips[MipLevel].Offset!=MAXDWORD; MipLevel++ )
 		{
 			SourceTex	= &Element(Mips[MipLevel-1].Offset);
@@ -611,56 +626,66 @@ void UTexture::CreateMips(int FullMips)
 			if( !(PolyFlags & PF_Masked) )
 			{
 				// Simple (non masked) mipmap.
-				for( U=0; U<HalfUSize; U++) for (V=0; V<HalfVSize; V++ )
+				for( V=0; V<HalfVSize; V++ )
 				{
-					if (U&1) GApp->StatusUpdate ("Creating mipmap",U,HalfUSize);
-
-					Red=0; Green=0; Blue=0;
-					for( X=0; X<BoxCSize; X++) for (Y=0; Y<BoxCSize; Y++ )
+					if( (V & 7)==7 )
 					{
-						SourceColor = &Colors[SourceTex[((V*2+Y-1)&VAnd)*ThisUSize + ((U*2+X-1)&UAnd)]];
-						Red   += BoxC[X][Y]*(int)SourceColor->R;
-						Green += BoxC[X][Y]*(int)SourceColor->G;
-						Blue  += BoxC[X][Y]*(int)SourceColor->B;
+						GApp->StatusUpdate( "Creating mipmap", V, HalfVSize );
 					}
-					ResultColor = FColor(Red>>BOX_SHIFT,Green>>BOX_SHIFT,Blue>>BOX_SHIFT);
-					DestTex[V*HalfUSize+U] = ThisPalette->BestMatch(ResultColor,0);
+					for( U=0; U<HalfUSize; U++)
+					{
+
+						Red=0; Green=0; Blue=0;
+						for( X=0; X<BoxCSize; X++) for (Y=0; Y<BoxCSize; Y++ )
+						{
+							SourceColor = &Colors[SourceTex[((V*2+Y-1)&VAnd)*ThisUSize + ((U*2+X-1)&UAnd)]];
+							Red   += BoxC[X][Y]*(int)SourceColor->R;
+							Green += BoxC[X][Y]*(int)SourceColor->G;
+							Blue  += BoxC[X][Y]*(int)SourceColor->B;
+						}
+						ResultColor = FColor( Red>>BOX_SHIFT, Green>>BOX_SHIFT, Blue>>BOX_SHIFT );
+						DestTex[V*HalfUSize+U] = ThisPalette->BestMatch( ResultColor, 0 );
+					}
 				}
 			}
 			else
 			{
 				// Masked mipmap.
-				for( U=0; U<HalfUSize; U++) for (V=0; V<HalfVSize; V++ )
+				for( V=0; V<HalfVSize; V++ )
 				{
-					if (U&1) GApp->StatusUpdate ("Creating mipmap",U,HalfUSize);
-
-					n = 0;
-					Red=0; Green=0; Blue=0;
-					for( X=0; X<BoxCSize; X++) for (Y=0; Y<BoxCSize; Y++ )
+					if( (V&7)==7 )
 					{
-						B = SourceTex[((V*2+Y-1)&VAnd)*ThisUSize + ((U*2+X-1)&UAnd)];
-						if( B )
+						GApp->StatusUpdate( "Creating mipmap", V, HalfVSize );
+					}
+					for( U=0; U<HalfUSize; U++) 
+					{
+						n = 0;
+						Red=0; Green=0; Blue=0;
+						for( X=0; X<BoxCSize; X++) for (Y=0; Y<BoxCSize; Y++ )
 						{
-							n     += BoxC[X][Y];
-							SourceColor = &Colors[B];
-							Red   += BoxC[X][Y]*(int)SourceColor->R;
-							Green += BoxC[X][Y]*(int)SourceColor->G;
-							Blue  += BoxC[X][Y]*(int)SourceColor->B;
+							B = SourceTex[((V*2+Y-1)&VAnd)*ThisUSize + ((U*2+X-1)&UAnd)];
+							if( B )
+							{
+								n     += BoxC[X][Y];
+								SourceColor = &Colors[B];
+								Red   += BoxC[X][Y]*(int)SourceColor->R;
+								Green += BoxC[X][Y]*(int)SourceColor->G;
+								Blue  += BoxC[X][Y]*(int)SourceColor->B;
+							}
 						}
+						if( (n*2) >= BOX_SUM )
+						{
+							// Mostly unmasked - keep it.
+							ResultColor = FColor(Red/n,Green/n,Blue/n);
+							B           = ThisPalette->BestMatch(ResultColor,0);
+						}
+						else
+						{
+							// Mostly masked - remain masked.
+							B = 0;
+						}
+						DestTex[V*HalfUSize+U] = B;
 					}
-					if( (n*2) >= BOX_SUM )
-					{
-						// Mostly unmasked - keep it.
-						ResultColor = FColor(Red/n,Green/n,Blue/n);
-						B           = ThisPalette->BestMatch(ResultColor,0);
-					}
-					else
-					{
-						// Mostly masked - remain masked.
-						B = 0;
-					}
-
-					DestTex[V*HalfUSize+U] = B;
 				}
 			}
 			ThisUSize = ThisUSize >> 1;
@@ -1331,44 +1356,6 @@ BYTE UPalette::BestMatch( FColor Color,int SystemPalette )
 			BestColor = TestColor;
 			BestDelta = Delta;
 		}
-	}
-	Unlock(LOCK_Read);
-	return BestColor;
-	unguard;
-}
-
-//
-// Find closest palette color matching a given RGB value that
-// lies within a particular one of the 8 palette ranges.
-//
-BYTE UPalette::BestMatchInRange( FColor MatchColor, BYTE RangeColor )
-{
-	guard(UPalette::BestMatchInRange);
-	Lock(LOCK_Read);
-
-	FColor		*ColorPtr;
-	int 		Delta,BestDelta,BestColor,TestColor;
-
-	RangeColor		= RangeColor & 7;
-	BestDelta  		= MAXINT;
-	BestColor  		= FIRSTCOLOR;
-
-	for( TestColor=FIRSTCOLOR; TestColor<LASTCOLOR; TestColor++ )
-	{
-		ColorPtr = &Element(TestColor);
-		if( RangeColor == (TestColor&7) )
-		{
-			Delta =
-				Square((int)ColorPtr->R - (int)MatchColor.R) +
-				Square((int)ColorPtr->G - (int)MatchColor.G) +
-				Square((int)ColorPtr->B - (int)MatchColor.B);
-			if( Delta < BestDelta )
-			{
-				BestColor = TestColor;
-				BestDelta = Delta;
-			}
-		}
-		ColorPtr++;
 	}
 	Unlock(LOCK_Read);
 	return BestColor;

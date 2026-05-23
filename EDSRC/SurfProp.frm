@@ -1,5 +1,5 @@
 VERSION 5.00
-Object = "{BDC217C8-ED16-11CD-956C-0000C04E4C0A}#1.1#0"; "tabctl32.ocx"
+Object = "{BDC217C8-ED16-11CD-956C-0000C04E4C0A}#1.1#0"; "TABCTL32.OCX"
 Begin VB.Form frmSurfaceProps 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Surface Properties"
@@ -106,39 +106,41 @@ Begin VB.Form frmSurfaceProps
          Strikethrough   =   0   'False
       EndProperty
       TabCaption(0)   =   "Effects"
+      TabPicture(0)   =   "SurfProp.frx":030A
       Tab(0).ControlCount=   1
       Tab(0).ControlEnabled=   -1  'True
       Tab(0).Control(0)=   "PolyFlagsHolder"
       Tab(0).Control(0).Enabled=   0   'False
       TabCaption(1)   =   "Rotate "
+      TabPicture(1)   =   "SurfProp.frx":0326
       Tab(1).ControlCount=   1
       Tab(1).ControlEnabled=   0   'False
       Tab(1).Control(0)=   "Frame6"
-      Tab(1).Control(0).Enabled=   -1  'True
+      Tab(1).Control(0).Enabled=   0   'False
       TabCaption(2)   =   "Pan "
       Tab(2).ControlCount=   3
       Tab(2).ControlEnabled=   0   'False
       Tab(2).Control(0)=   "Frame4"
-      Tab(2).Control(0).Enabled=   -1  'True
+      Tab(2).Control(0).Enabled=   0   'False
       Tab(2).Control(1)=   "Frame3"
-      Tab(2).Control(1).Enabled=   -1  'True
+      Tab(2).Control(1).Enabled=   0   'False
       Tab(2).Control(2)=   "PanReset"
       Tab(2).Control(2).Enabled=   -1  'True
       TabCaption(3)   =   "Align "
       Tab(3).ControlCount=   13
       Tab(3).ControlEnabled=   0   'False
       Tab(3).Control(0)=   "Label3"
-      Tab(3).Control(0).Enabled=   -1  'True
+      Tab(3).Control(0).Enabled=   0   'False
       Tab(3).Control(1)=   "Label8"
-      Tab(3).Control(1).Enabled=   -1  'True
+      Tab(3).Control(1).Enabled=   0   'False
       Tab(3).Control(2)=   "Label7"
-      Tab(3).Control(2).Enabled=   -1  'True
+      Tab(3).Control(2).Enabled=   0   'False
       Tab(3).Control(3)=   "Label6"
-      Tab(3).Control(3).Enabled=   -1  'True
+      Tab(3).Control(3).Enabled=   0   'False
       Tab(3).Control(4)=   "Label5"
-      Tab(3).Control(4).Enabled=   -1  'True
+      Tab(3).Control(4).Enabled=   0   'False
       Tab(3).Control(5)=   "Label9"
-      Tab(3).Control(5).Enabled=   -1  'True
+      Tab(3).Control(5).Enabled=   0   'False
       Tab(3).Control(6)=   "ColumnTexels"
       Tab(3).Control(6).Enabled=   -1  'True
       Tab(3).Control(7)=   "AlignWall"
@@ -157,16 +159,16 @@ Begin VB.Form frmSurfaceProps
       Tab(4).ControlCount=   2
       Tab(4).ControlEnabled=   0   'False
       Tab(4).Control(0)=   "Frame5"
-      Tab(4).Control(0).Enabled=   -1  'True
+      Tab(4).Control(0).Enabled=   0   'False
       Tab(4).Control(1)=   "Frame2"
-      Tab(4).Control(1).Enabled=   -1  'True
+      Tab(4).Control(1).Enabled=   0   'False
       TabCaption(5)   =   "Editor"
       Tab(5).ControlCount=   2
       Tab(5).ControlEnabled=   0   'False
       Tab(5).Control(0)=   "Frame1"
-      Tab(5).Control(0).Enabled=   -1  'True
+      Tab(5).Control(0).Enabled=   0   'False
       Tab(5).Control(1)=   "Frame7"
-      Tab(5).Control(1).Enabled=   -1  'True
+      Tab(5).Control(1).Enabled=   0   'False
       Begin VB.Frame Frame1 
          Caption         =   "Surface Stats"
          BeginProperty Font 
@@ -1183,26 +1185,29 @@ Dim Sqr2 As String
 ' Public
 '
 Public Sub GetSelectedPolys()
+    
     Dim OnFlags As Long, OffFlags As Long
     Dim N As Integer, L As Integer
-    '
-    N = Val(Ed.Server.GetProp("Polys", "NumSelected"))
-    If N = 0 Then
-        PropsTab.Enabled = False
-    Else
-        PropsTab.Enabled = True
-    End If
-    '
+    
     OnFlags = Val(Ed.Server.GetProp("Polys", "SelectedSetFlags"))
     OffFlags = Val(Ed.Server.GetProp("Polys", "SelectedClearFlags"))
-    '
+    
     Call PolyFlagsForm.SetFlagBits(OnFlags, OffFlags)
     Caption = "Surface properties (" & Trim(Str(N)) & " selected)"
-    '
+    
     StaticLights.Caption = Ed.Server.GetProp("Polys", "StaticLights")
     DynamicLights.Caption = Ed.Server.GetProp("Polys", "DynamicLights")
     SurfCache.Caption = Ed.Server.GetProp("Polys", "Meshels")
     MeshSize.Caption = Ed.Server.GetProp("Polys", "MeshSize")
+
+    N = Val(Ed.Server.GetProp("Polys", "NumSelected"))
+    If N = 0 Then
+        PropsTab.Enabled = False
+    Else
+        PropsTab.Visible = False
+        PropsTab.Enabled = True
+        PropsTab.Visible = True
+    End If
 End Sub
 
 Public Sub PolyFlagsUpdate(NewOnFlags As Long, NewOffFlags As Long)
@@ -1234,7 +1239,7 @@ Private Sub Form_Unload(Cancel As Integer)
     Set PolyFlagsForm = Nothing
     '
     Call Ed.EndOnTop(Me)
-    GPolyPropsAction = 1
+    GPolyPropsAction = 0
 End Sub
 
 Private Sub ResetAll_Click()

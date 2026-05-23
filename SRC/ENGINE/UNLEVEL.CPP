@@ -88,7 +88,6 @@ void ULevel::EmptyLevel()
 	// Allocate misc objects for level.
 	char TempName[NAME_SIZE];
 	sprintf(TempName,"%s_Misc",GetName());
-	Misc = new(TempName,CREATE_Replace) TArray<UObject*>(0);
 	Unlock(LOCK_ReadWrite);
 
 	unguard;
@@ -119,6 +118,11 @@ INT ULevel::Lock(DWORD NewLockType)
 {
 	guard(ULevel::Lock);
 	checkState(!IsLocked());
+
+	// Check intrinsics.
+	extern int GIntrinsicDuplicate;
+	if( GIntrinsicDuplicate )
+		appErrorf("Duplicate intrinsic registered: %i", GIntrinsicDuplicate);
 
 	// Init collision if first time through.
 	guard(1);
@@ -205,7 +209,7 @@ void ULevel::Unlock(DWORD OldLockType)
 // If you're setting the state to LEVEL_UP_PLAY, you must specify
 // the network mode and difficulty level.
 //
-void ULevel::SetState(ELevelState NewState)
+void ULevel::SetState( ELevelState NewState )
 {
 	guard(ULevel::SetState);
 
@@ -213,7 +217,7 @@ void ULevel::SetState(ELevelState NewState)
 	OldState	= State;
 	State		= NewState;
 
-	if( NewState == OldState )
+	if( State == OldState )
 		return;
 
 	// Send messages to all level actors notifying state we're exiting.
@@ -297,7 +301,6 @@ const char *ULevel::Import( const char *Buffer, const char *BufferEnd, const cha
 		else if( GetBEGIN(&StrPtr,"BRUSH") )
 		{
 			GApp->StatusUpdate("Importing Brushes",BrushArray->Num,NumBrushes);
-
 			if( GetSTRING(StrPtr,"NAME=",BrushName,NAME_SIZE) )
 			{
 				UModel *TempModel;
@@ -305,8 +308,9 @@ const char *ULevel::Import( const char *Buffer, const char *BufferEnd, const cha
 				{
 					// Parse the active brush, which has already been allocated.
 					TempModel = BrushArray->Element(0);
-					Buffer    = TempModel->Import(Buffer,BufferEnd,FileType);
-					if (!Buffer) return NULL;
+					Buffer = TempModel->Import(Buffer,BufferEnd,FileType);
+					if( !Buffer )
+						return NULL;
 					ImportedActiveBrush = 1;
 				}
 				else
@@ -314,7 +318,8 @@ const char *ULevel::Import( const char *Buffer, const char *BufferEnd, const cha
 					// Parse a new brush which has not yet been allocated.
 					TempModel = new(BrushName,CREATE_MakeUnique,RF_NotForClient|RF_NotForServer)UModel;
 					Buffer = TempModel->Import(Buffer,BufferEnd,FileType);
-					if( !Buffer ) return NULL;
+					if( !Buffer )
+						return NULL;
 					BrushArray->AddItem(TempModel);						
 				}
 				TempModel->ModelFlags |= MF_Selected;
@@ -322,9 +327,20 @@ const char *ULevel::Import( const char *Buffer, const char *BufferEnd, const cha
 		}
 		else if( GetBEGIN(&StrPtr,"ACTORLIST") )
 		{
+			for( int i=0; i<Num; i++ )
+			{
+				if( Element(i) )
+				{
+					Element(i)->bTempEditor = 1;
+					Element(i)->bSelected   = 0;
+				}
+			}
 			Buffer = ImportActors( Buffer, BufferEnd, FileType );
 			if( !Buffer )
 				return NULL;
+			for( i=0; i<Num; i++ )
+				if( Element(i) )
+					Element(i)->bSelected = !Element(i)->bTempEditor;
 		}
 	}
 	return Buffer;
@@ -447,10 +463,8 @@ void ULevel::RememberActors()
 	guard(ULevel::RememberActors);
 	for( int i=0; i<GCameraManager->CameraArray->Num; i++ )
 	{
-		UCamera *Camera                = GCameraManager->CameraArray->Element(i);
-		Camera->RememberedActor        = *Camera->Actor;
-		Camera->RememberedActor.Camera = NULL;
-		Camera->Actor				   = NULL;
+		UCamera *Camera = GCameraManager->CameraArray->Element(i);
+		Camera->Actor   = NULL;
 	}
 	unguard;
 }
@@ -474,7 +488,7 @@ void ULevel::DissociateActors()
 // It attempts to match each existing camera to an actor in the newly-loaded
 // level.  If no decent match can be found, creates a new actor for the camera.
 //
-void ULevel::ReconcileActors( int Remembered )
+void ULevel::ReconcileActors()
 {
 	guard(ULevel::ReconcileActors);
 	Lock(LOCK_ReadWrite);
@@ -491,13 +505,15 @@ void ULevel::ReconcileActors( int Remembered )
 			UCamera *Camera	= GCameraManager->CameraArray->Element(i);
 			Camera->Level   = this;
 			Camera->Actor	= NULL;
+			char NameToFind[NAME_SIZE+1];
+			sprintf( NameToFind, "%s0", Camera->GetName() );
 
 			for( INDEX j=0; j<Num; j++ )
 			{
 				AActor *Actor = Element(j);
-				if( Actor && Actor->IsA("View") && Actor->GetFName()==Camera->GetFName() )
+				if( Actor && Actor->IsA("View") && stricmp(Actor->GetName(),NameToFind)==0 )
 				{
-					debugf( LOG_Info, "Matched camera %s",Camera->GetName() );
+					debugf( LOG_Info, "Matched camera %s", Camera->GetName() );
 					Camera->Actor = (APawn *)Actor;
 					break;
 				}
@@ -516,19 +532,14 @@ void ULevel::ReconcileActors( int Remembered )
 			if( !Camera->Actor )
 			{
 				FName Name(Camera->GetName(),FNAME_Add);
-				Camera->Actor = SpawnViewActor
-				(
-					Camera,
-					Name,
-					Remembered ? &Camera->RememberedActor : NULL
-				);
+				Camera->Actor = SpawnViewActor( Camera, Name );
 				if( !Camera->Actor )
 				{
-					debug( LOG_Problem, "Camera spawn failed" );
+					debug( LOG_Problem, "Failed to spawn view actor for camera" );
 					Camera->Kill();
 					i--;
 				}
-				debugf( LOG_Info, "Spawned camera %s", Camera->GetName() );
+				debugf( LOG_Info, "Spawned view actor %s for camera %s", Camera->Actor->GetName(), Camera->GetName() );
 			}
 		}
 	}
@@ -544,10 +555,11 @@ void ULevel::ReconcileActors( int Remembered )
 			for( INDEX j=0; j<Num; j++ )
 			{
 				AActor *Actor = Element(j);
-				if( Actor && Actor->IsA("Pawn") && ((APawn*)Actor)->bIsPlayer )
+				if( Actor && Actor->IsA("Pawn") && ((APawn*)Actor)->bIsPlayer && !((APawn*)Actor)->Camera )
 				{
 					debugf( LOG_Info, "Matched camera %s to %s %s", Camera->GetName(), Actor->GetClassName(), Actor->GetName() );
-					Camera->Actor = (APawn *)Actor;
+					Camera->Actor            = (APawn *)Actor;
+					((APawn *)Actor)->Camera = Camera;
 					break;
 				}
 			}
@@ -630,8 +642,8 @@ int ULevel::Exec(const char *Cmd,FOutputDevice *Out)
 				if( Element(i) && Element(i)->IsA("Teleporter") )
 				{
 					ATeleporter &Teleporter = *(ATeleporter *)Element(i);
-					Results->Logf("   %s\r\n",Teleporter.TeleportURL);
-					if(strchr(Teleporter.TeleportURL,'//')) External++;
+					Results->Logf("   %s\r\n",Teleporter.URL);
+					if(strchr(Teleporter.URL,'//')) External++;
 					else Internal++;
 				}
 			}
@@ -666,7 +678,7 @@ int ULevel::Exec(const char *Cmd,FOutputDevice *Out)
 					break;
 			if( i == Num )
 			{
-				Results->Log("Error: Missing PlayerStart actor!\r\n");
+				Results->Log( "Error: Missing PlayerStart actor!\r\n" );
 				return 1;
 			}
 
@@ -676,9 +688,9 @@ int ULevel::Exec(const char *Cmd,FOutputDevice *Out)
 				if( Element(i) && Element(i)->IsA("PlayerStart") )
 				{
 					FCheckResult Hit(0.0);
-					if( !Model->PointCheck( Hit, NULL, Element(i)->Location, 0 ) )
+					if( !Model->PointCheck( Hit, NULL, Element(i)->Location, FVector(0,0,0), 0 ) )
 					{
-						Results->Log("Error: PlayerStart doesn't fit!\r\n");
+						Results->Log( "Error: PlayerStart doesn't fit!\r\n" );
 						return 1;
 					}
 				}
@@ -687,18 +699,18 @@ int ULevel::Exec(const char *Cmd,FOutputDevice *Out)
 			// Check scripts.
 			if( GEditor && !GEditor->CheckScripts( new(TOP_CLASS_NAME,FIND_Existing)UClass, *Results ) )
 			{
-				Results->Logf("\r\nError: Scripts need to be rebuilt!\r\n");
+				Results->Logf( "\r\nError: Scripts need to be rebuilt!\r\n" );
 				return 1;
 			}
 
 			// Check level title.
 			if( GetLevelInfo()->Title[0]==0 )
 			{
-				Results->Logf("Error: Level is missing a title!");
+				Results->Logf( "Error: Level is missing a title!" );
 				return 1;
 			}
 			else if( stricmp(GetLevelInfo()->Title,"Untitled")==0 )
-				Results->Logf("Warning: Level is untitled\r\n");
+				Results->Logf( "Warning: Level is untitled\r\n" );
 
 			// Check actors.
 			for( i=0; i<Num; i++ )

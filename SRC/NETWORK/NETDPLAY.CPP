@@ -447,7 +447,7 @@ BOOL CALLBACK DirectPlayProviderDialogProc
 				Info.Num			= 0;
 				Info.hWndListBox	= hWndListBox;
 				debug(LOG_Info,"Enumerating DirectPlay drivers");
-				NetManager.DirectPlayDriver->DirectPlayEnumerate(DirectPlayServicesCallback,(LPVOID)&Info);
+				//NetManager.DirectPlayDriver->DirectPlayEnumerate(DirectPlayServicesCallback,(LPVOID)&Info);
 				//
 				ListBox_SetCurSel(hWndListBox,0);
 				//

@@ -11,160 +11,26 @@
 #include "Unreal.h"
 
 /*---------------------------------------------------------------------------------------
-   Primitive PointCheck.
+   Primitive bounding boxes.
 ---------------------------------------------------------------------------------------*/
 
 //
-// Classify a point as inside (0) or outside (1), and also set its node location
-// or INDEX_NONE if Bsp is empty.
+// Get collision bounding box.
 //
-INT UModel::PointCheck
-(
-	FCheckResult	&Hit,
-	AActor			*Owner,
-	const FVector	&Location,
-	DWORD			ExtraNodeFlags
-)
+FBoundingBox UModel::GetCollisionBoundingBox( const AActor *Owner ) const
 {
-	guard(UModel::PointClass);
-	if( Nodes->Num )
-	{
-		INDEX iNode=0, iTempNode, Class=RootOutside;
-		do	
-		{
-			iTempNode				= iNode;
-			const FBspNode	&Node	= Nodes(iNode);
-			INT				CSG  	= Node.IsCsg(ExtraNodeFlags);
-
-			if( Node.Plane.PlaneDot(Location) > 0.0 )
-			{
-				Class |= CSG;
-				iNode = Node.iFront;
-			}
-			else
-			{
-				Class &= ~CSG;
-				iNode = Node.iBack;
-			}
-		} while( iNode != INDEX_NONE );
-		if( Class == 0 )
-		{
-			// Hit something.
-			Hit.Location    = Location;
-			Hit.Normal      = GMath.ZeroVector;
-			Hit.Actor       = NULL;
-			Hit.Primitive   = this;
-			Hit.Item        = iTempNode;
-			Hit.Time        = 0.0;
-		}
-		return Class;
-	}
-	else
-	{
-		Hit.Item = INDEX_NONE;
-   		return RootOutside;
-	}
+	guard(UModel::GetCollisionBoundingBox);
+	return (Owner ? LocalBound.TransformBy(Owner->ToWorld()) : LocalBound).ExpandBy(4.0);
 	unguard;
 }
 
-/*---------------------------------------------------------------------------------------
-   Primitive LineCheck.
----------------------------------------------------------------------------------------*/
-
 //
-// Recursive minion of UModel::LineCheck.
+// Get render bounding box.
 //
-int LineCheck
-(
-	FCheckResult	&Hit,
-	UModel			&Model,
-	INDEX			iHit,
-	INDEX			iParent,
-	INDEX			iNode,
-	const FVector	&Start,
-	const FVector	&End, 
-	INT				Outside,
-	DWORD			ExtraNodeFlags
-)
+FBoundingBox UModel::GetRenderBoundingBox( const AActor *Owner ) const
 {
-	while( iNode != INDEX_NONE )
-	{
-		const FBspNode*	Node	= &Model.Nodes(iNode);
-		INT				CSG		= Node->IsCsg(ExtraNodeFlags);
-
-		// Check side-of-plane for both points.
-		FLOAT		Dist1	= Node->Plane.PlaneDot(Start);
-		FLOAT		Dist2	= Node->Plane.PlaneDot(End);
-
-		// Classify line based on both distances.
-		if( Dist1 > -0.001 && Dist2 > -0.001 )
-		{
-			// Both points are in front.
-			Outside |= CSG;
-			iParent  = iNode;
-			iNode    = Node->iFront;
-		}
-		else if( Dist1 < 0.001 && Dist2 < 0.001 )
-		{
-			// Both points are in back.
-			Outside &= !CSG;
-			iParent  = iNode;
-			iNode    = Node->iBack;
-		}
-		else
-		{
-			// Line is split (guranteed to be non-parallel to plane, so TimeDenominator != 0).
-			FVector Middle = Start + (Start-End) * (Dist1/(Dist2-Dist1));
-			if( Dist1 > 0.0 )
-			{
-				// Dist2 < 0.
-				if( !LineCheck( Hit, Model, iHit, iNode, Node->iFront, Start, Middle, Outside || CSG, ExtraNodeFlags ) )
-					return 0;
-				return LineCheck( Hit, Model, iNode, iNode, Node->iBack, Middle, End, Outside && !CSG, ExtraNodeFlags );
-			}
-			else
-			{
-				// Dist1 < 0, Dist2 > 0.
-				if( !LineCheck( Hit, Model, iHit, iNode, Node->iBack, Start, Middle, Outside && !CSG, ExtraNodeFlags ) )
-					return 0;
-				return LineCheck( Hit, Model, iNode, iNode, Node->iFront, Middle, End, Outside || CSG, ExtraNodeFlags );
-			}
-		}
-	}
-	if( !Outside )
-	{
-		// We have encountered the first collision.
-		Hit.Location  = Start;
-		Hit.Normal    = Model.Nodes(iParent).Plane;
-		Hit.Actor     = NULL;
-		Hit.Primitive = &Model;
-		Hit.Item      = iHit;		
-	}
-	return Outside;
-}
-
-//
-// Classify a line as unobstructed (1) or obstructed (0).
-//
-int UModel::LineCheck
-(
-	FCheckResult	&Hit,
-	AActor			*Owner,
-	const FVector	&Start,
-	const FVector	&End,
-	DWORD			ExtraNodeFlags
-)
-{
-	guard(UModel::LineClass);
-	int Outside = RootOutside;
-
-	if( Nodes->Num )
-	{
-		Outside = ::LineCheck( Hit, *this, 0, 0, 0, Start, End, Outside, ExtraNodeFlags );
-		if( !Outside )
-			Hit.Time = sqrt( FDistSquared(Hit.Location,Start) / FDistSquared(End,Start) );
-	}
-	return Outside;	
+	guard(UModel::GetRenderBoundingBox);
+	return (Owner ? LocalBound.TransformBy(Owner->ToWorld()) : LocalBound).ExpandBy(4.0);
 	unguard;
 }
 
@@ -189,10 +55,11 @@ struct FBoxCheckInfo
 	};
 
 	// Hull variables.
-	FCheckResult	&Hit;
-	UModel			&Model;
-	FLOAT			Radius;
-	FLOAT			Height;
+	FCheckResult&	Hit;
+	UModel&			Model;
+	AActor*			Owner;
+	FCoords			Coords;
+	FVector			Extent;
 	DWORD			ExtraFlags;
 	INT				NumHulls;
 	FVector			Min,Max,LocalHit;
@@ -206,42 +73,41 @@ struct FBoxCheckInfo
 	// Constructor.
 	FBoxCheckInfo
 	(
-		FCheckResult	&InHit,
-		UModel			&InModel,
-		FLOAT			InRadius,
-		FLOAT			InHeight,
+		FCheckResult&	InHit,
+		UModel&			InModel,
+		AActor*			InOwner,
+		FVector			InExtent,
 		DWORD			InExtraFlags
 	)
 	:	Hit				(InHit)
 	,	Model			(InModel)
-	,	Radius			(InRadius)
-	,	Height			(InHeight)
+	,	Owner			(InOwner)
+	,	Coords			(Owner ? Owner->ToWorld() : GMath.UnitCoords)
+	,	Extent			(InExtent)
 	,	ExtraFlags		(InExtraFlags)
 	{}
 
-	// Functions
+	// Functions.
 	void SetupHulls( const FBspNode &Node )
 	{
 		// Get nodes on this leaf's collision hull.
-		HullNodes = &Model.LeafHulls( Node.iBound );
+		HullNodes = &Model.LeafHulls( Node.iCollisionBound );
 		for( NumHulls=0; HullNodes[NumHulls]!=INDEX_NONE && NumHulls<ARRAY_COUNT(Hulls); NumHulls++ )
 		{
-			Hulls[NumHulls] = Model.Nodes(HullNodes[NumHulls] & ~0x40000000).Plane;
+			FPlane &Hull = Hulls[NumHulls];
+			Hull         = Model.Nodes(HullNodes[NumHulls] & ~0x40000000).Plane;
+			if( Owner )
+				Hull = Hull.TransformPlaneByOrtho( Coords );
 			if( HullNodes[NumHulls] & 0x40000000 )
-			{
-				Hulls[NumHulls].X *= -1;
-				Hulls[NumHulls].Y *= -1;
-				Hulls[NumHulls].Z *= -1;
-				Hulls[NumHulls].W *= -1;
-			}
+				Hull = Hull.Flip();
 			Flags[NumHulls]
-			=	((Hulls[NumHulls].X < 0.0) ? CV_XM : (Hulls[NumHulls].X > 0.0) ? CV_XP : 0)
-			|	((Hulls[NumHulls].Y < 0.0) ? CV_YM : (Hulls[NumHulls].Y > 0.0) ? CV_YP : 0)
-			|	((Hulls[NumHulls].Z < 0.0) ? CV_ZM : (Hulls[NumHulls].Z > 0.0) ? CV_ZP : 0);
+			=	((Hull.X < 0.0) ? CV_XM : (Hull.X > 0.0) ? CV_XP : 0)
+			|	((Hull.Y < 0.0) ? CV_YM : (Hull.Y > 0.0) ? CV_YP : 0)
+			|	((Hull.Z < 0.0) ? CV_ZM : (Hull.Z > 0.0) ? CV_ZP : 0);
 		}
 
 		// Get precomputed maxima.
-		const FLOAT *Temp = (FLOAT*)&Model.LeafHulls( Node.iBound + NumHulls + 1);
+		const FLOAT *Temp = (FLOAT*)&Model.LeafHulls( Node.iCollisionBound + NumHulls + 1);
 		Min.X = Temp[0]; Min.Y = Temp[1]; Min.Z = Temp[2];
 		Max.X = Temp[3]; Max.Y = Temp[4]; Max.Z = Temp[5];
 	}
@@ -271,20 +137,21 @@ struct FBoxCheckInfo
 #define CLIP_COLLISION_PRIMITIVE \
 { \
 	/* Check collision against hull planes. */ \
-	FVector Hit=GMath.ZeroVector; \
+	FVector Hit=FVector(0,0,0); \
 	for( int i=0; i<NumHulls; i++ ) \
 		if( !ClipTo( Hulls[i], HullNodes[i] & ~0x40000000) ) \
 			goto NoBlock; \
 	\
 	/* Check collision against hull extent, minus small epsilon so flat hit nodes are identified. */ \
-	if \
-	(   !ClipTo( FPlane( 0.0, 0.0,-1.0,0.1-Min.Z), INDEX_NONE ) \
-	||	!ClipTo( FPlane( 0.0, 0.0,+1.0,Max.Z+0.1), INDEX_NONE ) \
-	||	!ClipTo( FPlane(-1.0, 0.0, 0.0,0.1-Min.X), INDEX_NONE ) \
-	||	!ClipTo( FPlane(+1.0, 0.0, 0.0,Max.X-0.1), INDEX_NONE ) \
-	||  !ClipTo( FPlane( 0.0,-1.0, 0.0,0.1-Min.Y), INDEX_NONE ) \
-	||	!ClipTo( FPlane( 0.0,+1.0, 0.0,Max.Y-0.1), INDEX_NONE ) ) \
-		goto NoBlock; \
+	if( !Owner ) \
+		if \
+		(   !ClipTo( FPlane( 0.0, 0.0,-1.0,0.1-Min.Z), INDEX_NONE ) \
+		||	!ClipTo( FPlane( 0.0, 0.0,+1.0,Max.Z+0.1), INDEX_NONE ) \
+		||	!ClipTo( FPlane(-1.0, 0.0, 0.0,0.1-Min.X), INDEX_NONE ) \
+		||	!ClipTo( FPlane(+1.0, 0.0, 0.0,Max.X-0.1), INDEX_NONE ) \
+		||  !ClipTo( FPlane( 0.0,-1.0, 0.0,0.1-Min.Y), INDEX_NONE ) \
+		||	!ClipTo( FPlane( 0.0,+1.0, 0.0,Max.Y-0.1), INDEX_NONE ) ) \
+			goto NoBlock; \
 	\
 	/* Check collision against hull edges. */ \
 	for( i=0; i<NumHulls; i++ ) \
@@ -301,7 +168,7 @@ struct FBoxCheckInfo
 }
 
 /*---------------------------------------------------------------------------------------
-   Primitive BoxPointCheck.
+   Primitive PointCheck.
 ---------------------------------------------------------------------------------------*/
 
 //
@@ -318,68 +185,69 @@ struct FBoxPointCheckInfo : public FBoxCheckInfo
 	(
 		FCheckResult		&InHit,
 		UModel				&InModel,
-		const FVector		&InPoint,
-		FLOAT				InRadius,
-		FLOAT				InHeight,
+		AActor*				InOwner,
+		FVector				InPoint,
+		FVector				InExtent,
 		FLOAT				InExtraFlags
 	)
-	:	FBoxCheckInfo	    (InHit, InModel, InRadius, InHeight, InExtraFlags)
+	:	FBoxCheckInfo	    (InHit, InModel, InOwner, InExtent, InExtraFlags)
+	,	BestDist			(100000)
 	,	Point				(InPoint)
 	{}
 
 	// Functions.
 	int ClipTo( const FPlane &Hull, INDEX Item )
 	{
-		FLOAT Dist = Hull.PlaneDot( Point );
-		if( Dist < BestDist )
+		FLOAT Push = FBoxPushOut( Hull, Extent );
+		FLOAT Dist = Hull.PlaneDot(Point);
+		if( Dist>0 && Dist<BestDist && Dist<Push )
 		{
 			BestDist      = Dist;
-			Hit.Location  = Point + Hull * Dist;
+			Hit.Location  = Point + 1.02 * Hull * (Push - Dist);
 			Hit.Normal    = Hull;
-			Hit.Actor     = NULL;
+			Hit.Actor     = Owner;
 			Hit.Primitive = &Model;
 			Hit.Item      = Item;
 			Hit.Time      = 0.0;
 		}
-		return Dist > FBoxPushOut( Hull, Radius, Height );
+		return Dist < Push;
 	}
 	BOOL BoxPointCheck( INDEX iParent, INDEX iNode, INT Outside )
 	{
+		INT Result = 1;
 		while( iNode != INDEX_NONE )
 		{
 			// Compute distance between start and end points and this node's plane.
-			const FBspNode &Node = Model.Nodes(iNode);
-			FLOAT PushOut        = FBoxPushOut(Node.Plane,Radius*1.1,Height*1.1);
-			FLOAT Dist           = Node.Plane.PlaneDot(Point);
+			const  FBspNode &Node = Model.Nodes   ( iNode );
+			FPlane Plane          = Owner ? Node.Plane.TransformPlaneByOrtho(Coords) : Node.Plane;
+			FLOAT  PushOut        = FBoxPushOut   ( Plane, Extent * 1.1 );
+			FLOAT  Dist           = Plane.PlaneDot( Point );
 
 			// Recurse with front.
 			if( Dist > -PushOut )
-				if( BoxPointCheck( iNode, Node.iFront, Outside || Node.IsCsg(ExtraFlags) ) )
-					return 1;
+				if( !BoxPointCheck( iNode, Node.iFront, Outside || Node.IsCsg(ExtraFlags) ) )
+					Result = 0;
 
 			// Loop with back.
-			if( Dist > PushOut )
-				return 0;
 			iParent = iNode;
 			iNode   = Node.iBack;
 			Outside = Outside && !Node.IsCsg(ExtraFlags);
+			if( Dist > PushOut )
+				goto NoBlock;
 		}
-		const FBspNode &Parent = Model.Nodes(iParent);
-		if( Outside==0 && (Parent.NodeFlags & NF_SolidLeaf) )
+		if( Outside==0 && Model.Nodes(iParent).iCollisionBound!=INDEX_NONE )
 		{
 			// Reached a solid leaf, so setup hulls.
-			debugState(Parent.iBound!=INDEX_NONE);
-			SetupHulls(Parent);
-			BestDist = 0.0;
+			SetupHulls(Model.Nodes(iParent));
 
 			// Clip it.
 			CLIP_COLLISION_PRIMITIVE;
 
-			// We are embedded.
-			return 1;
-			NoBlock:;
+			// We hit.
+			Result = 0;
 		}
-		return 0;
+		NoBlock:;
+		return Result;
 	}
 };
 
@@ -392,39 +260,127 @@ struct FBoxPointCheckInfo : public FBoxCheckInfo
 //
 // If it fits, returns 1.
 //
-BOOL UModel::BoxPointCheck
+BOOL UModel::PointCheck
 (
 	FCheckResult	&Hit,
 	AActor			*Owner,
-	const FVector   &Point,
-	FLOAT           Radius,
-	FLOAT           Height,
+	FVector			Location,
+	FVector			Extent,
 	DWORD           ExtraNodeFlags
 )
 {
-	guard(UModel::BoxPointCheck);
+	guard(UModel::PointCheck);
 
 	// Perform the check.
-	BOOL Outside = RootOutside;
+	Hit.Normal    = FVector(0,0,0);
+	Hit.Location  = Location;
+	Hit.Primitive = this;
+	Hit.Actor     = Owner;
+	Hit.Time      = 0.0;
+	BOOL Outside  = RootOutside;
 	if( Nodes->Num > 0 )
 	{
-		FBoxPointCheckInfo Check
-		(
-			Hit,
-			*this,
-			Point,
-			Radius,
-			Height,
-			ExtraNodeFlags
-		);
-		Outside = Check.BoxPointCheck( 0, 0, Outside );
+		if( Extent != FVector(0,0,0) )
+		{
+			// Perform expensive box convolution check.
+			FBoxPointCheckInfo Check( Hit, *this, Owner, Location, Extent, ExtraNodeFlags );
+			Outside = Check.BoxPointCheck( 0, 0, Outside );
+			checkState(Hit.Actor==Owner);
+		}
+		else
+		{
+			// Perform simple point check.
+			INDEX iPrevNode = INDEX_NONE, iNode=0, IsFront=0;
+			FCoords Coords = Owner ? Owner->ToWorld() : GMath.UnitCoords;
+			do
+			{
+				iPrevNode = iNode;
+				const FBspNode &Node = Nodes(iNode);
+				IsFront = Node.Plane.TransformPlaneByOrtho(Coords).PlaneDot(Location) > 0.0;
+				Outside = Node.ChildOutside( IsFront, Outside );
+				iNode   = Node.iChild[IsFront];
+			} while( iNode != INDEX_NONE );
+			Hit.Item = iPrevNode*2 + IsFront;
+		}
 	}
 	return Outside;
 	unguard;
 }
 
 /*---------------------------------------------------------------------------------------
-   Primitive BoxLineCheck.
+   LineCheck support.
+---------------------------------------------------------------------------------------*/
+
+//
+// Recursive minion of UModel::LineCheck.
+//
+int LineCheck
+(
+	FCheckResult	&Hit,
+	UModel			&Model,
+	const FCoords	*Coords,
+	INDEX			iHit,
+	INDEX			iParent,
+	INDEX			iNode,
+	FVector			Start,
+	FVector			End, 
+	INT				Outside,
+	DWORD			ExtraNodeFlags
+)
+{
+	while( iNode != INDEX_NONE )
+	{
+		const FBspNode*	Node = &Model.Nodes(iNode);
+
+		// Check side-of-plane for both points.
+		FLOAT Dist1	= Coords ? Node->Plane.TransformPlaneByOrtho(*Coords).PlaneDot(Start) : Node->Plane.PlaneDot(Start);
+		FLOAT Dist2	= Coords ? Node->Plane.TransformPlaneByOrtho(*Coords).PlaneDot(End)   : Node->Plane.PlaneDot(End);
+
+		// Classify line based on both distances.
+		if( Dist1 > -0.001 && Dist2 > -0.001 )
+		{
+			// Both points are in front.
+			Outside |= Node->IsCsg(ExtraNodeFlags);
+			iParent  = iNode;
+			iNode    = Node->iFront;
+		}
+		else if( Dist1 < 0.001 && Dist2 < 0.001 )
+		{
+			// Both points are in back.
+			Outside &= !Node->IsCsg(ExtraNodeFlags);
+			iParent  = iNode;
+			iNode    = Node->iBack;
+		}
+		else
+		{
+			// Line is split (guranteed to be non-parallel to plane, so TimeDenominator != 0).
+			FVector Middle     = Start + (Start-End) * (Dist1/(Dist2-Dist1));
+			INT     FrontFirst = Dist1 > 0.0;
+
+			// Recurse with front part.
+			if( !LineCheck( Hit, Model, Coords, iHit, iNode, Node->iChild[FrontFirst], Start, Middle, Node->ChildOutside(FrontFirst,Outside,ExtraNodeFlags), ExtraNodeFlags ) )
+				return 0;
+
+			// Loop with back part.
+			Outside = Node->ChildOutside(1-FrontFirst,Outside,ExtraNodeFlags);
+			iParent = iNode;
+			iNode   = Node->iChild[1-FrontFirst];
+			Start   = Middle;
+		}
+	}
+	if( !Outside )
+	{
+		// We have encountered the first collision.
+		Hit.Location  = Start;
+		Hit.Normal    = Model.Nodes(iParent).Plane;
+		Hit.Primitive = &Model;
+		Hit.Item      = iHit;		
+	}
+	return Outside;
+}
+
+/*---------------------------------------------------------------------------------------
+   Primitive LineCheck.
 ---------------------------------------------------------------------------------------*/
 
 //
@@ -437,83 +393,89 @@ struct FBoxLineCheckInfo : public FBoxCheckInfo
 	const FVector		End;
 	FVector				Vector;
 	FLOAT				Dist;
+	BOOL				DidHit;
 
 	// Constructor.
 	FBoxLineCheckInfo
 	(
-		FCheckResult	&Hit,
-		UModel			&InModel,
-		const FVector	&InStart,
-		const FVector	&InEnd,
-		FLOAT			InRadius,
-		FLOAT			InHeight,
+		FCheckResult&	Hit,
+		UModel&			InModel,
+		AActor*			InOwner,
+		FVector			InStart,
+		FVector			InEnd,
+		FVector			InExtent,
 		DWORD			InExtraFlags
 	)
-	:	FBoxCheckInfo	(Hit, InModel, InRadius, InHeight, InExtraFlags)
+	:	FBoxCheckInfo	(Hit, InModel, InOwner, InExtent, InExtraFlags)
 	,	Start			(InStart)
 	,	End				(InEnd)
 	,	Vector			(InEnd-InStart)
 	,	Dist			(Vector.Size())
-	{	
-		Hit.Time = 2.0;
-	}
+	,	DidHit			(0)
+	{}
 
 	// Tracer.
 	inline int ClipTo( const FPlane &Hull, INDEX Item )
 	{
-		FLOAT PushOut = FBoxPushOut(Hull,Radius,Height);
+		FLOAT PushOut = FBoxPushOut( Hull, Extent );
 		FLOAT D0      = Hull.PlaneDot(Start);
 		FLOAT D1      = Hull.PlaneDot(End);
-		FLOAT T       = (D0-PushOut)/(D0-D1);
+		
+		FLOAT AdjD0 = D0-PushOut;
+		if( D0>D1 && AdjD0>=-PushOut && AdjD0<0 ) AdjD0=0.0;
 
-		if     ( (D0-D1) < -0.0001        )	{ if( T < T1 ) { T1 = T; }                  }
-		else if( (D0-D1) > +0.0001        ) { if( T > T0 ) { T0 = T; LocalHit = Hull; } }
+		FLOAT T       = (AdjD0)/(D0-D1);
+
+		if     ( (D0-D1) < -0.00001       )	{ if( T < T1 ) { T1 = T; }                  }
+		else if( (D0-D1) > +0.00001       ) { if( T > T0 ) { T0 = T; LocalHit = Hull; } }
 		else if( D0>PushOut && D1>PushOut ) { return 0;                                 }
 
 		return T0 < T1;
 	}
-	void BoxLineCheck( INDEX iParent, INDEX iNode, INT Outside )
+	void BoxLineCheck( INDEX iParent, INDEX iNode, INT IsFront, INT Outside )
 	{
 		while( iNode != INDEX_NONE )
 		{
 			// Compute distance between start and end points and this node's plane.
 			const FBspNode &Node      = Model.Nodes(iNode);
-			FLOAT          D0         = Node.Plane.PlaneDot(Start);
-			FLOAT          D1         = Node.Plane.PlaneDot(End);
-			FLOAT          PushOut    = FBoxPushOut(Node.Plane,Radius*1.1,Height*1.1);
+			FPlane         Plane      = Owner ? Node.Plane.TransformPlaneByOrtho(Coords) : Node.Plane;
+			FLOAT          D0         = Plane.PlaneDot(Start);
+			FLOAT          D1         = Plane.PlaneDot(End);
+			FLOAT          PushOut    = FBoxPushOut( Plane, Extent *1.1 );
 			INT            Use[2]     = {D0<=PushOut || D1<=PushOut, D0>=-PushOut || D1>=-PushOut};
 			INT            FrontFirst = D0 >= D1;
 
 			// Traverse down nearest side then furthest side.
 			if( Use[FrontFirst] )
-				BoxLineCheck( iNode, Node.iChild[FrontFirst], Node.ChildOutside(FrontFirst,Outside) );
+				BoxLineCheck( iNode, Node.iChild[FrontFirst], FrontFirst, Node.ChildOutside(FrontFirst, Outside) );
 			if( !Use[1-FrontFirst] )
 				return;
 
 			iParent = iNode;
-			iNode   = Node.iChild[1-FrontFirst];
-			Outside = Node.ChildOutside(1-FrontFirst,Outside);
+			iNode   = Node.iChild[ 1-FrontFirst ];
+			Outside = Node.ChildOutside( 1-FrontFirst, Outside );
+			IsFront = 1-FrontFirst;
 		}
 		const FBspNode &Parent = Model.Nodes(iParent);
-		if( Outside==0 && (Parent.NodeFlags & NF_SolidLeaf) )
+		if( Outside==0 && Parent.iCollisionBound!=INDEX_NONE )
 		{
-			// Reached a solid leaf, so setup hulls.
-			debugState(Parent.iBound!=INDEX_NONE);
-
 			// Init.
 			SetupHulls(Parent);
-			T0       = 0.0; 
+			T0       = -1.0; 
 			T1       = Hit.Time;
-			LocalHit = GMath.ZeroVector;
+			LocalHit = FVector(0,0,0);
 
 			// Perform collision clipping.
 			CLIP_COLLISION_PRIMITIVE;
 
 			// See if we hit.
-			if( T0>0.0 && T0<T1 )
+			if( T0>-1.0 && T0<T1 && T1>0.0 )
 			{
-				Hit.Time   = T0;
-				Hit.Normal = LocalHit;
+				Hit.Time	  = T0;
+				Hit.Normal	  = LocalHit;
+				Hit.Actor     = Owner;
+				Hit.Primitive = &Model;
+				DidHit        = 1;
 			}
 			NoBlock:;
 		}
@@ -528,40 +490,50 @@ struct FBoxLineCheckInfo : public FBoxCheckInfo
 // is not stuck in solid space (i.e. CollisionPointCheck(Start)=1). If Start is
 // stuck in solid space, the returned time will be meaningless.
 //
-int UModel::BoxLineCheck
+int UModel::LineCheck
 (
 	FCheckResult	&Hit,
 	AActor			*Owner,
-	const FVector   &Start,
-	const FVector   &End,
-	FLOAT           Radius,
-	FLOAT           Height,
+	FVector			Start,
+	FVector			End,
+	FVector			Extent,
 	DWORD           ExtraNodeFlags
 )
 {
-	guard(UModel::BoxLineCheck);
+	guard(UModel::LineCheck);
 
 	// Perform the trace.
 	if( Nodes->Num>0 )
 	{
-		FBoxLineCheckInfo Trace
-		(
-			Hit,
-			*this,
-			Start,
-			End,
-			Radius,
-			Height,
-			ExtraNodeFlags
-		);
-		Trace.BoxLineCheck( 0, 0, RootOutside );
+		if( Extent != FVector(0,0,0) )
+		{
+			// Perform expensive box convolution trace.
+			Hit.Time = 2.0;
+			FBoxLineCheckInfo Trace( Hit, *this, Owner, Start, End, Extent, ExtraNodeFlags );
+			Trace.BoxLineCheck( 0, 0, 0, RootOutside );
 
-		// Truncate by the greater of 1% or 0.1 world units.
-		//Hit.Time = Clamp( Hit.Time - Max(0.001f, 0.1f/Trace.Dist),0.f, 1.f );
-		Hit.Time = Clamp( Hit.Time - Max(0.1f, 0.1f/Trace.Dist),0.f, 1.f );
-		return Hit.Time==1.0;
+			// Truncate by the greater of 10% or 0.1 world units.
+			if( Trace.DidHit )
+			{
+				Hit.Time      = Clamp( Hit.Time - Max(0.1f, 0.1f/Trace.Dist),0.f, 1.f );
+				Hit.Location  = Start + (End-Start) * Hit.Time;
+				return Hit.Time==1.0;
+			}
+			else return 1;
+		}
+		else
+		{
+			// Perform simple line trace.
+			int Outside = ::LineCheck( Hit, *this, Owner ? &Owner->ToWorld() : NULL, 0, 0, 0, Start, End, RootOutside, ExtraNodeFlags );
+			if( !Outside )
+			{
+				Hit.Time  = sqrt( FDistSquared(Hit.Location,Start) / FDistSquared(End,Start) );
+				Hit.Actor = Owner;
+			}
+			return Outside;	
+		}
 	}
-	return RootOutside ? 1.0 : 0.0;
+	else return RootOutside;
 	unguard;
 }
 
@@ -598,12 +570,12 @@ void PlaneFilter
 			if (Node->iFront!=INDEX_NONE)
 			{
 				// Recurse with front.
-				PlaneFilter (Model,Node->iFront,Location,Radius,Callback,SkipNodeFlags,Param); 
+				PlaneFilter( Model, Node->iFront, Location, Radius, Callback, SkipNodeFlags, Param ); 
 			}
 			if (Dist <= Radius)
 			{
 				// Within bounds: Do callback.
-				Callback(&Model,iNode,Param);
+				Callback( &Model, iNode, Param );
 			}
 		}
 		iNode = Node->iBack;
@@ -631,7 +603,7 @@ void UModel::PlaneFilter
 	guard(UModel::PlaneFilter);
 
 	if( Nodes->Num )
-		::PlaneFilter(*this,0,Location,Radius,Callback,SkipNodeFlags,Param);
+		::PlaneFilter( *this, 0, Location, Radius, Callback, SkipNodeFlags, Param );
 
 	unguard;
 }
@@ -670,9 +642,7 @@ int UModel::PointLeaf
 				IsFront = 0;
 			}
 		} while( iNode != INDEX_NONE );
-		if		( !Class  )	return INDEX_NONE;
-		else if ( IsFront ) return (INDEX)(Nodes(iTempNode).ZoneMask >> 32);
-		else				return (INDEX)(Nodes(iTempNode).ZoneMask >>  0);
+		return Class ? iTempNode : INDEX_NONE;
 	}
 	else return INDEX_NONE;
 	unguard;
@@ -742,64 +712,53 @@ FLOAT FindNearestVertex
 	INDEX			&pVertex
 )
 {
-	FLOAT ResultRadius = -1.0;
+	FLOAT ResultRadius     = -1.0;
 	while (iNode != INDEX_NONE)
 	{
 		const FBspNode	*Node	= &Model.Nodes(iNode);
-		const FBspSurf	*Surf	= &Model.Surfs(Node->iSurf);
 		INDEX			iBack   = Node->iBack;
-
-		FLOAT PlaneDist = FPointPlaneDist
-		(
-			SourcePoint,
-			Model.Points (Surf->pBase),
-			Model.Vectors(Surf->vNormal)
-		);
-		if ((PlaneDist >= -MinRadius) && (Node->iFront!=INDEX_NONE))
+		FLOAT PlaneDist = Node->Plane.PlaneDot( SourcePoint );
+		if( PlaneDist>=-MinRadius && Node->iFront!=INDEX_NONE )
 		{
 			// Check front.
 			FLOAT TempRadius = FindNearestVertex (Model,SourcePoint,DestPoint,MinRadius,Node->iFront,pVertex);
 			if (TempRadius >= 0.0) {ResultRadius = TempRadius; MinRadius = TempRadius;};
 		}
-		if ((PlaneDist > -MinRadius) && (PlaneDist <= MinRadius))
+		if( PlaneDist>-MinRadius && PlaneDist<=MinRadius )
 		{
 			// Check this node's poly's vertices.
-			while (iNode != INDEX_NONE)
+			while( iNode != INDEX_NONE )
 			{
 				// Loop through all coplanars.
-				Node	= &Model.Nodes(iNode);
-				Surf	= &Model.Surfs(Node->iSurf);
+				Node                    = &Model.Nodes(iNode);
+				const FBspSurf* Surf    = &Model.Surfs(Node->iSurf);
+				const FVector *Base	    = &Model.Points(Surf->pBase);
+				FLOAT TempRadiusSquared	= FDistSquared( SourcePoint, *Base );
 
-				const FVector *Base	= &Model.Points(Surf->pBase);
-				FLOAT   TempRadius	= FDistApprox (SourcePoint,*Base);
-
-				if (TempRadius < MinRadius)
+				if( TempRadiusSquared < Square(MinRadius) )
 				{
-					pVertex      = Surf->pBase;
-					ResultRadius = TempRadius;
-					MinRadius    = TempRadius;
-					DestPoint    =	*Base;
+					pVertex = Surf->pBase;
+					ResultRadius = MinRadius = sqrt(TempRadiusSquared);
+					DestPoint = *Base;
 				}
 
 				const FVert *VertPool = &Model.Verts(Node->iVertPool);
 				for (BYTE B=0; B<Node->NumVertices; B++)
 				{
-					const FVector	*Vertex		= &Model.Points(VertPool->pVertex);
-					FLOAT			TempRadius	= FDistApprox (SourcePoint,*Vertex);
-					if (TempRadius < MinRadius)
+					const FVector *Vertex   = &Model.Points(VertPool->pVertex);
+					FLOAT TempRadiusSquared = FDistSquared( SourcePoint, *Vertex );
+					if( TempRadiusSquared < Square(MinRadius) )
 					{
 						pVertex      = VertPool->pVertex;
-						ResultRadius = TempRadius;
-						MinRadius    = TempRadius;
-						DestPoint    =	*Vertex;
+						ResultRadius = MinRadius = sqrt(TempRadiusSquared);
+						DestPoint    = *Vertex;
 					}
 					VertPool++;
 				}
 				iNode = Node->iPlane;
 			}
 		}
-		if (PlaneDist > MinRadius) 
-			// Don't go down back.
+		if( PlaneDist > MinRadius )
 			break;
 		iNode = iBack;
 	}
@@ -819,12 +778,7 @@ FLOAT UModel::FindNearestVertex
 ) const
 {
 	guard(UModel::FindNearestVertex);
-
-	if (Nodes->Num) 
-		return ::FindNearestVertex( *this,SourcePoint,DestPoint,MinRadius,0,pVertex );
-	else 
-		return -1.0;
-
+	return Nodes->Num ? ::FindNearestVertex( *this,SourcePoint,DestPoint,MinRadius,0,pVertex ) : -1.0;
 	unguard;
 }
 
@@ -839,27 +793,25 @@ void PrecomputeSphereFilter( UModel &Model, INDEX iNode, const FPlane &Sphere )
 {
 	while( iNode != INDEX_NONE )
 	{
-		FBspNode	*Node	= &Model.Nodes(iNode);
-		FBspSurf	*Surf	= &Model.Surfs(Node->iSurf);
-		FLOAT		Dist	= Node->Plane.PlaneDot(Sphere);
+		FBspNode* Node = &Model.Nodes( iNode );
+		FLOAT     Dist = Node->Plane.PlaneDot( Sphere );
 
+		Node->NodeFlags &= ~(NF_IsFront | NF_IsBack);
 		if( Dist < -Sphere.W )
 		{
 			// All back.
-			Surf->PolyFlags = (Surf->PolyFlags & ~PF_IsFront) | PF_IsBack;
-			iNode = Node->iBack;
+			Node->NodeFlags |= NF_IsBack;
+			iNode            = Node->iBack;
 		}
 		else if( Dist > Sphere.W )
 		{	
 			// All front.
-			Surf->PolyFlags = (Surf->PolyFlags & ~PF_IsBack) | PF_IsFront;
-			iNode = Node->iFront;
+			Node->NodeFlags |= NF_IsFront;
+			iNode            = Node->iFront;
 		}
 		else
 		{
 			// Both front and back.
-			Surf->PolyFlags &= ~(PF_IsFront | PF_IsBack);
-
 			if( Node->iBack != INDEX_NONE )
 				PrecomputeSphereFilter( Model, Node->iBack, Sphere );
 			iNode = Node->iFront;
@@ -869,14 +821,14 @@ void PrecomputeSphereFilter( UModel &Model, INDEX iNode, const FPlane &Sphere )
 
 //
 // Precompute the front/back test for a bounding sphere.  Tags all nodes that
-// the sphere falls into with a PF_IsBack tag (if the sphere is entirely in back
-// of the node), a PF_IsFront tag (if the sphere is entirely in front of the node),
+// the sphere falls into with a NF_IsBack tag (if the sphere is entirely in back
+// of the node), a NF_IsFront tag (if the sphere is entirely in front of the node),
 // or neither (if the sphere is split by the node).  This only affects nodes
 // that the sphere falls in.  Thus, it is not necessary to perform any cleanup
 // after precomputing the filter as long as you're sure the sphere completely
 // encloses the object whose filter you're precomputing.
 //
-void UModel::PrecomputeSphereFilter( const FVector &Sphere )
+void UModel::PrecomputeSphereFilter( const FPlane &Sphere )
 {
 	guard(UModel::PrecomputeSphereFilter);
 

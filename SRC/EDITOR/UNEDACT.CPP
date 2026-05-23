@@ -34,7 +34,7 @@ void FGlobalEditor::edactMoveSelected
 		if( Actor && Actor->bSelected )
 		{
 			// Update actor's temporary dynamic lighting flags.
-			if( Delta != GMath.ZeroVector )
+			if( Delta != FVector(0,0,0) )
 				Actor->bDynamicLight = 1;
 			else
 				Actor->bLightChanged = 1;
@@ -99,14 +99,14 @@ void FGlobalEditor::edactDuplicateSelected( ULevel *Level )
 				Actor->GetClass(),
 				NULL,
 				Actor->GetFName(),
-				&NewLocation,
-				&Actor->Rotation,
+				NewLocation,
+				Actor->Rotation,
 				Actor
 			);
 			if( NewActor )
 			{
 				NewActor->Lock(LOCK_Trans);
-				if( NewActor->Brush )
+				if( Actor->Brush )
 				{
 					NewActor->Brush = csgDuplicateBrush(Level,Actor->Brush,0,0,0,Actor->IsMovingBrush());
 					NewActor->UpdateBrushPosition(Level,1);

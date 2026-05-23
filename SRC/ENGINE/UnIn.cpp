@@ -150,21 +150,22 @@ int FInput::Exec( const char *Str, FOutputDevice *Out )
 		// Bind an input key to a command string.
 		char KeyName[64];
 		EInputKey iKey;
-		if( !GrabSTRING(Str,KeyName,ARRAY_COUNT(KeyName)) )
+		if( !GrabSTRING( Str, KeyName, ARRAY_COUNT(KeyName) ) )
 		{
 			Out->Logf( "Missing key name" );
 			return 1;
 		}
 		else if( !FindKeyName( KeyName, iKey ) )
 		{
-			Out->Logf("Unrecognized key name <%s>",KeyName);
+			Out->Logf( "Unrecognized key name <%s>", KeyName );
 			return 1;
 		}
 		else
 		{
 			// Get possibly-blank key binding.
 			GrabSTRING( Str, Temp, ARRAY_COUNT(Temp) );
-			Out->Logf("Binding <%s> to <%s>",GetKeyName(iKey),Temp);
+			if( Out != GApp )
+				Out->Logf( "Binding <%s> to <%s>", GetKeyName(iKey), Temp );
 			Bind( iKey, Temp );
 			return 1;
 		}
@@ -172,19 +173,26 @@ int FInput::Exec( const char *Str, FOutputDevice *Out )
 	else if( GetCMD(&Str,"RESETBINDINGS") )
 	{
 		ResetInput();
-		Out->Log("Bindings reset");
+		if( Out != GApp )
+			Out->Log( "Bindings reset" );
 		return 1;
 	}
 	else if( GetCMD(&Str,"SHOWBINDINGS") )
 	{
-		SaveBindings(*Out);
+		SaveBindings( *Out );
+		return 1;
+	}
+	else if( GetCMD(&Str,"RESETINPUT") )
+	{
+		ResetInput();
+		Out->Log( "Input reset" );
 		return 1;
 	}
 	else if( GetCMD(&Str,"BUTTON") )
 	{
 		// Normal button.
 		EButtons iButton;
-		if( GrabSTRING(Str,Temp,ARRAY_COUNT(Temp)) && FindButtonName(Temp,iButton) )
+		if( GrabSTRING( Str, Temp, ARRAY_COUNT(Temp) ) && FindButtonName( Temp, iButton ) )
 		{
 			if( GetInputState() == IST_Press )
 				Buttons[iButton] += BUTTON_NORMAL;
@@ -198,7 +206,7 @@ int FInput::Exec( const char *Str, FOutputDevice *Out )
 	{
 		// Toggle button.
 		EButtons iButton;
-		if( GrabSTRING(Str,Temp,ARRAY_COUNT(Temp)) && FindButtonName(Temp,iButton) )
+		if( GrabSTRING( Str, Temp, ARRAY_COUNT(Temp) ) && FindButtonName( Temp, iButton ) )
 		{
 			if( GetInputState() == IST_Press )
 				Buttons[iButton] ^= BUTTON_TOGGLE;
@@ -215,7 +223,7 @@ int FInput::Exec( const char *Str, FOutputDevice *Out )
 		if( GrabSTRING( Str, Temp, ARRAY_COUNT(Temp) ) && FindAxisName( Temp, iAxis ) )
 		{
 			FLOAT Speed=1.0;
-			GetFLOAT(Str,"SPEED=",&Speed);
+			GetFLOAT( Str, "SPEED=", &Speed );
 			if( GetInputState() == IST_Axis )
 			{
 				Axes[iAxis] += 0.01 * GetInputDelta() * Speed;
@@ -225,7 +233,7 @@ int FInput::Exec( const char *Str, FOutputDevice *Out )
 				Axes[iAxis] += GetInputDelta() * Speed;
 			}
 		}
-		else Out->Logf("Bad %s command",IsAxis ? "Axis" : "Delta");
+		else Out->Logf( "Bad %s command",IsAxis ? "Axis" : "Delta" );
 		return 1;
 	}
 	else
@@ -296,10 +304,13 @@ int FInput::Process( FOutputDevice &Out, EInputKey iKey, EInputState State, FLOA
 		switch( State )
 		{
 			case IST_Press:
-				if( KeyDownTable[iKey] ) return 0;
+				if( KeyDownTable[iKey] )
+					return 0;
 				KeyDownTable[iKey] = 1;
 				break;
 			case IST_Release:
+				if( !KeyDownTable[iKey] )
+					return 0;
 				KeyDownTable[iKey] = 0;
 				break;
 		}
@@ -364,7 +375,7 @@ void FInput::ReadInput( PPlayerTick &PlayerTick, FLOAT DeltaSeconds, FOutputDevi
 	guard(FInput::ReadInput);
 
 	// Antidiscretization coefficient.
-	const FLOAT k = 100.0;
+	const FLOAT k = 50.0;
 
 	// Update everything with IST_Hold.
 	for( int i=0; i<IK_MAX; i++ )
@@ -376,7 +387,7 @@ void FInput::ReadInput( PPlayerTick &PlayerTick, FLOAT DeltaSeconds, FOutputDevi
 	{
 		FLOAT Velocity      = 20.0 * Axes[i] / DeltaSeconds;
 		PlayerTick.Axis[i]  = Velocity;
-		//Axes[i]            *= (1.0 - exp(-k * DeltaSeconds)) / (k * DeltaSeconds);
+		//Axes[i]             = Clamp(Axes[i],-0.2f,+0.2f) * (1.0 - exp(-k * DeltaSeconds)) / (k * DeltaSeconds);
 		Axes[i] = 0.0;
 	}
 
@@ -399,13 +410,16 @@ void FInput::ResetInput()
 	guard(FInput::ResetInput);
 
 	// Reset all keys.
-	for( int i=0; i<IK_MAX; i++ ) KeyDownTable[i]=0;
+	for( int i=0; i<IK_MAX; i++ )
+		KeyDownTable[i] = 0;
 
 	// Reset all buttons.
-	for( i=0; i<BUT_MAX; i++ ) Buttons[i]=0;
+	for( i=0; i<BUT_MAX; i++ )
+		Buttons[i] = 0;
 
 	// Reset all axes.
-	for( i=0; i<AXIS_MAX; i++ ) Axes[i]=0.0;
+	for( i=0; i<AXIS_MAX; i++ )
+		Axes[i] = 0.0;
 
 	unguard;
 }

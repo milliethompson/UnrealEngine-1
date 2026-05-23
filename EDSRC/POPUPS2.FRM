@@ -314,7 +314,7 @@ Private Sub arKey3_Click()
 End Sub
 
 Private Sub arScriptEdit_Click()
-    Call frmClassBrowser.LaunchScriptEd(GPopupActorClass, "", 0, 0)
+    Call frmClassBrowser.LaunchScriptEd(GPopupActorClass, "", 0, 0, "")
 End Sub
 
 Private Sub arScriptSubclass_Click()

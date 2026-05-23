@@ -63,7 +63,6 @@ public:
 	int				LevelTickTime;			// Time consumed by ULevel::Tick.
 	int				ActorTickTime;			// Time consumed by ticking all actors.
 	int				AudioTickTime;			// Time consumed by FGlobalAudio::Tick.
-	int				ActorCollisionFrags;	// Number of actor collision fragments.
 	int				Paused,Pauseable;		// Pausing.
 	int				ScriptExecTime;			// Script execution time.
 	int				Pad[9];					// Space available.

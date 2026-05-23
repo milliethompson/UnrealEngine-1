@@ -70,12 +70,6 @@ struct FSavedClass
 	FSavedObject SavedBins[PROPBIN_MAX];
 };
 
-// Class flags.
-enum EClassFlags
-{
-	// General flags.
-};
-
 //
 // An actor class.  Describes all of the attributes of a kind of actor, but
 // does not refer to an actual instance of an actor.
@@ -226,6 +220,7 @@ public:
 	,	Index   ( -1        )
 	,   FlagMask( ~(DWORD)0 )
 	{
+		debugState(Class!=NULL);
 		++*this;
 	}
 

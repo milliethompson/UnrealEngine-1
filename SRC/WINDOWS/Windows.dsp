@@ -52,7 +52,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 /nologo /subsystem:windows /machine:I386
-# ADD LINK32 ..\Lib\UnRender.lib ..\Lib\UnNet.lib ..\Lib\UnEngine.lib ..\Lib\UnEditor.lib ..\Lib\UnGame.lib ..\lib\dxguid.lib winmm.lib /nologo /base:"0x16000000" /subsystem:windows /incremental:yes /machine:I386 /out:"..\..\System\UnServer.exe"
+# ADD LINK32 ..\Lib\UnRender.lib ..\Lib\UnNet.lib ..\Lib\UnEngine.lib ..\Lib\UnEditor.lib ..\Lib\UnGame.lib ..\lib\dxguid.lib ..\lib\ddraw.lib winmm.lib /nologo /base:"0x16000000" /subsystem:windows /incremental:yes /machine:I386 /out:"..\..\System\UnServer.exe"
 # SUBTRACT LINK32 /profile /map /debug
 
 !ELSEIF  "$(CFG)" == "Windows - Win32 Debug"
@@ -226,6 +226,10 @@ SOURCE=.\Res\UnSplash.bmp
 # Begin Source File
 
 SOURCE=.\Res\UnSplash2.bmp
+# End Source File
+# Begin Source File
+
+SOURCE=.\Res\unsplash3.bmp
 # End Source File
 # Begin Source File
 

@@ -265,22 +265,22 @@ Public Sub OpenCameras(Reopen As Boolean)
     Call Ed.OpenCamera(Reopen, 0, 0, VBar.Left / Screen.TwipsPerPixelX, _
         LBar.Top / Screen.TwipsPerPixelY, _
         SHOW_NORMAL + SHOW_STANDARD_VIEW + SHOW_AS_CHILD + SHOW_MOVINGBRUSHES, _
-        REN_ORTHXY, "Standard1")
+        REN_ORTHXY, "Standard1V")
     Call Ed.OpenCamera(Reopen, (VBar.Left + VBar.Width) / Screen.TwipsPerPixelX, _
         0, (CXL - VBar.Left - VBar.Width) / Screen.TwipsPerPixelX, _
         RBar.Top / Screen.TwipsPerPixelY, _
         SHOW_NORMAL + SHOW_STANDARD_VIEW + SHOW_AS_CHILD + SHOW_MOVINGBRUSHES, _
-        REN_ORTHXZ, "Standard2")
+        REN_ORTHXZ, "Standard2V")
     Call Ed.OpenCamera(Reopen, 0, (LBar.Top + LBar.Height) / Screen.TwipsPerPixelY, _
         VBar.Left / Screen.TwipsPerPixelX, (CYL - LBar.Top - LBar.Height) / Screen.TwipsPerPixelY, _
         SHOW_NORMAL + SHOW_STANDARD_VIEW + SHOW_MENU + SHOW_AS_CHILD + SHOW_MOVINGBRUSHES, _
-        REN_PLAINTEX, "Standard3")
+        REN_PLAINTEX, "Standard3V")
     Call Ed.OpenCamera(Reopen, (VBar.Left + VBar.Width) / Screen.TwipsPerPixelX, _
         (RBar.Top + RBar.Height) / Screen.TwipsPerPixelY, _
         (CXL - VBar.Left - VBar.Width) / Screen.TwipsPerPixelX, _
         (CYL - RBar.Top - RBar.Height) / Screen.TwipsPerPixelY, _
         SHOW_NORMAL + SHOW_STANDARD_VIEW + SHOW_AS_CHILD + SHOW_MOVINGBRUSHES, _
-        REN_ORTHYZ, "Standard4")
+        REN_ORTHYZ, "Standard4V")
 End Sub
 
 '

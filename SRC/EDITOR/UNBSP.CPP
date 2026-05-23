@@ -243,9 +243,9 @@ INDEX FGlobalEditor::bspAddNode
 	else appError("BspAddNode: iLink==INDEX_NONE");
 
 	// Set NodeFlags.
-	if( Surf->PolyFlags & PF_NotSolid  ) NodeFlags |= NF_NotCsg;
-	if( Surf->PolyFlags & PF_Invisible ) NodeFlags |= NF_NotLightBlocking;
-	if( Surf->PolyFlags & PF_Masked    ) NodeFlags |= NF_ShootThrough;
+	if( Surf->PolyFlags & PF_NotSolid              ) NodeFlags |= NF_NotCsg;
+	if( Surf->PolyFlags & (PF_Invisible|PF_Portal) ) NodeFlags |= NF_NotVisBlocking;
+	if( Surf->PolyFlags & PF_Masked                ) NodeFlags |= NF_ShootThrough;
 
 	if( EdPoly->NumVertices > FBspNode::MAX_NODE_VERTICES )
 	{
@@ -283,16 +283,17 @@ INDEX FGlobalEditor::bspAddNode
 			Model->Nodes->ModifyItem( iParent );
 
 		// Set node properties.
-		INDEX iNode			= Model->Nodes->Add();
-		FBspNode &Node      = Model->Nodes(iNode);
-		Node.iSurf       	= EdPoly->iLink;
-		Node.iDynamic[0]	= INDEX_NONE;
-		Node.iDynamic[1] 	= INDEX_NONE;
-		Node.NodeFlags   	= NodeFlags;
-		Node.iBound			= INDEX_NONE;
-		Node.iZone[0]		= 0;
-		Node.iZone[1]		= 0;
-		Node.ZoneMask		= 0;
+		INDEX iNode			 = Model->Nodes->Add();
+		FBspNode &Node       = Model->Nodes(iNode);
+		Node.iSurf       	 = EdPoly->iLink;
+		Node.iDynamic[0]	 = 0;
+		Node.iDynamic[1] 	 = 0;
+		Node.NodeFlags   	 = NodeFlags;
+		Node.iRenderBound    = INDEX_NONE;
+		Node.iCollisionBound = INDEX_NONE;
+		Node.iZone[0]		 = 0;
+		Node.iZone[1]		 = 0;
+		Node.ZoneMask		 = 0;
 
 		// Set node plane.
 		Node.Plane = FPlane( EdPoly->Base, EdPoly->Normal );
@@ -371,21 +372,19 @@ FPoly *FindBestSplit
 	if( NumPolys==1 )
 		return PolyList[0];
 
-	FPoly   *Poly,*Best=NULL;
-	FLOAT   Score,BestScore;
-	int     i,Index,j,Inc;
-	int     Splits,Front,Back,Coplanar,AllSemiSolids;
+	FPoly   *Poly, *Best=NULL;
+	FLOAT   Score, BestScore;
+	int     i, Index, j, Inc;
+	int     Splits, Front, Back, Coplanar, AllSemiSolids;
 
-	if		(Opt==BSP_Optimal)  Inc = 1;					// Test lots of nodes
-	else if (Opt==BSP_Good)		Inc = Max(1,NumPolys/20);	// Test 20 nodes
-	else /* BSP_Lame */			Inc = Max(1,NumPolys/4);	// Test 4 nodes
+	if		(Opt==BSP_Optimal)  Inc = 1;					// Test lots of nodes.
+	else if (Opt==BSP_Good)		Inc = Max(1,NumPolys/20);	// Test 20 nodes.
+	else /* BSP_Lame */			Inc = Max(1,NumPolys/4);	// Test 4 nodes.
 
 	// See if there are any non-semisolid polygons here.
 	for( i=0; i<NumPolys; i++ )
-	{
 		if( !(PolyList[i]->PolyFlags & PF_AddLast) )
 			break;
-	}
 	AllSemiSolids = (i>=NumPolys);
 
 	// Search through all polygons in the pool and find:
@@ -395,53 +394,51 @@ FPoly *FindBestSplit
 	BestScore = 0;
 	for( i=0; i<NumPolys; i+=Inc )
 	{
-		Splits   = 0;
-		Front    = 0;
-		Back     = 0;
-		Coplanar = 0;
-		Index    = i-1;
-
-		do	{
+		Splits = Front = Back = Coplanar = 0;
+		Index = i-1;
+		do
+		{
 			Index++;
 			Poly = PolyList[Index];
-			} while ((Index<(i+Inc)) && (Index<NumPolys) && (Poly->PolyFlags & PF_AddLast) && (!AllSemiSolids));
-		if ((Index>=(i+Inc))||(Index>=NumPolys)) continue;
+		} while( Index<(i+Inc) && Index<NumPolys && (Poly->PolyFlags & PF_AddLast) && !AllSemiSolids );
+		if( Index>=i+Inc || Index>=NumPolys )
+			continue;
 
-		for( j=0; j<NumPolys; j+=Inc ) if (j!=Index)
+		for( j=0; j<NumPolys; j+=Inc ) if( j != Index )
 		{
 			FPoly *OtherPoly = PolyList[j];
-			switch( OtherPoly->SplitWithPlane (Poly->Base,Poly->Normal,NULL,NULL,0) )
+			switch( OtherPoly->SplitWithPlaneFast( FPlane( Poly->Base, Poly->Normal), NULL, NULL ) )
 			{
 				case SP_Coplanar:
 					Coplanar++;
 					break;
-				
+
 				case SP_Front:
 					Front++;
 					break;
-				
+
 				case SP_Back:
 					Back++;
 					break;
-				
+
 				case SP_Split:
 					// Disfavor splitting polys that are zone portals.
-					if (!(Poly->PolyFlags & PF_Portal)) Splits++;
-					else Splits += 16;
+					if( !(Poly->PolyFlags & PF_Portal) )
+						Splits++;
+					else
+						Splits += 16;
 					break;
 			}
 		}
-		Score = 
-			(FLOAT)(Balance * Abs(Front-Back) +	(100-Balance)*Splits) / 
-			(0.001 + Poly->Area()
-			);
-		if( (Score < BestScore) || !Best )
+		//Score = (Balance * Abs(Front-Back) + (100-Balance)*Splits) / (0.001 + Poly->Area());
+		Score = Balance * Abs(Front-Back) + (100-Balance)*Splits;
+		if( Score<BestScore || !Best )
 		{
 			Best      = Poly;
 			BestScore = Score;
 		}
 	}
-	if(!Best) appError ("Decision failed");
+	checkOutput(Best);
 	return Best;
 	unguard;
 }
@@ -491,25 +488,18 @@ void SplitPolyList
 
 	FPoly *FrontEdPoly = new(GMem)FPoly;
 	FPoly *BackEdPoly  = new(GMem)FPoly;
-
 	for( INDEX i=0; i<NumPolys; i++ )
 	{
 		FPoly *EdPoly = PolyList[i];
 		if( EdPoly == SplitPoly )
 			continue;
 
-		switch(EdPoly->SplitWithPlane
-      	(
-			SplitPoly->Base,
-			SplitPoly->Normal,
-			FrontEdPoly,
-			BackEdPoly,
-			0)
-		)
+		switch( EdPoly->SplitWithPlane( SplitPoly->Base, SplitPoly->Normal, FrontEdPoly, BackEdPoly, 0 ) )
 		{
 			case SP_Coplanar:
-	            if (RebuildSimplePolys) EdPoly->iLink = Model->Surfs->Num-1;
-				iPlaneNode = GUnrealEditor.bspAddNode(Model,iPlaneNode,NODE_Plane,0,EdPoly);
+	            if( RebuildSimplePolys )
+					EdPoly->iLink = Model->Surfs->Num-1;
+				iPlaneNode = GUnrealEditor.bspAddNode( Model, iPlaneNode, NODE_Plane, 0, EdPoly );
 				break;
 			
 			case SP_Front:
@@ -656,7 +646,6 @@ void FGlobalEditor::bspValidateBrush
 	if( ForceValidate || !(Brush->ModelFlags & MF_Linked) )
 	{
 		Brush->ModelFlags |= MF_Linked;
-
 		for( i=0; i<Brush->Polys->Num; i++ )
 		{
 			Brush->Polys(i).iLink = i;
@@ -673,13 +662,11 @@ void FGlobalEditor::bspValidateBrush
 				{
 					OtherPoly = &Brush->Polys(j);
 					if
-					(
-						(OtherPoly->iLink == j) &&
-						(OtherPoly->Texture == EdPoly->Texture) &&
-						((OtherPoly->Normal | EdPoly->Normal)>0.9999)
-					)
+					(	OtherPoly->iLink == j
+					&&	OtherPoly->Texture == EdPoly->Texture
+					&&	(OtherPoly->Normal | EdPoly->Normal)>0.9999 )
 					{
-						Dist = FPointPlaneDist (OtherPoly->Base,EdPoly->Base,EdPoly->Normal);
+						Dist = FPointPlaneDist( OtherPoly->Base, EdPoly->Base, EdPoly->Normal );
 						if( Dist>-0.001 && Dist<0.001 )
 						{
 							OtherPoly->iLink = i;
@@ -696,7 +683,6 @@ void FGlobalEditor::bspValidateBrush
 	// Build bounds.
 	Brush->BuildBound(0);
 	Brush->BuildBound(1);
-
 	unguard;
 }
 
@@ -959,13 +945,7 @@ void CleanupNodes( UModel *Model, INDEX iNode, INDEX iParent )
 	FBspNode *Node = &Model->Nodes(iNode);
 
 	// Transactionally empty vertices of tag-for-empty nodes.
-	if( (Node->NodeFlags & NF_TagForEmpty) && (Node->NumVertices!=0) )
-	{
-		Model->Nodes->ModifyItem(iNode);
-		Node->NumVertices = 0;
-		Node->NodeFlags &= ~(NF_TagForEmpty);
-	}
-	Node->NodeFlags &= ~(NF_IsNew | NF_Bounded);
+	Node->NodeFlags &= ~(NF_IsNew | NF_IsFront | NF_IsBack);
 
 	// Recursively clean up front, back, and plane nodes.
 	if( Node->iFront != INDEX_NONE ) CleanupNodes( Model, Node->iFront, iNode );
@@ -1010,7 +990,7 @@ void CleanupNodes( UModel *Model, INDEX iNode, INDEX iParent )
 			if      ( ParentNode->iFront == iNode ) ParentNode->iFront = Node->iPlane;
 			else if ( ParentNode->iBack  == iNode ) ParentNode->iBack  = Node->iPlane;
 			else if ( ParentNode->iPlane == iNode ) ParentNode->iPlane = Node->iPlane;
-			else    appError ("CleanupNodes: Parent and child are unlinked");
+			else appError( "CleanupNodes: Parent and child are unlinked" );
 		}
 	}
 	else if( Node->NumVertices == 0 && ( Node->iFront==INDEX_NONE || Node->iBack==INDEX_NONE ) )
@@ -1051,25 +1031,12 @@ void CleanupNodes( UModel *Model, INDEX iNode, INDEX iParent )
 }
 
 //
-// Recursive worker function called by BspCleanup.
-//
-void CleanupSurfs( UModel *Model )
-{
-	guard(CleanupSurfs);
-	for( INDEX i=0; i<Model->Surfs->Num; i++ )
-		Model->Surfs(i).PolyFlags &= ~(PF_IsFront | PF_IsBack);
-
-	unguard;
-}
-
-//
 // Clean up all nodes after a CSG operation.  Resets temporary bit flags and unlinks
 // empty leaves.  Removes zero-vertex nodes which have nonzero-vertex coplanars.
 //
 void FGlobalEditor::bspCleanup( UModel *Model )
 {
 	guard(FGlobalEditor::bspCleanup);
-	CleanupSurfs( Model );
 	if( Model->Nodes->Num > 0 ) 
 		CleanupNodes( Model, 0, INDEX_NONE );
 	unguard;
@@ -1113,7 +1080,11 @@ void AddWorldToBrushFunc( UModel *Model, INDEX iNode, FPoly *EdPoly,
 		case F_COSPATIAL_FACING_OUT:
 			// Discard original poly.
 			GDiscarded++;
-			GModel->Nodes(GNode).NodeFlags |= NF_TagForEmpty;
+			if( GModel->Nodes(GNode).NumVertices )
+			{
+				GModel->Nodes->ModifyItem(GNode);
+				GModel->Nodes(GNode).NumVertices = 0;
+			}
 			break;
 	}
 }
@@ -1154,7 +1125,11 @@ void SubtractWorldToBrushFunc( UModel *Model, INDEX iNode, FPoly *EdPoly,
 		case F_COSPATIAL_FACING_OUT:
 			// Discard original poly.
 			GDiscarded++;
-			GModel->Nodes(GNode).NodeFlags |= NF_TagForEmpty;
+			if( GModel->Nodes(GNode).NumVertices )
+			{
+				GModel->Nodes->ModifyItem(GNode);
+				GModel->Nodes(GNode).NumVertices = 0;
+			}
 			break;
 	}
 }
@@ -1336,8 +1311,7 @@ void FilterEdPoly
 		FilterEdPoly( FilterFunc, Model, iNode, &Temp, CoplanarInfo, Outside );
 	}
 
-	// See if we've precomputed whether this is in front or back
-	// based on a bounding sphere.
+	// Split em.
 	FPoly TempFrontEdPoly,TempBackEdPoly;
 	SplitResult = EdPoly->SplitWithPlane
 	(
@@ -1707,9 +1681,12 @@ void FilterWorldThroughBrush
 				}
 				else
 				{
-					// Tag original world poly for deletion; has been deleted or replaced by
-					// partial fragments.
-					GModel->Nodes(GNode).NodeFlags |= NF_TagForEmpty;
+					// Tag original world poly for deletion; has been deleted or replaced by partial fragments.
+					if( GModel->Nodes(GNode).NumVertices )
+					{
+						GModel->Nodes->ModifyItem(GNode);
+						GModel->Nodes(GNode).NumVertices = 0;
+					}
 				}
 			}
 			else if( CSGOper == CSG_Intersect )
@@ -1784,7 +1761,7 @@ int FGlobalEditor::bspBrushCSG
 	Brush->Lock(LOCK_Trans);
 	Brush->Location += Brush->PostPivot;
 
-	// Prep the tempoarary model.
+	// Prep the temporary model.
 	TempModel->Lock(LOCK_ReadWrite);
 	TempModel->EmptyModel(1,1);
 
@@ -1792,22 +1769,22 @@ int FGlobalEditor::bspBrushCSG
 	// transform (if negative, edpolyTransform will reverse the clockness
 	// of the EdPoly points and invert the normal).
 	FModelCoords Coords,Uncoords;
-	FLOAT Orientation = Brush->BuildCoords(&Coords,&Uncoords);
+	FLOAT Orientation = Brush->BuildCoords( &Coords, &Uncoords );
 
 	// Update status.
 	ReallyBig = (Brush->Polys->Num > 200);
-	if (ReallyBig)
+	if( ReallyBig )
+	{
+		switch( CSGOper )
 		{
-		switch (CSGOper)
-			{
 			case CSG_Add:			Descr = "Adding brush to world"; break;
 			case CSG_Subtract: 		Descr = "Subtracting brush from world"; break;
 			case CSG_Intersect: 	Descr = "Intersecting brush with world"; break;
 			case CSG_Deintersect: 	Descr = "Deintersecting brush with world"; break;
 			default:				Descr = "Performing CSG operation"; break;
-			};
-		GApp->BeginSlowTask (Descr,1,0);
-		};
+		}
+		GApp->BeginSlowTask( Descr, 1, 0 );
+	}
 
 	// Transform original brush poly into same coordinate system as world
 	// so Bsp filtering operations make sense.
@@ -1815,7 +1792,7 @@ int FGlobalEditor::bspBrushCSG
 	for( i=0; i<Brush->Polys->Num; i++ )
 	{
 		// Get the brush poly.
-		FPoly DestEdPoly       = Brush->Polys(i);
+		FPoly DestEdPoly = Brush->Polys(i);
 
 		// Set its backward brush link.
 		DestEdPoly.Brush       = Brush;
@@ -1829,7 +1806,7 @@ int FGlobalEditor::bspBrushCSG
 			DestEdPoly.iLink = i;
 
 		// Transform it.
-		DestEdPoly.Transform( Coords, &Brush->PrePivot, &Brush->Location, Orientation );
+		DestEdPoly.Transform( Coords, Brush->PrePivot, Brush->Location, Orientation );
 
 		// Fix the base if necessary.
 		FLOAT Error = (DestEdPoly.Vertex[0] - DestEdPoly.Base) | DestEdPoly.Normal;
@@ -1856,12 +1833,7 @@ int FGlobalEditor::bspBrushCSG
 		{
          	FPoly EdPoly = TempModel->Polys(i);
 			GModel = Brush;
-			BspFilterFPoly
-			(
-				CSGOper==CSG_Intersect ? IntersectBrushWithWorldFunc : DeIntersectBrushWithWorldFunc,
-				Model, 
-				&EdPoly
-			);
+			BspFilterFPoly( CSGOper==CSG_Intersect ? IntersectBrushWithWorldFunc : DeIntersectBrushWithWorldFunc, Model,  &EdPoly );
 		}
 		NumPolysFromBrush = Brush->Polys->Num;
 	}
@@ -1886,12 +1858,7 @@ int FGlobalEditor::bspBrushCSG
 			}
 
 			// Filter brush through the world.
-			BspFilterFPoly
-			(
-				CSGOper==CSG_Add ? AddBrushToWorldFunc : SubtractBrushFromWorldFunc,
-				Model,
-				&EdPoly
-			);
+			BspFilterFPoly( CSGOper==CSG_Add ? AddBrushToWorldFunc : SubtractBrushFromWorldFunc, Model, &EdPoly );
 		}
 	}
 	if( Model->Nodes->Num && !(PolyFlags & (PF_NotSolid | PF_Semisolid)) )
@@ -1910,16 +1877,9 @@ int FGlobalEditor::bspBrushCSG
 		TempModel->BuildBound(0);
 
 		TempModel->Lock(LOCK_ReadWrite);		
-		FilterWorldThroughBrush
-		(
-			Model,
-			TempModel,
-			CSGOper,
-			0,
-			&TempModel->LocalBound.Sphere
-		);
+		FilterWorldThroughBrush( Model, TempModel, CSGOper, 0, &TempModel->LocalBound.Sphere );
 	}
-	if( (CSGOper==CSG_Intersect) || (CSGOper==CSG_Deintersect) )
+	if( CSGOper==CSG_Intersect || CSGOper==CSG_Deintersect )
 	{
 		if( ReallyBig ) GApp->StatusUpdate( "Adjusting brush", 0, 0 );
 
@@ -1954,14 +1914,12 @@ int FGlobalEditor::bspBrushCSG
 		}
 		Brush->ModelFlags |= MF_Linked;
 
-		// Detransform the brush back into its original coordinate system.
+		// Detransform the obtained brush back into its original coordinate system.
 		for( i=0; i<Brush->Polys->Num; i++ )
 		{
 			FPoly *DestEdPoly = &Brush->Polys(i);
-
-			DestEdPoly->Transform (Uncoords,&Brush->Location,&Brush->PrePivot,Orientation);
-			DestEdPoly->Fix       ();
-
+			DestEdPoly->Transform( Uncoords, Brush->Location, Brush->PrePivot, Orientation );
+			DestEdPoly->Fix();
 			DestEdPoly->Brush		= NULL;
 			DestEdPoly->iBrushPoly	= i;
 		}
@@ -1989,14 +1947,16 @@ int FGlobalEditor::bspBrushCSG
 	TempModel->EmptyModel(1,1);
 	
 	// Merge coplanars if needed.
-	if( (CSGOper==CSG_Intersect) || (CSGOper==CSG_Deintersect) )
+	if( CSGOper==CSG_Intersect || CSGOper==CSG_Deintersect )
 	{
-		if (ReallyBig) GApp->StatusUpdate ("Merging",0,0);
-		bspMergeCoplanars (Brush,1,0);
+		if( ReallyBig )
+			GApp->StatusUpdate( "Merging", 0, 0 );
+		bspMergeCoplanars( Brush, 1, 0 );
 	}
-	if( ReallyBig ) GApp->EndSlowTask();
-	return 1 + GErrors;
+	if( ReallyBig )
+		GApp->EndSlowTask();
 
+	return 1 + GErrors;
 	unguard;
 }
 
@@ -2470,16 +2430,18 @@ void MergeNearPoints( UModel *Model, FLOAT Dist )
 
 	// Remap VertPool.
 	for( i=0; i<Model->Verts->Num; i++ )
-		Model->Verts(i).pVertex = PointRemap[Model->Verts(i).pVertex];
+		if( Model->Verts(i).pVertex>=0 && Model->Verts(i).pVertex<Model->Points->Num )
+			Model->Verts(i).pVertex = PointRemap[Model->Verts(i).pVertex];
 
 	// Remap Surfs.
 	for( i=0; i<Model->Surfs->Num; i++ )
-		Model->Surfs(i).pBase = PointRemap[Model->Surfs(i).pBase];
+		if( Model->Surfs(i).pBase>=0 && Model->Surfs(i).pBase<Model->Points->Num )
+			Model->Surfs(i).pBase = PointRemap[Model->Surfs(i).pBase];
 
-	// Fix nodes.
+	// Remove duplicate points from nodes.
 	for( i=0; i<Model->Nodes->Num; i++ )
 	{
-		FBspNode  &Node = Model->Nodes(i);
+		FBspNode &Node = Model->Nodes(i);
 		FVert *Pool = &Model->Verts(Node.iVertPool);
 		
 		int k=0;
@@ -2489,10 +2451,11 @@ void MergeNearPoints( UModel *Model, FLOAT Dist )
 			FVert *B = &Pool[j ? j-1 : Node.NumVertices-1];
 			
 			if( A->pVertex != B->pVertex )
-				Pool[k++]=Pool[j];
+				Pool[k++] = Pool[j];
 		}
 		Node.NumVertices = k>=3 ? k : 0;
-		if(k<3) Collapsed++;
+		if( k < 3 )
+			Collapsed++;
 	}
 
 	// Success.
@@ -2590,7 +2553,6 @@ void FGlobalEditor::bspOptGeom( UModel *Model )
 						{
 							// Make sure that the other node's two vertices are adjacent and
 							// ordered opposite this node's vertices.
-
 							INDEX		iOtherNode	= PV2->iNode;
 							FBspNode	&OtherNode	= Model->Nodes(iOtherNode);
 

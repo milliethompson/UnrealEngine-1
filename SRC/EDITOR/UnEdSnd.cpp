@@ -192,6 +192,7 @@ AudioCmdLine(const char *Str,FOutputDevice *Out)
 		** when the user presses the "test sound"
 		** button in the Unreal editor.
 		*/
+#if 1
 		char		TempName[256];	/* Name of object. */
 		USound *	Sound;		/* Ptr to object. */
 
@@ -209,38 +210,6 @@ AudioCmdLine(const char *Str,FOutputDevice *Out)
 		}
 
 		UfxTest(Sound->GetData(), TempName, 0);
-#if 0
-#if 1
-		char		TempName[256];	/* Name of object. */
-		char		CmdLine[256];	/* Command to execute. */
-		USound *	Sound;		/* Ptr to object. */
-		FILE *		hfile;		/* Handle to file. */
-
-		if (!GetSTRING(Str, "NAME=", TempName, 256))
-		{
-			debugf(LOG_Info, "AUDIO TEST:  No NAME= specified!\n");
-			return;
-		}
-
-		Sound = NULL;
-		if (!GetUSound(Str, "NAME=", Sound))
-		{
-			debugf(LOG_Info, "AUDIO TEST:  Specified sound not found in object list!\n");
-			return;
-		}
-
-		strcat(TempName, ".tmp");
-		hfile = fopen(TempName, "wb");
-		if (hfile != NULL)
-		{
-			fwrite(Sound->GetData(), Sound->DataSize, 1, hfile);
-			fclose(hfile);
-			strcpy(CmdLine, "UnAudTst.exe ");
-			strcat(CmdLine, TempName);
-			strcat(CmdLine, " /DELETE");
-			spawnlp(_P_NOWAIT, "UnAudTst.exe", "UnAudTst.exe",
-				TempName, "/DELETE", NULL);
-		}
 #else
 /* OLD STUFF -- Don't delete, used for reference. */
 		char		TempName[256];	/* Name of object. */
@@ -253,7 +222,7 @@ AudioCmdLine(const char *Str,FOutputDevice *Out)
 		}
 
 		Sound = NULL;
-		if (!GetUSound(Str, "NAME=", &Sound))
+		if (!GetUSound(Str, "NAME=", Sound))
 		{
 			debugf(LOG_Info, "AUDIO TEST:  Specified sound not found in object list!\n");
 			return;
@@ -274,7 +243,6 @@ AudioCmdLine(const char *Str,FOutputDevice *Out)
 			iTestPID = GAudio.PlaySfxPrimitive(Sound);
 			debugf(LOG_Info, "AUDIO TEST:  Name==\"%s\" PID==%d\n", TempName, iTestPID);
 		}
-#endif
 #endif
 	}
 	else if (GetCMD(&Str, "TESTOFF"))

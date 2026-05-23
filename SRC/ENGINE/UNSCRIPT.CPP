@@ -22,39 +22,189 @@ UNENGINE_API void (*GIntrinsics[EX_Max])( FExecStack &Stack, UObject *Context, B
 int GIntrinsicDuplicate=0;
 
 /*-----------------------------------------------------------------------------
+	Tim's physics modes.
+-----------------------------------------------------------------------------*/
+
+FLOAT Splerp( FLOAT F )
+{
+	FLOAT S = Square(F);
+	return (1.0/16.0)*S*S - (1.0/2.0)*S + 1;
+}
+
+//
+// Interpolating along a path.
+//
+void AActor::physPathing( float DeltaTime )
+{
+	guard(AActor::physPathing);
+
+	// Linear interpolate from Target to Target.Next.
+	while( PhysRate!=0.0 && bInterpolating && DeltaTime>0.0 )
+	{
+		// Find destination interpolation point, if any.
+		AInterpolationPoint* Dest = NULL;
+		if( Target && Target->IsA("InterpolationPoint") )
+			Dest = (AInterpolationPoint*)Target;
+
+		// Compute rate modifier.
+		FLOAT RateModifier = 1.0;
+		if( Dest && Dest->Next )
+			RateModifier = Dest->RateModifier * (1.0 - PhysAlpha) + Dest->Next->RateModifier * PhysAlpha;
+
+		// Update alpha.
+		FLOAT OldAlpha  = PhysAlpha;
+		FLOAT DestAlpha = PhysAlpha + PhysRate * RateModifier * DeltaTime;
+		PhysAlpha       = Clamp( DestAlpha, 0.f, 1.f );
+
+		// Move and rotate.
+		if( Dest && Dest->Next )
+		{
+			FCheckResult Hit;
+			FVector   NewLocation;
+			FRotation NewRotation;
+			if( Dest->Prev && Dest->Next->Next )
+			{
+				// Cubic spline interpolation.
+				FLOAT W0 = Splerp(PhysAlpha+1.0);
+				FLOAT W1 = Splerp(PhysAlpha+0.0);
+				FLOAT W2 = Splerp(PhysAlpha-1.0);
+				FLOAT W3 = Splerp(PhysAlpha-2.0);
+				FLOAT RW = 1.0 / (W0 + W1 + W2 + W3);
+				NewLocation = (W0*Dest->Prev->Location + W1*Dest->Location + W2*Dest->Next->Location + W3*Dest->Next->Next->Location)*RW;
+				NewRotation = (W0*Dest->Prev->Rotation + W1*Dest->Rotation + W2*Dest->Next->Rotation + W3*Dest->Next->Next->Rotation)*RW;
+			}
+			else
+			{
+				// Linear interpolation.
+				FLOAT W0 = 1.0 - PhysAlpha;
+				FLOAT W1 = PhysAlpha;
+				NewLocation = W0*Dest->Location + W1*Dest->Next->Location;
+				NewRotation = W0*Dest->Rotation + W1*Dest->Next->Rotation;
+			}
+			XLevel->MoveActor( this, NewLocation - Location, NewRotation, Hit );
+			if( IsA("Pawn") )
+				((APawn*)this)->ViewRotation = Rotation;
+		}
+
+		// If overflowing, notify and go to next place.
+		if( PhysRate>0.0 && DestAlpha>1.0 )
+		{
+			PhysAlpha = 0.0;
+			DeltaTime -= DeltaTime * (DestAlpha - 1.0) / (DestAlpha - OldAlpha);
+			if( Target )
+			{
+				Target->Process( NAME_InterpolateEnd, &PActor(this) );
+				Process( NAME_InterpolateEnd, &PActor(Target) );
+				if( Target->IsA("InterpolationPoint") )
+					Target = ((AInterpolationPoint*)Target)->Next;
+			}
+		}
+		else if( PhysRate<0.0 && DestAlpha<0.0 )
+		{
+			PhysAlpha = 1.0;
+			DeltaTime -= DeltaTime * (1.0 - DestAlpha) / (OldAlpha - DestAlpha);
+			if( Target )
+			{
+				Target->Process( NAME_InterpolateEnd, &PActor(this) );
+				Process( NAME_InterpolateEnd, &PActor(Target) );
+				if( Target->IsA("InterpolationPoint") )
+					Target = ((AInterpolationPoint*)Target)->Prev;
+			}
+			Process( NAME_InterpolateEnd, NULL );
+			Process( NAME_InterpolateEnd, NULL );
+		}
+		else DeltaTime=0.0;
+	};
+	unguard;
+}
+
+//
+// Moving brush.
+//
+void AActor::physMovingBrush( float DeltaTime )
+{
+	guard(physMovingBrush);
+	if( IsA("Mover") )
+	{
+		AMover* Mover  = (AMover*)this;
+		INT KeyNum     = Clamp( (INT)Mover->KeyNum, (INT)0, (INT)ARRAY_COUNT(Mover->KeyPos) );
+
+		if( Mover->bInterpolating )
+		{
+			// We are moving.
+			FLOAT NewAlpha    = Min( Mover->PhysAlpha + DeltaTime * Mover->PhysRate, 1.f );
+			FLOAT RenderAlpha = NewAlpha;
+			if( Mover->MoverGlideType == MV_GlideByTime )
+			{
+				// Make alpha time-smooth and time-continuous.
+				// f(0)=0, f(1)=1, f'(0)=f'(1)=0.
+				RenderAlpha = 3.0*NewAlpha*NewAlpha - 2.0*NewAlpha*NewAlpha*NewAlpha;
+			}
+			else RenderAlpha = NewAlpha;
+
+			// Move.
+			FCheckResult Hit(1.0);
+			if( XLevel->MoveActor
+			(
+				Mover,
+				Mover->OldPos + ((Mover->BasePos + Mover->KeyPos[KeyNum]) - Mover->OldPos) * RenderAlpha - Mover->Location,
+				Mover->OldRot + ((Mover->BaseRot + Mover->KeyRot[KeyNum]) - Mover->OldRot) * RenderAlpha,
+				Hit
+			) )
+			{
+				// Successfully moved.
+				Mover->PhysAlpha = NewAlpha;
+			}
+
+			// Finished moving?
+			if( Mover->PhysAlpha == 1.0 )
+			{
+				// Just finished moving.
+				Mover->bInterpolating = 0;
+				Mover->PhysAlpha      = 0;
+				Mover->PrevKeyNum     = Mover->KeyNum;
+				Mover->Process( NAME_InterpolateEnd, &PActor(NULL) );
+			}
+		}
+	}
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
 	Script warning.
 -----------------------------------------------------------------------------*/
 
-void ScriptWarn( FExecStack &Stack, char *Fmt, ... )
+void ScriptWarn( BOOL Critical, FExecStack &Stack, char *Fmt, ... )
 {
 	char TempStr[4096];
 	va_list  ArgPtr;
 
-	va_start (ArgPtr,Fmt);
-	vsprintf (TempStr,Fmt,ArgPtr);
-	va_end   (ArgPtr);
+	va_start( ArgPtr, Fmt );
+	vsprintf( TempStr, Fmt, ArgPtr );
+	va_end( ArgPtr );
 
 	guard(ScriptWarn);
-#if 0 /* Use this to cause a critical error for any script warnings */
-	appErrorf
+	if( Critical ) appErrorf
 	(
-		"%s %s (%s) Warning: %s",
+		"%s %s (%s:%s:%04X) Critical Error: %s",
 		Stack.Object->GetClassName(),
 		Stack.Object->GetName(),
-		Stack.Link.Node().Name(),
+		Stack.Script->GetName(),
+		Stack.Link->Name(),
+		Stack.Code - &Stack.Script->Element(0),
 		TempStr
 	);
-#else /* Use this to displace a log message for any script warnings */
-	debugf
+	else debugf
 	(
 		LOG_ScriptWarn,
-		"%s %s (%s) Warning: %s",
+		"%s %s (%s:%s:%04X) Warning: %s",
 		Stack.Object->GetClassName(),
 		Stack.Object->GetName(),
-		Stack.Link.Node().Name(),
+		Stack.Script->GetName(),
+		Stack.Link->Name(),
+		Stack.Code - &Stack.Script->Element(0),
 		TempStr
 	);
-#endif
 	unguard;
 }
 
@@ -63,7 +213,6 @@ void ScriptWarn( FExecStack &Stack, char *Fmt, ... )
 -----------------------------------------------------------------------------*/
 
 //warning: Byte order dependencies.
-
 static union
 {
 	struct			{BYTE B0,B1,B2,B3;};
@@ -110,11 +259,99 @@ inline FName scriptReadName( BYTE *&Code )
 	return *(FName*)&scriptTemp.W0;
 }
 
-inline FStackNodeLink scriptReadStackNodeLink( BYTE *&Code )
+inline FStackNodePtr scriptReadStackNodeLink( BYTE *&Code )
 {
-	FStackNodeLink Temp = *(FStackNodeLink*)Code;
-	Code += sizeof(FStackNodeLink);
+	FStackNodePtr Temp = *(FStackNodePtr*)Code;
+	Code += sizeof(FStackNodePtr);
 	return Temp;
+}
+
+/*-----------------------------------------------------------------------------
+	UStackTree.
+-----------------------------------------------------------------------------*/
+
+// Virtual function hash builder.
+static void BuildVfHashes( UClass* Class, FStackNodePtr Link, FStackNodePtr*& HashMemory )
+{
+	guard(BuildVfHashes);
+
+	// Allocate and and initialize the virtual function hash for this node.
+	Link->VfHash = HashMemory;
+	FStackNodePtr* PrevLink[FStackNode::HASH_COUNT];
+	for( int i=0; i<FStackNode::HASH_COUNT; i++ )
+	{
+		HashMemory [i] = FStackNodePtr(NULL,0);
+		PrevLink   [i] = &HashMemory[i];
+	}
+	HashMemory += FStackNode::HASH_COUNT;
+
+	// Add all functions at this node to the hash.
+	for( FStackNodePtr Function=Link->ChildFunctions; Function.Class; Function=Function->Next )
+	{
+		if( !(Function->StackNodeFlags & SNODE_FinalFunc) )
+		{
+			INDEX iHash        = Function->Name.GetIndex() & (FStackNode::HASH_COUNT-1);
+			*PrevLink[iHash]   = Function;
+			PrevLink[iHash]    = &Function->HashNext;
+			Function->HashNext = FStackNodePtr(NULL,0);
+		}
+	}
+
+	// Build hash for child states.
+	for( FStackNodePtr State=Link->ChildStates; State.Class==Class; State=State->Next )
+		BuildVfHashes( Class, State, HashMemory );
+
+	unguard;
+}
+
+// UObject implementation.
+void UStackTree::PostLoadData( DWORD PostFlags )
+{
+	guard(UStackTree::PostLoadData);
+	checkInput(Num>0);
+
+	// Count class and state stack nodes in this class.
+	int HashCount=1;
+	for( FStackNodePtr State=Element(0).ChildStates; State.Class==Class; State=State->Next )
+		HashCount++;
+
+	FStackNodePtr* HashMemory = (FStackNodePtr*)appMalloc( HashCount * FStackNode::HASH_COUNT * sizeof(FStackNodePtr), "vfcache" );
+
+	// Build virtual function hash for the class and for each state.
+	BuildVfHashes( Class, FStackNodePtr(Class,0), HashMemory );
+
+	unguardobj;
+}
+void UStackTree::UnloadData()
+{
+	guard(UStackTree::UnloadData);
+	if( GetData()!=NULL && Num>0 && Element(0).VfHash )
+	{
+		appFree( Element(0).VfHash );
+		Element(0).VfHash = NULL;
+	}
+
+	// Call parent.
+	UDatabase::UnloadData();
+
+	unguardobj;
+}
+
+/*-----------------------------------------------------------------------------
+	FExecStackMain.
+-----------------------------------------------------------------------------*/
+
+//
+// Initialize an object's main after a state change.
+//
+void FExecStackMain::InitForState()
+{
+	guard(FExecStackMain::InitForState);
+
+	// Compute probes.
+	ProbeMask = (Link->ProbeMask | Object->GetClass()->StackTree->Element(0).ProbeMask) & Link->IgnoreMask;
+
+	unguard;
 }
 
 /*-----------------------------------------------------------------------------
@@ -136,7 +373,7 @@ struct FOutParmRec
 // If found, sets DestLink and returns 1.
 // If not found, returns 0.
 //
-static int FindLabelLink( UScript *&DestScript, BYTE *&DestCode, FStackNodeLink *SourceLink, FName FindLabel )
+static int FindLabelLink( UScript *&DestScript, BYTE *&DestCode, FStackNodePtr SourceLink, FName FindLabel )
 {
 	guard(FindLabelLink);
 	//debugf("FindLabelLink '%s' in state '%s'",FindLabel(),SourceLink->Node().Name());
@@ -144,18 +381,18 @@ static int FindLabelLink( UScript *&DestScript, BYTE *&DestCode, FStackNodeLink 
 	if( FindLabel != NAME_None )
 	{
 		// Check this state and all its parent states for the label.
-		while( SourceLink->Class )
+		while( SourceLink.Class )
 		{
-			FStackNode &Node = SourceLink->Node();
+			FStackNode &Node = *SourceLink;
 			if( Node.CodeLabelOffset != MAXWORD )
 			{
-				FLabelEntry *Label = (FLabelEntry *)&SourceLink->Class->Script->Element(Node.CodeLabelOffset);
+				FLabelEntry *Label = (FLabelEntry *)&SourceLink.Class->Script->Element(Node.CodeLabelOffset);
 				while( Label->Name != NAME_None )
 				{
 					if( Label->Name == FindLabel )
 					{
 						// Found it.
-						DestScript = SourceLink->Class->Script;
+						DestScript = SourceLink.Class->Script;
 						DestCode   = &DestScript->Element(Label->iCode);
 						return 1;
 					}
@@ -164,7 +401,7 @@ static int FindLabelLink( UScript *&DestScript, BYTE *&DestCode, FStackNodeLink 
 			}
 
 			// Check parent state for this label.
-			SourceLink = &Node.Parent;
+			SourceLink = Node.ParentItem;
 		}
 	}
 
@@ -187,42 +424,47 @@ int AActor::GotoState( FName NewState )
 	debugState(GetClass()->StackTree!=NULL);
 	debugState(GetClass()->StackTree->Num>0);
 
-	FStackNodeLink Link(NULL,0);
+	FStackNodePtr NodePtr(NULL,0);
 	if( NewState != NAME_Auto )
 	{
 		// Find regular state.
-		for( Link = GetClass()->StackTree->Element(0).ChildStates; Link.Class; Link=Link.Node().Next )
-			if( Link.Node().Name == NewState )
+		for( NodePtr = GetClass()->StackTree->Element(0).ChildStates; NodePtr.Class; NodePtr=NodePtr->Next )
+			if( NodePtr->Name == NewState )
 				break;
 	}
 	else
 	{
 		// Find auto state.
-		for( Link = GetClass()->StackTree->Element(0).ChildStates; Link.Class; Link=Link.Node().Next )
-			if( Link.Node().StackNodeFlags & SNODE_AutoState )
+		for( NodePtr = GetClass()->StackTree->Element(0).ChildStates; NodePtr.Class; NodePtr=NodePtr->Next )
+			if( NodePtr->StackNodeFlags & SNODE_AutoState )
 				break;
 	}
 
-	if( !Link.Class )
+	if( !NodePtr.Class )
 	{
 		// Going nowhere.
 		NewState = NAME_None;
-		Link	 = FStackNodeLink( GetClass(), 0 );
+		NodePtr  = FStackNodePtr( GetClass(), 0 );
 	}
 
-	// Go there.
-	State			 = NewState;
-	MainStack.Link	 = Link;
-	MainStack.Script = Link.Class->Script;
-	MainStack.Code	 = NULL;
-	MainStack.InitVfCache();
+	// Send EndState notification.
+	if( State!=NAME_None && NewState!=State && IsProbing(NAME_EndState) )
+		Process( NAME_EndState, NULL );
 
-	// Compute probes.
-	MainStack.ProbeMask = 
-		(Link.Node().ProbeMask | GetClass()->StackTree->Element(0).ProbeMask) & Link.Node().IgnoreMask;
+	// Go there.
+	FName OldState   = State;
+	State			 = NewState;
+	MainStack.Link	 = NodePtr;
+	MainStack.Script = NodePtr.Class->Script;
+	MainStack.Code	 = NULL;
+	MainStack.InitForState();
 
 	// End any latent action in progress.
 	LatentAction = 0;
+
+	// Send BeginState notification.
+	if( State!=NAME_None && State!=OldState && IsProbing(NAME_BeginState) )
+		Process( NAME_BeginState, NULL );
 
 	return State!=NAME_None;
 	unguard;
@@ -241,10 +483,9 @@ int AActor::GotoLabel( FName Label )
 	debugState(GetClass()->StackTree!=NULL);
 	debugState(GetClass()->StackTree->Num>0);
 
-	return FindLabelLink( MainStack.Script, MainStack.Code, &MainStack.Link, Label );
+	return FindLabelLink( MainStack.Script, MainStack.Code, MainStack.Link, Label );
 	unguard;
 }
-
 
 //
 // Begin execution, by setting the state.
@@ -252,10 +493,6 @@ int AActor::GotoLabel( FName Label )
 void AActor::BeginExecution()
 {
 	guard(UObject::BeginExecution);
-
-	// Init major info.
-	MainStack.InitVfCache();
-	MainStack.Locals = NULL;
 
 	checkState(GetClass()!=NULL);
 	checkState(GetClass()->Script!=NULL);
@@ -267,10 +504,12 @@ void AActor::BeginExecution()
 	checkState(XLevel->Element(0)!=NULL);
 	checkState(XLevel->Element(0)==Level);
 
+	// Init major info.
+	MainStack.Locals   = NULL;
+
 	// Init the state to None and then set the desired state, if any.
 	FName InitialState = State!=NAME_None ? State : NAME_Auto;
 	State              = NAME_None;
-
 
 	// Set the state.
 	GotoState( InitialState );
@@ -279,6 +518,7 @@ void AActor::BeginExecution()
 
 	unguardf(("(%s %s)",GetClassName(),GetName()));
 }
+
 /*-----------------------------------------------------------------------------
 	Intrinsics.
 -----------------------------------------------------------------------------*/
@@ -294,7 +534,10 @@ void UNENGINE_API execUndefined( FExecStack &Stack, UObject *Context, BYTE *&Res
 {
 	// Execute an undefined opcode.
 	guardSlow(execUndefined);
-	appErrorf("%s (%s): Unknown code token %02x", Stack.Script->GetName(), Stack.Link.Node().Name(), Stack.Code[-1] );
+
+	// This should never occur.
+	ScriptWarn( 1, Stack, "Unknown code token %02x", Stack.Code[-1] );
+
 	unguardexecSlow;
 }
 
@@ -349,7 +592,7 @@ static void execArrayElement( FExecStack &Stack, UObject *Context, BYTE *&Result
 
 	// Get array offset.
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 
 	// Add scaled offset to base pointer.
 	Result += *(INT*)Addr * *Stack.Code++;
@@ -357,14 +600,9 @@ static void execArrayElement( FExecStack &Stack, UObject *Context, BYTE *&Result
 	// Bounds check.
 	if( *(INT*)Addr>=*Stack.Code++ || *(INT*)Addr<0 )
 	{
-		appErrorf
-		(
-			"Array bounds error in %s (%s): %i/%i",
-			Stack.Script->GetName(),
-			Stack.Link.Node().Name(),
-			*(INT*)Addr,Stack.Code[-1]
-		);
-		//!! try to recover somehow?
+		// Display out-of-bounds warning and continue on with index clamped to valid range.
+		ScriptWarn( 0, Stack, "Accessed array out of bounds (%i/%i)", *(INT*)Addr, Stack.Code[-1] );
+		*(INT*)Addr = Clamp( *(INT*)Addr, 0, Stack.Code[-1] - 1 );
 	}
 	unguardexecSlow;
 }
@@ -392,6 +630,7 @@ AUTOREGISTER_INTRINSIC( EX_BoolVariable, execBoolVariable );
 
 static void execNothing( FExecStack &Stack, UObject *Context, BYTE *&Result  )
 {
+	// EX_Nothing: For skipping over optional function parms without values specified.
 }
 AUTOREGISTER_INTRINSIC( EX_Nothing, execNothing );
 
@@ -518,15 +757,7 @@ static void execAssert( FExecStack &Stack, UObject *Context, BYTE *&Result )
 
 	// Check it.
 	if( !*(DWORD*)Val )
-	{
-		appErrorf
-		(
-			"%s (%s): Assertion failed, line %i",
-			Stack.Script->GetName(),
-			Stack.Link.Node().Name(), 
-			wLine
-		);
-	}
+		ScriptWarn( 1, Stack, "Assertion failed, line %i", wLine );
 
 	unguardexecSlow;
 }
@@ -542,7 +773,7 @@ static void execGotoLabel( FExecStack &Stack, UObject *Context, BYTE *&Result )
 
 	P_GET_NAME(N);
 	if( !ActorContext->GotoLabel( N ) )
-		ScriptWarn( Stack, "GotoLabel (%s): Label not found", N );
+		ScriptWarn( 0, Stack, "GotoLabel (%s): Label not found", N );
 
 	unguardexecSlow;
 }
@@ -556,9 +787,9 @@ static void execBroadcast( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	debugState(Context->IsA("Actor"));
 	AActor *ActorContext = (AActor*)Context;
 
-	// Get optional name of broadcast destination.
-	FName NameBuffer, *Name=&NameBuffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, *(BYTE**)&Name );
+	// Get optional tag of broadcast destination.
+	FName TagBuffer, *Tag=&TagBuffer;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, *(BYTE**)&Tag );
 
 	// Get broadcast class mask.
 	UClass *ClassBuffer, **Class=&ClassBuffer;
@@ -568,14 +799,13 @@ static void execBroadcast( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	INT wOffset = scriptReadWord( Stack.Code );
 
 	// Broadcast to all matching actors.
-	//debugf("BC:%s TO:%s",(*Name)(),*Class ? (*Class)->GetName() : "NULL" );
 	ULevel *Level = ActorContext->GetLevel();
 	for( int iActor=0; iActor<Level->Num; iActor++ )
 	{
 		AActor *Actor = Level->Element(iActor);
 		if
 		(	(Actor)
-		&&	( *Name==NAME_None || *Name == Actor->GetFName() )
+		&&	( *Tag==NAME_None || *Tag == Actor->Tag )
         &&  ( Actor->IsA(*Class) ) )
         {
 			// Call the function through a temporary execution stack. This assumes and 
@@ -764,7 +994,7 @@ static void execContext( FExecStack &Stack, UObject *Context, BYTE *&Result )
 		Stack.Code += wSkip;
 
 		// Display debugging message.
-		ScriptWarn( Stack, "Accessed None" );
+		ScriptWarn( 0, Stack, "Accessed None" );
 	}
 	unguardexecSlow;
 }
@@ -777,114 +1007,96 @@ AUTOREGISTER_INTRINSIC( EX_Context, execContext );
 static void execVirtualFunction( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execVirtualFunction);
-	debugState(FExecStackMain::NUM_CACHE_ENTRIES==4);
 	debugInput(Context!=NULL);
 
-	FStackNodeLink *Link;
-	FStackNode     *Node;
-	INT            IsState = Context->IsA("Actor") && ((AActor*)Context)->State!=NAME_None;
+	INT IsState = Context->IsA("Actor") && ((AActor*)Context)->State!=NAME_None;
 
 	// Get virtual function name.
 	FName Message = scriptReadName(Stack.Code);
 
-	// Get virtual function cache info.
-	FExecStackMain::FVfCacheEntry *Cache = Context->MainStack.VfCache, *CacheStart=Cache;
-
-	// Make all virtual function cache entries staler.
-	CacheStart[0].Staleness++;
-	CacheStart[1].Staleness++;
-	CacheStart[2].Staleness++;
-	CacheStart[3].Staleness++;
-
-	// See if the virtual function is cached.
-	for( int i=0; i<FExecStackMain::NUM_CACHE_ENTRIES && Cache->Name!=Message; i++,Cache++ );
-	if( i < FExecStackMain::NUM_CACHE_ENTRIES )
-	{
-		// The virtual function is cached.
-		//debugf("Cached: %s",Message());
-		Cache->Staleness = 0;
-		Link = &Cache->Link;
-		Node = &Link->Node();
-		goto Found;
-	}
-
 	// Find the virtual function in state scope or global scope.
 	// Traverse the current stack node to find the specified function.
-	Link = &Context->MainStack.Link.Node().ChildFunctions;
+	FStackNodePtr ParentLink = Context->MainStack.Link;
 	Recheck:
-	while( Link->Class != NULL )
-	{
-		Node = &Link->Node();
+
+	// Find function from virtual function hash.
+	for( FStackNodePtr Node = ParentLink->VfHash[Message.GetIndex() & (FStackNode::HASH_COUNT-1)]; Node.Class; Node=Node->HashNext )
 		if( Node->Name == Message )
+			break;
+
+	// Find function by linearly searching the list.	
+	if( Node.Class )
+	{
+		// Found it.
+		if( Node->iIntrinsic )
 		{
-			// Update the cache.
-			//debugf("Uncached: %s",Message());
-			{
-				int i1 = 0 + (CacheStart[0 ].Staleness < CacheStart[1 ].Staleness);
-				int i2 = 2 + (CacheStart[2 ].Staleness < CacheStart[3 ].Staleness);
-				int i  =     (CacheStart[i1].Staleness < CacheStart[i2].Staleness) ? i2 : i1;
-				CacheStart[i].Name      = Message;
-				CacheStart[i].Link      = *Link;
-				CacheStart[i].Staleness = 0;
-			}
-			
-			// Found it.
-			Found:
-			if( Node->iIntrinsic )
-			{
-				// Virtual intrinsic function.
-				(*GIntrinsics[ Node->iIntrinsic ])(Stack, Context, Result);
-			}
-			else
-			{
-				// Virtual scripted function.
-				FMemMark Mark(GMem);
-				debugState(Node->iCode!=MAXWORD);
-				FExecStack NewStack( Context, *Link, new(GMem,MEM_Zeroed,Node->LocalsSize)BYTE );
-
-				// Form the parms.
-				BYTE *Dest = NewStack.Locals;
-				FOutParmRec Outs[MAX_FUNC_PARMS], *Out = Outs;
-				while( (Out->Size = *NewStack.Code++) != 0 )
-				{
-					debugState(*NewStack.Code==0 || *NewStack.Code==1);
-					Out->Src = Out->Dest = Dest;
-					(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Out->Dest );
-					if( Out->Dest != Dest )
-						memcpy( Dest, Out->Dest, Out->Size );
-					Dest += Out->Size;
-					Out  += *NewStack.Code++;
-				}
-				debugState(*Stack.Code==EX_EndFunctionParms);
-				Stack.Code++;
-
-				// Execute the code.
-				BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr, B;
-				while( (B = *NewStack.Code++) != EX_Return )
-					(*GIntrinsics[B])( NewStack, NewStack.Object, Addr=Buffer );
-
-				// Copy back outparms.
-				while( --Out >= Outs )
-					memcpy( Out->Dest, Out->Src, Out->Size );
-
-				// Snag return offset and finish.
-				Result = &NewStack.Locals[Node->CodeLabelOffset];
-
-				// Release temp memory.
-				Mark.Pop();
-			}
-			return;
+			// Virtual intrinsic function.
+			(*GIntrinsics[ Node->iIntrinsic ])( Stack, Context, Result);
 		}
-		Link = &Node->Next;
+		else
+		{
+			// Virtual scripted function.
+			FMemMark Mark(GMem);
+			debugState(Node->iCode!=MAXWORD);
+			FExecStack NewStack( Context, Node, new(GMem,MEM_Zeroed,Node->LocalsSize)BYTE );
+
+			// Form the parms.
+			BYTE *Dest = NewStack.Locals;
+			FOutParmRec Outs[MAX_FUNC_PARMS], *Out = Outs;
+			while( (Out->Size = *NewStack.Code++) != 0 )
+			{
+				debugState(*NewStack.Code==0 || *NewStack.Code==1);
+				Out->Src = Out->Dest = Dest;
+				(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Out->Dest );
+				if( Out->Dest != Dest )
+					memcpy( Dest, Out->Dest, Out->Size );
+				Dest += Out->Size;
+				Out  += *NewStack.Code++;
+			}
+			debugState(*Stack.Code==EX_EndFunctionParms);
+			Stack.Code++;
+
+			// Execute the code.
+			if( Context->IsProbing( Node->Name ) )
+			{
+				if( !(Node->StackNodeFlags & SNODE_SingularFunc) )
+				{
+					BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr, B;
+					while( (B = *NewStack.Code++) != EX_Return )
+						(*GIntrinsics[B])( NewStack, NewStack.Object, Addr=Buffer );
+				}
+				else if( !(Context->GetFlags() & RF_InSingularFunc) )
+				{
+					Context->SetFlags(RF_InSingularFunc);
+					BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr, B;
+					while( (B = *NewStack.Code++) != EX_Return )
+						(*GIntrinsics[B])( NewStack, NewStack.Object, Addr=Buffer );
+					Context->ClearFlags(RF_InSingularFunc);
+				}
+			}
+
+			// Copy back outparms.
+			while( --Out >= Outs )
+				memcpy( Out->Dest, Out->Src, Out->Size );
+
+			// Snag return offset and finish.
+			Result = &NewStack.Locals[Node->CodeLabelOffset];
+
+			// Release temp memory.
+			Mark.Pop();
+		}
+		return;
 	}
 	if( IsState )
 	{
 		// Failed to find a state version of the function, so check for a global version.
-		IsState  = 0;
-		Link     = &Context->GetClass()->StackTree->Element(0).ChildFunctions;
+		IsState    = 0;
+		ParentLink = FStackNodePtr( Context->GetClass(), 0 );
 		goto Recheck;
 	}
-	appErrorf( "Function '%s' not found in %s (%s)", Message(), Stack.Object->GetClassName(), Stack.Link.Node().Name() );
+
+	// This should never occur.
+	ScriptWarn( 1, Stack, "Virtual function '%s' not found", Message() );
 	unguardexecSlow;
 }
 AUTOREGISTER_INTRINSIC( EX_VirtualFunction, execVirtualFunction );
@@ -895,8 +1107,8 @@ static void execFinalFunction( FExecStack &Stack, UObject *Context, BYTE *&Resul
 
 	// Make new stack frame in the current actor context.
 	FMemMark Mark(GMem);
-	FStackNodeLink NewLink = scriptReadStackNodeLink(Stack.Code);
-	FStackNode     &Node   = NewLink.Node();
+	FStackNodePtr NewLink = scriptReadStackNodeLink(Stack.Code);
+	FStackNode&   Node    = *NewLink;
 	FExecStack NewStack( Context, NewLink, new(GMem,MEM_Zeroed,Node.LocalsSize)BYTE );
 	debugState(Node.iCode!=MAXWORD);
 
@@ -917,10 +1129,23 @@ static void execFinalFunction( FExecStack &Stack, UObject *Context, BYTE *&Resul
 	Stack.Code++;
 
 	// Execute the code.
-	
-	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr, B;
-	while( (B = *NewStack.Code++) != EX_Return )
-		(*GIntrinsics[B])( NewStack, NewStack.Object, Addr=Buffer );
+	if( Context->IsProbing( Node.Name ) )
+	{
+		if( !(Node.StackNodeFlags & SNODE_SingularFunc) )
+		{
+			BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr, B;
+			while( (B = *NewStack.Code++) != EX_Return )
+				(*GIntrinsics[B])( NewStack, NewStack.Object, Addr=Buffer );
+		}
+		else if( !(Context->GetFlags() & RF_InSingularFunc) )
+		{
+			Context->SetFlags(RF_InSingularFunc);
+			BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr, B;
+			while( (B = *NewStack.Code++) != EX_Return )
+				(*GIntrinsics[B])( NewStack, NewStack.Object, Addr=Buffer );
+			Context->ClearFlags(RF_InSingularFunc);
+		}
+	}
 
 	// Copy back outparms.
 	while( --Out >= Outs )
@@ -955,7 +1180,7 @@ AUTOREGISTER_INTRINSIC( EX_FloatConst, execFloatConst );
 
 static void execStringConst( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
-	// If everything goes properly, the caller won't overwrite the code.
+	// Safe because the caller won't overwrite Result (==Stack.Code).
 	guardSlow(execStringConst);
 	Result      = Stack.Code;
 	Stack.Code += strlen((char*)Stack.Code)+1;
@@ -982,9 +1207,9 @@ AUTOREGISTER_INTRINSIC( EX_NameConst, execNameConst );
 static void execRotationConst( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execRotationConst);
-	((FRotation*)Result)->Pitch = scriptReadWord( Stack.Code );
-	((FRotation*)Result)->Yaw   = scriptReadWord( Stack.Code );
-	((FRotation*)Result)->Roll  = scriptReadWord( Stack.Code );
+	((FRotation*)Result)->Pitch = scriptReadInt( Stack.Code );
+	((FRotation*)Result)->Yaw   = scriptReadInt( Stack.Code );
+	((FRotation*)Result)->Roll  = scriptReadInt( Stack.Code );
 	unguardexecSlow;
 }
 AUTOREGISTER_INTRINSIC( EX_RotationConst, execRotationConst );
@@ -1068,7 +1293,7 @@ static void execResizeString( FExecStack &Stack, UObject *Context, BYTE *&Result
 
 	// Get copy of string expression to convert.
 	BYTE *Addr = Result;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	if( Addr != Result )
 		strncpy( (char*)Result, (char*)Addr, NewLength );
 	Result[NewLength-1] = 0;
@@ -1086,7 +1311,7 @@ static void execActorCast( FExecStack &Stack, UObject *Context, BYTE *&Result )
 
 	// Compile actor expression.
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 
 	AActor *Castee = *(AActor**)Addr;
 	if( Castee && Castee->IsA(Class) )
@@ -1107,7 +1332,7 @@ static void execByteToInt( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execByteToInt);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(INT*)Result = *(BYTE*)Addr;
 	unguardexecSlow;
 }
@@ -1117,7 +1342,7 @@ static void execByteToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execByteToBool);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(DWORD*)Result = *(BYTE*)Addr ? 1 : 0;
 	unguardexecSlow;
 }
@@ -1127,7 +1352,7 @@ static void execByteToFloat( FExecStack &Stack, UObject *Context, BYTE *&Result 
 {
 	guardSlow(execByteToFloat);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(FLOAT*)Result = *(BYTE*)Addr;
 	unguardexecSlow;
 }
@@ -1135,10 +1360,9 @@ AUTOREGISTER_INTRINSIC( EX_ByteToFloat, execByteToFloat );
 
 static void execByteToString( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
-	// Bytes can't overflow maximum size.
 	guardSlow(execByteToString);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	itoa(*(BYTE*)Addr,(char*)Result,10);
 	unguardexecSlow;
 }
@@ -1149,8 +1373,8 @@ static void execIntToByte( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	guardSlow(execIntToByte);
 	BYTE Buffer[MAX_CONST_SIZE];
 	Result = Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Result );
-	// Result is automatically truncated.
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Result );
+	*(BYTE*)Result = *(INT*)Result;
 	unguardexecSlow;
 }
 AUTOREGISTER_INTRINSIC( EX_IntToByte, execIntToByte );
@@ -1159,7 +1383,7 @@ static void execIntToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execIntToBool);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(INT*)Result = *(INT*)Addr ? 1 : 0;
 	unguardexecSlow;
 }
@@ -1169,7 +1393,7 @@ static void execIntToFloat( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execIntToFloat);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(FLOAT*)Result = *(INT*)Addr;
 	unguardexecSlow;
 }
@@ -1177,10 +1401,10 @@ AUTOREGISTER_INTRINSIC( EX_IntToFloat, execIntToFloat );
 
 static void execIntToString( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
-	// Integers can't overflow maximum size.
+	// Safe because integers can't overflow maximum size of 16 characters.
 	guardSlow(execIntToString);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	itoa(*(INT*)Addr,(char*)Result,10);
 	unguardexecSlow;
 }
@@ -1190,7 +1414,7 @@ static void execBoolToByte( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execBoolToByte);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(BYTE*)Result = *(DWORD*)Addr & 1;
 	unguardexecSlow;
 }
@@ -1200,7 +1424,7 @@ static void execBoolToInt( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execBoolToInt);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(INT*)Result = *(DWORD*)Addr & 1;
 	unguardexecSlow;
 }
@@ -1210,7 +1434,7 @@ static void execBoolToFloat( FExecStack &Stack, UObject *Context, BYTE *&Result 
 {
 	guardSlow(execBoolToFloat);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(FLOAT*)Result = *(DWORD*)Addr & 1;
 	unguardexecSlow;
 }
@@ -1220,7 +1444,7 @@ static void execBoolToString( FExecStack &Stack, UObject *Context, BYTE *&Result
 {
 	guardSlow(execBoolToString);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	strcpy( (char*)Result, (*(DWORD*)Addr&1) ? "True" : "False" );
 	unguardexecSlow;
 }
@@ -1230,7 +1454,7 @@ static void execFloatToByte( FExecStack &Stack, UObject *Context, BYTE *&Result 
 {
 	guardSlow(execFloatToByte);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(BYTE*)Result = *(FLOAT*)Addr;
 	unguardexecSlow;
 }
@@ -1240,7 +1464,7 @@ static void execFloatToInt( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execFloatToInt);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(INT*)Result = *(FLOAT*)Addr;
 	unguardexecSlow;
 }
@@ -1250,7 +1474,7 @@ static void execFloatToBool( FExecStack &Stack, UObject *Context, BYTE *&Result 
 {
 	guardSlow(execFloatToBool);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(DWORD*)Result = *(FLOAT*)Addr!=0.0 ? 1 : 0;
 	unguardexecSlow;
 }
@@ -1260,7 +1484,7 @@ static void execFloatToString( FExecStack &Stack, UObject *Context, BYTE *&Resul
 {
 	guardSlow(execFloatToString);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	sprintf((char*)Result,"%f",*(FLOAT*)Addr);
 	unguardexecSlow;
 }
@@ -1270,7 +1494,7 @@ static void execObjectToBool( FExecStack &Stack, UObject *Context, BYTE *&Result
 {
 	guardSlow(execObjectToBool);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(DWORD*)Result = *(UObject**)Addr!=NULL;
 	unguardexecSlow;
 }
@@ -1280,7 +1504,7 @@ static void execObjectToInt( FExecStack &Stack, UObject *Context, BYTE *&Result 
 {
 	guardSlow(execObjectToInt);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	UObject *Test = *(UObject**)Addr;
 	*(DWORD*)Result = Test ? Test->GetIndex() : -1;
 	unguardexecSlow;
@@ -1291,7 +1515,7 @@ static void execObjectToString( FExecStack &Stack, UObject *Context, BYTE *&Resu
 {
 	guardSlow(execObjectToString);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	strcpy((char*)Result, *(UObject**)Addr ? (*(UObject**)Addr)->GetName() : "None");
 	unguardexecSlow;
 }
@@ -1301,7 +1525,7 @@ static void execNameToBool( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execNameToBool);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(DWORD*)Result = *(FName*)Addr!=NAME_None ? 1 : 0;
 	unguardexecSlow;
 }
@@ -1311,7 +1535,7 @@ static void execNameToString( FExecStack &Stack, UObject *Context, BYTE *&Result
 {
 	guardSlow(execNameToString);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	strcpy((char*)Result,(*(FName*)Addr)());
 	unguardexecSlow;
 }
@@ -1321,7 +1545,7 @@ static void execStringToByte( FExecStack &Stack, UObject *Context, BYTE *&Result
 {
 	guardSlow(execStringToByte);
 	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(BYTE*)Result = atoi((char*)Addr);
 	unguardexecSlow;
 }
@@ -1331,7 +1555,7 @@ static void execStringToInt( FExecStack &Stack, UObject *Context, BYTE *&Result 
 {
 	guardSlow(execStringToInt);
 	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(INT*)Result = atoi((char*)Addr);
 	unguardexecSlow;
 }
@@ -1341,7 +1565,7 @@ static void execStringToBool( FExecStack &Stack, UObject *Context, BYTE *&Result
 {
 	guardSlow(execStringToBool);
 	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	if     ( stricmp((char*)Addr,"True" ) == 0 ) *(INT*)Result = 1;
 	else if( stricmp((char*)Addr,"False") == 0 ) *(INT*)Result = 0;
 	else                                         *(INT*)Result = atoi((char*)Addr) ? 1 : 0;
@@ -1353,7 +1577,7 @@ static void execStringToFloat( FExecStack &Stack, UObject *Context, BYTE *&Resul
 {
 	guardSlow(execStringToFloat);
 	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(FLOAT*)Result = atof((char*)Addr);
 	unguardexecSlow;
 }
@@ -1363,8 +1587,8 @@ static void execStringToVector( FExecStack &Stack, UObject *Context, BYTE *&Resu
 {
 	guardSlow(execStringToVector);
 	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
-	*(FVector*)Result = GMath.ZeroVector;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
+	*(FVector*)Result = FVector(0,0,0);
 	GetFVECTOR((char*)Addr,(FVector*)Result);
 	unguardexecSlow;
 }
@@ -1374,8 +1598,8 @@ static void execStringToRotation( FExecStack &Stack, UObject *Context, BYTE *&Re
 {
 	guardSlow(execStringToRotation);
 	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
-	*(FRotation*)Result = GMath.ZeroRotation;
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
+	*(FRotation*)Result = FRotation(0,0,0);
 	GetFROTATION((char*)Addr,(FRotation*)Result,1.0);
 	unguardexecSlow;
 }
@@ -1385,7 +1609,7 @@ static void execVectorToBool( FExecStack &Stack, UObject *Context, BYTE *&Result
 {
 	guardSlow(execVectorToBool);
 	BYTE Buffer[MAX_STRING_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(DWORD*)Result = ((FVector*)Addr)->IsZero() ? 0 : 1;
 	unguardexecSlow;
 }
@@ -1395,7 +1619,7 @@ static void execVectorToString( FExecStack &Stack, UObject *Context, BYTE *&Resu
 {
 	guardSlow(execVectorToString);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	sprintf((char*)Result,"%f,%f,%f",((FVector*)Addr)->X,((FVector*)Addr)->Y,((FVector*)Addr)->Z);
 	unguardexecSlow;
 }
@@ -1405,7 +1629,7 @@ static void execVectorToRotation( FExecStack &Stack, UObject *Context, BYTE *&Re
 {
 	guardSlow(execVectorToRotation);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(FRotation*)Result = ((FVector*)Addr)->Rotation();
 	unguardexecSlow;
 }
@@ -1415,7 +1639,7 @@ static void execRotationToBool( FExecStack &Stack, UObject *Context, BYTE *&Resu
 {
 	guardSlow(execRotationToBool);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(DWORD*)Result = ((FRotation*)Addr)->IsZero() ? 0 : 1;
 	unguardexecSlow;
 }
@@ -1425,7 +1649,7 @@ static void execRotationToVector( FExecStack &Stack, UObject *Context, BYTE *&Re
 {
 	guardSlow(execRotationToVector);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	*(FVector*)Result = ((FRotation*)Addr)->Vector();
 	unguardexecSlow;
 }
@@ -1435,7 +1659,7 @@ static void execRotationToString( FExecStack &Stack, UObject *Context, BYTE *&Re
 {
 	guardSlow(execRotationToString);
 	BYTE Buffer[MAX_CONST_SIZE], *Addr=Buffer;
-	(*GIntrinsics[*Stack.Code++])( Stack, Context, Addr );
+	(*GIntrinsics[*Stack.Code++])( Stack, Stack.Object, Addr );
 	sprintf((char*)Result,"%i,%i,%i",((FRotation*)Addr)->Pitch&65535,((FRotation*)Addr)->Yaw&65535,((FRotation*)Addr)->Roll&65535);
 	unguardexecSlow;
 }
@@ -2250,7 +2474,7 @@ static void execFloatLogicAE( FExecStack &Stack, UObject *Context, BYTE *&Result
 	P_GET_FLOAT(B);
 	P_FINISH;
 
-	*(DWORD*)Result = Abs(A - B)<KINDA_SMALL_NUMBER;
+	*(DWORD*)Result = Abs(A - B) < KINDA_SMALL_NUMBER;
 
 	unguardexecSlow;
 }	
@@ -2377,6 +2601,7 @@ static void execFloatFuncAtan( FExecStack &Stack, UObject *Context, BYTE *&Resul
 }	
 AUTOREGISTER_INTRINSIC( 0x80 + 62, execFloatFuncAtan );
 
+#pragma DISABLE_OPTIMIZATION /*!! Work around Microsoft VC++ 5.0 code generator bug */
 static void execFloatFuncExp( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execFloatFuncExp);
@@ -2386,9 +2611,13 @@ static void execFloatFuncExp( FExecStack &Stack, UObject *Context, BYTE *&Result
 
 	*(FLOAT*)Result = exp(A);
 
+	// This illustrates the Microsoft Visual C++ 5.0 code generator bug.
+	//debugf( " exp %f %f=%f", A, *(FLOAT*)Result, exp(A) );
+
 	unguardexecSlow;
 }	
-AUTOREGISTER_INTRINSIC( 0x80 + 63, execFloatFuncExp );
+AUTOREGISTER_INTRINSIC( 191, execFloatFuncExp );
+#pragma ENABLE_OPTIMIZATION /*!! Work around Microsoft VC++ 5.0 code generator bug */
 
 static void execFloatFuncLog( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
@@ -2401,7 +2630,7 @@ static void execFloatFuncLog( FExecStack &Stack, UObject *Context, BYTE *&Result
 
 	unguardexecSlow;
 }	
-AUTOREGISTER_INTRINSIC( 0x80 + 64, execFloatFuncLog );
+AUTOREGISTER_INTRINSIC( 192, execFloatFuncLog );
 
 static void execFloatFuncSqrt( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
@@ -2414,7 +2643,7 @@ static void execFloatFuncSqrt( FExecStack &Stack, UObject *Context, BYTE *&Resul
 
 	unguardexecSlow;
 }	
-AUTOREGISTER_INTRINSIC( 0x80 + 65, execFloatFuncSqrt );
+AUTOREGISTER_INTRINSIC( 193, execFloatFuncSqrt );
 
 static void execFloatFuncSquare( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
@@ -2427,7 +2656,7 @@ static void execFloatFuncSquare( FExecStack &Stack, UObject *Context, BYTE *&Res
 
 	unguardexecSlow;
 }	
-AUTOREGISTER_INTRINSIC( 0x80 + 66, execFloatFuncSquare );
+AUTOREGISTER_INTRINSIC( 194, execFloatFuncSquare );
 
 static void execFloatFuncFRand( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
@@ -3055,6 +3284,21 @@ static void execVectorFuncDist( FExecStack &Stack, UObject *Context, BYTE *&Resu
 }
 AUTOREGISTER_INTRINSIC( 0x80 + 125, execVectorFuncDist );
 
+static void execVectorFuncMirrorVectorByNormal( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execMirrorVectorByNormal);
+
+	P_GET_VECTOR(A);
+	P_GET_VECTOR(B);
+	P_FINISH;
+
+	B = B.Normal();
+	*(FVector*)Result = A - 2.f * B * (B | A);
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 300, execVectorFuncMirrorVectorByNormal );
+
 //////////////////////////////////////
 // Rotation operators and functions //
 //////////////////////////////////////
@@ -3247,12 +3491,12 @@ AUTOREGISTER_INTRINSIC( 0x80 + 103, execLog );
 
 static void execWarn( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
-	guardSlow(execLog);
+	guardSlow(execWarn);
 
 	P_GET_STRING(S);
 	P_FINISH;
 
-	ScriptWarn( Stack, "%s", S );
+	ScriptWarn( 0, Stack, "%s", S );
 
 	unguardexecSlow;
 }
@@ -3260,7 +3504,7 @@ AUTOREGISTER_INTRINSIC( 0x80 + 104, execWarn );
 
 static void execError( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
-	guardSlow(execLog);
+	guardSlow(execError);
 	debugState(Context!=NULL);
 	debugState(Context->IsA("Actor"));
 	AActor *ActorContext = (AActor*)Context;
@@ -3268,7 +3512,7 @@ static void execError( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_GET_STRING(S);
 	P_FINISH;
 
-	ScriptWarn( Stack, S );
+	ScriptWarn( 0, Stack, S );
 	ActorContext->XLevel->DestroyActor( ActorContext );
 
 	unguardexecSlow;
@@ -3342,8 +3586,9 @@ HIGH_INTRINSIC(15);
 
 enum EPollSlowFuncs
 {
-	EPOLL_Sleep			= 384,
-	EPOLL_FinishAnim	= 385,
+	EPOLL_Sleep			      = 384,
+	EPOLL_FinishAnim	      = 385,
+	EPOLL_FinishInterpolation = 302,
 };
 
 static void execSleep( FExecStack &Stack, UObject *Context, BYTE *&Result )
@@ -3372,17 +3617,35 @@ static void execFinishAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
 
 	P_FINISH;
 
+	// If we are looping, finish at the next sequence end.
 	if( ActorContext->bAnimLoop )
 	{
-		// We are looping, so finish at the next sequence end.
 		ActorContext->bAnimLoop     = 0;
 		ActorContext->bAnimFinished = 0;
 	}
-	ActorContext->LatentAction = EPOLL_FinishAnim;
+
+	// If animation is playing, wait for it to finish.
+	if( ActorContext->AnimRate != 0.0 )
+		ActorContext->LatentAction = EPOLL_FinishAnim;
 
 	unguardexecSlow;
 }
 AUTOREGISTER_INTRINSIC( 261, execFinishAnim );
+
+static void execFinishInterpolation( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFinishInterpolation);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor *ActorContext = (AActor*)Context;
+
+	P_FINISH;
+
+	ActorContext->LatentAction = EPOLL_FinishInterpolation;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 301, execFinishInterpolation );
 
 ///////////////////////////
 // Slow function pollers //
@@ -3417,6 +3680,19 @@ static void execPollFinishAnim( FExecStack &Stack, UObject *Context, BYTE *&Resu
 }
 AUTOREGISTER_INTRINSIC( EPOLL_FinishAnim, execPollFinishAnim );
 
+static void execPollFinishInterpolation( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execPollFinishInterpolation);
+	debugState(Stack.Object->IsA("Actor"));
+	AActor *StackActor = (AActor*)Stack.Object;
+
+	if( !StackActor->bInterpolating )
+		StackActor->LatentAction = 0;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( EPOLL_FinishInterpolation, execPollFinishInterpolation );
+
 /////////////////////////
 // Animation functions //
 /////////////////////////
@@ -3436,7 +3712,7 @@ static void execPlayAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	// Set one-shot animation.
 	if( ActorContext->Mesh )
 	{
-		FMeshAnimSeq *Seq = ActorContext->Mesh->GetAnimSeq( SequenceName );
+		const FMeshAnimSeq *Seq = ActorContext->Mesh->GetAnimSeq( SequenceName );
 		if( Seq )
 		{
 			ActorContext->AnimSequence  = SequenceName;
@@ -3447,8 +3723,8 @@ static void execPlayAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
 			ActorContext->bAnimFinished = 0;
 			ActorContext->bAnimLoop     = 0;
 		}
-		else ScriptWarn( Stack, "PlayAnim: Sequence '%s' not found in Mesh '%s'", SequenceName(), ActorContext->Mesh->GetName() );
-	} else ScriptWarn( Stack, "PlayAnim: No mesh" );
+		else ScriptWarn( 0, Stack, "PlayAnim: Sequence '%s' not found in Mesh '%s'", SequenceName(), ActorContext->Mesh->GetName() );
+	} else ScriptWarn( 0, Stack, "PlayAnim: No mesh" );
 	unguardexecSlow;
 }
 AUTOREGISTER_INTRINSIC( 259, execPlayAnim );
@@ -3469,7 +3745,7 @@ static void execLoopAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	// Set looping animation.
 	if( ActorContext->Mesh )
 	{
-		FMeshAnimSeq *Seq = ActorContext->Mesh->GetAnimSeq( SequenceName );
+		const FMeshAnimSeq *Seq = ActorContext->Mesh->GetAnimSeq( SequenceName );
 		if( Seq )
 		{
 			ActorContext->AnimSequence  = SequenceName;
@@ -3481,8 +3757,8 @@ static void execLoopAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
 			ActorContext->bAnimFinished = 0;
 			ActorContext->bAnimLoop     = 1;
 		}
-		else ScriptWarn( Stack, "LoopAnim: Sequence '%s' not found in Mesh '%s'", SequenceName(), ActorContext->Mesh->GetName() );
-	} else ScriptWarn( Stack, "LoopAnim: No mesh" );
+		else ScriptWarn( 0, Stack, "LoopAnim: Sequence '%s' not found in Mesh '%s'", SequenceName(), ActorContext->Mesh->GetName() );
+	} else ScriptWarn( 0, Stack, "LoopAnim: No mesh" );
 	unguardexecSlow;
 }
 AUTOREGISTER_INTRINSIC( 260, execLoopAnim );
@@ -3501,7 +3777,7 @@ static void execTweenAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	// Tweening an animation from wherever it is, to the start of a specified sequence.
 	if( ActorContext->Mesh )
 	{
-		FMeshAnimSeq *Seq = ActorContext->Mesh->GetAnimSeq( SequenceName );
+		const FMeshAnimSeq *Seq = ActorContext->Mesh->GetAnimSeq( SequenceName );
 		if( Seq )
 		{
 			ActorContext->AnimSequence  = SequenceName;
@@ -3512,8 +3788,8 @@ static void execTweenAnim( FExecStack &Stack, UObject *Context, BYTE *&Result )
 			ActorContext->bAnimFinished = 0;
 			ActorContext->bAnimLoop     = 0;
 		}
-		else ScriptWarn( Stack, "TweenAnim: Sequence '%s' not found in Mesh '%s'", SequenceName(), ActorContext->Mesh->GetName() );
-	} else ScriptWarn( Stack, "LoopAnim: No mesh" );
+		else ScriptWarn( 0, Stack, "TweenAnim: Sequence '%s' not found in Mesh '%s'", SequenceName(), ActorContext->Mesh->GetName() );
+	} else ScriptWarn( 0, Stack, "LoopAnim: No mesh" );
 	unguardexecSlow;
 }
 AUTOREGISTER_INTRINSIC( 294, execTweenAnim );
@@ -3590,7 +3866,8 @@ static void execGoto( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_GET_NAME(L);
 	P_FINISH;
 
-	ActorContext->GotoLabel( L );
+	if( !ActorContext->GotoLabel( L ) )
+		ScriptWarn( 0, Stack, "Goto (%s): Label not found", L() );
 
 	unguardexecSlow;
 }
@@ -3604,17 +3881,16 @@ static void execGotoState( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	AActor *ActorContext = (AActor*)Context;
 
 	P_GET_NAME_OPT(S,NAME_None);
-	P_GET_NAME_OPT(L,NAME_Begin);
+	P_GET_NAME_OPT(L,NAME_None);
 	P_FINISH;
 
-	if( ActorContext->GotoState( S ) )
+	if( S==ActorContext->State || ActorContext->GotoState( S ) )
 	{
-		if( L != NAME_None )
-		{
-			ActorContext->GotoLabel( L );
-		}
+		if( !ActorContext->GotoLabel( L==NAME_None ? NAME_Begin : L ) && L!=NAME_None )
+			ScriptWarn( 0, Stack, "GotoState (%s %s): Label not found", S(), L() );
 	}
-	else ScriptWarn( Stack, "GotoState (%s %s): State not found", S, L );
+	else if( S!=NAME_None )
+		ScriptWarn( 0, Stack, "GotoState (%s %s): State not found", S(), L() );
 
 	unguardexecSlow;
 }
@@ -3646,7 +3922,7 @@ static void execIsLabel( FExecStack &Stack, UObject *Context, BYTE *&Result )
 
 	UScript *DummyScript;
 	BYTE    *DummyByte;
-	*(DWORD*)Result = FindLabelLink(DummyScript,DummyByte,&Context->MainStack.Link,L);
+	*(DWORD*)Result = FindLabelLink( DummyScript, DummyByte, Context->MainStack.Link, L );
 
 	unguardexecSlow;
 }
@@ -3658,15 +3934,14 @@ static void execIsState( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	debugInput(Context!=NULL);
 
 	P_GET_NAME(S);
-	P_GET_NAME_OPT(L,NAME_None);
 	P_FINISH;
-
-	for( FStackNodeLink *Link = &Context->MainStack.Link.Node().ChildStates; Link->Class; Link=&Link->Node().Next )
-		if( Link->Node().Name == S )
+	
+	// See if this actor is in the specified state.
+	for( FStackNodePtr Link = Context->MainStack.Link; Link.Class; Link=Link->ParentItem )
+		if( Link->NestType==NEST_State && Link->Name==S )
 			break;
-	UScript *DummyScript;
-	BYTE    *DummyByte;
-	*(DWORD*)Result = !Link->Class ? 0 : L==NAME_None ? 1 : FindLabelLink(DummyScript,DummyByte,Link,L);
+
+	*(DWORD*)Result = Link.Class!=NULL;
 
 	unguardexecSlow;
 }
@@ -3679,7 +3954,10 @@ static void execEnable( FExecStack &Stack, UObject *Context, BYTE *&Result )
 
 	P_GET_NAME(N);
 	if( N.GetIndex()>=PROBE_MIN && N.GetIndex()<PROBE_MAX )
-		Context->MainStack.ProbeMask |= (Context->MainStack.Link.Node().ProbeMask & ((QWORD)1<<(N.GetIndex()-PROBE_MIN)));
+	{
+		QWORD BaseProbeMask = (Context->MainStack.Link->ProbeMask | Context->GetClass()->StackTree->Element(0).ProbeMask) & Context->MainStack.Link->IgnoreMask;
+		Context->MainStack.ProbeMask |= (BaseProbeMask & ((QWORD)1<<(N.GetIndex()-PROBE_MIN)));
+	}
 	P_FINISH;
 
 	unguardexecSlow;
@@ -3692,9 +3970,10 @@ static void execDisable( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	debugInput(Context!=NULL);
 
 	P_GET_NAME(N);
+	P_FINISH;
+
 	if( N.GetIndex()>=PROBE_MIN && N.GetIndex()<PROBE_MAX )
 		Context->MainStack.ProbeMask &= ~((QWORD)1<<(N.GetIndex()-PROBE_MIN));
-	P_FINISH;
 
 	unguardexecSlow;
 }
@@ -3752,43 +4031,21 @@ static void execSetCollisionSize( FExecStack &Stack, UObject *Context, BYTE *&Re
 }
 AUTOREGISTER_INTRINSIC( 283, execSetCollisionSize );
 
-static void execSetFloor( FExecStack &Stack, UObject *Context, BYTE *&Result )
+static void execSetBase( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execSetFloor);
 	debugState(Context!=NULL);
 	debugState(Context->IsA("Actor"));
 	AActor *ActorContext = (AActor*)Context;
 
-	P_GET_OBJECT(AActor,NewFloor);
+	P_GET_OBJECT(AActor,NewBase);
 	P_FINISH;
 
-	ActorContext->SetFloor( NewFloor );
+	ActorContext->SetBase( NewBase );
 
 	unguardSlow;
 }
-AUTOREGISTER_INTRINSIC( 298, execSetFloor );
-
-static void execCollisionTrace( FExecStack &Stack, UObject *Context, BYTE *&Result )
-{
-	guardSlow(execCollisionTrace);
-	debugState(Context!=NULL);
-	debugState(Context->IsA("Actor"));
-	AActor *ActorContext = (AActor*)Context;
-
-	P_GET_VECTOR_REF (HitLocation);
-	P_GET_VECTOR_REF (HitNormal);
-	P_GET_VECTOR     (TraceEnd);
-	P_GET_VECTOR_OPT (TraceStart,ActorContext->Location);
-	P_GET_FLOAT_OPT  (Radius,ActorContext->CollisionRadius);
-	P_GET_FLOAT_OPT  (Height,ActorContext->CollisionHeight);
-	P_GET_BOOL_OPT   (bReboundAdjust,1);
-	P_FINISH;
-
-	//todo!!
-
-	unguardexecSlow;
-}
-AUTOREGISTER_INTRINSIC( 284, execCollisionTrace );
+AUTOREGISTER_INTRINSIC( 298, execSetBase );
 
 ///////////
 // Audio //
@@ -3865,7 +4122,7 @@ static void execMove( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_FINISH;
 
 	FCheckResult Hit(1.0);
-	*(DWORD*)Result = ActorContext->GetLevel()->MoveActor( ActorContext, &Delta, Hit );
+	*(DWORD*)Result = ActorContext->GetLevel()->MoveActor( ActorContext, Delta, ActorContext->Rotation, Hit );
 
 	unguardexecSlow;
 }
@@ -3881,7 +4138,19 @@ static void execSetLocation( FExecStack &Stack, UObject *Context, BYTE *&Result 
 	P_GET_VECTOR(NewLocation);
 	P_FINISH;
 
-	*(DWORD*)Result = ActorContext->GetLevel()->FarMoveActor( ActorContext, &NewLocation );
+	/* !! For testing PointCheck !!
+	FCheckResult Hit;
+	INT i = ActorContext->GetLevel()->Model->PointCheck( Hit, NULL, ActorContext->Location, ActorContext->GetCollisionExtent()+FVector(4,4,4), 0 );
+	FVector V = ActorContext->Location - Hit.Location;
+	if( i==1 ) debugf("%i",i);
+	else if( Hit.Normal!=FVector(0,0,0) )
+	{
+		debugf("%f %f %f",V.X,V.Y,V.Z);
+		i = ActorContext->GetLevel()->Model->PointCheck( Hit, NULL, Hit.Location, ActorContext->GetCollisionExtent()+FVector(4,4,4), 0 );
+		debugf("    Resulting adjustment: %i", i);
+	}
+	*/
+	*(DWORD*)Result = ActorContext->GetLevel()->FarMoveActor( ActorContext, NewLocation );
 
 	unguardexecSlow;
 }
@@ -3897,7 +4166,8 @@ static void execSetRotation( FExecStack &Stack, UObject *Context, BYTE *&Result 
 	P_GET_ROTATION(NewRotation);
 	P_FINISH;
 
-	*(DWORD*)Result = ActorContext->GetLevel()->RotateActor( ActorContext, NewRotation );
+	FCheckResult Hit(1.0);
+	*(DWORD*)Result = ActorContext->GetLevel()->MoveActor( ActorContext, FVector(0,0,0), NewRotation, Hit );
 
 	unguardexecSlow;
 }
@@ -3922,30 +4192,6 @@ static void execDistanceTo( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	unguardexecSlow;
 }
 AUTOREGISTER_INTRINSIC( 270, execDistanceTo );
-
-static void execCanSee( FExecStack &Stack, UObject *Context, BYTE *&Result )
-{
-	guardSlow(execCanSee);
-	debugState(Context!=NULL);
-	debugState(Context->IsA("Actor"));
-	AActor *ActorContext = (AActor*)Context;
-
-	P_GET_ACTOR(Other);
-	P_FINISH;
-
-	FCheckResult Hit(0.0);
-	*(DWORD*)Result = Other ? !ActorContext->GetLevel()->Model->LineCheck
-	(
-		Hit,
-		NULL,
-		ActorContext->Location,
-		Other->Location,
-		0
-	) : 0;
-
-	unguardexecSlow;
-}
-AUTOREGISTER_INTRINSIC( 271, execCanSee );
 
 ///////////////
 // Relations //
@@ -3999,18 +4245,12 @@ static void execTrace( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_GET_VECTOR(TraceEnd);
 	P_GET_VECTOR_OPT(TraceStart,ActorContext->Location);
 	P_GET_BOOL_OPT(bTraceActors,ActorContext->bCollideActors);
+	P_GET_VECTOR_OPT(Extent,FVector(0,0,0));
 	P_FINISH;
 
 	// Trace the line.
 	FCheckResult Hit(1.0);
-	ActorContext->XLevel->Trace
-	(
-		Hit,
-		ActorContext,
-		TraceEnd,
-		TraceStart,
-		bTraceActors
-	);
+	ActorContext->XLevel->Trace( Hit, ActorContext, TraceEnd, TraceStart, TRACE_AllColliding, Extent );
 	*(AActor**)Result = Hit.Actor;
 	*HitLocation      = Hit.Location;
 	*HitNormal        = Hit.Normal;
@@ -4038,14 +4278,14 @@ static void execSpawn( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_FINISH;
 
 	// Spawn and return actor.
-	*(AActor**)Result = ActorContext->GetLevel()->SpawnActor
+	*(AActor**)Result = SpawnClass ? ActorContext->GetLevel()->SpawnActor
 	(
 		SpawnClass,
 		(AActor*)SpawnOwner,
 		SpawnName,
-		&SpawnLocation,
-		&SpawnRotation
-	);
+		SpawnLocation,
+		SpawnRotation
+	) : NULL;
 
 	unguardexecSlow;
 }
@@ -4106,10 +4346,310 @@ static void execSetTickRate( FExecStack &Stack, UObject *Context, BYTE *&Result 
 }
 AUTOREGISTER_INTRINSIC( 281, execSetTickRate );
 
+/*-----------------------------------------------------------------------------
+	Intrinsic actor iterator functions.
+-----------------------------------------------------------------------------*/
+
+static void execIterator( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{}
+AUTOREGISTER_INTRINSIC( EX_Iterator, execIterator );
+
+// Iterator macros.
+#define PRE_ITERATOR \
+	INT wEndOffset = scriptReadWord(Stack.Code); \
+	BYTE B=0, *Addr, Buffer[MAX_CONST_SIZE]; \
+	BYTE *StartCode = Stack.Code; \
+	do {
+#define POST_ITERATOR \
+		while( (B = *Stack.Code++)!=EX_IteratorPop && B!=EX_IteratorNext ) \
+			(*GIntrinsics[B])( Stack, Stack.Object, Addr=Buffer ); \
+		if( B==EX_IteratorNext ) \
+			Stack.Code = StartCode; \
+	} while( B != EX_IteratorPop ); \
+	Stack.Code = &Stack.Script->Element(wEndOffset+1);
+
+static void execAllActors( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(AllActors);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor* ActorContext = (AActor*)Context;
+
+	// Get the parms.
+	P_GET_OBJECT		(UClass,BaseClass);
+	P_GET_ACTOR_REF		(OutActor);
+	P_GET_NAME_OPT		(TagName,NAME_None);
+	P_FINISH;
+
+	BaseClass = BaseClass ? BaseClass : AActor::GetBaseClass();
+	INT iActor=0;
+
+	PRE_ITERATOR;
+		// Fetch next actor in the iteration.
+		*OutActor = NULL;
+		while( iActor<ActorContext->XLevel->Num && *OutActor==NULL )
+		{
+			AActor* TestActor = ActorContext->XLevel->Element(iActor++);
+			if(	TestActor && TestActor->IsA(BaseClass) && (TagName==NAME_None || TestActor->Tag==TagName) )
+				*OutActor = TestActor;
+		}
+		if( *OutActor == NULL )
+			break;
+	POST_ITERATOR;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 304, execAllActors );
+
+static void execChildActors( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execChildActors);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor* ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT		(UClass,BaseClass);
+	P_GET_ACTOR_REF		(OutActor);
+	P_FINISH;
+
+	BaseClass = BaseClass ? BaseClass : AActor::GetBaseClass();
+	INT iActor=0;
+
+	PRE_ITERATOR;
+		// Fetch next actor in the iteration.
+		*OutActor = NULL;
+		while( iActor<ActorContext->XLevel->Num && *OutActor==NULL )
+		{
+			AActor* TestActor = ActorContext->XLevel->Element(iActor++);
+			if(	TestActor && TestActor->IsA(BaseClass) && TestActor->IsOwnedBy( ActorContext ) )
+				*OutActor = TestActor;
+		}
+		if( *OutActor == NULL )
+			break;
+	POST_ITERATOR;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 305, execChildActors );
+
+static void execBasedActors( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execBasedActors);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor* ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT		(UClass,BaseClass);
+	P_GET_ACTOR_REF		(OutActor);
+	P_FINISH;
+
+	BaseClass = BaseClass ? BaseClass : AActor::GetBaseClass();
+	INT iActor=0;
+
+	PRE_ITERATOR;
+		// Fetch next actor in the iteration.
+		*OutActor = NULL;
+		while( iActor<ActorContext->XLevel->Num && *OutActor==NULL )
+		{
+			AActor* TestActor = ActorContext->XLevel->Element(iActor++);
+			if(	TestActor && TestActor->IsA(BaseClass) && TestActor->Base==ActorContext )
+				*OutActor = TestActor;
+		}
+		if( *OutActor == NULL )
+			break;
+	POST_ITERATOR;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 306, execBasedActors );
+
+static void execTouchingActors( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execTouchingActors);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor* ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT		(UClass,BaseClass);
+	P_GET_ACTOR_REF		(OutActor);
+	P_FINISH;
+
+	BaseClass = BaseClass ? BaseClass : AActor::GetBaseClass();
+	INT iTouching=0;
+
+	PRE_ITERATOR;
+		// Fetch next actor in the iteration.
+		*OutActor = NULL;
+		for( iTouching; iTouching<ARRAY_COUNT(ActorContext->Touching) && *OutActor==NULL; iTouching++ )
+		{
+			AActor* TestActor = ActorContext->Touching[iTouching];
+			if(	TestActor && TestActor->IsA(BaseClass) )
+				*OutActor = TestActor;
+		}
+		if( *OutActor == NULL )
+			break;
+	POST_ITERATOR;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 307, execTouchingActors );
+
+static void execTraceActors( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execTraceActors);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor* ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT		(UClass,BaseClass);
+	P_GET_ACTOR_REF		(OutActor);
+	P_GET_VECTOR_REF	(HitLocation);
+	P_GET_VECTOR_REF	(HitNormal);
+	P_GET_VECTOR	    (End);
+	P_GET_VECTOR_OPT	(Start,ActorContext->Location);
+	P_GET_VECTOR_OPT    (Extent,FVector(0,0,0));
+	P_FINISH;
+
+	FMemMark Mark(GMem);
+	BaseClass         = BaseClass ? BaseClass : AActor::GetBaseClass();
+	FCheckResult* Hit = ActorContext->XLevel->Hash.LineCheck( GMem, Start, End, Extent, 1, ActorContext->Level );
+
+	PRE_ITERATOR;
+		if( Hit )
+		{
+			*OutActor    = Hit->Actor;
+			*HitLocation = Hit->Location;
+			*HitNormal   = Hit->Normal;
+			Hit          = Hit->GetNext();
+		}
+		else
+		{
+			*OutActor = NULL;
+			break;
+		}
+	POST_ITERATOR;
+	Mark.Pop();
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 309, execTraceActors );
+
+static void execRadiusActors( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execRadiusActors);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor* ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT		(UClass,BaseClass);
+	P_GET_ACTOR_REF		(OutActor);
+	P_GET_FLOAT         (Radius);
+	P_GET_VECTOR_OPT    (Location,ActorContext->Location);
+	P_FINISH;
+
+	BaseClass = BaseClass ? BaseClass : AActor::GetBaseClass();
+	INT iActor=0;
+
+	PRE_ITERATOR;
+		// Fetch next actor in the iteration.
+		*OutActor = NULL;
+		while( iActor<ActorContext->XLevel->Num && *OutActor==NULL )
+		{
+			AActor* TestActor = ActorContext->XLevel->Element(iActor++);
+			if
+			(	TestActor
+			&&	TestActor->IsA(BaseClass) 
+			&&	(TestActor->Location - Location).SizeSquared() < Square(Radius + TestActor->CollisionRadius) )
+				*OutActor = TestActor;
+		}
+		if( *OutActor == NULL )
+			break;
+	POST_ITERATOR;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 310, execRadiusActors );
+
+static void execVisibleActors( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execVisibleActors);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor* ActorContext = (AActor*)Context;
+
+	P_GET_OBJECT		(UClass,BaseClass);
+	P_GET_ACTOR_REF		(OutActor);
+	P_GET_FLOAT_OPT     (Radius,0.0);
+	P_GET_VECTOR_OPT    (Location,ActorContext->Location);
+	P_FINISH;
+
+	BaseClass = BaseClass ? BaseClass : AActor::GetBaseClass();
+	INT iActor=0;
+
+	PRE_ITERATOR;
+		// Fetch next actor in the iteration.
+		*OutActor = NULL;
+		FCheckResult Hit;
+		while( iActor<ActorContext->XLevel->Num && *OutActor==NULL )
+		{
+			AActor* TestActor = ActorContext->XLevel->Element(iActor++);
+			if
+			(	TestActor
+			&&	!TestActor->bHidden
+			&&	TestActor->IsA(BaseClass)
+			&&	(Radius==0.0 || (TestActor->Location-Location).SizeSquared() < Square(Radius))
+			&&	TestActor->GetLevel()->Trace( Hit, ActorContext, TestActor->Location, ActorContext->Location, TRACE_VisBlocking ) )
+				*OutActor = TestActor;
+		}
+		if( *OutActor == NULL )
+			break;
+	POST_ITERATOR;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 311, execVisibleActors );
+
+static void execZoneActors( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execZoneActors);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Zone"));
+	AZoneInfo* ZoneContext = (AZoneInfo*)Context;
+
+	P_GET_OBJECT		(UClass,BaseClass);
+	P_GET_ACTOR_REF		(OutActor);
+	P_FINISH;
+
+	BaseClass = BaseClass ? BaseClass : AActor::GetBaseClass();
+	INT iActor=0;
+
+	PRE_ITERATOR;
+		// Fetch next actor in the iteration.
+		*OutActor = NULL;
+		while( iActor<ZoneContext->XLevel->Num && *OutActor==NULL )
+		{
+			AActor* TestActor = ZoneContext->XLevel->Element(iActor++);
+			if
+			(	TestActor
+			&&	TestActor->IsA(BaseClass)
+			&&	TestActor->IsIn(ZoneContext) );
+				*OutActor = TestActor;
+		}
+		if( *OutActor == NULL )
+			break;
+	POST_ITERATOR;
+
+	unguardexecSlow;
+}
+AUTOREGISTER_INTRINSIC( 308, execZoneActors );
+
 /* Prototype code for an intrinsic function.
 static void exec( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(exec);
+	debugState(Context!=NULL);
+	debugState(Context->IsA("Actor"));
+	AActor* ActorContext = (AActor*)Context;
 
 	P_FINISH;
 
@@ -4124,7 +4664,7 @@ AUTOREGISTER_INTRINSIC( ?, exec );
 
 //
 // Register an intrinsic function.
-// Called at startup time, before engine initialization.
+//warning: Called at startup time, before engine initialization.
 //
 int UNENGINE_API RegisterIntrinsic
 (
@@ -4136,12 +4676,13 @@ int UNENGINE_API RegisterIntrinsic
 	if( !Initialized )
 	{
 		Initialized = 1;
-		for( int i=0; i<EX_Max; i++ )
+		for( int i=0; i<ARRAY_COUNT(GIntrinsics); i++ )
 			GIntrinsics[i] = execUndefined;
 	}
 	if( iIntrinsic<0 || iIntrinsic>ARRAY_COUNT(GIntrinsics) || GIntrinsics[iIntrinsic]!=execUndefined) 
-		GIntrinsicDuplicate = 1;
-	GIntrinsics[iIntrinsic] = Func;
+		GIntrinsicDuplicate = iIntrinsic;
+	else
+		GIntrinsics[iIntrinsic] = Func;
 	return 0;
 }
 
@@ -4149,6 +4690,103 @@ int UNENGINE_API RegisterIntrinsic
 	Script processing function.
 -----------------------------------------------------------------------------*/
 
+//
+// Script processing function.
+// Should return 1 if processed, 0 if not.
+//
+#if 0
+void UObject::Process( FName Message, PMessageParms *Parms )
+{
+	guard(UObject::Process);
+	AActor *Actor = (AActor*)this;
+
+	if( !IsA("Actor") || Actor->bDeleteMe )
+		return;
+	if( Actor->GetLevel()->GetState() != LEVEL_UpPlay )
+		return;
+	if( !IsProbing( Message ) )
+		return;
+
+	// Validate.
+	debugState(Class!=NULL);
+	debugState(Class->Script!=NULL);
+	debugState(Class->StackTree!=NULL);
+	debugState(Class->StackTree->Num>0);
+	debugState(MainStack.Link.Class!=NULL);
+	debugState(MainStack.Link.iNode!=MAXWORD);
+	debugState(MainStack.Object==this);
+
+	// Traverse the current stack node to find the specified function.
+	clock(GServer.ScriptExecTime);
+	INT            IsState = IsA("Actor") && (((AActor*)this)->State!=NAME_None);
+	FStackNodePtr  Link    = MainStack.Link->ChildFunctions;
+	Recheck:
+	while( Link.Class != NULL )
+	{
+		FStackNode& Node = *Link;
+		if( Node.Name == Message )
+		{
+			//debugf("Found %i %s - %s",iMe,Class->GetName(),Message());
+			//debugf("%s LocalsSize=%i",Message(),Node.LocalsSize);
+
+			// Calling an intrinsic function from the engine is illegal, because the
+			// intrinsics call script parsing functions.
+			checkState(Node.iIntrinsic==0);
+			checkState(Node.iCode!=MAXWORD);
+			debugState(Node.ParmsSize==0 || Parms!=NULL);
+
+			// If an undefined engine function, skip it.
+			if( !(Node.StackNodeFlags & SNODE_DefinedFunc) )
+				goto Unfound;
+
+			// Create a new local execution stack.
+			FMemMark Mark(GMem);
+			FExecStack NewStack( this, Link, new(GMem,MEM_Zeroed,Node.LocalsSize)BYTE );
+			memcpy( NewStack.Locals, Parms, Node.ParmsSize );
+
+			// Skip the parm info in the script code.
+			while( *NewStack.Code++ != 0 )
+				NewStack.Code++;
+
+			// Execute the script code.
+			if( !(Node.StackNodeFlags & SNODE_SingularFunc) )
+			{
+				BYTE Buffer[MAX_CONST_SIZE], *Addr, B;
+				while( (B = *NewStack.Code++) != EX_Return )
+					(*GIntrinsics[B])( NewStack, this, Addr=Buffer );
+			}
+			else if( !(GetFlags() & RF_InSingularFunc) )
+			{
+				SetFlags(RF_InSingularFunc);
+				BYTE Buffer[MAX_CONST_SIZE], *Addr, B;
+				while( (B = *NewStack.Code++) != EX_Return )
+					(*GIntrinsics[B])( NewStack, this, Addr=Buffer );
+				ClearFlags(RF_InSingularFunc);
+			}
+
+			// Copy outparms and return value back.
+			memcpy( Parms, NewStack.Locals, Node.ParmsSize );
+
+			// Restore locals bin.
+			Mark.Pop();
+
+			unclock(GServer.ScriptExecTime);
+			return;
+		}
+		Link = Link->Next;
+	}
+	if( IsState )
+	{
+		// Failed to find a state version of the function, so check for a global version.
+		IsState  = 0;
+		Link     = GetClass()->StackTree->Element(0).ChildFunctions;
+		goto Recheck;
+	}
+	Unfound:;
+	unclock(GServer.ScriptExecTime);
+	unguardf(( "(class %s, func %s)", GetClassName(), Message() ));
+}
+#endif
 //
 // Script processing function.
 // Should return 1 if processed, 0 if not.
@@ -4162,6 +4800,8 @@ void UObject::Process( FName Message, PMessageParms *Parms )
 		return;
 	if( Actor->GetLevel()->GetState() != LEVEL_UpPlay )
 		return;
+	if( !IsProbing( Message ) )
+		return;
 
 	// Validate.
 	debugState(Class!=NULL);
@@ -4172,81 +4812,75 @@ void UObject::Process( FName Message, PMessageParms *Parms )
 	debugState(MainStack.Link.iNode!=MAXWORD);
 	debugState(MainStack.Object==this);
 
-	// Make sure we're probing for this message.
-	if( IsProbing( Message ) )
+	// Traverse the current stack node to find the specified function.
+	clock(GServer.ScriptExecTime);
+	INT            IsState = IsA("Actor") && (((AActor*)this)->State!=NAME_None);
+	FStackNodePtr  Link    = MainStack.Link->ChildFunctions;
+	Recheck:
+	while( Link.Class != NULL )
 	{
-		// Traverse the current stack node to find the specified function.
-		clock(GServer.ScriptExecTime);
-		INT            IsState = IsA("Actor") && (((AActor*)this)->State!=NAME_None);
-		FStackNodeLink *Link   = &MainStack.Link.Node().ChildFunctions;
-		FStackNode     *Node;
-		Recheck:
-		while( Link->Class != NULL )
+		FStackNode& Node = *Link;
+		if( Node.Name == Message )
 		{
-			Node = &Link->Node();
-			if( Node->Name == Message )
+			//debugf("Found %i %s - %s",iMe,Class->GetName(),Message());
+			//debugf("%s LocalsSize=%i",Message(),Node.LocalsSize);
+
+			// Calling an intrinsic function from the engine is illegal, because the
+			// intrinsics call script parsing functions.
+			checkState(Node.iIntrinsic==0);
+			checkState(Node.iCode!=MAXWORD);
+			debugState(Node.ParmsSize==0 || Parms!=NULL);
+
+			// If an undefined engine function, skip it.
+			if( !(Node.StackNodeFlags & SNODE_DefinedFunc) )
+				goto Unfound;
+
+			// Create a new local execution stack.
+			FMemMark Mark(GMem);
+			FExecStack NewStack( this, Link, new(GMem,MEM_Zeroed,Node.LocalsSize)BYTE );
+			memcpy( NewStack.Locals, Parms, Node.ParmsSize );
+
+			// Skip the parm info in the script code.
+			while( *NewStack.Code++ != 0 )
+				NewStack.Code++;
+
+			// Execute the script code.
+			if( !(Node.StackNodeFlags & SNODE_SingularFunc) )
 			{
-				//debugf("Found %i %s - %s",iMe,Class->GetName(),Message());
-				//debugf("%s LocalsSize=%i",Message(),Node->LocalsSize);
-
-				// Calling an intrinsic function from the engine is illegal, because the
-				// intrinsics call script parsing functions.
-				checkState(Node->iIntrinsic==0);
-				checkState(Node->iCode!=MAXWORD);
-				debugState(Node->ParmsSize==0 || Parms!=NULL);
-
-				// If an undefined engine function, skip it.
-				if( !(Node->StackNodeFlags & SNODE_DefinedFunc) )
-					goto Unfound;
-
-				// Create a new local execution stack.
-				FMemMark Mark(GMem);
-				FExecStack NewStack( this, *Link, new(GMem,MEM_Zeroed,Node->LocalsSize)BYTE );
-				memcpy( NewStack.Locals, Parms, Node->ParmsSize );
-
-				// Parse the outparms.
-				BYTE *Dest = (BYTE*)Parms;
-				BYTE *Src  = NewStack.Locals;
-				FOutParmRec Outs[MAX_FUNC_PARMS], *Out = Outs;
-				while( (Out->Size = *NewStack.Code++) != 0 )
-				{
-					debugState(*NewStack.Code==0 || *NewStack.Code==1);
-					Out->Src  = Src;
-					Out->Dest = Dest;
-					Src      += Out->Size;
-					Dest     += Out->Size;
-					Out      += *NewStack.Code++;
-				}
-
-				// Execute the script code.
 				BYTE Buffer[MAX_CONST_SIZE], *Addr, B;
 				while( (B = *NewStack.Code++) != EX_Return )
 					(*GIntrinsics[B])( NewStack, this, Addr=Buffer );
-
-				// Copy outparms and return value back.
-				while( --Out >= Outs )
-					memcpy( Out->Dest, Out->Src, Out->Size );
-
-				// Restore locals bin.
-				Mark.Pop();
-
-				unclock(GServer.ScriptExecTime);
-				return;
 			}
-			Link = &Node->Next;
-		}
-		if( IsState )
-		{
-			// Failed to find a state version of the function, so check for a global version.
-			IsState  = 0;
-			Link     = &GetClass()->StackTree->Element(0).ChildFunctions;
-			goto Recheck;
-		}
-		unclock(GServer.ScriptExecTime);
-	}
+			else if( !(GetFlags() & RF_InSingularFunc) )
+			{
+				SetFlags(RF_InSingularFunc);
+				BYTE Buffer[MAX_CONST_SIZE], *Addr, B;
+				while( (B = *NewStack.Code++) != EX_Return )
+					(*GIntrinsics[B])( NewStack, this, Addr=Buffer );
+				ClearFlags(RF_InSingularFunc);
+			}
 
+			// Copy outparms and return value back.
+			memcpy( Parms, NewStack.Locals, Node.ParmsSize );
+
+			// Restore locals bin.
+			Mark.Pop();
+
+			unclock(GServer.ScriptExecTime);
+			return;
+		}
+		Link = Link->Next;
+	}
+	if( IsState )
+	{
+		// Failed to find a state version of the function, so check for a global version.
+		IsState  = 0;
+		Link     = GetClass()->StackTree->Element(0).ChildFunctions;
+		goto Recheck;
+	}
 	Unfound:;
-	unguardf(("(class %s, func %s)",GetClassName(),Message()));
+	unclock(GServer.ScriptExecTime);
+	unguardf(( "(class %s, func %s)", GetClassName(), Message() ));
 }
 
 /*-----------------------------------------------------------------------------
@@ -4307,6 +4941,11 @@ static EExprToken SerializeExpr( UScript *Script, INT &iCode, FArchive &Ar )
 		case EX_False:
 		case EX_NoObject:
 		case EX_Self:
+		case EX_IteratorPop:
+		case EX_EndCode:
+		case EX_Stop:
+		case EX_Return:
+		case EX_IteratorNext:
 		{
 			break;
 		}
@@ -4334,7 +4973,7 @@ static EExprToken SerializeExpr( UScript *Script, INT &iCode, FArchive &Ar )
 		}
 		case EX_FinalFunction:
 		{
-			Ar << *(FStackNodeLink*)&Script->Element(iCode); iCode+=sizeof(FStackNodeLink);
+			Ar << *(FStackNodePtr*)&Script->Element(iCode); iCode+=sizeof(FStackNodePtr);
 			while( SerializeExpr( Script, iCode, Ar ) != EX_EndFunctionParms );
 			break;
 		}
@@ -4365,10 +5004,10 @@ static EExprToken SerializeExpr( UScript *Script, INT &iCode, FArchive &Ar )
 		}
 		case EX_RotationConst:
 		{
-			Ar << *(WORD*)&Script->Element(iCode+0);
-			Ar << *(WORD*)&Script->Element(iCode+2);
-			Ar << *(WORD*)&Script->Element(iCode+4);
-			iCode+=6;
+			Ar << *(INT*)&Script->Element(iCode+0);
+			Ar << *(INT*)&Script->Element(iCode+4);
+			Ar << *(INT*)&Script->Element(iCode+8);
+			iCode+=12;
 			break;
 		}
 		case EX_VectorConst:
@@ -4398,16 +5037,16 @@ static EExprToken SerializeExpr( UScript *Script, INT &iCode, FArchive &Ar )
 			SerializeExpr( Script, iCode, Ar );
 			break;
 		}
-		case EX_EndCode:
-		case EX_Stop:
-		case EX_Return:
-		{
-			break;
-		}
 		case EX_JumpIfNot:
 		{
 			Ar << *(WORD*)&Script->Element(iCode); iCode+=2; // Code offset.
 			SerializeExpr( Script, iCode, Ar );              // Boolean expr.
+			break;
+		}
+		case EX_Iterator:
+		{
+			SerializeExpr( Script, iCode, Ar );              // Iterator expr.
+			Ar << *(WORD*)&Script->Element(iCode); iCode+=2; // Code offset.
 			break;
 		}
 		case EX_Switch:
@@ -4492,6 +5131,7 @@ static EExprToken SerializeExpr( UScript *Script, INT &iCode, FArchive &Ar )
 		}
 		default:
 		{
+			// This should never occur.
 			appErrorf( "Bad expr token %02x", Expr );
 			break;
 		}
@@ -4529,7 +5169,7 @@ FArchive& operator<<( FArchive& Ar, FStackNode &Node )
 	guard(FStackNode::<<);
 
 	// Archive the stuff.
-	Ar << Node.Parent << Node.ChildFunctions << Node.ChildStates << Node.Next;
+	Ar << Node.ParentItem << Node.ParentNest << Node.ChildFunctions << Node.ChildStates << Node.Next;
 	Ar << Node.Name << Node.iCode << Node.CodeLabelOffset << Node.Line << Node.Pos;
 	Ar << Node.NestType << Node.StackNodeFlags << Node.NumParms << Node.OperPrecedence;
 
@@ -4545,7 +5185,7 @@ FArchive& operator<<( FArchive& Ar, FStackNode &Node )
 		Ar << Node.ParmsSize << Node.iIntrinsic;
 		Ar << Node.iFirstProperty << Node.NumProperties;
 
-		// Set intrinsic function.
+		// Check intrinsic function.
 		if( Node.iIntrinsic != 0 )
 		{
 			checkState(Node.iIntrinsic<EX_Max);

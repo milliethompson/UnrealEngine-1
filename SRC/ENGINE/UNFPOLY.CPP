@@ -27,10 +27,10 @@ void FPoly::Init()
 {
 	guard(FPoly::Init);
 
-	Base			= GMath.ZeroVector;
-	Normal			= GMath.ZeroVector;
-	TextureU		= GMath.ZeroVector;
-	TextureV		= GMath.ZeroVector;
+	Base			= FVector(0,0,0);
+	Normal			= FVector(0,0,0);
+	TextureU		= FVector(0,0,0);
+	TextureV		= FVector(0,0,0);
 	PolyFlags       = 0;
 	Brush			= NULL;
 	Texture         = NULL;
@@ -83,14 +83,14 @@ int FPoly::Fix()
 	j=0; prev=NumVertices-1;
 	for( i=0; i<NumVertices; i++ )
 	{
-		if( !FPointsAreSame(Vertex[i],Vertex[prev]) )
+		if( !FPointsAreSame( Vertex[i], Vertex[prev] ) )
 		{
 			if( j != i )
 				Vertex[j] = Vertex[i];
 			prev = j;
 			j    ++;
 		}
-		else debug(LOG_Problem,"FPoly::Fix: Collapsed a point");
+		else debug( LOG_Problem, "FPoly::Fix: Collapsed a point" );
 	}
 	if (j>=3) NumVertices = j;
 	else      NumVertices = 0;
@@ -193,7 +193,7 @@ int FPoly::SplitWithPlane
 		for( i=0; i<NumVertices; i++ )
 		{
 			PrevDist	= Dist;
-      		Dist		= FPointPlaneDist(Vertex[i],PlaneBase,PlaneNormal);
+      		Dist		= FPointPlaneDist( Vertex[i], PlaneBase, PlaneNormal );
 
 			if      (Dist > +Thresh)  	Status = V_FRONT;
 			else if (Dist < -Thresh)  	Status = V_BACK;
@@ -308,8 +308,7 @@ int FPoly::SplitWithNode
 //
 int FPoly::SplitWithPlaneFast
 (
-	const FVector	&PlaneBase,
-	const FVector	&PlaneNormal,
+	const FPlane	Plane,
 	FPoly			*FrontPoly,
 	FPoly			*BackPoly
 ) const
@@ -322,23 +321,24 @@ int FPoly::SplitWithPlaneFast
 	StatusPtr = &VertStatus[0];
 	for( int i=0; i<NumVertices; i++ )
 	{
-		FLOAT Dist = FPointPlaneDist(Vertex[i],PlaneBase,PlaneNormal);
-
+		FLOAT Dist = Plane.PlaneDot(Vertex[i]);
 		if( Dist >= 0.0 )
 		{
 			*StatusPtr++ = V_FRONT;
-			if (Dist > +THRESH_SPLIT_POLY_WITH_PLANE) Front=1;
+			if( Dist > +THRESH_SPLIT_POLY_WITH_PLANE )
+				Front=1;
 		}
 		else
 		{
 			*StatusPtr++ = V_BACK;
-			if (Dist < -THRESH_SPLIT_POLY_WITH_PLANE) Back=1;
+			if( Dist < -THRESH_SPLIT_POLY_WITH_PLANE )
+				Back=1;
 		}
 	}
 	if( !Front )
 	{
 		if( Back ) return SP_Back;
-		return SP_Coplanar;
+		else       return SP_Coplanar;
 	}
 	if( !Back )
 	{
@@ -363,12 +363,12 @@ int FPoly::SplitWithPlaneFast
 				if( Status != PrevStatus )
 				{
 					// Crossing.
-					*V1++ = *V2++ = FLinePlaneIntersection(*W,*V,PlaneBase,PlaneNormal);
-					if (PrevStatus == V_FRONT)	{*V2++ = *V; N1++; N2+=2;}
-					else						{*V1++ = *V; N2++; N1+=2;};
+					*V1++ = *V2++ = FLinePlaneIntersection( *W, *V, Plane );
+					if( PrevStatus == V_FRONT )	{*V2++ = *V; N1++; N2+=2;}
+					else {*V1++ = *V; N2++; N1+=2;};
 				}
-				else if (Status==V_FRONT) {*V1++ = *V; N1++;}
-				else                      {*V2++ = *V; N2++;};
+				else if( Status==V_FRONT ) {*V1++ = *V; N1++;}
+				else {*V2++ = *V; N2++;};
 
 				PrevStatus = Status;
 				W          = V++;
@@ -425,38 +425,17 @@ int FPoly::CalcNormal()
 {
 	guard(FPoly::CalcNormal);
 
-	FVector 	Side1,Side2;
-	FLOAT		SizeSquared;
-	int			i;
+	Normal = FVector(0,0,0);
+	for( int i=2; i<NumVertices; i++ )
+		Normal += (Vertex[i-1] - Vertex[0]) ^ (Vertex[i] - Vertex[0]);
 
-	i		= 2;
-	Normal	= GMath.ZeroVector;
-	Side1   = Vertex[1] - Vertex[0];
-
-	while( i < NumVertices )
+	if( Normal.SizeSquared() < (FLOAT)THRESH_ZERO_NORM_SQUARED )
 	{
-		Side2   = Vertex[i] - Vertex[0];
-		Normal += Side1 ^ Side2;
-
-		SizeSquared = Normal.SizeSquared();
-		if( SizeSquared >= 10000.0*(FLOAT)THRESH_ZERO_NORM_SQUARED )
-		{
-			// Sufficient precision to normalize.
-			Normal *= 1.0 / sqrt(SizeSquared);
-			return 0; // Successful
-		}
-		Side1 = Side2;
-		i++;
+		debug( LOG_Problem, "FPoly::CalcNormal: Zero-area polygon" );
+		return 1;
 	}
-	SizeSquared = Normal.SizeSquared();
-	if( SizeSquared >= (FLOAT)THRESH_ZERO_NORM_SQUARED )
-	{
-		// Sufficient precision to normalize.
-		Normal *= 1.0 / sqrt(SizeSquared);
-		return 0; // Successful.
-	}
-	debug (LOG_Problem,"FPoly::CalcNormal: Zero-area polygon");
-	return 1;
+	Normal.Normalize();
+	return 0;
 	unguard;
 }
 
@@ -467,8 +446,8 @@ int FPoly::CalcNormal()
 void FPoly::Transform
 (
 	const FModelCoords	&Coords,
-	const FVector		*PreSubtract,
-	const FVector		*PostAdd,
+	const FVector		&PreSubtract,
+	const FVector		&PostAdd,
 	FLOAT				Orientation
 )
 {
@@ -480,20 +459,9 @@ void FPoly::Transform
 	TextureU = TextureU.TransformVectorBy(Coords.VectorXform);
 	TextureV = TextureV.TransformVectorBy(Coords.VectorXform);
 
-	if( PreSubtract )
-		Base -= *PreSubtract;
-	Base = Base.TransformVectorBy(Coords.PointXform);
-	if( PostAdd )
-		Base += *PostAdd;
-
+	Base = (Base - PreSubtract).TransformVectorBy(Coords.PointXform) + PostAdd;
 	for( i=0; i<NumVertices; i++ )
-	{
-		if( PreSubtract )
-			Vertex[i] -= *PreSubtract;
-		Vertex[i] = Vertex[i].TransformVectorBy( Coords.PointXform );
-		if( PostAdd )
-			Vertex[i] += *PostAdd;
-	}
+		Vertex[i]  = (Vertex[i] - PreSubtract).TransformVectorBy( Coords.PointXform ) + PostAdd;
 
 	// Flip vertex order if orientation is negative.
 	if( Orientation < 0.0 )
@@ -585,7 +553,7 @@ int FPoly::Split( const FVector &Normal, const FVector &Base, int NoOverflow )
 	if( NoOverflow && NumVertices>=FPoly::VERTEX_THRESHOLD )
 	{
 		// Don't split it, just reject it.
-		if( SplitWithPlaneFast( Normal, Base, NULL, NULL )==SP_Back )
+		if( SplitWithPlaneFast( FPlane(Base,Normal), NULL, NULL )==SP_Back )
 			return 0;
 		else
 			return NumVertices;
@@ -594,7 +562,7 @@ int FPoly::Split( const FVector &Normal, const FVector &Base, int NoOverflow )
 	{
 		// Split it.
 		FPoly Front, Back;
-		switch( SplitWithPlaneFast( Normal, Base, &Front, &Back ))
+		switch( SplitWithPlaneFast( FPlane(Base,Normal), &Front, &Back ))
 		{
 			case SP_Back:
 				return 0;
@@ -614,9 +582,10 @@ int FPoly::Split( const FVector &Normal, const FVector &Base, int NoOverflow )
 //
 int FPoly::Finalize( int NoError )
 {
-	//guard(FPoly::Finalize);
+	guard(FPoly::Finalize);
 
 	// Check for problems.
+	Fix();
 	if( NumVertices<3 )
 	{
 		debugf( LOG_Problem, "FPoly::Finalize: Not enough vertices (%i)", NumVertices );
@@ -632,21 +601,24 @@ int FPoly::Finalize( int NoError )
 		if( CalcNormal() )
 		{
 			debugf( LOG_Problem, "FPoly::Finalize: Normalization failed, verts=%i, size=%f", NumVertices, Normal.Size() );
-			if( NoError )
-				return -1;
-			else
-				appErrorf("FPoly::Finalize: Normalization failed, verts=%i, size=%f",NumVertices,Normal.Size());
+			if( NoError ) return -1;
+			else appErrorf( "FPoly::Finalize: Normalization failed, verts=%i, size=%f", NumVertices, Normal.Size() );
 		}
 	}
 
-	// If texture U and V coordinates weren't specified, fudge them.
+	// If texture U and V coordinates weren't specified, generate them.
 	if( TextureU.IsZero() && TextureV.IsZero() )
 	{
-		TextureU = ((Vertex[0] - Vertex[1]) ^ Normal).Normal() * +65536.0;
-		TextureV = (TextureU                ^ Normal).Normal() * -65536.0;
+		for( int i=1; i<NumVertices; i++ )
+		{
+			TextureU = ((Vertex[0] - Vertex[i]) ^ Normal).Normal() * +65536.0;
+			TextureV = (TextureU                ^ Normal).Normal() * -65536.0;
+			if( TextureU.SizeSquared()!=0 && TextureV.SizeSquared()!=0 )
+				break;
+		}
 	}
 	return 0;
-	//unguard;
+	unguard;
 }
 
 /*---------------------------------------------------------------------------------------
@@ -791,7 +763,7 @@ void UPolys::ParseFPolys( const char **Stream, int More, int CmdLine )
 						else
 						{
 							// Bad.
-							debugf("DXF: Bad vertex count %i",NewPoly.NumVertices);
+							debugf( "DXF: Bad vertex count %i", NewPoly.NumVertices );
 						}
 						
 						// Prepare for next.
@@ -803,7 +775,7 @@ void UPolys::ParseFPolys( const char **Stream, int More, int CmdLine )
 					{
 						// Start of new vertex.
 						//debugf("DXF: Vertex");
-						PointPool[NumPts] = GMath.ZeroVector;
+						PointPool[NumPts] = FVector(0,0,0);
 						Started = 1;
 						IsFace  = 0;
 					}
@@ -840,7 +812,7 @@ void UPolys::ParseFPolys( const char **Stream, int More, int CmdLine )
 						if( IsFace && Code-10==NewPoly.NumVertices )
 						{
 							//debugf("DXF: NewVertex %i",NewPoly.NumVertices);
-							NewPoly.Vertex[NewPoly.NumVertices++] = GMath.ZeroVector;
+							NewPoly.Vertex[NewPoly.NumVertices++] = FVector(0,0,0);
 						}
 						NewPoly.Vertex[Code-10].X = PointPool[NumPts].X = atof(ExtraLine);
 					}

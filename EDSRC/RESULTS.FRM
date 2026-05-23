@@ -116,25 +116,4 @@ Private Sub Form_Unload(Cancel As Integer)
 End Sub
 
 Public Sub Results_DblClick()
-    Dim S As String, T As String, i As Long, Line As Long
-    If Results.ListIndex >= 0 Then
-        S = Results.List(Results.ListIndex)
-        '
-        If Left(S, 10) = "Compiling " Then
-            S = Mid(S, 11)
-            i = InStr(S, "...")
-            If i <> 0 Then
-                S = Left(S, i - 1) ' Class name
-                Call frmClassBrowser.LaunchScriptEd(S, "", 0, 0)
-            End If
-        ElseIf Left(S, 9) = "Error in " Then
-            S = Mid(S, 10)
-            i = InStr(S, ", Line ")
-            If i <> 0 Then
-                Line = Val(Mid(S, i + 7)) ' Line number
-                S = Left(S, i - 1) ' Class name
-                Call frmClassBrowser.LaunchScriptEd(S, "", 0, Line)
-            End If
-        End If
-    End If
 End Sub

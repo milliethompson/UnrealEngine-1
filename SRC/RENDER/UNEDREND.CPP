@@ -462,9 +462,9 @@ void FRender::DrawCircle
 {
 	FLOAT F = 0.0;
 	FVector A,B,P1,P2;
-	if	   ( Camera->Actor->RendMap==REN_OrthXY )	{A=GMath.XAxisVector; B=GMath.YAxisVector;}
-	else if( Camera->Actor->RendMap==REN_OrthXZ )	{A=GMath.XAxisVector; B=GMath.ZAxisVector;}
-	else											{A=GMath.YAxisVector; B=GMath.ZAxisVector;};
+	if	   ( Camera->Actor->RendMap==REN_OrthXY )	{A=FVector(1,0,0); B=FVector(0,1,0);}
+	else if( Camera->Actor->RendMap==REN_OrthXZ )	{A=FVector(1,0,0); B=FVector(0,0,1);}
+	else											{A=FVector(0,1,0); B=FVector(0,0,1);};
 
 	Dotted=0;
 	int Subdivide=8;
@@ -655,7 +655,8 @@ int FRender::Project(UCamera *Camera, FVector *V, FLOAT *ScreenX, FLOAT *ScreenY
 	{
 		*ScreenX = +Temp.Y * Camera->RZoom + Camera->FX2;
 		*ScreenY = -Temp.Z * Camera->RZoom + Camera->FY2;
-		if (Scale != NULL) *Scale = Camera->RZoom;
+		if( Scale )
+			*Scale = Camera->RZoom;
 		return 1;
 	}
 	else
@@ -669,7 +670,7 @@ int FRender::Project(UCamera *Camera, FVector *V, FLOAT *ScreenX, FLOAT *ScreenY
 		if( Scale  )
 			*Scale = RZ;
 
-		return (Z>1.0);
+		return Z > 1.0;
 	}
 	unguard;
 }
@@ -1092,7 +1093,7 @@ void FRender::DrawBrushPolys
 
 	// See if we can reject the brush.
 	if( Brush->TransformedBound.IsValid )
-		if( !BoundVisible( Camera, &Brush->TransformedBound, NULL, NULL, NULL ) )
+		if( !BoundVisible( Camera, &Brush->TransformedBound, NULL, NULL ) )
 			return;
 
 	APawn		*Actor = Camera->Actor;
@@ -1102,7 +1103,7 @@ void FRender::DrawBrushPolys
 	FLOAT       X,Y;
 	BYTE		DrawColor,VertexColor,PivColor;
 	INDEX       i,j;
-	const FVector *OrthoNormal = Camera->GetOrthoNormal();
+	FVector     OrthoNormal = Camera->GetOrthoNormal();
 
 	// Get model.
 	Brush->Lock(LOCK_Read);
@@ -1128,32 +1129,31 @@ void FRender::DrawBrushPolys
 	// Transform and draw all FPolys.
 	int NumTransformed = 0;
 	FPoly *EdPoly = &TransformedEdPolys[0];
-	for (i=0; i<Brush->Polys->Num; i++)
-		{
+	for( i=0; i<Brush->Polys->Num; i++ )
+	{
 		*EdPoly = Brush->Polys(i);
 		EdPoly->Normal = EdPoly->Normal.TransformVectorBy(Coords);
 		//
-		if ((!OrthoNormal) || (Camera->Actor->OrthoZoom < ORTHO_LOW_DETAIL) || 
-			(EdPoly->PolyFlags & PF_NotSolid) || ((*OrthoNormal | EdPoly->Normal)!=0.0))
-			{
-			//
-			// Transform it:
-			//
+		if
+		(	!Camera->IsOrtho()
+		||	(Camera->Actor->OrthoZoom<ORTHO_LOW_DETAIL)
+		||	(EdPoly->PolyFlags & PF_NotSolid)
+		||	(OrthoNormal | EdPoly->Normal) != 0.0 )
+		{
+			// Transform it.
 			VertPtr = &EdPoly->Vertex[0];
 			for( j=0; j<EdPoly->NumVertices; j++ )
 				*VertPtr++ = (*VertPtr - Brush->PrePivot).TransformVectorBy(Coords) + Brush->PostPivot + Location;
 
-			//
-			// Draw this brush's EdPoly's:
-			//
+			// Draw this brush's EdPoly's.
 			if (DoScan && GEditor && GEditor->Scan.Active) GEditor->Scan.PreScan();
 			DrawFPoly (Camera,EdPoly,DrawColor,0,Dotted);
 			if (DoScan && GEditor && GEditor->Scan.Active) GEditor->Scan.PostScan (EDSCAN_BrushSide,(int)Brush,i,0,NULL);
-			//
+
 			NumTransformed++;
 			EdPoly++;
-			};
-		};
+		}
+	}
 	//
 	// Draw all vertices:
 	//
@@ -1298,9 +1298,9 @@ void FRender::DrawActiveBrush(UCamera *Camera)
 //
 // Draw the brush's bounding box and pivots:
 //
-void FRender::DrawBoundingRect(UCamera *Camera,FBoundingRect *Bound)
+void FRender::DrawBoundingBox( UCamera *Camera, FBoundingBox *Bound )
 {
-	guard(FRender::DrawBoundingRect);
+	guard(FRender::DrawBoundingBox);
 
 	FVector B[2],P,Q;
 	FLOAT SX,SY;
@@ -1365,8 +1365,8 @@ void FRender::DrawGridSection
 	if( !CameraGridY ) return;
 	if( !Camera->IsOrtho() ) appError("Ortho camera error");
 
-	FLOAT	Start = (int)((CameraLocX - (CameraSXR>>1)*Camera->Zoom)/CameraGridY) - 1.0;
-	FLOAT	End   = (int)((CameraLocX + (CameraSXR>>1)*Camera->Zoom)/CameraGridY) + 1.0;
+	FLOAT	Start = (int)((CameraLocX - (CameraSXR>>1) * Camera->Zoom)/CameraGridY) - 1.0;
+	FLOAT	End   = (int)((CameraLocX + (CameraSXR>>1) * Camera->Zoom)/CameraGridY) + 1.0;
 	int     Dist  = (int)(Camera->X * Camera->Zoom / CameraGridY);
 	int		i,Color,IncBits,GMax,iStart,iEnd;
 	FLOAT	Alpha,Ofs;
@@ -1401,7 +1401,7 @@ void FRender::DrawGridSection
 			DrawOrthoLine( Camera, *A, *B, Color, 0, 0.5 );
 #else
 			if (i&1) Ofs += Alpha * (4.0-Ofs);
-			Color = COLOR(P_GREY,27-(int)Ofs);
+			Color = COLOR(P_GREY,4+(int)Ofs);
 			DrawOrthoLine( Camera, *A, *B, Color, 1, 1.0 );
 #endif
 		}
@@ -1412,7 +1412,7 @@ void FRender::DrawGridSection
 //
 // Draw worldbox and groundplane lines, if desired.
 //
-void FRender::DrawWireBackground(UCamera *Camera)
+void FRender::DrawWireBackground( UCamera *Camera )
 {
 	guard(FRender::DrawWireBackground);
 	if( !GEditor )

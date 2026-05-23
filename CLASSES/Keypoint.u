@@ -3,20 +3,22 @@ DeclareClass Name=Pawn
 DeclareClass Name=Object
 DeclareClass Name=Class
 DeclareClass Name=Keypoint
-DeclareClass Name=PlayerStart
-DeclareClass Name=Creaturepoint
+DeclareClass Name=CreaturePoint
 DeclareClass Name=BlockMonsters
 DeclareClass Name=BlockAll
 DeclareClass Name=AmbientSound
-DeclareClass Name=PathNode
 DeclareClass Name=TextMessage
 DeclareClass Name=CreatureFactory
 DeclareClass Name=Teleporter
+DeclareClass Name=PlayerStart
+DeclareClass Name=ScriptedPawn
 DeclareClass Name=WayBeacon
+DeclareClass Name=InterpolationPoint
 DeclareClass Name=Patrolpoint
 DeclareClass Name=Ambushpoint
 DeclareClass Name=HomeBase
 DeclareClass Name=Spawnpoint
+DeclareClass Name=PathNode
 
 Begin Class Name=Keypoint
    Begin Text
@@ -38,48 +40,73 @@ class Keypoint expands Actor
    End DefaultProperties
 End Class
 
-Begin Class Name=PlayerStart
+Begin Class Name=CreaturePoint
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //=============================================================================
-// Player start location.
+// CreaturePoint.
 //=============================================================================
-class PlayerStart expands Keypoint 
+class CreaturePoint expands Keypoint
 	package(UnEngine);
 
-#exec Texture Import File=..\Graphics\S_Player.pcx Name=S_Player Palette=Palette Mips=Off Flags=2
+var() name ownerTeam;	//creature clan owning this area (area visible from this point)
+var bool taken; //set when a creature is occupying this spot
+var int upstreamPaths[16];
+var int Paths[16]; //index of reachspecs (used by C++ Navigation code)
+var() vector turnDirection; //defines orientation of corner
+var float visitedWeight;
+var() float cost; //added cost to visit this pathnode
+var bool bEndPoint; //used by C++ navigation code
+var bool bSpecialBlock; //use to force no use of path (during findpath)
+var bool bPathsDefined; //set if paths have been defined
 
-// Type of player to spawn.
-var() class PlayerSpawnClass;
-
-// Players on different teams are not spawned in areas with the
-// same TeamNumber unless there are more teams in the level than
-// team numbers.
-var() byte TeamNumber;
+intrinsic(519) final function describeSpec(int iSpec); //FIXME - replace with function that returns spec values
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      PlayerSpawnClass=Human
-      TeamNumber=0
-      bDirectional=True
-      Texture=S_Player
-      DefaultEdCategory=PlayerStart
-   End DefaultProperties
-End Class
-
-Begin Class Name=Creaturepoint
-   Begin Text
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//=============================================================================
-// Creaturepoint.
-//=============================================================================
-class Creaturepoint expands Keypoint;
-
-var() name ownerClan;	//creature clan owning this area (area visible from this point)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   End Text
-   Begin DefaultProperties
-      ownerClan=None
+      ownerTeam=None
+      taken=False
+      upstreamPaths(0)=0
+      upstreamPaths(1)=0
+      upstreamPaths(2)=0
+      upstreamPaths(3)=0
+      upstreamPaths(4)=0
+      upstreamPaths(5)=0
+      upstreamPaths(6)=0
+      upstreamPaths(7)=0
+      upstreamPaths(8)=0
+      upstreamPaths(9)=0
+      upstreamPaths(10)=0
+      upstreamPaths(11)=0
+      upstreamPaths(12)=0
+      upstreamPaths(13)=0
+      upstreamPaths(14)=0
+      upstreamPaths(15)=0
+      Paths(0)=0
+      Paths(1)=0
+      Paths(2)=0
+      Paths(3)=0
+      Paths(4)=0
+      Paths(5)=0
+      Paths(6)=0
+      Paths(7)=0
+      Paths(8)=0
+      Paths(9)=0
+      Paths(10)=0
+      Paths(11)=0
+      Paths(12)=0
+      Paths(13)=0
+      Paths(14)=0
+      Paths(15)=0
+      turnDirection=(+00000.000000,+00000.000000,+00000.000000)
+      visitedWeight=+00000.000000
+      cost=+00000.000000
+      bEndPoint=False
+      bSpecialBlock=False
+      bPathsDefined=False
+      CollisionRadius=+00018.000000
+      CollisionHeight=+00030.000000
+      bCollideWhenPlacing=True
    End DefaultProperties
 End Class
 
@@ -87,15 +114,16 @@ Begin Class Name=Patrolpoint
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //=============================================================================
-// Patrolpoint.
+// PatrolPoint.
 //=============================================================================
-class Patrolpoint expands Creaturepoint;
+class PatrolPoint expands CreaturePoint
+	package(UnEngine);
 
 var() name Nextpatrol; //next point to go to
 var() float pausetime; //how long to pause here
 var() vector lookdir; //direction to look while stopped
 
-function TellAboutTo(Pawn other)
+function TellAboutTo(ScriptedPawn other)
 {
 	other.SetPatrol(Self);
 }
@@ -114,15 +142,15 @@ Begin Class Name=Ambushpoint
 //=============================================================================
 // Ambushpoint.
 //=============================================================================
-class Ambushpoint expands Creaturepoint;
+class AmbushPoint expands CreaturePoint
+	package(UnEngine);
 
 var() vector lookdir; //direction to look while ambushing
-var bool taken; //set when a creature is occupying this spot
 //at start, ambushing creatures will pick either their current location, or the location of
 //some ambushpoint belonging to their team
 var byte survivecount; //used when picking ambushpoint 
 
-function TellAboutTo(Pawn other)
+function TellAboutTo(ScriptedPawn other)
 {
 		other.SetAmbush(Self);
 }
@@ -130,7 +158,6 @@ function TellAboutTo(Pawn other)
    End Text
    Begin DefaultProperties
       lookdir=(+00000.000000,+00000.000000,+00000.000000)
-      taken=False
       survivecount=0
    End DefaultProperties
 End Class
@@ -141,10 +168,19 @@ Begin Class Name=HomeBase
 //=============================================================================
 // HomeBase.
 //=============================================================================
-class HomeBase expands Creaturepoint;
+class HomeBase expands CreaturePoint
+	package(UnEngine);
+
+var() float extent; //how far the base extends from central point (in line of sight)
+
+function TellAboutTo(ScriptedPawn other)
+{
+		other.SetHome(Self);
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
+      Extent=+00700.000000
    End DefaultProperties
 End Class
 
@@ -154,17 +190,46 @@ Begin Class Name=Spawnpoint
 //=============================================================================
 // Spawnpoint.
 //=============================================================================
-class Spawnpoint expands Creaturepoint;
+class SpawnPoint expands CreaturePoint
+	package(UnEngine);
 
 function Create(class creatureClass)
 {
 	local actor newcreature;
 	newcreature = Spawn(creatureClass);
-	(Pawn(newcreature)).orders = Roaming;
+	(Pawn(newcreature)).orders = 'Roaming';
 }
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
+   End DefaultProperties
+End Class
+
+Begin Class Name=PathNode
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// PathNode.
+//=============================================================================
+class PathNode expands CreaturePoint
+	package(UnEngine);
+
+/*
+function PreBeginPlay()
+{
+	local int j;
+	log("Describe paths for pathnode at "$Location);
+	for (j=0; j<16; j++)
+	{
+		if (Paths[j] != -1)
+			describeSpec(Paths[j]);
+	}
+}
+*/
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      CollisionRadius=+00046.000000
    End DefaultProperties
 End Class
 
@@ -219,80 +284,6 @@ class AmbientSound expands Keypoint
    End DefaultProperties
 End Class
 
-Begin Class Name=PathNode
-   Begin Text
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//=============================================================================
-// Used for navigation AI
-//=============================================================================
-class PathNode Expands keypoint
-	package(UnEngine);
-
-var int upstreamPaths[16];
-var int Paths[16]; //index of reachspecs (used by C++ Navigation code)
-var() vector turnDirection; //defines orientation of corner
-var float visitedWeight;
-var() float cost; //added cost to visit this pathnode
-var bool bEndPoint; //used by C++ navigation code
-var bool bSpecialBlock; //use to force no use of path (during findpath)
-
-intrinsic(519) final function describeSpec(int iSpec);
-
-/*
-function PreBeginPlay()
-{
-	local int j;
-	log("Describe paths for pathnode at "$Location);
-	for (j=0; j<16; j++)
-	{
-		if (Paths[j] != -1)
-			describeSpec(Paths[j]);
-	}
-}
-*/
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   End Text
-   Begin DefaultProperties
-      upstreamPaths(0)=0
-      upstreamPaths(1)=0
-      upstreamPaths(2)=0
-      upstreamPaths(3)=0
-      upstreamPaths(4)=0
-      upstreamPaths(5)=0
-      upstreamPaths(6)=0
-      upstreamPaths(7)=0
-      upstreamPaths(8)=0
-      upstreamPaths(9)=0
-      upstreamPaths(10)=0
-      upstreamPaths(11)=0
-      upstreamPaths(12)=0
-      upstreamPaths(13)=0
-      upstreamPaths(14)=0
-      upstreamPaths(15)=0
-      Paths(0)=0
-      Paths(1)=0
-      Paths(2)=0
-      Paths(3)=0
-      Paths(4)=0
-      Paths(5)=0
-      Paths(6)=0
-      Paths(7)=0
-      Paths(8)=0
-      Paths(9)=0
-      Paths(10)=0
-      Paths(11)=0
-      Paths(12)=0
-      Paths(13)=0
-      Paths(14)=0
-      Paths(15)=0
-      turnDirection=(+00000.000000,+00000.000000,+00000.000000)
-      visitedWeight=+00000.000000
-      cost=+00000.000000
-      bEndPoint=False
-      bSpecialBlock=False
-   End DefaultProperties
-End Class
-
 Begin Class Name=TextMessage
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -315,7 +306,8 @@ Begin Class Name=CreatureFactory
 //=============================================================================
 // CreatureFactory.
 //=============================================================================
-class CreatureFactory expands Keypoint;
+class CreatureFactory expands Keypoint
+	package(UnEngine);
 
 var() class prototype; 	// the template class
 var() byte maxpawns;	// max number of pawns from this factory at any time
@@ -328,7 +320,7 @@ var Spawnpoint spawnspot[5]; //possible start locations
 
 Auto State Waiting
 {
-Engine Function Touch(Actor Other)
+function Touch(Actor Other)
 	{
 	local pawn otherpawn;
 	log(other.class$" touched "$class);
@@ -337,7 +329,7 @@ Engine Function Touch(Actor Other)
 		if (otherpawn.bIsPlayer)
 			{
 			log("factory is primed");
-			GotoState(Spawning);
+			GotoState('Spawning');
 			}		
 	}
 
@@ -348,7 +340,7 @@ Begin:
 
 State Spawning
 {
-Function Trigger(actor Other)
+Function Trigger(actor Other, pawn EventInstigator)
 	{
 	backlog += 1;
 	maxpawns -= 1;
@@ -356,7 +348,7 @@ Function Trigger(actor Other)
 		StartBuilding();
 	}
 	
-engine function Timer( int TimerTicks )
+function Timer()
 	{
 	local Spawnpoint bld;
 	//pick a spawn point
@@ -369,7 +361,7 @@ engine function Timer( int TimerTicks )
 	if (capacity > 0)
 		capacity -= 1;
 	if (capacity == 0)
-		GotoState(Finished);
+		GotoState('Finished');
 		
 	if (backlog > 0)
 		StartBuilding();
@@ -395,7 +387,7 @@ Function CallBack(Object Other)
 Function GetSpawnspots()
 {
 	numspots = 0;
-	Broadcast(NoName, Spawnpoint).Callme(Self);
+	Broadcast('', class 'Spawnpoint').Callme(Self);
 	log("Got "$numspots$" spawn spots");
 }
 	
@@ -452,7 +444,7 @@ class Teleporter expands Keypoint
 // Unreal://Server.domain.com/LevelName/TeleporterName
 //     Teleports to a different server on the net.
 //
-var() string[64] TeleportURL;
+var() string[64] URL;
 
 //-----------------------------------------------------------------------------
 // Product the user must have installed in order to enter the teleporter.
@@ -470,10 +462,57 @@ var() bool    bReversesZ;       // Reverses Z-component of velocity.
 // Teleporter directions.
 var() int     TargetYaw;        // If bChangesYaw, set target's yaw to this.
 var() vector  TargetVelocity;   // If bChangesVelocity, set target's velocity to this.
+
+//-----------------------------------------------------------------------------
+// Teleporter functions.
+
+// Accept an actor that has teleported in.
+function Accept( actor Incoming )
+{
+	// Move the actor here.
+	Incoming.SetLocation( Location + vect (0,0,20));
+	Incoming.Velocity = vect(0,0,0);
+
+	// Play teleport-in effect.
+}
+
+// Teleporter was touched by an actor.
+function Touch( actor Other )
+{
+	local Teleporter Dest;
+	local int i;
+	if( Other.bCanTeleport && Other.PreTeleport(Self)==false )
+	{
+		if( InStr( URL, "/" ) >= 0 )
+		{
+			// Teleport to a level on the net.
+		}
+		else
+		{
+			// Teleport to a random teleporter in this local level, if more than one pick random.
+			foreach AllActors( class 'Teleporter', Dest )
+				if( Dest.URL~=URL && Dest!=Self )
+					i++;
+			i = rand(i);
+			foreach AllActors( class 'Teleporter', Dest )
+				if( Dest.URL~=URL && Dest!=Self && i-- == 0 )
+					break;
+			if( Dest != None )
+			{
+				// Teleport the actor into the other teleporter.
+				Other.Message( "Teleport ok!" );
+				Dest.Accept( Other );
+
+				// Play teleport-out effect.
+			}
+			else Other.Message( "Teleport destination not found!" );
+		}
+	}
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      TeleportURL=""
+      URL=""
       ProductRequired=None
       bChangesVelocity=False
       bChangesYaw=False
@@ -482,11 +521,43 @@ var() vector  TargetVelocity;   // If bChangesVelocity, set target's velocity to
       bReversesZ=False
       TargetYaw=0
       TargetVelocity=(+00000.000000,+00000.000000,+00000.000000)
+      bStatic=False
       bDirectional=True
       bCollideActors=True
       CollisionRadius=+00020.000000
       CollisionHeight=+00020.000000
+      bCollideWhenPlacing=True
       DefaultEdCategory=Teleporter
+   End DefaultProperties
+End Class
+
+Begin Class Name=PlayerStart
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Player start location.
+//=============================================================================
+class PlayerStart expands Keypoint 
+	package(UnEngine);
+
+#exec Texture Import File=..\Graphics\S_Player.pcx Name=S_Player Palette=Palette Mips=Off Flags=2
+
+// Type of player to spawn.
+var() class PlayerSpawnClass;
+
+// Players on different teams are not spawned in areas with the
+// same TeamNumber unless there are more teams in the level than
+// team numbers.
+var() byte TeamNumber;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      PlayerSpawnClass=Human
+      TeamNumber=0
+      bDirectional=True
+      Texture=S_Player
+      bCollideWhenPlacing=True
+      DefaultEdCategory=PlayerStart
    End DefaultProperties
 End Class
 
@@ -496,27 +567,28 @@ Begin Class Name=WayBeacon
 //=============================================================================
 // WayBeacon.
 //=============================================================================
-class WayBeacon expands Keypoint;
+class WayBeacon expands Keypoint
+	package(UnEngine);
 
 //temporary beacon for serverfind navigation
-#exec MESH IMPORT MESH=lamp4 ANIVFILE=..\MODELS\lamp4_a.3D DATAFILE=..\MODELS\lamp4_d.3D X=0 Y=0 Z=0
-#exec MESH ORIGIN MESH=lamp4 X=0 Y=100 Z=-120 YAW=64
+#exec MESH IMPORT MESH=Lamp4 ANIVFILE=..\MODELS\lamp4_a.3D DATAFILE=..\MODELS\lamp4_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Lamp4 X=0 Y=100 Z=-120 YAW=64
 
-#exec MESH SEQUENCE MESH=lamp4 SEQ=All  STARTFRAME=0  NUMFRAMES=1
-#exec MESH SEQUENCE MESH=lamp4 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Lamp4 SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Lamp4 SEQ=Still  STARTFRAME=0   NUMFRAMES=1
 
 
 #exec TEXTURE IMPORT NAME=Jlamp41 FILE=..\MODELS\lamp4.PCX FAMILY=!Skins PALETTE=Jlamp41 FLAGS=2
 
-#exec MESHMAP NEW   MESHMAP=lamp4 MESH=lamp4 
-#exec MESHMAP SCALE MESHMAP=lamp4 X=0.05 Y=0.05 Z=0.1
+#exec MESHMAP NEW   MESHMAP=Lamp4 MESH=lamp4 
+#exec MESHMAP SCALE MESHMAP=Lamp4 X=0.05 Y=0.05 Z=0.1
 
-#exec MESHMAP SETTEXTURE MESHMAP=lamp4 NUM=1 TEXTURE=Jlamp41
+#exec MESHMAP SETTEXTURE MESHMAP=Lamp4 NUM=1 TEXTURE=Jlamp41
 
-engine function touch(actor other)
+function touch(actor other)
 {
 	if (other == owner)
-		Pawn(owner).ServerFind(0.0,NoName,"");
+		Pawn(owner).ServerFind(0.0,'',"");
 }
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
@@ -524,7 +596,7 @@ engine function touch(actor other)
       bHidden=False
       bCollideActors=True
       DrawType=DT_Mesh
-      Mesh=lamp4
+      Mesh=Lamp4
       DrawScale=+00000.500000
       AmbientGlow=40
       LightType=LT_Steady
@@ -532,6 +604,82 @@ engine function touch(actor other)
       LightSaturation=125
       bOnlyOwnerSee=True
       LifeSpan=+00006.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=InterpolationPoint
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// InterpolationPoint.
+//=============================================================================
+class InterpolationPoint expands Keypoint
+	package(UnEngine);
+
+// Number in sequence sharing this tag.
+var() int   Position;
+var() float RateModifier;
+var() bool  bEndOfPath;
+
+// Other points in this interpolation path.
+var InterpolationPoint Prev, Next;
+
+// At start of gameplay, link all matching interpolation points together.
+function BeginPlay()
+{
+	CallParent.BeginPlay();
+
+	// Try to find previous.
+	foreach AllActors( class 'InterpolationPoint', Prev, Tag )
+		if( Prev.Position == Position-1 )
+			break;
+	if( Prev != None )
+		Prev.Next = Self;
+
+	// Try to find next.
+	foreach AllActors( class 'InterpolationPoint', Next, Tag )
+		if( Next.Position == Position+1 )
+			break;
+	if( Next == None )
+		foreach AllActors( class 'InterpolationPoint', Next, Tag )
+			if( Next.Position == 0 )
+				break;
+	if( Next != None )
+		Next.Prev = Self;
+}
+
+function PostBeginPlay()
+{
+	// Verify that we're linked up.
+	CallParent.PostBeginPlay();
+	log( "Interpolation point " $ Tag $ " # " $ Position $ ":" );
+	if( Prev != None )
+		log( "   Prev # " $ Prev.Position );
+	if( Next != None )
+		log( "   Next # " $ Next.Position );
+}
+
+function InterpolateEnd( actor Other )
+{
+	if( bEndOfPath )	
+	{
+		if( Pawn(Other)!=None && Pawn(Other).bIsPlayer )
+		{
+			Pawn(Other).GotoState('PlayerWalking');
+			Other.SetCollision(Other.bCollideActors,true,true);
+		}
+	}
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Position=0
+      RateModifier=+00001.000000
+      bEndOfPath=False
+      Prev=None
+      Next=None
+      bStatic=False
+      bDirectional=True
    End DefaultProperties
 End Class
 

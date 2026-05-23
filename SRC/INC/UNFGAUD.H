@@ -94,8 +94,12 @@ public:
 	/* Volume get/set routines. */
 	INT MusicVolumeGet(void);
 	INT MusicVolumeSet(INT NewVol);
+	void MusicMute(INT bMute);
+	INT MusicIsMuted(void);
 	INT SfxVolumeGet(void);
 	INT SfxVolumeSet(INT NewVol);
+	void SfxMute(INT bMute);
+	INT SfxIsMuted(void);
 
 	/* Start fade-in or fade-out. */
 	void MusicFade(INT fFadeOut);	/* 1 = fade in; 0 = fade out */
@@ -109,6 +113,7 @@ public:
 	/* Enable/disable DirectSound in Galaxy. */
 	INT DirectSoundFlagGet(void);
 	INT DirectSoundFlagSet(INT val);
+	void DirectSoundOwnerWindowSet(void *hWnd);
 
 	/* Enable/disable Galaxy interpolation filter. */
 	INT FilterFlagGet(void);
@@ -132,6 +137,12 @@ public:
 	/* Temporarily stop/start sound during playback. */
 	void Pause(void);
 	void UnPause(void);
+
+	/* Specify exaggeration factor for panning. */
+	void PanExaggerationSet(FLOAT val);
+
+	/* Specify exaggeration factor for Doppler shift. */
+	void DopplerExaggerationSet(FLOAT val);
 
 /*
 private:

@@ -333,7 +333,7 @@ Private Sub BroLoad_Click()
         Fnames = Trim(frmDialogs.TexFamLoad.filename)
         While (Fnames <> "")
             Temp = GrabFname(Fnames)
-            Ed.Server.Exec "TEXTURE LOADSet FILE=" & Quotes(Temp)
+            Ed.Server.Exec "TEXTURE LOADSET FILE=" & Quotes(Temp)
         Wend
         While InStr(Temp, "\")
             Temp = Mid(Temp, InStr(Temp, "\") + 1)
@@ -359,7 +359,7 @@ Private Sub BroSaveAll_Click()
     '
     Fname = frmDialogs.TexFamSave.filename
     If Fname <> "" Then
-        Ed.Server.Exec "TEXTURE SaveSet ALL FILE=" & Quotes(Fname)
+        Ed.Server.Exec "TEXTURE SAVESET ALL FILE=" & Quotes(Fname)
     End If
 Skip:
     Ed.Server.Enable
@@ -401,7 +401,7 @@ TryAgain:
         Fname = frmDialogs.TexFamSave.filename
         '
         If (Fname <> "") Then
-            Ed.Server.Exec "TEXTURE SAVESet Set=" & Quotes(SetName) & " FILE=" & Quotes(Fname)
+            Ed.Server.Exec "TEXTURE SAVESET Set=" & Quotes(SetName) & " FILE=" & Quotes(Fname)
         End If
     End If
 Skip:

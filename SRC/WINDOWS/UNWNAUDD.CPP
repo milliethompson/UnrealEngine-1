@@ -95,12 +95,8 @@ BOOL CDialogAudio::OnInitDialog()
     SoundVolume.SetPos( GAudio.SfxVolumeGet() );
     MusicVolume.SetRange(0,MAX_MUSIC_VOLUME);
     MusicVolume.SetPos( GAudio.MusicVolumeGet() );
-    MuteMusic = FALSE;
-    if (GAudio.MusicVolumeGet() < 1)
-		MuteMusic = TRUE;
-    MuteSound = FALSE;
-    if (GAudio.SfxVolumeGet() < 1)
-		MuteSound = TRUE;
+    MuteMusic = GAudio.MusicIsMuted();
+    MuteSound = GAudio.SfxIsMuted();
     UseDirectSound = GAudio.DirectSoundFlagGet() != 0 ? TRUE : FALSE;
     EnableFilter = GAudio.FilterFlagGet() != 0 ? TRUE : FALSE;
     Enable16Bit = GAudio.Use16BitFlagGet() != 0 ? TRUE : FALSE;
@@ -133,11 +129,9 @@ BOOL CDialogAudio::Accept()
     BOOL Accepted = TRUE; // We always accept the input (it cannot be wrong).
     UpdateData(TRUE);
     GAudio.SfxVolumeSet( SoundVolume.GetPos() );
-    if (MuteSound)
-		GAudio.SfxVolumeSet(0);
+    GAudio.SfxMute(MuteSound);
     GAudio.MusicVolumeSet( MusicVolume.GetPos() );
-    if (MuteMusic)
-		GAudio.MusicVolumeSet(0);
+    GAudio.MusicMute(MuteMusic);
     GAudio.DirectSoundFlagSet( UseDirectSound );
     GAudio.FilterFlagSet( EnableFilter );
     GAudio.Use16BitFlagSet( Enable16Bit );

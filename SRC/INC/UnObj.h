@@ -213,7 +213,8 @@ public:
 	TArray<TClassPtr>() {}
 
 	// UDatabase interface.
-	TClassPtr &Element(int i) {return ((TClassPtr *)GetData())[i];}
+	      TClassPtr &Element(int i)       {return ((TClassPtr *)GetData())[i];}
+	const TClassPtr &Element(int i) const {return ((TClassPtr *)GetData())[i];}
 
 	// TArray interface.
 	struct UNENGINE_API Ptr
@@ -321,38 +322,38 @@ public:
 	}
 
 	// Operators.
-	int operator==( FColor &C )
+	int operator==( const FColor &C ) const
 	{
 		return R==C.R && G==C.G && B==C.B;
 	}
-	int operator!=(FColor &C )
+	int operator!=( const FColor &C ) const
 	{
 		return R!=C.R || G!=C.G || B!=C.B;
 	}
 
 	// Greyscale 0-255 brightness.
-	int Brightness()
+	int Brightness() const
 	{
 		return (2*(int)R + 3*(int)G + 1*(int)B)>>3;
 	}
 	// Floating point 0.0 to 1.0 brightness.
-	FLOAT FBrightness()
+	FLOAT FBrightness() const
 	{
 		return (2.0*R + 3.0*G + 1.0*B)/(6.0*256.0);
 	}
-	DWORD TrueColor()
+	DWORD TrueColor() const
 	{
 		return ((D&0xff)<<16) + (D&0xff00) + ((D&0xff0000)>>16);
 	}
-	WORD HiColor565()
+	WORD HiColor565() const
 	{
 		return ((D&0xf8) << 8) + ((D&0xfC00) >> 5) + ((D&0xf80000) >> 19);
 	}
-	WORD HiColor555()
+	WORD HiColor555() const
 	{
 		return ((D&0xf8) << 7) + ((D&0xf800) >> 6) + ((D&0xf80000) >> 19);
 	}
-	FVector Vector()
+	FVector Vector() const
 	{
 		return FVector(R,G,B);
 	}
@@ -382,7 +383,6 @@ class UNENGINE_API UPalette : public UDatabase
 
 	// UPalette interface.
 	BYTE BestMatch(FColor Color,int SystemPalette=1);
-	BYTE BestMatchInRange(FColor MatchColor, BYTE RangeColor);
 	UPalette* ReplaceWithExisting();
 	void BuildPaletteRemapIndex(int Masked);
 	void Smooth();
@@ -396,20 +396,24 @@ class UNENGINE_API UPalette : public UDatabase
 
 // Maximum number of mipmaps that a texture can have.
 enum {MAX_MIPS=12};
+enum {MAX_TEXTURE_SIZE=1024};
 
 // Flags for normal textures.
 enum ETextureFlags
 {
 	// General info about the texture.
-	TF_NoTile			= 0x00001,	// Texture size isn't a power of two.
-	TF_BumpMap			= 0x00002,	// This texture is a normal-discretized bumpmap.
-	TF_Blur				= 0x00004,	// Blur this texture on import.
-	TF_Temp				= 0x08000,	// Temporary.
+	TF_NoTile			= 0x00000001,	// Texture size isn't a power of two.
+	TF_BumpMap			= 0x00000002,	// This texture is a normal-discretized bumpmap.
+	TF_Blur				= 0x00000004,	// Blur this texture on import.
+	TF_Realtime         = 0x00000008,   // Texture data (not animation) changes in realtime.
+
+	// Special flags.
+	TF_Temp				= 0x08000000,	// Temporary.
 
 	// Special info about a locked texture, relative to the camera it was locked for.
-	TL_Render			= 0x10000,	// Suitable for polygon rendering to the camera.
-	TL_RenderPalette	= 0x20000,	// Colors is a valid palette for the camera.
-	TL_RenderRamp		= 0x40000,	// Colors is a valid ramp palette for the camera.
+	TL_Render			= 0x10000000,	// Suitable for polygon rendering to the camera.
+	TL_RenderPalette	= 0x20000000,	// Colors is a valid palette for the camera.
+	TL_RenderRamp		= 0x40000000,	// Colors is a valid ramp palette for the camera.
 
 	// Flag groups.
 	TL_AnyRender = TL_Render | TL_RenderPalette | TL_RenderRamp,
@@ -458,14 +462,19 @@ class UNENGINE_API UTexture : public UDatabase
 	enum {BaseFlags = CLASS_Intrinsic | CLASS_ScriptWritable | CLASS_Swappable};
 	enum {GUID1=0,GUID2=0,GUID3=0,GUID4=0};
 
-	// Variables.
+	// Subtextures.
+	UTexture*	BumpMap;			// Bump map to illuminate this texture with.
+	UTexture*	DetailTexture;		// Detail texture to apply.
+	UTexture*	MacroTexture;		// Macrotexture to apply, not currently used.
+	UTexture*	AnimNext;			// Next texture in looped animation sequence.
+
+	// The palette.
 	UPalette::Ptr	Palette;		// Custom texture palette, NULL = use default palette.
 
 	// Surface lighting properties.
 	FLOAT		DiffuseC;			// Diffuse lighting coefficient (0.0-1.0).
 	FLOAT		SpecularC;			// Specular lighting coefficient (0.0-1.0).
 	FLOAT		ReflectivityC;		// Reflectivity (0.0-0.1).
-	FLOAT		MipmapC;			// Mipmap threshold adjustment.
 
 	// Surface physics properties.
 	FLOAT		FrictionC;			// Surface friction coefficient, 1.0=none, 0.95=some.
@@ -514,8 +523,10 @@ class UNENGINE_API UTexture : public UDatabase
 		UDatabase::SerializeHeader(Ar);
 
 		// UTexture references.
+		Ar << BumpMap << DetailTexture << MacroTexture << AnimNext;
 		Ar << Palette;
-		Ar << DiffuseC << SpecularC << FrictionC << ReflectivityC;
+		Ar << DiffuseC << SpecularC << ReflectivityC;
+		Ar << FrictionC;
 		Ar << FootstepSound << HitSound;
 		Ar << PolyFlags << TextureFlags;
 		Ar << UBits << VBits;
@@ -600,27 +611,18 @@ class UNENGINE_API UTextureSet : public UDatabase
 // Flags associated with a Bsp node.
 enum EBspNodeFlags
 {
-	// General flags.
-	NF_NotCsg			= 0x00000001, // Node is not a Csg splitter, i.e. is a transparent poly.
-	NF_Sporadic			= 0x00000002, // Node is sporadic (changes from time to time).
-	NF_TerrainFront		= 0x00000040, // Node front contains terrain, NumVertices=0, iVertPool = terrain index.
-	NF_PolyOccluded		= 0x00000080, // Node's poly was occluded on the previously-drawn frame.
-	NF_AllOccluded		= 0x00000100, // Node and all its children were occluded on previously-drawn frame.
-	NF_PortalFront		= 0x00000400, // Temporary NodeFlags tag for zone portals.
-	NF_NoMerge			= 0x00000800, // Don't merge this node's polys.
-	NF_ShootThrough		= 0x00002000, // Can shoot through (for projectile solid ops).
-	NF_Bounded			= 0x00004000, // Bound is valid (otherwise is undefined).
-	NF_NotLightBlocking = 0x00008000, // Node is not a light blocker, i.e. is an invisible collision hull.
-	NF_SolidLeaf        = 0x00010000, // iBack is a solid leaf and iBound points to its hull list.
-
-	// Editor flags.
-	NF_Modified			= 0x10000000, // Editor: Node was modified during editorCleanupNodes.
-	NF_TagForEmpty	 	= 0x20000000, // Editor: Node's polys should be emptied after Csg.
-	NF_IsNew 		 	= 0x40000000, // Editor: Node was newly-added.
-	NF_PortalBack		= 0x80000000, // Editor: Temporary NodeFlags tag for zone portals.
+	// Flags.
+	NF_NotCsg			= 0x01, // Node is not a Csg splitter, i.e. is a transparent poly.
+	NF_ShootThrough		= 0x02, // Can shoot through (for projectile solid ops).
+	NF_NotVisBlocking   = 0x04, // Node does not block visibility, i.e. is an invisible collision hull.
+	NF_PolyOccluded		= 0x08, // Node's poly was occluded on the previously-drawn frame.
+	NF_AllOccluded		= 0x10, // Node and all its children were occluded on previously-drawn frame.
+	NF_IsNew 		 	= 0x20, // Editor: Node was newly-added.
+	NF_IsFront     		= 0x40, // Filter operation bounding-sphere precomputed and guaranteed to be front.
+	NF_IsBack      		= 0x80, // Guaranteed back.
 
 	// Combinations of flags.
-	NF_NeverMove		= NF_TerrainFront, // Bsp cleanup must not move nodes with this tag.
+	NF_NeverMove		= 0, // Bsp cleanup must not move nodes with these tags.
 };
 
 //
@@ -646,7 +648,6 @@ public:
 	// Persistent information.
 	FPlane			Plane;			// 16 Plane the node falls into (X, Y, Z, W).
 	QWORD			ZoneMask;		// 8  Bit mask for all zones at or below this node (up to 64).
-	INDEX			NodeFlags;		// 4  Bsp-related node bit flags.
 	INDEX			iVertPool;		// 4  Index of first vertex in vertex pool, =iTerrain if NumVertices==0 and NF_TerrainFront.
 	INDEX			iSurf;			// 4  Index to surface information.
 	union
@@ -662,29 +663,38 @@ public:
 			INDEX	iChild[3];		// 12 Index representation of children.
 		};
 	};
-	INDEX			iBound;			// 4  Optional Bounding volume index, valid only if NF_Bounded.
-	BYTE			iZone[2];		// 1  Visibility zone in 1=front, 0=back.
+	INDEX			iCollisionBound;// 4  Collision bound.
+	INDEX			iRenderBound;	// 4  Rendering bound.
+	BYTE			iZone[2];		// 2  Visibility zone in 1=front, 0=back.
 	BYTE			NumVertices;	// 1  Number of vertices in node.
-	BYTE			Pad1;			// 1  Available.
+	BYTE			NodeFlags;		// 1  Node flags.
 
 	// Valid in memory only.
-	INDEX			iDynamic[2];	// 4  Index to dynamic contents in 1=front, 0=Back.
+	INDEX			iDynamic[2];	// 4  Index to dynamic contents in 1=front, 0=Back. !!old!!
 
 	// Functions.
-	int IsCsg(INDEX ExtraFlags=0) const
+	int IsCsg( DWORD ExtraFlags=0 ) const
 	{
 		return (NumVertices>0) && !(NodeFlags & (NF_IsNew | NF_NotCsg | ExtraFlags));
 	}
-	int ChildOutside( int iChild, int Outside ) const
+	int ChildOutside( int iChild, int Outside, DWORD ExtraFlags=0 ) const
 	{
-		return iChild ? (Outside || IsCsg()) : (Outside && !IsCsg());
+		return iChild ? (Outside || IsCsg(ExtraFlags)) : (Outside && !IsCsg(ExtraFlags));
+	}
+	struct FDynamicsIndex* GetDynamic( int i )
+	{
+		return (FDynamicsIndex*)iDynamic[i];
+	}
+	void SetDynamic( int i, struct FDynamicsIndex* Value )
+	{
+		iDynamic[i] = (int)Value;
 	}
 	friend FArchive& operator<< (FArchive &Ar, FBspNode &N )
 	{
 		guard(FBspNode<<);
 		Ar << N.Plane << N.ZoneMask << N.NodeFlags << N.iVertPool << N.iSurf;
 		Ar << N.iChild[0] << N.iChild[1] << N.iChild[2];
-		Ar << N.iBound << N.iZone[0] << N.iZone[1];
+		Ar << N.iCollisionBound << N.iRenderBound << N.iZone[0] << N.iZone[1];
 		Ar << N.NumVertices;
 		return Ar;
 		unguard;
@@ -831,8 +841,6 @@ enum EPolyFlags
 	// Editor flags.
 	PF_Memorized     	= 0x01000000,	// Editor: Poly is remembered.
 	PF_Selected      	= 0x02000000,	// Editor: Poly is selected.
-	PF_IsFront     		= 0x10000000,	// Filter operation bounding-sphere precomputed and guaranteed to be front.
-	PF_IsBack      		= 0x20000000,	// Guaranteed back.
 	PF_InternalUnused1	= 0x40000000,	// FPoly has been split by SplitPolyWithPlane.   
 	PF_DynamicLight		= 0x80000000,	// Polygon is dynamically lit.
 
@@ -841,11 +849,11 @@ enum EPolyFlags
 	PF_EdCut       		= 0x80000000,	// FPoly has been split by SplitPolyWithPlane.  
 
 	// Combinations of flags.
-	PF_NoOcclude		= PF_Masked | PF_Transparent | PF_Invisible, // Doesn't obscure stuff beneath it
-	PF_NoEdit			= PF_Memorized | PF_Selected | PF_IsFront | PF_IsBack | PF_EdProcessed | PF_EdCut, // Can't change these flags in UnrealEd
-	PF_NoImport			= PF_NoEdit | PF_NoMerge | PF_Memorized | PF_Selected | PF_IsFront | PF_IsBack | PF_DynamicLight | PF_EdProcessed | PF_EdCut,
+	PF_NoOcclude		= PF_Masked | PF_Transparent | PF_Invisible,
+	PF_NoEdit			= PF_Memorized | PF_Selected | PF_EdProcessed | PF_NoMerge | PF_EdCut,
+	PF_NoImport			= PF_NoEdit | PF_NoMerge | PF_Memorized | PF_Selected | PF_DynamicLight | PF_EdProcessed | PF_EdCut,
 	PF_AddLast			= PF_Semisolid | PF_NotSolid,
-	PF_NoAddToBSP		= PF_EdCut | PF_EdProcessed | PF_Selected | PF_Memorized | PF_IsFront | PF_IsBack,
+	PF_NoAddToBSP		= PF_EdCut | PF_EdProcessed | PF_Selected | PF_Memorized,
 	PF_NoShadows		= PF_Unlit | PF_Invisible | PF_Environment | PF_FakeBackdrop | PF_Portal,
 };
 
@@ -879,7 +887,7 @@ class UNENGINE_API UBspSurfs : public UDatabase
 //
 class UNENGINE_API UBounds : public UDatabase
 {
-	DECLARE_DB_CLASS(UBounds,UDatabase,FBoundingRect,NAME_Bounds,NAME_UnEngine)
+	DECLARE_DB_CLASS(UBounds,UDatabase,FBoundingBox,NAME_Bounds,NAME_UnEngine)
 
 	// Identification.
 	enum {BaseFlags = CLASS_Intrinsic};
@@ -1041,12 +1049,12 @@ public:
 	void  Init				();
 	void  Reverse			();
 	void  SplitInHalf		(FPoly *OtherHalf);
-	void  Transform			(const FModelCoords &Coords, const FVector *PreSubtract,const FVector *PostAdd, FLOAT Orientation);
+	void  Transform			(const FModelCoords &Coords, const FVector &PreSubtract,const FVector &PostAdd, FLOAT Orientation);
 	int   Fix				();
 	int   CalcNormal		();
 	int   SplitWithPlane	(const FVector &Base,const FVector &Normal,FPoly *FrontPoly,FPoly *BackPoly,int VeryPrecise) const;
 	int   SplitWithNode		(const UModel *Model,INDEX iNode,FPoly *FrontPoly,FPoly *BackPoly,int VeryPrecise) const;
-	int   SplitWithPlaneFast(const FVector &Base,const FVector &Normal,FPoly *FrontPoly,FPoly *BackPoly) const;
+	int   SplitWithPlaneFast(const FPlane Plane,FPoly *FrontPoly,FPoly *BackPoly) const;
 	int   Split				(const FVector &Normal, const FVector &Base, int NoOverflow=0 );
 	int   RemoveColinears	();
 	int   Finalize			(int NoError);

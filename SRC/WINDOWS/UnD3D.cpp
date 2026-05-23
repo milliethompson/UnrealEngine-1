@@ -6,380 +6,371 @@
 
 	Revision history:
 		* Created by Tim Sweeney
+		* ported to D3D DrawPrim by Phil Taylor
 =============================================================================*/
 
 // Precompiled header.
 #include "StdAfx.h"
-#include "UnWnCam.h"
-#include "UnRender.h"
 
 // Unreal includes.
+#include "UnWnCam.h"
+#include "UnRender.h"
 #include "UnRenDev.h"
 
 // Direct3D includes.
 #include "d3d.h"
 #include "d3dcaps.h"
 
-// The global camera manager.
+// Externs.
 extern FWindowsCameraManager CameraManager;
+HWND GetCameraWindow( UCamera* Camera );
 
-// Macro for calling d3d functions and displaying errors.
-#define EXECUTE_ASSERT checkLogic
-#define DEBUGCALL(func,tag) {HRESULT hRes=func; if(hRes) debugf("%s: %s",tag,CameraManager.ddError(hRes));}
-#define CRITICALCALL(func,tag) {HRESULT hRes=func; if(hRes) appErrorf("%s: %s",tag,CameraManager.ddError(hRes));}
-#define USE_DRAWPRIMITIVE 0
+// Macros.
+#define CRITICALCALL(func) {HRESULT hRes=func; if(hRes) appErrorf("%s: %s",#func,CameraManager.ddError(hRes));}
+#define SAFERELEASE(x)     {if (x) { x->Release(); x = NULL; }}
+
+// Globals.
+char		     szAppName[]="UnrealD3D";
+char             DeviceName[128];
+IDirectDraw*     dd;
 
 /*-----------------------------------------------------------------------------
-	Execute buffer assembler.
+	FD3DTexture definition.
 -----------------------------------------------------------------------------*/
 
 //
-// Define the EXECUTE_ASSERT(x) macro to enable overflow checking while
-// building execute buffers, at a small cost in performance.
+// The Direct3D Texture class.
 //
-#ifndef EXECUTE_ASSERT
-#define EXECUTE_ASSERT(x)
-#endif
-
-//
-// A C++ class for assembling execute buffers easily.
-//
-class CExecuteBuffer
+class FD3DTexture
 {
-private:
-	///////////////////////
-	// Private variables //
-	///////////////////////
-
-	// Constants.
-	enum{ MAX_SIZE = 65536};
-
-	// Direct3D info.
-	IDirect3DDevice			*Device;
-	IDirect3DExecuteBuffer	*Exec;
-	IDirect3DViewport		*Viewport;
-	D3DEXECUTEBUFFERDESC	ExecDesc;
-	D3DEXECUTEDATA			ExecData;
-
-	// Start and end of buffer.
-	BYTE *Start, *End;
-	D3DINSTRUCTION *PreviousTop;
-
-	// Pointer to current top of buffer.
-	union
-	{
-		INT					TopINT;
-		BYTE				*TopBYTE;
-		WORD				*TopWORD;
-		DWORD				*TopDWORD;
-		D3DINSTRUCTION		*TopINSTRUCTION;
-		D3DPOINT			*TopPOINT;
-		D3DLINE				*TopLINE;
-		D3DTRIANGLE			*TopTRIANGLE;
-		D3DMATRIXLOAD		*TopMATRIXLOAD;
-		D3DMATRIXMULTIPLY	*TopMATRIXMULTIPLY;
-		D3DSTATE			*TopSTATE;
-		D3DPROCESSVERTICES	*TopPROCESSVERTICES;
-		D3DTEXTURELOAD		*TopTEXTURELOAD;
-		D3DBRANCH			*TopBRANCH;
-		D3DSPAN				*TopSPAN;
-		D3DSTATUS			*TopSTATUS;
-	};
-
-	// Most recently written opcode.
-	D3DOPCODE PreviousOpcode;
-
 public:
-	/////////////////
-	// Init & Exit //
-	/////////////////
+	DDSURFACEDESC       ddsd;			// dd surface description, for sys-mem surface		
+	IDirectDrawSurface* MemorySurface;  // system memory surface	
+	IDirectDrawPalette* Palette;
+	
+    IDirectDrawSurface* DeviceSurface;  // video memory texture	
+	D3DTEXTUREHANDLE    Handle;
+    FD3DTexture()
+    {
+		MemorySurface = 0;
+		DeviceSurface = 0;
+        Palette = 0;
+		Handle = 0;
+    }
 
-	// Init this execute buffer.
-	void Init( IDirect3DDevice *InDevice, IDirect3DViewport *InViewport )
-	{
-		Start = TopBYTE = new BYTE[MAX_SIZE];
-		PreviousOpcode	= (D3DOPCODE)255;
-		Device			= InDevice;
-		Viewport		= InViewport;
-		End				= &Start[MAX_SIZE];
-		PreviousTop		= NULL;
-		Exec			= NULL;
-	}
+    D3DTEXTUREHANDLE    GetHandle()    {return Handle;}
+    IDirectDrawSurface* GetSurface()   {return MemorySurface;}
+    IDirectDrawPalette* GetPalette()   {return Palette;}
 
-	// Exit.
-	void Exit()
-		{if( Exec ) Exec->Release();}
+    HRESULT InitEmpty(IDirect3DDevice2 *Device,int width,int height,int depth);		
+	HRESULT InitEmptyMip(IDirect3DDevice2 *Device,int width,int height,int depth, int numMips);
 
-	//////////////////////
-	// Helper functions //
-	//////////////////////
-
-	// Return number of bytes used in the execute buffer.
-	INT GetSize()
-		{return Align(TopBYTE - Start,8);}
-
-	// Finish filling the execute buffer with code.
-	HRESULT Make( DWORD NumVertices, DWORD MaxVertices, DWORD VertexSize )
-	{
-		// Make Direct3D execute buffer description.
-		memset(&ExecDesc,0,sizeof(ExecDesc));
-		ExecDesc.dwSize			= sizeof(ExecDesc);
-		ExecDesc.dwFlags		= D3DDEB_BUFSIZE | D3DDEB_CAPS;
-		ExecDesc.dwCaps			= D3DDEBCAPS_SYSTEMMEMORY;
-		ExecDesc.dwBufferSize	= GetSize() + MaxVertices * VertexSize;
-		ExecDesc.lpData			= NULL;
-
-		// Create the execute buffer.	
-		HRESULT hRes = Device->CreateExecuteBuffer( &ExecDesc, &Exec, NULL );
-		if( hRes ) return hRes;
-
-		// Lock the execute buffer.
-		memset(&ExecDesc,0,sizeof(ExecDesc));
-		ExecDesc.dwSize = sizeof(ExecDesc);
-		hRes = Exec->Lock( &ExecDesc );
-		if( hRes ) return hRes;
-
-		// Fill the execute buffer with our commands.
-		memcpy( ExecDesc.lpData, Start, GetSize() );
-
-		// Get rid of temporary memory.
-		delete Start;
-
-		// Unlock the execute buffer.
-		hRes = Exec->Unlock();
-		if( hRes ) return hRes;
-
-		// Set execute buffer's data info.
-		memset(&ExecData,0,sizeof(ExecData));
-		ExecData.dwSize					= sizeof(ExecData);
-		ExecData.dwVertexOffset			= GetSize();
-		ExecData.dwVertexCount			= NumVertices;
-		ExecData.dwInstructionOffset	= 0;
-		ExecData.dwInstructionLength	= GetSize();
-
-		// Set execute buffer's data.
-		return Exec->SetExecuteData(&ExecData);
-	}
-
-	// Execute the execute buffer.
-	HRESULT Execute( DWORD dwFlags )
-		{return Device->Execute( Exec, Viewport, dwFlags );}
-
-	HRESULT Lock( D3DTLVERTEX *&FirstVertex )
-	{
-		ExecDesc.dwSize = sizeof(ExecDesc);
-		HRESULT hRes = Exec->Lock(&ExecDesc);
-		if( hRes ) return hRes;
-		FirstVertex = (D3DTLVERTEX *)ExecDesc.lpData + GetSize();
-		return 0;
-	}
-
-	HRESULT Unlock()
-		{return Exec->Unlock();}
-
-	///////////////////////////////////////////////////////
-	// Functions to write things into the execute buffer //
-	///////////////////////////////////////////////////////
-
-	// Raw instruction.
-	// EXECUTE_ASSERTs that there is enough space for the opcode and its operands.
-	// bOpcode = opcode to write.
-	// bSize   = size of the operand array.
-	// wCount  = number of operands in the operand array.
-	void INSTRUCTION( D3DOPCODE bOpcode, BYTE bSize, WORD wCount )
-	{
-		if( PreviousOpcode == bOpcode )
-		{
-			// Tack this onto the end of the previous instruction.
-			EXECUTE_ASSERT( TopBYTE + (INT)bSize * (INT)wCount < End );
-			TopINSTRUCTION->wCount++;
-		}
-		else
-		{
-			// Generate a new instruction.
-			EXECUTE_ASSERT( TopBYTE + sizeof(D3DINSTRUCTION) + (INT)bSize * (INT)wCount < End );
-			PreviousTop    = TopINSTRUCTION;
-			PreviousOpcode = bOpcode;
-
-			TopINSTRUCTION->bOpcode	= bOpcode;
-			TopINSTRUCTION->bSize   = bSize;
-			TopINSTRUCTION->wCount	= wCount;
-			TopINSTRUCTION++;
-		}
-	}
-
-	// Dealign.
-	void DEALIGN()
-	{
-		if( (TopINT & 7) == 0 )
-		{
-			EXECUTE_ASSERT( TopBYTE + sizeof(D3DINSTRUCTION) < End );
-			PreviousOpcode = (D3DOPCODE)255;
-
-			TopINSTRUCTION->bOpcode	= D3DOP_TRIANGLE;
-			TopINSTRUCTION->bSize   = sizeof(D3DTRIANGLE);
-			TopINSTRUCTION->wCount	= 0;
-			TopINSTRUCTION++;
-		}
-	}
-
-	// Point.
-	// wFirst = index of first point into the execute buffer's vertex array.
-	// wCount = number of points to render from the execute buffer's vertex array.
-    void POINT( WORD wFirst, WORD wCount )
-	{
-		INSTRUCTION( D3DOP_POINT, sizeof(D3DPOINT), 1 );
-		TopPOINT->wFirst        = wFirst;
-		TopPOINT->wCount        = wCount;
-		TopPOINT++;
-	}
-
-	// Line.
-	void LINE( WORD wV1, WORD wV2 )
-	{
-		DEALIGN();
-		INSTRUCTION( D3DOP_LINE, sizeof(D3DLINE), 1 );
-		TopLINE->wV1            = wV1;
-		TopLINE->wV2            = wV2;
-		TopLINE++;
-    };
-
-	// Triangle.
-	void TRIANGLE( WORD wV1, WORD wV2, WORD wV3, WORD wFlags=0 )
-	{
-		DEALIGN();
-		INSTRUCTION( D3DOP_TRIANGLE, sizeof(D3DTRIANGLE), 1 );
-		TopTRIANGLE->wV1        = wV1;
-		TopTRIANGLE->wV2        = wV2;
-		TopTRIANGLE->wV3        = wV3;
-		TopTRIANGLE->wFlags     = wFlags;
-		TopTRIANGLE++;
-	}
-
-	// Matrix load.
-	void MATRIXLOAD( D3DMATRIXHANDLE hDestMatrix, D3DMATRIXHANDLE hSrcMatrix )
-	{
-		INSTRUCTION( D3DOP_MATRIXLOAD, sizeof(D3DMATRIXLOAD), 1 );
-		TopMATRIXLOAD->hDestMatrix  = hDestMatrix;
-		TopMATRIXLOAD->hSrcMatrix   = hSrcMatrix;
-		TopMATRIXLOAD++;
-	}
-
-	// Matrix multiply.
-	void MATRIXMULTIPLY( D3DMATRIXHANDLE hDestMatrix, D3DMATRIXHANDLE hSrcMatrix1, D3DMATRIXHANDLE hSrcMatrix2 )
-	{
-		INSTRUCTION( D3DOP_MATRIXMULTIPLY, sizeof(D3DMATRIXMULTIPLY), 1 );
-		TopMATRIXMULTIPLY->hDestMatrix = hDestMatrix;
-		TopMATRIXMULTIPLY->hSrcMatrix1 = hSrcMatrix1;
-		TopMATRIXMULTIPLY->hSrcMatrix2 = hSrcMatrix2;
-		TopMATRIXMULTIPLY++;
-	}
-
-	// State transform.
-	void STATETRANSFORM_I( D3DTRANSFORMSTATETYPE dtstTransformStateType, DWORD Arg )
-	{
-		INSTRUCTION( D3DOP_STATETRANSFORM, sizeof(D3DSTATE), 1 );
-		TopSTATE->dtstTransformStateType = dtstTransformStateType;
-		TopSTATE->dwArg[0]               = Arg;
-		TopSTATE++;
-	}
-	void STATETRANSFORM_F( D3DTRANSFORMSTATETYPE dtstTransformStateType, D3DVALUE Arg )
-	{
-		INSTRUCTION( D3DOP_STATETRANSFORM, sizeof(D3DSTATE), 1 );
-		TopSTATE->dtstTransformStateType = dtstTransformStateType;
-		TopSTATE->dvArg[0]               = Arg;
-		TopSTATE++;
-	}
-
-	// State light.
-	void STATELIGHT_I( D3DLIGHTSTATETYPE dlstLightStateType, DWORD Arg )
-	{
-		INSTRUCTION( D3DOP_STATELIGHT, sizeof(D3DSTATE), 1 );
-		TopSTATE->dlstLightStateType     = dlstLightStateType;
-		TopSTATE->dwArg[0]               = Arg;
-		TopSTATE++;
-	}
-	void STATELIGHT_F( D3DLIGHTSTATETYPE dlstLightStateType, D3DVALUE Arg )
-	{
-		INSTRUCTION( D3DOP_STATELIGHT, sizeof(D3DSTATE), 1 );
-		TopSTATE->dlstLightStateType     = dlstLightStateType;
-		TopSTATE->dvArg[0]               = Arg;
-		TopSTATE++;
-	}
-
-	// State render.
-	void STATERENDER_I( D3DRENDERSTATETYPE drstRenderStateType, DWORD Arg )
-	{
-		INSTRUCTION( D3DOP_STATERENDER, sizeof(D3DSTATE), 1 );
-		TopSTATE->drstRenderStateType    = drstRenderStateType;
-		TopSTATE->dwArg[0]               = Arg;
-		TopSTATE++;
-	}
-	void STATERENDER_F( D3DRENDERSTATETYPE drstRenderStateType, D3DVALUE Arg )
-	{
-		INSTRUCTION( D3DOP_STATERENDER, sizeof(D3DSTATE), 1 );
-		TopSTATE->drstRenderStateType    = drstRenderStateType;
-		TopSTATE->dvArg[0]               = Arg;
-		TopSTATE++;
-	}
-
-	// Process vertices.
-	void PROCESSVERTICES( DWORD dwFlags, WORD wStart, WORD wDest, DWORD dwCount, DWORD dwReserved )
-	{
-		INSTRUCTION( D3DOP_PROCESSVERTICES, sizeof(D3DPROCESSVERTICES), 1 );
-		TopPROCESSVERTICES->dwFlags		= dwFlags;
-		TopPROCESSVERTICES->wStart		= wStart;
-		TopPROCESSVERTICES->wDest		= wDest;
-		TopPROCESSVERTICES->dwCount		= dwCount;
-		TopPROCESSVERTICES->dwReserved	= dwReserved;
-		TopPROCESSVERTICES++;
-	}
-
-	// Texture load.
-	void TEXTURELOAD( D3DTEXTUREHANDLE hDestTexture, D3DTEXTUREHANDLE hSrcTexture )
-	{
-		INSTRUCTION( D3DOP_TEXTURELOAD, sizeof(D3DTEXTURELOAD), 1 );
-		TopTEXTURELOAD->hDestTexture	= hDestTexture;
-		TopTEXTURELOAD->hSrcTexture		= hSrcTexture;
-		TopTEXTURELOAD++;
-	}
-
-	// Exit.
-	void EXIT()
-	{
-		INSTRUCTION( D3DOP_EXIT, 0, 0 );
-	}
-
-	// Branch forward.
-	void BRANCHFORWARD( DWORD dwMask, DWORD dwValue, BOOL bNegate, DWORD dwOffset )
-	{
-		INSTRUCTION( D3DOP_BRANCHFORWARD, sizeof(D3DBRANCH), 1 );
-		TopBRANCH->dwMask		= dwMask;
-		TopBRANCH->dwValue		= dwValue;
-		TopBRANCH->bNegate		= bNegate;
-		TopBRANCH->dwOffset		= dwOffset;
-		TopBRANCH++;
-	}
-
-	// Span.
-	void SPAN( WORD wCount, WORD wFirst )
-	{
-		INSTRUCTION( D3DOP_SPAN, sizeof(D3DSPAN), 1 );
-		TopSPAN->wCount         = wCount;
-		TopSPAN->wFirst         = wFirst;
-		TopSPAN++;
-	}
-
-	// Status.
-	void SETSTATUS( DWORD dwFlags, DWORD dwStatus, D3DRECT drExtent )
-	{
-		INSTRUCTION( D3DOP_SETSTATUS, sizeof(D3DSTATUS), 1 );
-		TopSTATUS->dwFlags		= dwFlags;
-		TopSTATUS->dwStatus		= dwStatus;
-		TopSTATUS->drExtent		= drExtent;
-		TopSTATUS++;
-	}
+    HRESULT Release(void);
+    BOOL Restore(IDirectDraw* dd,IDirect3DDevice2 *Device);
 };
+
+/*-----------------------------------------------------------------------------
+	ChooseTextureFormat.
+-----------------------------------------------------------------------------*/
+
+// Structure for holding best texture format found.
+struct FindTextureData
+{
+    DWORD           bpp;        // We want a texture format of this bpp.
+    DDPIXELFORMAT   ddpf;       // Place the format here.
+};
+
+// Texture format enumeration callback.
+HRESULT CALLBACK FindTextureCallback( DDSURFACEDESC *DeviceFmt, LPVOID lParam )
+{
+    FindTextureData * FindData = (FindTextureData *)lParam;
+    DDPIXELFORMAT ddpf = DeviceFmt->ddpfPixelFormat;
+
+    // We use GetDC/BitBlt to init textures so we only
+    // want to use formats that GetDC will support.
+    if( ddpf.dwFlags & (DDPF_ALPHA|DDPF_ALPHAPIXELS) )
+        return DDENUMRET_OK;
+    if( ddpf.dwRGBBitCount <= 8 && !(ddpf.dwFlags & (DDPF_PALETTEINDEXED8 | DDPF_PALETTEINDEXED4)) )
+        return DDENUMRET_OK;
+    if( ddpf.dwRGBBitCount > 8 && !(ddpf.dwFlags & DDPF_RGB) )
+        return DDENUMRET_OK;
+
+    // Keep the texture format that is nearest to the bitmap we have.
+    if (FindData->ddpf.dwRGBBitCount == 0 ||
+       (ddpf.dwRGBBitCount >= FindData->bpp &&
+       (UINT)(ddpf.dwRGBBitCount - FindData->bpp) < (UINT)(FindData->ddpf.dwRGBBitCount - FindData->bpp)))
+    {
+        FindData->ddpf = ddpf;
+    }
+
+    return DDENUMRET_OK;
+}
+
+// Choose an appropriate texture format.
+void ChooseTextureFormat( IDirect3DDevice2 *Device, DWORD bpp, DDPIXELFORMAT *pddpf )
+{
+    FindTextureData FindData;
+    ZeroMemory( &FindData, sizeof(FindData) );
+    FindData.bpp = bpp;
+    Device->EnumTextureFormats( FindTextureCallback, (LPVOID)&FindData );
+    *pddpf = FindData.ddpf;
+}
+
+/*-----------------------------------------------------------------------------
+	PaletteFromUPalette.
+-----------------------------------------------------------------------------*/
+
+// Convert a UPalette to an IDirectDrawPalette.
+static IDirectDrawPalette *PaletteFromUPalette( IDirectDraw *DirectDraw, UPalette *Pal )
+{
+    IDirectDrawPalette* Palette = NULL;
+
+    // Convert BGR to RGB.
+	DWORD Colors[256];
+    for( int i=0; i<256; i++ )
+        Colors[i] = RGB( Pal->Element(i).R, Pal->Element(i).G, Pal->Element(i).B );
+
+    // Create a DirectDraw palette for the texture.
+    DirectDraw->CreatePalette( DDPCAPS_8BIT, (PALETTEENTRY *)Colors, &Palette, NULL );
+
+    return Palette;
+}
+
+/*-----------------------------------------------------------------------------
+	InitEmpty.
+-----------------------------------------------------------------------------*/
+
+//
+// Init the D3D texture.
+//
+HRESULT FD3DTexture::InitEmpty( IDirect3DDevice2 *Device, int width, int height, int depth )
+{
+	guard(FD3DTexture::InitEmpty);
+
+	HRESULT hres;
+    IDirectDrawSurface* Target;
+
+    // Get the render target (we need it to get the IDirectDraw).
+    if( Device==NULL || Device->GetRenderTarget(&Target) != DD_OK )
+        return FALSE;
+
+    // Find the best texture format to use.
+    ZeroMemory( &ddsd, sizeof(ddsd) );
+    ddsd.dwSize = sizeof(ddsd);
+    ChooseTextureFormat( Device, depth, &ddsd.ddpfPixelFormat );
+    ddsd.dwFlags |= DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT;
+    ddsd.dwWidth  = width;
+    ddsd.dwHeight = height;
+
+    // Create a video memory texture.
+    D3DDEVICEDESC hal, hel;
+    hal.dwSize = sizeof(hal);
+    hel.dwSize = sizeof(hel);
+    Device->GetCaps( &hal, &hel );
+
+    // Should we check for texture caps?
+    if( hal.dcmColorModel )
+        ddsd.ddsCaps.dwCaps = DDSCAPS_VIDEOMEMORY | DDSCAPS_TEXTURE | DDSCAPS_ALLOCONLOAD;
+    else
+        ddsd.ddsCaps.dwCaps = DDSCAPS_SYSTEMMEMORY| DDSCAPS_TEXTURE;
+  
+    hres = dd->CreateSurface( &ddsd, &DeviceSurface, NULL );
+	if( hres != DD_OK )
+	{
+		Release();
+		return hres;
+	}
+
+    // Create a system memory surface for the texture.
+    // We use this system memory surface for the ::Load call
+    // and this surface does not get lost.
+    if( hal.dcmColorModel )
+    {
+        ddsd.ddsCaps.dwCaps = DDSCAPS_SYSTEMMEMORY | DDSCAPS_TEXTURE;  
+        hres                = dd->CreateSurface(&ddsd, &MemorySurface, NULL);
+		if( hres != DD_OK )
+		{
+			Release();
+			return hres;
+		}
+    }
+    else
+    {
+        // When dealing with a SW rasterizer we don't need to make two surfaces.
+        MemorySurface = DeviceSurface;
+        DeviceSurface->AddRef();
+    }
+
+    // Get the texture handle.
+    IDirect3DTexture2 *	Texture;
+    DeviceSurface->QueryInterface(IID_IDirect3DTexture2, (void**)&Texture);
+    Texture->GetHandle(Device, &Handle);
+    Texture->Release();
+
+    return DD_OK;
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	InitEmptyMip.
+-----------------------------------------------------------------------------*/
+
+HRESULT FD3DTexture::InitEmptyMip( IDirect3DDevice2 *Device, int width, int height, int depth, int numMips )
+{
+	guard(FD3DTexture::InitEmpty);
+	HRESULT hres;
+    IDirectDrawSurface* Target;
+
+    // Get the render target (We need it to get the IDirectDraw).
+    if (Device==NULL || Device->GetRenderTarget(&Target) != DD_OK)
+        return FALSE;
+
+    // Find the best texture format to use.
+    ZeroMemory( &ddsd, sizeof(ddsd) );
+    ddsd.dwSize = sizeof(ddsd);
+    ChooseTextureFormat( Device, depth, &ddsd.ddpfPixelFormat );
+    ddsd.dwFlags |= DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT | DDSD_MIPMAPCOUNT;
+    ddsd.dwWidth  = width;
+    ddsd.dwHeight = height;
+    
+	// Create a video memory texture.
+    D3DDEVICEDESC hal, hel;
+    hal.dwSize = sizeof(hal);
+    hel.dwSize = sizeof(hel);
+    Device->GetCaps( &hal, &hel );
+
+    // Should we check for texture caps?
+	if( hal.dcmColorModel )
+		ddsd.ddsCaps.dwCaps = DDSCAPS_TEXTURE | DDSCAPS_MIPMAP | DDSCAPS_ALLOCONLOAD | DDSCAPS_COMPLEX | DDSCAPS_VIDEOMEMORY;
+	else
+		ddsd.ddsCaps.dwCaps = DDSCAPS_TEXTURE | DDSCAPS_MIPMAP | DDSCAPS_COMPLEX | DDSCAPS_SYSTEMMEMORY;  
+    ddsd.dwMipMapCount = numMips;
+
+    hres = dd->CreateSurface( &ddsd, &DeviceSurface, NULL );
+	if( hres != DD_OK )
+	{
+		Release();
+		return hres;
+	}
+
+    // Create a system memory surface for the texture.
+    // We use this system memory surface for the ::Load call
+    // and this surface does not get lost.
+    if( hal.dcmColorModel )
+    {
+        ddsd.ddsCaps.dwCaps = DDSCAPS_SYSTEMMEMORY | DDSCAPS_TEXTURE;
+		ddsd.dwMipMapCount  = numMips;
+		ddsd.ddsCaps.dwCaps = DDSCAPS_TEXTURE | DDSCAPS_MIPMAP | DDSCAPS_COMPLEX | DDSCAPS_SYSTEMMEMORY;
+		hres                = dd->CreateSurface(&ddsd, &MemorySurface, NULL);
+		if( hres != DD_OK )
+		{
+			Release();
+			return hres;
+		}
+    }
+    else
+    {
+        // When dealing with a software rasterizer we dont need to make two surfaces.
+        MemorySurface = DeviceSurface;
+        DeviceSurface->AddRef();
+    }
+
+    // Get the texture handle.
+    IDirect3DTexture2 *	Texture;
+    DeviceSurface->QueryInterface(IID_IDirect3DTexture2, (void**)&Texture);
+    Texture->GetHandle(Device, &Handle);
+    Texture->Release();
+
+    return DD_OK;
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	Restore.
+-----------------------------------------------------------------------------*/
+
+// Restore this D3D texture.
+BOOL FD3DTexture::Restore( IDirectDraw* dd, IDirect3DDevice2 *Device )
+{
+	guard(FD3DTexture::Restore);
+    HRESULT             err;
+    IDirect3DTexture2  *MemoryTexture;
+    IDirect3DTexture2  *DeviceTexture;
+
+    if( DeviceSurface == NULL || MemorySurface == NULL )
+        return FALSE;
+
+    // We dont need to do this step for system memory surfaces.
+    if( DeviceSurface == MemorySurface )
+        return TRUE;
+
+    // Restore the video memory texture.
+	err = DeviceSurface->Restore();
+    if( err != DD_OK )
+	{
+		debugf( "Restoring video memory surface failed: %s", CameraManager.ddError(err) );
+        return FALSE;
+	}
+
+    // Call IDirect3DTexture::Load() to copy the texture to the device.
+    DeviceSurface->QueryInterface( IID_IDirect3DTexture2, (void**)&DeviceTexture );
+    MemorySurface->QueryInterface( IID_IDirect3DTexture2, (void**)&MemoryTexture );
+
+    err = DeviceTexture->Load(MemoryTexture);
+	if( err != DD_OK )
+	{
+		debugf( "Loading video memory surface failed: %s", CameraManager.ddError(err) );
+        return FALSE;
+	}
+
+    // Get the texture handle.
+    DeviceTexture->GetHandle(Device, &Handle);
+	if( err !=DD_OK )
+	{
+		debugf("restore texture handle failed : %s",CameraManager.ddError(err));
+        return FALSE;
+	}
+
+	// Release temporary interfaces.
+    DeviceTexture->Release();
+    MemoryTexture->Release();
+
+    return TRUE;
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	Release.
+-----------------------------------------------------------------------------*/
+
+HRESULT FD3DTexture::Release()
+{
+	HRESULT hres;
+    if( MemorySurface ) hres = MemorySurface->Release();   MemorySurface = 0;
+    if( DeviceSurface ) hres = DeviceSurface->Release();   DeviceSurface = 0;
+    if( Palette       ) hres = Palette->Release();         Palette = 0;
+	return hres;
+}
+
+/*-----------------------------------------------------------------------------
+	FindDeviceCallback.
+-----------------------------------------------------------------------------*/
+
+// Callback for finding the D3D device.
+BOOL CALLBACK FindDeviceCallback( GUID* lpGUID, LPSTR szName, LPSTR szDevice, LPVOID lParam )
+{
+    char ach[128];
+    char * szFind = (char *)lParam;
+
+    wsprintf(ach,"%s (%s)",szName, szDevice);
+
+    if (lstrcmpi(szFind, szDevice) == 0 || lstrcmpi(szFind, ach) == 0)
+    {
+        DirectDrawCreate( lpGUID, &dd, NULL );
+        return DDENUMRET_CANCEL;
+    }
+    return DDENUMRET_OK;
+}
 
 /*-----------------------------------------------------------------------------
 	FDirect3DRenderDevice definition.
@@ -391,21 +382,40 @@ public:
 class FDirect3DRenderDevice : public FRenderDevice
 {
 public:
-	// DirectX interfaces.
-	IDirect3D					*d3d;
-	IDirect3DDevice				*d3dDevice;
-	IDirect3DViewport			*d3dViewport;
-	IDirect3DMaterial			*d3dBackground;
+	// DirectDraw interfaces.
+	IDirectDrawSurface			*FrontBuffer;
+	IDirectDrawSurface			*BackBuffer;
+	IDirectDrawSurface	        *ZBuffer;
 
-	// Execute buffer.
-	CExecuteBuffer				ExecuteBuffer;
+	// Direct3D2 Interfaces.
+	IDirect3D2					*d3d;
+	IDirect3DDevice2			*d3dDevice;
+	IDirect3DViewport2			*d3dViewport;
+	IDirect3DMaterial2			*d3dBackground;	
+	IDirect3DLight				*d3dLight;
 
 	// Variables.
-	D3DMATERIALHANDLE			hBackground;
+	char						*d3dName;
+	SIZE						ScreenSize;	
+	D3DMATERIALHANDLE			hBackground;	
 	D3DDEVICEDESC				DeviceDesc;
 	D3DVIEWPORT					Viewport;
 	GUID						DeviceGUID;
 	INT							DevicesFound;
+
+	// Texture cache.
+	enum {MAX_TEXTURES=256};
+	typedef struct tagD3DTexCache
+	{		
+		UTexture			*Texture;		// The Unreal texture object being cached
+		FD3DTexture			D3DTexture;		// d3d texture class
+		INT					numMips;		// num mip levels
+		BOOL				InUse;			// slot in use
+		INT					TexValue;		// w*h = value, a weighting hint for memory fragmentation
+		INT					UsageCount;		// slot usage count,for lru'ing
+	} D3DTexCache;
+	int						NumTexInCache;
+	D3DTexCache				TexCache[MAX_TEXTURES];	
 
 	// FRenderDevice interface.
 	int Init3D( UCamera *Camera, int RequestX, int RequestY );
@@ -417,90 +427,260 @@ public:
 		const FVector &Base, const FVector &Normal, const FVector &U, const FVector &V, FLOAT PanU, FLOAT PanV,
 		DWORD PolyFlags);
 	void DrawPolyC(UCamera *Camera,UTexture *Texture,const FTransTexture *Pts,int NumPts,DWORD PolyFlags);
-	void DrawPolyF(UCamera *Camera,const FTransform *Pts,int NumPts,FColor Color);
 	int Exec(const char *Cmd,FOutputDevice *Out);
+
+	// Internal functions.
+	BOOL Init3D();
+	BOOL DDInit(UCamera *Camera,char *szDevice=NULL, int canvasX=640, int canvasY=400);
+	BOOL DDSetMode(int width, int height, int bpp);
+	void DDTerm(BOOL fAll=TRUE);	
+
+	// Internal texturing functions.
+	D3DTEXTUREHANDLE	LockTexture(UTexture *Texture);
+	void				UnlockTexture(UTexture *Texture);
+	D3DTEXTUREHANDLE	RegisterTexture(UTexture *Texture);
+	void				UnregisterTexture(UTexture *Texture);
+	void				BuildTexture(D3DTexCache *CachedTexture,int mipLevel);
 };
 
 /*-----------------------------------------------------------------------------
-	Direct3D device enumeration callback.
+	Init3D.
 -----------------------------------------------------------------------------*/
 
 //
-// Callback for enumerating Direct3D devices.
+// Init Direct3D rendering device.
 //
-HRESULT WINAPI EnumDevicesCallback
-(
-	LPGUID			lpGuid,
-	LPSTR			lpDeviceDescription,
-    LPSTR			lpDeviceName,
-	LPD3DDEVICEDESC lpD3DHWDeviceDesc,
-    LPD3DDEVICEDESC lpD3DHELDeviceDesc,
-	LPVOID			lpUserArg
-)
+BOOL FDirect3DRenderDevice::Init3D()
 {
-	guard(EnumDevicesCallback);
-	FDirect3DRenderDevice *RenDev = (FDirect3DRenderDevice*)lpUserArg;
-	debugf("   Direct3D device: [%s] [%s]",lpDeviceName,lpDeviceDescription);
+    HRESULT err = E_FAIL;
 
-	// Make sure this device is useful.
-	if( 0 )
-		debugf("      Error");
-	//else if( lpD3DHWDeviceDesc->dcmColorModel != D3DCOLOR_RGB )
-	//	debugf("      Not hardware or not RGB (%i)",lpD3DHWDeviceDesc->dcmColorModel);
-	else if( !(lpD3DHWDeviceDesc->dwDevCaps & D3DDEVCAPS_FLOATTLVERTEX ) )
-		debugf("      Rejects floating vertices");
-	//else if( !(lpD3DHWDeviceDesc->dwDevCaps & D3DDEVCAPS_EXECUTESYSTEMMEMORY ) )
-	//	debugf("      No execute in system memory");
-	else if( lpD3DHWDeviceDesc->dwDevCaps & (D3DDEVCAPS_SORTDECREASINGZ|D3DDEVCAPS_SORTEXACT|D3DDEVCAPS_SORTINCREASINGZ) )
-		debugf("      Nutty sorting requirements");
-	else if( !(lpD3DHWDeviceDesc->dwDevCaps & D3DDEVCAPS_TEXTUREVIDEOMEMORY ) )
-		debugf("      No video memory textures");
-	//else if( !(lpD3DHWDeviceDesc->dwDevCaps & D3DDEVCAPS_TLVERTEXSYSTEMMEMORY ) )
-	//	debugf("      No tlvertices in system memory");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwMiscCaps & D3DPRASTERCAPS_ZTEST ) )
-		debugf("      No z buffering");
-	//else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwMiscCaps & D3DPMISCCAPS_MASKZ ) )
-	//	debugf("      No z changes");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwZCmpCaps & D3DPCMPCAPS_ALWAYS ) )
-		debugf("      No z always");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwZCmpCaps & D3DPCMPCAPS_LESSEQUAL ) )
-		debugf("      No z lessequal");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwSrcBlendCaps & D3DPBLENDCAPS_BOTHSRCALPHA ) )
-		debugf("      No source alpha blending");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwDestBlendCaps & D3DPBLENDCAPS_SRCCOLOR ) )
-		debugf("      No modulation blending");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwShadeCaps & D3DPSHADECAPS_ALPHAGOURAUDBLEND ) )
-		debugf("      No alpha gouraud blend");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwShadeCaps & D3DPSHADECAPS_COLORFLATRGB ) )
-		debugf("      No color flat shading");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwShadeCaps & D3DPSHADECAPS_COLORGOURAUDRGB ) )
-		debugf("      No color gouraud shading");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwTextureCaps & D3DPTEXTURECAPS_PERSPECTIVE ) )
-		debugf("      No perspective correction");
-	else if( lpD3DHWDeviceDesc->dpcTriCaps.dwTextureCaps & D3DPTEXTURECAPS_SQUAREONLY )
-		debugf("      Square textures only");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwTextureCaps & D3DPTEXTURECAPS_ALPHA) )
-		debugf("      No alpha textures");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwTextureFilterCaps & D3DPTFILTERCAPS_LINEAR) )
-		debugf("      No bilinear filtering");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwTextureBlendCaps & D3DTBLEND_DECAL) )
-		debugf("      No decal texturing");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwTextureBlendCaps & D3DPTBLENDCAPS_DECALALPHA ) )
-		debugf("      No decal alpha texturing");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwTextureBlendCaps & D3DPTBLENDCAPS_MODULATE ) )
-		debugf("      No modulation texturing");
-	else if( !(lpD3DHWDeviceDesc->dpcTriCaps.dwTextureBlendCaps & D3DPTBLENDCAPS_MODULATEALPHA ) )
-		debugf("      No modulation alpha texturing");
-	else if( lpD3DHWDeviceDesc->dwDeviceRenderBitDepth != DDBD_16 )
-		debugf("      Not 16-bit color");
-	else 
+    // Create a Direct3D device.
+    // first try HAL, then RGB, RAMP.
+    d3dName = "HAL";
+    err = d3d->CreateDevice(IID_IDirect3DHALDevice, BackBuffer, &d3dDevice);
+    if( err != DD_OK )
+    {
+        d3dName = "RGB";
+        err = d3d->CreateDevice(IID_IDirect3DRGBDevice, BackBuffer, &d3dDevice);
+    }
+    if( err != DD_OK )
+    {
+        d3dName = "RAMP";
+        err = d3d->CreateDevice(IID_IDirect3DRampDevice, BackBuffer, &d3dDevice);
+    }
+    if( err != DD_OK )
+        return FALSE;
+
+    // Now make a Viewport
+    err = d3d->CreateViewport(&d3dViewport, NULL);
+    if( err != DD_OK )
+        return FALSE;
+
+	// Add viewport to device.
+    err = d3dDevice->AddViewport(d3dViewport);
+
+    // Setup the viewport for a reasonable viewing area.
+    D3DVIEWPORT2 viewData;
+    memset( &viewData, 0, sizeof(D3DVIEWPORT2) );
+    viewData.dwSize       = sizeof(D3DVIEWPORT2);
+    viewData.dwX          = 0;
+    viewData.dwY          = 0;
+    viewData.dwWidth      = ScreenSize.cx;
+    viewData.dwHeight     = ScreenSize.cy;
+	viewData.dvClipX      = 0.0f;
+    viewData.dvClipY      = 0.0f;
+	viewData.dvClipWidth  = ScreenSize.cx;
+    viewData.dvClipHeight = ScreenSize.cy;
+    viewData.dvMinZ       = 0.0f;
+    viewData.dvMaxZ       = 1.0f;//1.0f;//2.0f;
+
+    err = d3dViewport->SetViewport2( &viewData );
+    if( err != DD_OK )
+		return FALSE;
+
+    err = d3dDevice->SetCurrentViewport( d3dViewport );
+    if( err != DD_OK )
+        return FALSE;
+
+	// Init the render state.
+    d3dDevice->SetRenderState(D3DRENDERSTATE_CULLMODE,				D3DCULL_NONE);
+	d3dDevice->SetRenderState(D3DRENDERSTATE_SHADEMODE,				D3DSHADE_FLAT);
+    d3dDevice->SetRenderState(D3DRENDERSTATE_ZENABLE,				1);
+    d3dDevice->SetRenderState(D3DRENDERSTATE_ZFUNC,					D3DCMP_LESSEQUAL);
+    d3dDevice->SetRenderState(D3DRENDERSTATE_ZWRITEENABLE,			1);
+	d3dDevice->SetRenderState(D3DRENDERSTATE_DITHERENABLE,			TRUE);
+	d3dDevice->SetRenderState(D3DRENDERSTATE_TEXTUREPERSPECTIVE,	TRUE);
+    d3dDevice->SetRenderState(D3DRENDERSTATE_TEXTUREMAG,			D3DFILTER_MIPLINEAR);
+    d3dDevice->SetRenderState(D3DRENDERSTATE_TEXTUREMIN,			D3DFILTER_MIPLINEAR);    	
+    d3dDevice->SetRenderState(D3DRENDERSTATE_SPECULARENABLE,		FALSE);
+	d3dDevice->SetLightState (D3DLIGHTSTATE_FOGMODE,				D3DFOG_NONE);
+    d3dDevice->SetLightState (D3DLIGHTSTATE_FOGSTART,				0);
+    d3dDevice->SetLightState (D3DLIGHTSTATE_FOGEND,					0);
+
+    return TRUE;
+}
+
+
+/*-----------------------------------------------------------------------------
+	DDInit.
+-----------------------------------------------------------------------------*/
+
+BOOL FDirect3DRenderDevice::DDInit(UCamera *Camera,char *szDevice, int canvasX, int canvasY)
+{
+	guard(FDirect3DRenderDevice::DDInit);
+    HRESULT err;
+
+	// Kill any existing interfaces.
+    DDTerm();
+
+	// Enumerate devices in order to find an appropriate one.
+    if( szDevice && szDevice[0] )
+        DirectDrawEnumerate( FindDeviceCallback, (LPVOID)szDevice );
+    if( dd == NULL )
 	{
-		// This Direct3D driver doesn't suck.
-		RenDev->DeviceGUID = *lpGuid;
-		RenDev->DeviceDesc = *lpD3DHWDeviceDesc;
-		RenDev->DevicesFound++;
+		// Create the default device.
+        szDevice = NULL;
+        err = DirectDrawCreate( NULL, &dd, NULL );
+    }
+    if( dd == NULL )
+		return FALSE;
+
+	// Go exclusive.
+    err = dd->SetCooperativeLevel
+	(
+		GetCameraWindow(Camera),
+		DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN | DDSCL_ALLOWMODEX | DDSCL_NOWINDOWCHANGES
+	);
+	if (err != DD_OK)
+	{			
+		debugf( "SetCooperativeLevel failed: %s", CameraManager.ddError(err) );
+        return FALSE;
 	}
-	return D3DENUMRET_OK;
+
+	// Get Direct3D2 interface.
+    err = dd->QueryInterface( IID_IDirect3D2, (void**)&d3d );
+    if( err != DD_OK )
+    {
+		debugf( "This device doesn't support Direct3D2" );
+        return FALSE;
+    }
+
+	// Set mode to 16-bit color.
+    if( !DDSetMode(canvasX,canvasY,16) && !DDSetMode(canvasX,canvasY,32) )
+        return FALSE;
+
+    char ach[128];
+    wsprintf(ach, "%s - %s %s", szAppName, szDevice ? szDevice : "DISPLAY", d3dName);
+	debugf("%s",ach);
+
+    return TRUE;
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	DDSetMode.
+-----------------------------------------------------------------------------*/
+
+//
+// Set the DirectDraw mode.
+//
+BOOL FDirect3DRenderDevice::DDSetMode( int width, int height, int bpp )
+{
+	guard(FDirect3DRenderDevice::DDSetMode);
+
+	// Set the display mode.
+    HRESULT err;
+    err = dd->SetDisplayMode(width, height, bpp);
+    if( err != DD_OK )
+        return FALSE;
+
+	// Set globals.
+    ScreenSize.cx = width;
+    ScreenSize.cy = height;
+
+    // Get rid of any previous surfaces.
+    DDTerm( FALSE );
+
+	// Create surfaces.
+    DDSURFACEDESC ddsd;
+    ZeroMemory( &ddsd, sizeof(ddsd) );
+    ddsd.dwSize            = sizeof(ddsd);
+    ddsd.dwFlags           = DDSD_CAPS | DDSD_BACKBUFFERCOUNT;
+    ddsd.dwBackBufferCount = 2;
+    ddsd.ddsCaps.dwCaps    = DDSCAPS_PRIMARYSURFACE | DDSCAPS_FLIP | DDSCAPS_COMPLEX | DDSCAPS_3DDEVICE | DDSCAPS_VIDEOMEMORY;
+
+    // Try to get a tripple-buffered video memory surface.
+    err = dd->CreateSurface( &ddsd, &FrontBuffer, NULL );
+    if( err != DD_OK )
+	{
+		// Try a double-buffered surface.
+		ddsd.dwBackBufferCount = 1;
+        err = dd->CreateSurface( &ddsd, &FrontBuffer, NULL );
+		if( err != DD_OK )
+		{
+			// settle for a main memory surface.
+			ddsd.ddsCaps.dwCaps &= ~DDSCAPS_VIDEOMEMORY;
+			err = dd->CreateSurface(&ddsd, &FrontBuffer, NULL);
+		}
+	}
+    if( err != DD_OK )
+        return FALSE;
+
+    // Get a pointer to the back buffer.
+    DDSCAPS caps;
+    caps.dwCaps = DDSCAPS_BACKBUFFER;
+    err = FrontBuffer->GetAttachedSurface(&caps, &BackBuffer);
+
+    if( err != DD_OK )
+        return FALSE;
+    
+    // Create the z-buffer.
+    ZeroMemory( &ddsd, sizeof(ddsd) );
+    ddsd.dwSize            = sizeof(ddsd);
+    ddsd.dwFlags           = DDSD_CAPS
+                           | DDSD_WIDTH
+                           | DDSD_HEIGHT
+                           | DDSD_ZBUFFERBITDEPTH;
+    ddsd.ddsCaps.dwCaps    = DDSCAPS_ZBUFFER | DDSCAPS_VIDEOMEMORY;
+    ddsd.dwWidth           = width;
+    ddsd.dwHeight          = height;
+    ddsd.dwZBufferBitDepth = bpp;
+    err = dd->CreateSurface( &ddsd, &ZBuffer, NULL );
+    if( err != DD_OK )
+        return err;
+
+	// Attach z-buffer to the rendering target.
+    err = BackBuffer->AddAttachedSurface(ZBuffer);
+    if( err!= DD_OK )
+        return err;
+
+	// Init 3D.
+    return Init3D();
+    unguard;
+}
+
+/*-----------------------------------------------------------------------------
+	DDTerm.
+-----------------------------------------------------------------------------*/
+
+//
+// Terminate DirectDraw.
+//
+void FDirect3DRenderDevice::DDTerm( BOOL fAll )
+{	
+	guard(FDirect3DRenderDevice::DDTerm);
+    SAFERELEASE(d3dDevice);
+    SAFERELEASE(d3dViewport);
+    SAFERELEASE(d3dLight);
+
+    SAFERELEASE(BackBuffer);
+    SAFERELEASE(FrontBuffer);
+
+    if( fAll )
+    {
+        SAFERELEASE(d3d);
+        SAFERELEASE(dd);
+    }
 	unguard;
 }
 
@@ -514,64 +694,25 @@ HRESULT WINAPI EnumDevicesCallback
 int FDirect3DRenderDevice::Init3D( UCamera *Camera, int RequestX, int RequestY )
 {
 	guard(FDirect3DRenderDevice::Init3D);
-	HRESULT hRes;
 	checkState(!Active);
 	debugf("Initializing Direct3D...");
 
-	// Get Direct3D interface.
-	d3d  = NULL;
-	hRes = CameraManager.dd->QueryInterface( IID_IDirect3D, (void**)&d3d );
-	if( hRes )
-	{
-		debugf("Can't get IDirect3D: %s",CameraManager.ddError(hRes));
-		return 0;
-	}
+	// read the device name from WIN.INI so we come up on the last device that the user picked.
+	// must fix this to use whatever device picking mechanism unreal uses
+	//		examine flip3d dx5 sdk sample code to see how it enums,picks & uses a similar mechanism to save choice
+	GetProfileString( szAppName, "Device", "", DeviceName, sizeof(DeviceName) );
 
-	// Find an appropriate device.
-	DevicesFound=0;
-	hRes = d3d->EnumDevices(EnumDevicesCallback,this);
-	if( !DevicesFound )
-	{
-		debugf("Found no Direct3D devices");
-		d3d->Release();
-		return 0;
-	}
-
-	// Set fullscreen mode.
-	if( !CameraManager.ddSetCamera
-	(
-		Camera,
-		RequestX,
-		RequestY,
-		2,
-		CC_Hardware3D
-	) )
-	{	
-		debugf("Setting DirectDraw mode failed");
-		d3d->Release();
-		return 0;
-	}
-	checkState(CameraManager.dd!=NULL);
-
-	// Get Direct3D interface.
-	d3dDevice = NULL;
-	hRes = CameraManager.ddBackBuffer->QueryInterface( DeviceGUID, (void**)&d3dDevice );
-	if( hRes )
-	{
-		debugf("Can't get IDirect3DDevice: %s",CameraManager.ddError(hRes));
-		d3d->Release();
-		CameraManager.EndFullscreen();
-		return 0;
-	}
+	if( !DDInit( Camera, DeviceName, RequestX, RequestY ) )
+		return FALSE;
 
 	// Create the background material.
-    CRITICALCALL(d3d->CreateMaterial( &d3dBackground, NULL ),"CreateMaterial");
+    CRITICALCALL( d3d->CreateMaterial( &d3dBackground, NULL ) );
 	D3DMATERIAL Background;
     ZeroMemory(&Background, sizeof(Background));
     Background.dwSize        = sizeof(Background);
     Background.dcvDiffuse.r  = D3DVAL(0.0);
     Background.dcvDiffuse.g  = D3DVAL(0.0);
-    Background.dcvDiffuse.b  = D3DVAL(0.3);
+    Background.dcvDiffuse.b  = D3DVAL(0.5);
     Background.dcvAmbient.r  = D3DVAL(0.0);
     Background.dcvAmbient.g  = D3DVAL(0.0);
     Background.dcvAmbient.b  = D3DVAL(0.0);
@@ -580,55 +721,21 @@ int FDirect3DRenderDevice::Init3D( UCamera *Camera, int RequestX, int RequestY )
     Background.dcvSpecular.b = D3DVAL(0.0);
     Background.dvPower       = D3DVAL(0.0);
     Background.dwRampSize    = 1;
-    CRITICALCALL(d3dBackground->SetMaterial(&Background),"Background.SetMaterial");
-    CRITICALCALL(d3dBackground->GetHandle( (IDirect3DDevice *)d3dDevice, &hBackground),"Background.GetHandle");
-
-	// Create a viewport.
-	CRITICALCALL(d3d->CreateViewport( &d3dViewport, NULL ),"d3d.CreateViewport");
-
-	// Add viewport to device.
-	CRITICALCALL(d3dDevice->AddViewport(d3dViewport),"d3dDevice.AddViewport");
+    CRITICALCALL( d3dBackground->SetMaterial( &Background) );
+    CRITICALCALL( d3dBackground->GetHandle  ( (IDirect3DDevice2 *)d3dDevice, &hBackground) );
 
 	// Attach the background material to the viewport.
-    CRITICALCALL(d3dViewport->SetBackground(hBackground),"d3dViewport.SetBackground");
-
-	// Set viewport z-buffer.
-	//d3dviewport->SetBackgroundDepth(zbuffer_surf);
-
-	// Set viewport.
-	memset(&Viewport,0,sizeof(Viewport));
-	Viewport.dwSize		= sizeof(Viewport);
-    Viewport.dwX		= 0;
-    Viewport.dwY		= 0;
-    Viewport.dwWidth	= Camera->X;
-    Viewport.dwHeight	= Camera->Y; 
-    Viewport.dvScaleX	= Camera->FX2;
-    Viewport.dvScaleY	= Camera->FY2;
-    Viewport.dvMaxX		= 1.0;
-    Viewport.dvMaxY		= 1.0;
-    //Viewport.dvMinZ		= 1.0;
-    //Viewport.dvMaxZ		= 16383.0;
-
-	CRITICALCALL(d3dViewport->SetViewport(&Viewport),"Viewport.SetViewport");
-
-	// Init execute buffer.
-	ExecuteBuffer.Init( d3dDevice, d3dViewport );
-	ExecuteBuffer.STATERENDER_I( D3DRENDERSTATE_FILLMODE, D3DFILL_SOLID );
-	ExecuteBuffer.STATERENDER_I( D3DRENDERSTATE_SHADEMODE, D3DSHADE_GOURAUD );
-	//ExecuteBuffer.STATERENDER_I( D3DRENDERSTATE_DITHERENABLE, TRUE );
-	ExecuteBuffer.PROCESSVERTICES( D3DPROCESSVERTICES_COPY, 0, 0, 3, 0 );
-	//ExecuteBuffer.TRIANGLE( 0, 1, 2, D3DTRIFLAG_EDGEENABLETRIANGLE );
-	ExecuteBuffer.LINE( 0, 1 );
-	ExecuteBuffer.EXIT();
-	ExecuteBuffer.Make( 3, 32, sizeof( D3DTLVERTEX ));
-
+    CRITICALCALL( d3dViewport->SetBackground(hBackground) );
 
 	// Init general info.
 	Active      = 1;
 	Locked      = 0;
 
+	// Init texture cache.
+	NumTexInCache = 0;
+
 	// Success.
-	return 1;
+	return TRUE;
 	unguard;
 }
 
@@ -639,20 +746,28 @@ void FDirect3DRenderDevice::Exit3D()
 {
 	guard(FDirect3DRenderDevice::Exit3D);
 	checkState(Active);
-	debugf("Shutting down Direct3D...");
+	debugf( LOG_Init, "Shutting down Direct3D" );
+	HRESULT err;
 
-	// Release objects.
-	ExecuteBuffer.Exit();
-	d3dViewport->Release();
-	d3dDevice->Release();
-	d3d->Release();
+	// Reset mode.		
+	err = dd->SetCooperativeLevel( NULL, DDSCL_NORMAL );
+	if( err != DD_OK )
+		appErrorf( "SetCooperativeLevel failed: %s", CameraManager.ddError(err) );
+
+	err = dd->RestoreDisplayMode();		
+	if( err != DD_OK )
+		appErrorf( "RestoreDisplayMode failed: %s", CameraManager.ddError(err) );
+	
+	WriteProfileString( szAppName, "Device", DeviceName );
+	
+	// Release objects.	
+	DDTerm();
 
 	// Note we're inactive.
 	Active = 0;
 
 	// Shut down Direct3D.
-	debugf(LOG_Exit,"Direct3D terminated");
-
+	debugf( LOG_Exit, "Direct3D successfully shut down" );
 	unguard;
 };
 
@@ -664,6 +779,10 @@ void FDirect3DRenderDevice::Flush3D()
 	guard(FDirect3DRenderDevice::Flush3D);
 	checkState(Active);
 	checkState(!Locked);
+
+	// Flush all cached textures.
+	for( int i=NumTexInCache-1; i>=0; i-- )
+		UnregisterTexture(TexCache[i].Texture);
 
 	unguard;
 }
@@ -677,21 +796,20 @@ void FDirect3DRenderDevice::Flush3D()
 //
 void FDirect3DRenderDevice::Lock3D( UCamera *Camera )
 {
+	HRESULT err;
+	D3DRECT				d3dRect;
 	guard(FDirect3DRenderDevice::Lock3D);
 	checkState(!Locked);
 
-	//!!SUCKIT!!
-	CameraManager.ddBackBuffer->Unlock(Camera->RealScreen);
+	d3dRect.lX1 = 0;
+	d3dRect.lY1 = 0;
+	d3dRect.lX2 = Camera->X;
+	d3dRect.lY2 = Camera->Y;
+	err = d3dViewport->Clear( 1UL, &d3dRect, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER );
 
-	// Clear the z-buffer.
-	D3DRECT Rect;
-	Rect.x1 = 0; Rect.x2 = Camera->X;
-	Rect.y1 = 0; Rect.y2 = Camera->Y;
-    DEBUGCALL(d3dViewport->Clear(1, &Rect, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER),"Clear");
-
-	// Lock Direct3D.
-	DEBUGCALL(d3dDevice->BeginScene(),"BeginScene");
-
+    // Lock Direct3D.
+	CRITICALCALL( d3dDevice->BeginScene() );
+	
 	Locked = 1;
 	unguard;
 };
@@ -701,25 +819,290 @@ void FDirect3DRenderDevice::Lock3D( UCamera *Camera )
 //
 void FDirect3DRenderDevice::Unlock3D( UCamera *Camera, int Blit )
 {
+//	HRESULT err;
 	guard(FDirect3DRenderDevice::Unlock3D);
 	checkState(Locked);
 
-	// Unlock Direct3D.
-	DEBUGCALL(d3dDevice->EndScene(),"EndScene");
+	// We have rendered the backbuffer, sp call flip so we can see it.
+    FrontBuffer->Flip( NULL, DDFLIP_WAIT );
 
-	//!!SUCKIT!!
-	DDSURFACEDESC ddSurfaceDesc;
-	ZeroMemory(&ddSurfaceDesc,sizeof(ddSurfaceDesc));
-  	ddSurfaceDesc.dwSize = sizeof(ddSurfaceDesc);
-	CameraManager.ddBackBuffer->Lock( NULL, &ddSurfaceDesc, DDLOCK_WAIT, NULL );
+    // Unlock Direct3D.
+	CRITICALCALL( d3dDevice->EndScene() );
 
 	Locked = 0;
 	unguard;
 };
 
 /*-----------------------------------------------------------------------------
+	FD3DDevice Texture caching.
+-----------------------------------------------------------------------------*/
+
+//
+// Build a texture by spraying bits on the sys-mem surf
+// called on RegisterTexture   
+// Requires that the texture's surface is valid and locked.
+//
+void FDirect3DRenderDevice::BuildTexture( D3DTexCache *CachedTexture, int MipLevel )
+{
+	guard(FD3DDevice::BuildTexture);
+
+    IDirectDrawPalette *Palette = NULL;
+	UTexture           *Texture = CachedTexture->Texture;
+	FMipInfo           &Mip     = Texture->Mips[MipLevel];
+
+	// If palettized, get the palette.
+    if( CachedTexture->D3DTexture.ddsd.ddpfPixelFormat.dwRGBBitCount == 8 )
+    {
+		// Attach to surface and texture.
+        Palette = PaletteFromUPalette( dd, Texture->Palette );
+        CachedTexture->D3DTexture.MemorySurface->SetPalette( Palette );
+        CachedTexture->D3DTexture.DeviceSurface->SetPalette( Palette );
+    }
+
+	// Copy stuff to system memory surface.
+	BYTE* Src  = &Texture->Element(Mip.Offset);
+	BYTE* Dest = (BYTE *)CachedTexture->D3DTexture.ddsd.lpSurface;
+	for( int i = 0; i<(int)Mip.VSize; i++ )
+	{
+		memcpy( Dest, Src, Mip.USize );
+		Dest += CachedTexture->D3DTexture.ddsd.lPitch;
+		Src  += CachedTexture->D3DTexture.ddsd.lPitch;
+	}
+	unguard;
+}
+
+//
+// Register a texture with the 3D hardware. 
+// May cause one or more other textures to be flushed.  
+// Returns with the system-memory texture surface locked.
+//
+D3DTEXTUREHANDLE FDirect3DRenderDevice::RegisterTexture( UTexture *Texture )
+{
+	guard(FDirect3DRenderDevice::RegisterTexture);
+
+	// Make sure this texture is cacheable.
+	if( Texture->USize != Texture->VSize )
+	{
+		//!!
+		debugf( "nonsquare texture size: %i %i (%s)", Texture->USize, Texture->VSize, Texture->GetName() );
+		return NULL;
+	}
+
+	// Validate the texture size.
+	if( Texture->USize>1024 || (Texture->USize&(Texture->USize-1)))
+		appErrorf( "Invalid texture U size: %i (%s)", Texture->USize, Texture->GetName() );
+	if( Texture->VSize>1024 || (Texture->VSize&(Texture->VSize-1)))
+		appErrorf( "Invalid texture V size: %i (%s)", Texture->USize, Texture->GetName() );
+
+	// Make texture entry.
+	if( NumTexInCache >= MAX_TEXTURES )
+	{
+		// Dump all textures. !!Should be lru.
+		Flush3D(); 
+	}
+
+	// Create cache entry.
+	D3DTexCache *CachedTexture       = &TexCache[NumTexInCache++];
+	CachedTexture->Texture			 = Texture;
+	CachedTexture->D3DTexture.Handle = NULL;
+	
+	// Find number of mipmap levels.
+	int i=0, n=0;
+	while( i < MAX_MIPS )
+	{
+		if( Texture->Mips[i].Offset == MAXDWORD )
+			break;
+		else
+			n++;
+		i++;
+	}
+
+	// Create empty system and video memory surfaces.
+	HRESULT DDResult; 
+	if( n == 1)
+		DDResult = CachedTexture->D3DTexture.InitEmpty(d3dDevice,Texture->USize,Texture->VSize,8);
+	else
+		DDResult = CachedTexture->D3DTexture.InitEmptyMip(d3dDevice,Texture->USize,Texture->VSize,8,n);
+	if( DDResult != DD_OK )
+	{
+		// Must start flushing stuff!
+		appErrorf( "Failed creating texture %s (%ix%i)", Texture->GetName(), Texture->USize, Texture->VSize );
+	}
+
+	// Fetch a pointer to the sys-mem texture surface.
+	DDResult = CachedTexture->D3DTexture.MemorySurface->Lock
+	(
+		NULL,
+		&CachedTexture->D3DTexture.ddsd,
+		DDLOCK_SURFACEMEMORYPTR | DDLOCK_WAIT,
+		NULL
+	);
+	if( DDResult )
+	{
+		appErrorf("DirectDraw lock failed: %s",CameraManager.ddError(DDResult));		
+		return NULL;
+	}
+
+	//now sys-mem surface locked, spray bits
+	BuildTexture(CachedTexture,0);
+
+	// Unlock system memory texture, since can now upload at will.
+	DDResult = CachedTexture->D3DTexture.MemorySurface->Unlock( NULL );
+	
+	// Deal with 1 to NumMips surfaces.
+	if( n > 1 )
+	{		
+		
+		LPDIRECTDRAWSURFACE lpDDThisLevel = CachedTexture->D3DTexture.MemorySurface;
+		LPDIRECTDRAWSURFACE lpDDNextLevel;
+		DDSCAPS ddsCaps;
+		i = 1;
+		while( i < n )
+		{
+			ddsCaps.dwCaps = DDSCAPS_TEXTURE | DDSCAPS_MIPMAP;
+			DDResult = lpDDThisLevel->GetAttachedSurface(	&ddsCaps, &lpDDNextLevel);
+			if( DDResult != DD_OK )
+			{
+				break;
+			}
+
+			// Fetch a pointer to the ith sys-mem texture surface.
+			DDResult = lpDDNextLevel->Lock
+			(
+				NULL,
+				&CachedTexture->D3DTexture.ddsd,
+				DDLOCK_SURFACEMEMORYPTR | DDLOCK_WAIT,
+				NULL
+			);			
+			if( DDResult )
+			{
+				appErrorf( "DirectDraw lock failed: %s", CameraManager.ddError(DDResult) );
+				return NULL;
+			}
+			
+			// Now ith system-memory surface is locked, so copy data.
+			BuildTexture(CachedTexture, i);
+
+			// Unlock it.
+			DDResult = lpDDNextLevel->Unlock(NULL);
+
+			// Go to next one.
+			lpDDThisLevel = lpDDNextLevel;
+			i++;
+		}
+	}
+
+	// Now download the texture by restoring the surface.
+	if( CachedTexture->D3DTexture.Restore( dd, d3dDevice ) )
+	{
+		CachedTexture->InUse	= TRUE;
+		CachedTexture->TexValue = Texture->USize*Texture->VSize;
+		CachedTexture->UsageCount++;
+		return CachedTexture->D3DTexture.Handle;
+	}
+	else
+	{
+		appErrorf( "Failed creating texture %s (%ix%i)", Texture->GetName(), Texture->USize, Texture->VSize );
+		return NULL;
+	}
+	unguard;
+}
+
+//
+// Unregister a texture with the 3D hardware.
+//
+void FDirect3DRenderDevice::UnregisterTexture( UTexture *Texture )
+{
+	guard(FDirect3DRenderDevice::UnregisterTexture);
+	D3DTexCache *CachedTexture = NULL;
+
+	// Find the texture in the list and remove it.
+	int j=0;
+	for( int i=0; i<NumTexInCache; i++ )
+	{
+		if (j!=i) TexCache[j]=TexCache[i];
+		if (TexCache[i].Texture==Texture)
+			CachedTexture = &TexCache[i];
+		else
+			j++;
+	}
+	if( !CachedTexture )
+		appErrorf("Texture %s not found in cache",Texture->GetName());
+	NumTexInCache = j;
+
+	// Unregister the texture.
+	checkState(CachedTexture->D3DTexture.Handle!=NULL);
+
+	// Release the surfaces.
+ 	HRESULT DDResult = CachedTexture->D3DTexture.Release();
+	if( DDResult )
+		appErrorf( "Error releasing %s: %s", CachedTexture->Texture->GetName(), CameraManager.ddError(DDResult) );
+
+	// Clear in-use flag.
+	CachedTexture->InUse		= FALSE;
+	CachedTexture->UsageCount	= 0;
+	CachedTexture->TexValue		= 0;
+
+	unguard;
+}
+
+//
+// Look up a texture from 3D hardware and lock it.  
+// Either returns an existing, cached texture, or registers a new one and returns it.
+//
+D3DTEXTUREHANDLE FDirect3DRenderDevice::LockTexture( UTexture *Texture )
+{
+	guard(FDirect3DRenderDevice::LockTexture);
+	D3DTexCache *CachedTexture = NULL;
+
+	// See if texture exists in cache.
+	for( int i=0; i<NumTexInCache; i++ )
+	{
+		CachedTexture = &TexCache[i];
+		if( CachedTexture->Texture == Texture )
+		{
+			// Restore from system memory copy if it's lost.
+			if( CachedTexture->D3DTexture.DeviceSurface->IsLost() )			
+				CachedTexture->D3DTexture.Restore(dd,d3dDevice);
+			CachedTexture->UsageCount++;
+			return CachedTexture->D3DTexture.Handle;
+		}
+	}
+
+	// Not found, so create a new texture and return it.
+	return RegisterTexture( Texture );
+	unguard;
+}
+
+//
+// Unlock a texture.
+//
+void FDirect3DRenderDevice::UnlockTexture( UTexture *Texture )
+{
+	guard(FDirect3DRenderDevice::UnlockTexture);
+	for( int i=0; i<NumTexInCache; i++ )
+	{
+		D3DTexCache *CachedTexture = &TexCache[i];
+		if( CachedTexture->Texture == Texture )
+		{
+			// System memory surface already unlocked.
+			return;
+		}
+	}
+	appErrorf( "Texture %s not found for unlock", Texture->GetName() );
+	unguard;
+}
+
+/*-----------------------------------------------------------------------------
 	FDirect3DRenderDevice texture vector polygon drawer.
 -----------------------------------------------------------------------------*/
+
+#define C_64K 65536
+#define C_32K 32768
+static	D3DTEXTUREHANDLE	hLastDecalTexture = NULL;
+static  UTexture*			uLastDecalTexture = NULL;
+static	D3DTEXTUREHANDLE	hLastLMTexture	= NULL;
+static  UTexture*			uLastLMTexture	= NULL;
 
 //
 // Draw a textured polygon using surface vectors.
@@ -741,39 +1124,86 @@ void FDirect3DRenderDevice::DrawPolyV
 {
 	guard(FDirect3DRenderDevice::DrawPolyV);
 
-#if USE_DRAWPRIMITIVE
-	D3DTLVERTEX Verts[32];
-#else
-	D3DTLVERTEX *Verts;
-	CRITICALCALL(ExecuteBuffer.Lock(Verts),"ExecuteBuffer.Lock");
-#endif
+	D3DTEXTUREHANDLE  hTexture; 
+	D3DTEXTUREHANDLE  hLMTexture; 
+	
+	// Set the rendering state.
+	d3dDevice->SetRenderState( D3DRENDERSTATE_SHADEMODE, D3DSHADE_FLAT );	
+	d3dDevice->SetRenderState( D3DRENDERSTATE_BLENDENABLE, FALSE );
+	d3dDevice->SetRenderState( D3DRENDERSTATE_TEXTUREMAPBLEND, D3DTBLEND_DECAL );
+
+	// Setup first-pass texture, decal mode	
+	if( Texture != uLastDecalTexture )
+	{		
+		hTexture = LockTexture(Texture);
+		CRITICALCALL( d3dDevice->SetRenderState( D3DRENDERSTATE_TEXTUREHANDLE, hTexture ) );
+	}
+	else CRITICALCALL( d3dDevice->SetRenderState(D3DRENDERSTATE_TEXTUREHANDLE,hLastDecalTexture) );
 
 	// Translate the points to D3DTLVERTEX's.
+	D3DTLVERTEX Verts[32];
 	for( int i=0; i<NumPts; i++ )
 	{
 		const FTransform  &Pt   = Pts  [i];
 		D3DTLVERTEX       &Vert = Verts[i];
 
 		// Set screen coords.
-		Vert.sx			= Pt.ScreenX/65536.0;
+		Vert.sx			= Pt.ScreenX/C_64K;
 		Vert.sy			= Pt.ScreenY;
-		Vert.sz			= Pt.Z;
-		Vert.rhw		= 1.0 / Pt.Z;
-		Vert.color		= RGBA_MAKE(rand()%255, rand()%255, rand()%255, 255);
-		Vert.specular	= RGBA_MAKE(rand()%255, rand()%255, rand()%255, 255);
-		Vert.tu			= 0;
-		Vert.tv			= 0;
+		Vert.sz			= Pt.Z/C_32K;
+		Vert.rhw		= 1.0f/Pt.Z;	
+		Vert.color		= RGB_MAKE(0,0,0);
+		Vert.tu			= (((FVector&)Pt - Base) | U) / (Texture->USize);
+		Vert.tv			= (((FVector&)Pt - Base) | V) / (Texture->VSize);
 	}
 
-	// Draw it.
-#if USE_DRAWPRIMITIVE
 	// Draw with DrawPrimitive.
-	CRITICALCALL(d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, D3DVT_TLVERTEX, Verts, 3), "DrawPrimitive");
-#else
-	CRITICALCALL( ExecuteBuffer.Unlock(), "ExecuteBuffer.Unlock" );
-	CRITICALCALL( ExecuteBuffer.Execute( D3DEXECUTE_UNCLIPPED ), "Execute" );
-#endif
+	CRITICALCALL( d3dDevice->DrawPrimitive( D3DPT_TRIANGLEFAN, D3DVT_TLVERTEX, Verts, NumPts, 0 ) );
 
+	// Remember texture.
+	if( Texture != uLastDecalTexture )
+	{
+		hLastDecalTexture = hTexture;
+		uLastDecalTexture = Texture;
+	}
+
+	// Light maps.
+	d3dDevice->SetRenderState(D3DRENDERSTATE_BLENDENABLE, TRUE);
+	d3dDevice->SetRenderState(D3DRENDERSTATE_SRCBLEND,    D3DBLEND_ZERO);
+	d3dDevice->SetRenderState(D3DRENDERSTATE_DESTBLEND,   D3DBLEND_SRCCOLOR);
+	if( Texture != uLastLMTexture )
+	{		
+		hLMTexture = LockTexture(Texture);
+		CRITICALCALL( d3dDevice->SetRenderState( D3DRENDERSTATE_TEXTUREHANDLE, hLMTexture ) );
+	}
+	else CRITICALCALL( d3dDevice->SetRenderState( D3DRENDERSTATE_TEXTUREHANDLE, hLastLMTexture ) );
+
+	// Translate the points to D3DTLVERTEX's.
+	for( i=0; i<NumPts; i++ )
+	{
+		const FTransform  &Pt   = Pts  [i];
+		D3DTLVERTEX       &Vert = Verts[i];
+
+		// Set screen coords.
+		Vert.sx			= Pt.ScreenX/C_64K;
+		Vert.sy			= Pt.ScreenY;
+		Vert.sz			= Pt.Z/C_32K;
+		Vert.rhw		= 1.0f/Pt.Z;	
+		Vert.color		= RGB_MAKE(255,255,255);
+		Vert.specular	= RGB_MAKE(0,0,0);
+		Vert.tu			= (((FVector&)Pt - Base) | U) / (Texture->USize) / 16;
+		Vert.tv			= (((FVector&)Pt - Base) | V) / (Texture->VSize) / 16;
+	}
+
+	// Draw with DrawPrimitive.
+	CRITICALCALL( d3dDevice->DrawPrimitive( D3DPT_TRIANGLEFAN, D3DVT_TLVERTEX, Verts, NumPts, 0) );
+
+	// Remember light map.
+	if( Texture != uLastLMTexture )
+	{
+		hLastLMTexture = hLMTexture;
+		uLastLMTexture = Texture;
+	}
 	unguard;
 }
 
@@ -781,43 +1211,71 @@ void FDirect3DRenderDevice::DrawPolyV
 	FDirect3DRenderDevice texture coordinates polygon drawer.
 -----------------------------------------------------------------------------*/
 
+static D3DTEXTUREHANDLE	hCLastDecalTexture = NULL;
+static UTexture*		uCLastDecalTexture = NULL;
+static D3DTEXTUREHANDLE	hCLastLMTexture	= NULL;
+static UTexture*		uCLastLMTexture	= NULL;
+
 //
 // Draw a polygon with texture coordinates.
 //
 void FDirect3DRenderDevice::DrawPolyC
 (
-	UCamera				*Camera,
-	UTexture			*Texture,
-	const FTransTexture	*Pts,
+	UCamera*			Camera,
+	UTexture*			Texture,
+	const FTransTexture*Pts,
 	int					NumPts,
 	DWORD				PolyFlags
 )
-{
+{	
 	guard(FDirect3DRenderDevice::DrawPolyC);
-	checkState(Locked);
+	checkState(Locked);	
+	D3DTEXTUREHANDLE  hCTexture;
 
-	// Not yet implemented.
-	unguard;
-}
+	// Setup creature texture, shade & blend mode.
+	d3dDevice->SetRenderState(D3DRENDERSTATE_BLENDENABLE,        FALSE);
+	d3dDevice->SetRenderState(D3DRENDERSTATE_SHADEMODE,			 D3DSHADE_GOURAUD);	
+	d3dDevice->SetRenderState(D3DRENDERSTATE_TEXTUREMAPBLEND,	 D3DTBLEND_MODULATE);
+	if ( Texture != uCLastDecalTexture )
+	{		
+		hCTexture = LockTexture(Texture);
+		CRITICALCALL( d3dDevice->SetRenderState(D3DRENDERSTATE_TEXTUREHANDLE,hCTexture) );
+	}
+	else CRITICALCALL( d3dDevice->SetRenderState(D3DRENDERSTATE_TEXTUREHANDLE,hCLastDecalTexture) );
 
-/*-----------------------------------------------------------------------------
-	FDirect3DRenderDevice flat shaded polygon drawer.
------------------------------------------------------------------------------*/
+	// Translate the points to D3DTLVERTEX's.
+	D3DTLVERTEX Verts[32];
+	for( int i=0; i<NumPts; i++ )
+	{
+		const FTransTexture &Pt = Pts[i];
+		D3DTLVERTEX &Vert = Verts[i];
 
-//
-// Draw a flat-shaded poly.
-//
-void FDirect3DRenderDevice::DrawPolyF
-(
-	UCamera				*Camera,
-	const FTransform	*Pts,
-	int					NumPts,
-	FColor				Color
-)
-{
-	guard(FDirect3DRenderDevice::DrawPolyF);
-	checkState(Locked);
+		// Set screen coords.
+		Vert.sx			= Pt.ScreenX;
+		Vert.sy			= Pt.ScreenY;
+		Vert.sz			= Pt.Z/C_32K;
+		Vert.rhw		= 1.0 / Pt.Z;
+		BYTE r			= Min(Pt.Color.R * (2.0f/256.f),255.f);
+		BYTE g			= Min(Pt.Color.G * (2.0f/256.f),255.f);
+		BYTE b			= Min(Pt.Color.B * (2.0f/256.f),255.f);
+		Vert.color		= RGB_MAKE(r, g, b);
+		Vert.specular	= RGB_MAKE(0, 0, 0);
+		Vert.tu			= Pt.U / (Texture->USize * 65536.0);
+		Vert.tv			= Pt.V / (Texture->VSize * 65536.0);
+	}
 
+	// Draw with DrawPrimitive.
+	CRITICALCALL( d3dDevice->DrawPrimitive(D3DPT_TRIANGLEFAN, D3DVT_TLVERTEX, Verts, NumPts, 0) );
+
+	//last used caching, creature
+	if ( Texture != uCLastDecalTexture )
+	{
+		hCLastDecalTexture = hCTexture;
+		uCLastDecalTexture = Texture;
+	}
+
+	// Revert to polyv 1st pass blend mode.
+	d3dDevice->SetRenderState(D3DRENDERSTATE_TEXTUREMAPBLEND, D3DTBLEND_DECAL);
 	unguard;
 }
 
@@ -850,6 +1308,7 @@ FDirect3DRenderDevice GDirect3DRenDev;
 FRenderDevice *FindRenderDevice()
 {
 	int FoundDirect3D = 0;
+	debugf("%s","found d3d render device");
 	if( CameraManager.dd )
 	{
 		// See if the DirectDraw device has a Direct3D.
@@ -861,16 +1320,32 @@ FRenderDevice *FindRenderDevice()
 			d3d->Release();
 		}
 	}
+	else
+	{   
+		IDirectDraw *dd;
+        HRESULT err = DirectDrawCreate( NULL, &dd, NULL );
+		if( dd != NULL )
+		{
+			IDirect3D2 *d3d;
+			dd->QueryInterface( IID_IDirect3D2, (void**)&d3d );
+			if( d3d )
+			{
+				FoundDirect3D = 1;
+				d3d->Release();
+			}
+			dd->Release();
+		}
+	} 
 
 	// Found it?
 	if( FoundDirect3D )
 	{
-		debugf(LOG_Init,"Found Direct3D");
+		debugf( LOG_Init, "Found Direct3D" );
 		return &GDirect3DRenDev;
 	}
 	else
 	{
-		debugf(LOG_Init,"No Direct3D detected");
+		debugf( LOG_Init, "No Direct3D detected" );
 		return NULL;
 	}
 }

@@ -97,6 +97,7 @@ public:
 	UArray*			Graphics;			// Graphics array object.
 	UArray*			Tables;				// Stored/regenerated tables of textures & things.
 	UArray*			Luts;				// Lookup tables.
+	UPrimitive*		Cylinder;			// Cylinder primitive.
 
 	UTexture		*DefaultTexture;	// Default texture for untextured polygons.
 	UTexture		*BkgndTexture;		// Background texture for viewers.

@@ -18,25 +18,6 @@
 -----------------------------------------------------------------------------*/
 
 //
-// Return whether this actor's collision cyllinder overlaps
-// with the other actor's.
-//
-inline BOOL AActor::IsOverlapping( const AActor *Other ) const
-{
-	guardSlow(AActor::IsOverlapping);
-	debugInput(Other!=NULL);
-
-	return
-		Square(Location.X      - Other->Location.X)
-	+	Square(Location.Y      - Other->Location.Y)
-	<	Square(CollisionRadius + Other->CollisionRadius) 
-	&&	Square(Location.Z      - Other->Location.Z)
-	<	Square(CollisionHeight + Other->CollisionHeight);
-
-	unguardSlow;
-}
-
-//
 // See if this is the owner of the specified actor.
 //
 inline BOOL AActor::IsOwnedBy( const AActor *TestActor ) const
@@ -49,6 +30,14 @@ inline BOOL AActor::IsOwnedBy( const AActor *TestActor ) const
 	}
 	return 0;
 	unguardSlow;
+}
+
+//
+// See if this actor is in the specified zone.
+//
+inline BOOL AActor::IsIn( const AZoneInfo *TestZone ) const
+{
+	return Zone!=Level ? Zone==TestZone : 1;
 }
 
 //
@@ -98,10 +87,26 @@ inline BOOL AActor::IsPlayer() const
 inline BOOL AActor::IsBlockedBy( const AActor *Other ) const
 {
 	guardSlow(AActor::IsBlockedBy);
-	return
-		(       GetPlayer() ? Other->bBlockPlayers : Other->bBlockActors)
-	&&	(Other->GetPlayer() ?        bBlockPlayers :        bBlockActors);
+	debugInput(this!=NULL);
+	debugInput(Other!=NULL);
+	if( Other == Level )
+		return bCollideWorld;
+	else
+		return (GetPlayer() ? Other->bBlockPlayers : Other->bBlockActors) && (Other->GetPlayer() ? bBlockPlayers : bBlockActors);
 	unguardSlow;
+}
+
+//
+// Return whether this actor's movement is based on another actor.
+//
+inline BOOL AActor::IsBasedOn( const AActor *Other ) const
+{
+	guard(AActor::IsBasedOn);
+	for( const AActor* Test=this; Test!=NULL; Test=Test->Base )
+		if( Test == Other )
+			return 1;
+	return 0;
+	unguard;
 }
 
 //
@@ -135,21 +140,6 @@ inline void AActor::SetCollision
 		GetLevel()->Hash.AddActor( this );
 
 	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	Collision.
------------------------------------------------------------------------------*/
-
-inline void AActor::GetCoordinates
-(
-	FCoords &Coords,
-	FCoords &Uncoords
-) const
-{
-	guardSlow(AActor::GetCoordinates);
-	FCalcWorldCoords( Location, Rotation, Coords, Uncoords );
-	unguardSlow;
 }
 
 /*-----------------------------------------------------------------------------
@@ -218,6 +208,18 @@ inline void AActor::UpdateSound()
 		&Location
 		//SoundVolume * 16.0 / 256.0
 	);
+	unguardSlow;
+}
+
+//
+// Get the actor's primitive.
+//
+inline UPrimitive* AActor::GetPrimitive() const
+{
+	guardSlow(AActor::GetPrimitive);
+	if     ( Brush ) return Brush;
+	else if( Mesh  ) return Mesh;
+	else             return GGfx.Cylinder;
 	unguardSlow;
 }
 

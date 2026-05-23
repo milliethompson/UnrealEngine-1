@@ -11,12 +11,6 @@
 #include "Unreal.h"
 
 /*---------------------------------------------------------------------------------------
-	UPrimitive object implementation.
----------------------------------------------------------------------------------------*/
-
-IMPLEMENT_CLASS(UPrimitive);
-
-/*---------------------------------------------------------------------------------------
 	UBspNodes object implementation.
 ---------------------------------------------------------------------------------------*/
 
@@ -43,8 +37,8 @@ void UBspNodes::PostLoadItem( int Index, DWORD PostFlags )
 	guard(UBspNodes::PostLoadItem);
 
 	// Reset Bsp flags.
-	Element(Index).NodeFlags   &= ~(NF_IsNew | NF_TagForEmpty);
-	Element(Index).iDynamic[0]  = Element(Index).iDynamic[1] = INDEX_NONE;
+	Element(Index).NodeFlags &= ~(NF_IsNew);
+	Element(Index).iDynamic[0] = Element(Index).iDynamic[1] = 0;
 
 	unguard;
 }
@@ -138,7 +132,6 @@ void UModel::InitHeader()
 
 	// Init parent class.
 	UPrimitive::InitHeader();
-	bCheckCollision = 1;
 
 	// Init object header to defaults.
 	Vectors    		= (UVectors  *)NULL;
@@ -150,16 +143,16 @@ void UModel::InitHeader()
 	Bounds			= (UBounds   *)NULL;
 	LeafHulls		= (UInts     *)NULL;
 	LightMesh   	= (ULightMesh*)NULL;
-	Location      	= GMath.ZeroVector;
-	Rotation		= GMath.ZeroRotation;
-	PrePivot		= GMath.ZeroVector;
-	PostPivot		= GMath.ZeroVector;
+	Location      	= FVector(0,0,0);
+	Rotation		= FRotation(0,0,0);
+	PrePivot		= FVector(0,0,0);
+	PostPivot		= FVector(0,0,0);
 	Scale			= GMath.UnitScale;
 	PostScale		= GMath.UnitScale;
 	CsgOper			= CSG_Active;
 	ModelFlags		= 0;
 
-	TransformedBound.Init();
+	TransformedBound = FBoundingVolume(0);
 
 	unguard;
 }
@@ -174,7 +167,6 @@ const char *UModel::Import(const char *Buffer, const char *BufferEnd,const char 
 	while( GetLINE (&Buffer,StrLine,256)==0 )
 	{
 		StrPtr = StrLine;
-
 		if( GetEND(&StrPtr,"BRUSH") )
 		{
 			// End of brush polys.
@@ -207,7 +199,7 @@ const char *UModel::Import(const char *Buffer, const char *BufferEnd,const char 
 		else if (GetCMD(&StrPtr,"ROTATION"))		GetFROTATION(StrPtr,&Rotation,1);
 	}
 	
-	if (GEditor)
+	if( GEditor )
 		GEditor->bspValidateBrush(this,0,0);
 
 	return Buffer;
@@ -255,7 +247,6 @@ void UModel::PostLoadHeader( DWORD PostFlags )
 			Unlock(LOCK_ReadWrite);
 		}
 	}
-
 	unguard;
 }
 IMPLEMENT_CLASS(UModel);
@@ -320,22 +311,22 @@ void UModel::Init( int InitPositionRotScale )
 		// Init position, rotation, and scale only.
 		Scale		= GMath.UnitScale;
 		PostScale	= GMath.UnitScale;
-		Location	= GMath.ZeroVector;
-		Rotation	= GMath.ZeroRotation;
+		Location	= FVector(0,0,0);
+		Rotation	= FRotation(0,0,0);
 	}
 	else
 	{
 		// Just update.
 		if( GEditor )
-			GEditor->constraintApply(NULL,NULL,&Location,&Rotation,&GEditor->Constraints);
+			GEditor->constraintApply( NULL, NULL, &Location, &Rotation, &GEditor->Constraints );
 		
 		FModelCoords TempCoords;
 		BuildCoords( &TempCoords, NULL );
 
-		Location += PostPivot - PrePivot.TransformVectorBy(TempCoords.PointXform);
+		Location += PostPivot - PrePivot.TransformVectorBy( TempCoords.PointXform );
 	}
-	PrePivot	= GMath.ZeroVector;
-	PostPivot	= GMath.ZeroVector;
+	PrePivot	= FVector(0,0,0);
+	PostPivot	= FVector(0,0,0);
 	unguard;
 }
 
@@ -397,13 +388,13 @@ FLOAT UModel::BuildCoords( FModelCoords *Coords, FModelCoords *Uncoords )
 	guard(UModel::BuildCoords);
 	if( Coords )
 	{
-		Coords->PointXform    = (GMath.UnitCoords * PostScale * Rotation * Scale);
-		Coords->VectorXform   = (GMath.UnitCoords / Scale / Rotation / PostScale).Transpose();
+		Coords->PointXform    = (GMath.UnitCoords * PostScale * Rotation * Scale);             // Covariant inverse.
+		Coords->VectorXform   = (GMath.UnitCoords / Scale / Rotation / PostScale).Transpose(); // Contravariant inverse.
 	}
 	if( Uncoords )
 	{
-		Uncoords->PointXform  = (GMath.UnitCoords / Scale / Rotation / PostScale);
-		Uncoords->VectorXform = (GMath.UnitCoords * PostScale * Rotation * Scale).Transpose();
+		Uncoords->PointXform  = (GMath.UnitCoords / Scale / Rotation / PostScale);             // Covariant.
+		Uncoords->VectorXform = (GMath.UnitCoords * PostScale * Rotation * Scale).Transpose(); // Contravariant.
 	}
 	return Scale.Orientation();
 	unguard;
@@ -429,33 +420,25 @@ void UModel::BuildBound( int Transformed )
 		FLOAT		Orientation = 0.0;
 
 		if( Transformed )
-			Orientation = BuildCoords(&Coords,NULL);
+			Orientation = BuildCoords( &Coords, NULL );
 
 		int Count = 0;
 		for( i=0; i<Polys->Num; i++ )
 		{
 			FPoly Temp = Polys(i);
-			
 			if( Transformed )
-				Temp.Transform( Coords, &PrePivot, &Location, Orientation );
+				Temp.Transform( Coords, PrePivot, Location + PostPivot, Orientation );
 
 			for( int j=0; j<Temp.NumVertices; j++ )
 				Points[Count++] = Temp.Vertex[j];
 		}
 		checkLogic(Count==Total);
-		if( Transformed )
-			TransformedBound.Init(Points,Total);
-		else
-			LocalBound.Init(Points,Total);
+		if( Transformed ) TransformedBound = FBoundingVolume( Total, Points );
+		else              LocalBound       = FBoundingVolume( Total, Points );
 		Mark.Pop();
 	}
-	else
-	{
-		if( Transformed )
-			TransformedBound.Init();
-		else
-			LocalBound.Init();
-	}
+	else if( Transformed ) TransformedBound = FBoundingVolume(0);
+	else                   LocalBound       = FBoundingVolume(0);
 
 	Unlock(LOCK_ReadWrite);
 	unguard;
@@ -472,13 +455,11 @@ void UModel::Transform()
 	FModelCoords	Coords,Uncoords;
 	FLOAT			Orientation;
 
-	Orientation = BuildCoords(&Coords,&Uncoords);
+	Orientation = BuildCoords( &Coords, &Uncoords );
 
-	Location += PostPivot;
 	for( INDEX i=0; i<Polys->Num; i++ )
-		Polys(i).Transform( Coords, &PrePivot, &Location, Orientation	);
+		Polys( i ).Transform( Coords, PrePivot, Location + PostPivot, Orientation );
 
-	Location -= PostPivot;
 	Unlock(LOCK_Trans);
 	unguard;
 }
@@ -501,14 +482,14 @@ void UModel::SetPivotPoint( FVector *PivotLocation, int SnapPivotToGrid )
 	if( GTrans )
 		GTrans->NoteResHeader (this);
 
-	PrePivot += (*PivotLocation - Location - PostPivot).TransformVectorBy(Uncoords.PointXform);
+	PrePivot += (*PivotLocation - Location - PostPivot).TransformVectorBy( Uncoords.PointXform );
 	Location  = *PivotLocation;
 
 	if( GEditor )
-		GEditor->constraintApply(NULL,NULL,&Location,&Rotation,&GEditor->Constraints);
+		GEditor->constraintApply( NULL, NULL, &Location, &Rotation, &GEditor->Constraints );
 
 	if( SnapPivotToGrid )
-		PostPivot = GMath.ZeroVector;
+		PostPivot = FVector(0,0,0);
 	else
 		PostPivot = *PivotLocation - Location;
 	

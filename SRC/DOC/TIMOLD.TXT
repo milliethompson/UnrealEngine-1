@@ -12130,3 +12130,587 @@ Begin:
 
 ===0.863c
 +	Merge Steven's new code.
+
+///////////////////////////////////////////////////////////////////
+
+===0.863d
++	Actors.
++		LevelInfo sky needs no-smooth option: bNoSmoothSky
++		AActor Fatness
+X		Add SkyShader to LevelInfo sky, use in UnLight.
+
++	UnrealEd.
++		Import after rebuild crash?
++		Closing the mesh browser still sucks away CPU cycles. Close its window.
+
+===0.863e
++		Make sure all dlgs support long filenames's including multiselect ones.
++		Fixed all common dialogs to support long filenames.
++		Can't load read-only files in load-actor-class (.u).
++		Test all the loaders with read-only files.
+
++		Retest the suites.
+
+///////////////////////////////////////////////////////////////////
+
+===0.863f
++	UnrealEd script editor.
++		Find must highlight word.
++		Find and replace.
++		Save and restore cursor position between recompiles.
++		^C/^V and edit-copy/edit-paste use different clipboard? Use Clipboard.Clear.
+
++		Undo/redo cursor and top positioning.
++		Torture test undo/redo.
+
++		Shift-tab autoindent doesn't indent last line.
++		Autoindent misses last line.
+
++		Enter mark undo point.
+
++		Remember script window pos and top.
++		Remember script window pos and top for undos.
++		Tweak undo/redo usability.
+
++		Save ALL scripts when press F6/F7 or when focus changes.
++		Remove UnrealEd "save class" - now there is only "savebelow".
+
++		Enter conserve cursor position if before last tab.
+X		Autosave no setfocus; kills DirectDraw.
+
++		Fix message loop time sucker when we don't have focus.
+
++	Importing more than one map messes up the texture browser window.
+
+///////////////////////////////////////////////////////////////////
+5-17-97
+
+===0.863g
++	Generalize mesh rendering code to hardware and software.
++	Mesh phong shading.
+
+===0.863h
++	Clean up FTransform.
+
+===0.863i
++	Made FScreenBounds floating point.
++	Eliminated FTemp.
+
+===0.863j
++	Added Normal to FTransSample.
++	Phong shading.
++	Subdivision with t-junction removal.
+
+===0.863k
++	Fatness.
++	Backfacing.
++	Colors not being clipped?
++	Alpha interpolate in.
+X	Teleport-in effect
+
+///////////////////////////////////////////////////////////////////
+
+===0.863m
++	Animation tweening setup.
++		UMesh::GetFrame return a cached set of FVector's; no UCamera parm.
+
+===0.863n
++	Tweening setup.
++		Looped and one-shot animations now both generate AnimEnd messages at frame n-1,
++			even though looped animations loop at frame n.
++		FinishAnim from a loop finishes with frame n-1.
++		ULevel::Tick update.
+
+	Animation system variables.
+		AnimSequence  = Animation sequence to play or tween to.
+		AnimRate      = Normalized animation rate, or (Tweening Rate / NumFrames).
+		AnimFrame     = Current position in animation, 0.0-1.0, negative indicates tweening-to.
+		AnimEnd       = Sequence end for PlayAnim.
+
+		bAnimFinished = Indicates animation or tweening has finished.
+		bAnimLoop     = Indicates animation should loop.
+		bAnimNotify   = Whether the animation sequence has any notifies.
+
+	Tweening caveats:
+
+		To support tweening perfectly would require too much memory and network bandwidth, so I
+		use a frame-cache approximation to tweening which works well nearly all of the time.
+		The case where it may look strange is when an actor first comes into view when
+		it's in the middle of a tween. In this case, the tween source may not be the correct
+		frame, so the actor's animation may look strange. This is always safe and won't cause
+		any harm, but it may look strange in some infrequent cases.
+
+///////////////////////////////////////////////////////////////////
+5-17-97
+
+===0.863o
++		Backup.
++		TweenAnim work.
++			Proper FinishAnim() handling.
++			Proper AnimEnd handling.
+
+===0.863p
++		Frame tweening.
++			Test tweening with random interruptions.
++			Tweening is now continuous.
+
++		Tweening must be able to lead into a PlayAnim/LoopAnim smoothly.
++		PlayAnim's must morph together.
++		execTweenAnim.
++		UMesh::GetFrame update.
++		Playing single frame animations must work (tween only).
+
+///////////////////////////////////////////////////////////////////
+
+===0.863q
++		SpawnActor needs an owner.
++		Remove ETrace.
+
++		Fix ULevel::Trace.
+
+===0.863r
++		Updated the scripts.
+
+///////////////////////////////////////////////////////////////////
+
+	Move towards the new "primitive tree" rendering architecture:
+	1. Separate UModel and ULevel.
+	2. Merge ULevel and UActors.
+	3. Eliminate the ALevelInfo actor class (now use ULevel directly).
+
+///////////////////////////////////////////////////////////////////
+
+===0.864a
++	Separate UModel and ULevel.
+
+===0.864b
++	Separate collision hash table into FCollisionHash.
+
+===0.864c
++	Merge ULevel and UActors.
++	Level->Max problem.
++	ULevel::Lock is complicated which is bad for StandardSerializeData.
++	Update import/export code to handle this new approach.
++	Torture test importing/exporting/playing.
+
+///////////////////////////////////////////////////////////////////
+5-20-97
+
+	Force feedback: There are three kinds of force feedback support coming
+	in Unreal:
+
+	* Ambient forces, which are directly related to ambient sounds
+	  (ambient forces share paramters with ambient sounds); these are
+	  emitted by one actor at a specific location, and they affect all
+	  actors in their ambient radius.
+
+	* Surface forces, which are generated by the texture the player is
+	  standing on; one of these surface forces can be set for
+	  a player representing the force feedback related to his moving over
+	  a blumpy surface, or through water.
+
+	* Impulse forces, instantaneous force feedback responses that are
+	  generated by PlayForce script calls, and affect a certain player.
+
+	All actors variables:
+		enum AmbientForceType.
+			AFT_None
+			AFT_Machinery.
+			AFT_Rumble.
+			AFT_Shake.
+
+	Pawn variables:
+		enum SurfaceForceType.
+			SFT_None: No surface force feedback.
+			SFT_StillWater: Still water.
+			SFT_FlowingWater: Flowing water.
+			SFT_Rocky: Walking over a rocky surface.
+			SFT_Grate: Walking over a grate.
+		byte SurfaceForcePeriod: Period of the surface force, negative means scale
+			it by the player's velocity.
+		byte SurfaceForceMagnitude: Magnitude of the surface force.
+
+	Pawn commands:
+		enum EPlayForceType
+			PFT_SquareWave: Stay at full impulse for entire time.
+			PFT_RampUp:     Ramp up to full impulse then stop.
+			PFT_RampDown:   Start at full impulse then ramp down.
+			PFT_Smooth:     Smoothly ramp up then back down.
+			PFT_Decay:      Start at full force then decay exponentially.
+		PlayForce( PlayForceType Type, vector Direction, float Time );
+
+///////////////////////////////////////////////////////////////////
+5-22-97
+
+===0.864f
++	Test exporting!
++	Fix the ugly sky.
++	Separate cloudcast texture.
+
++	intrinsic(295) final function PlayForce( EPlayForceType Type, vector Direction, float Time );
++	intrinsic(296) final operator(16) vector *     ( vector A, vector B );
++	intrinsic(297) final operator(34) vector *=    ( out vector A, vector B );
+
++	Componentwise vector*vector(296).
+
+===0.864g
++	Cleaned up UnrealFile format.
+
+===0.864h
++	Eliminated object-header-size fragility in UnrealFiles.
++		This solves the "fragile base class" problem for class loading and saving,
++		though is still remains in script variable references.
+
+===0.864i
++	RF_Import.
++	Merge exports and imports, NumImports+NumExports->NumObjects.
+
+===0.864j
++	Clean up imports and exports.
++	Mesh no-curve flag.
++		bMeshCurvy.
+
+===0.864k
++	int FGlobalPlatform::FindFile( const char *InFilename, char *OutFilename );
++	FIND_PATHS
++	Proper map loading from paths, command line operation.
+
++	Retest game loading/saving.
++		Saving is fine.
++		Fixed load spawning an extra player.
++	Retest the suites.
+
++	3dfx.
++		Now properly handles fullscreen 3dfx mode (two monitors not required!)
++		New GoHard console command (can place in bind.mac).
+
+===0.864m
++	UnrealEd
++		When add new class below and highlight the new class, need to select it
++			in the edserver.
++		Fixed bug adding actor to the world immediately after adding new class.
+
++		Merge imports and exports together, imports need RF_Import, so that resources
++			can be exported/imported in proper order.
++		Hardcoding Export.FileLoadHeaderSize exposes the fragile base class problem; this should
++			only represent the properties defined in the particular class, and be relevant to
++			the parent class.
++		Eliminate the remaining class-loading hacks.
+
+///////////////////////////////////////////////////////////////////
+
+==== CONFIDENTIAL ====
+
+New features / changes.
+* To bring up the command line, press Tab or '~' (was 'T' in previous versions).
+* To fly, type Tab + "Server Fly" + Enter. To walk, use "Server Walk".
+* New status bar rendering is not in this version.
+* Loading and saving single player games works. The savegame files are huge at the moment, but they will later be reduced from a few megs each to a few hunded K each (storing only the changed objects).
+* We now support both 256-color .pcx files and 256-color .bmp files, so you can use whichever format is most convenient.
+* Geomtry size is now unlimited; there are no more overflow errors.
+* Great actor/world and actor/actor collision.
+* Great player controls.
+* Invisible collision brushes are now supported (but HighLedgeBlock is no longer supported).
+
+UnrealScript:
+* Java/C++ style object oriented scripting language.
+* Full range of standard C++/Java datatypes and operators, including advanced types like vector, rotation, object, actor, etc.
+* Latent, time-based execution.
+* Large documentation file coming soon.
+* Four-way calling interface (U->U, U->C, C->U, C->C).
+* Support for automatic runtime loading of the appropriate game DLL's.
+
+Rendering features:
+* Curved surface rendering for meshes (supports phong shading). bCurvy turns curved surface rendering on/off for particular actors (only affects meshes, not level geometry).
+* 3dfx support with colored lighting.
+
+Gotchas:
+* Textures with extreme aspect ratios (like 1x8 or 8x1) don't display yet on 3dfx.
+* Moving brushes and actors don't collide; actors can walk through moving brushes. This is the next major thing I'm working on but everyone wanted 0.86 now rather than waiting for the brush fix.
+* 3dfx gamma correction isn't quite right.
+* Dynamic lighting sometimes "sticks" to surfaces.
+
+What I'm working on next:
+* Fixing moving brush collision.
+* New status bar rendering code.
+* UnrealScript docs.
+* 3dfx rendering improvements (fixing the sky, speed).
+
+///////////////////////////////////////////////////////////////////
+
+===0.864n
++	Prep for release.
++	Graphics.zip
++	Models.zip
+
+///////////////////////////////////////////////////////////////////
+
+===0.864o
++	3dfx.
++		Fix the status bar!
++		Automatic texture aspect ratio adjustment.
++		Fix the border.
++		Fixed transparency (was broken).
++		Test 3dfx masked textures.
++		rgba masked textures.
+
+===0.864p
++	Merged with Steven.
++	msvcrt.dll.
++	comdlg32.ocx.
++	oleaut32.dll
+
+///////////////////////////////////////////////////////////////////
+5-23-97
+
++	Fix 2d shaper (input but no dlgs).
++	Fix Delete.
+
++	Brightened actors in 3dfx.
++	Fixed bug causing a crash when selecting a brush vertex.
++	Fixed adding a moving brush is undoable.
+
++	Actor collision bug in Unreal.unr -> this bug was caused by Steven's workaround
++		to my old actor collision bug.
+
++	//  It is illegal to call out while inside message filter.
++	#define RPC_E_CANTCALLOUT_INEXTERNALCALL _HRESULT_TYPEDEF_(0x80010005L)
++	Fixed this! It was an RPC limitation: you can't make recursive RPC calls. 
++	Though this can be avoided, it really underscores some of the reasons why
++	OLE is a crappy framework to build applications on.
+
+===0.864q
++	Test release to Inoxx and Jeremy.
+
+///////////////////////////////////////////////////////////////////
+
+Fixed since initial 0.86:
+
+* Fixed problem with some (but not all) 3dfx boards seeing random colored
+  incorrect textures all over the place.
+* 3dfx now uses the same meaning of hue, saturation, and brightness as 
+  software rendering (was inverted).
+* The file-load and file-import dialogs were broken on some machines (the
+  installer now includes COMDLG32.OCX).
+* 3dfx masking and transparency weren't working (fixed).
+* Fixed broken 2d editor.
+* Fixed amazingly annoying "Runtime : 2147418107 (80010005)" problem.
+* Fixed problem: Player got stuck when standing on an actor.
+* Note: The texture format hasn't changed since the previous 0.86 so you can
+  keep your old textures. However, you will need to reimport your maps from .t3d.
+
+Notes for this version of 0.86:
+
+* AutoUPan, AutoVPan and wavy effects don't work with 3dfx yet.
+
+* When clicking on an actor, don't use the "Subclass and edit script": it's broken.
+
+* If you have any ZoneDescriptors in your level which you want to reimport
+  into 0.86 (such as Inoxx), you need to do this: Load your old .t3d file from 0.84
+  into Notepad.exe, and do a search-and-replace: replace all occurances of
+  the text "ZoneDescriptor" with "ZoneInfo". Then import it into 0.84.
+
+* When using masked textures (where color 0 is transparent), you also
+  need to make color 0 black. If color 0 is not black, you will get a
+  weird colored transparency effect on 3dfx.
+
+* Spotlights work, but I've extended them and maps imported from previous
+  versions might not contain all of the new properties. Make sure the following
+  properties are set for spotlight actors:
+
+  LightType = LT_StaticSpot (for static spotlights), or LT_Spotlight (for dynamic spotlights).
+      Most spotlights should be static. The only case where you need to make a spotlight
+	  dynamic is when you're going to write a script to rotate it.
+  bDirectional = True
+  LightCone = 128 (or some other value indicating the spotlight cone angle but NOT 0!)
+
+* The shadows on polygons with aspect ratios outside of the range 1:8 to 8:1 will
+  render incorrectly on 3dfx (possibly as weird blobby incorrect colored shadows).
+  I'll be working on this shortly.
+
+* 3dfx gamma correction is strange. To adjust gamma, type something like the following 
+  while in fullscreen 3dfx mode:
+  RENDEV SET GAMMA=2.0
+  RENDEV SET GAMMA=1.5
+  RENDEV SET GAMMA=1.0
+
+* Coplanar sheet brushes (made using the 'build sheet brush' and 'add special'
+  dialogs) aren't going to work anymore for decorations placed on walls. That
+  technique creates some major inefficiencies with hardware rendering and with
+  the new software rendering optimizations I'm planning. The problem is due to two
+  polygons overlapping. To get the same visual effect, now you need to add a cube 
+  (or some other brush) flush with the wall. This creates more polygons, but there
+  is no overlap. Sorry!
+
+Other notes:
+
+	The meaning of Hue (color wheel):
+		0     = red
+		27    = orange
+		39    = yellow
+		85    = green
+		123   = aqua
+		137   = light blue
+		170   = deep blue
+		194   = purple
+		255   = back to red again
+
+///////////////////////////////////////////////////////////////////
+
+ascention texture mapping
+-------------------------
+
+;
+; Pass 0: Init chunk table.
+;
+;-Init TexAddr
+;-Init FogAddr
+
+;
+; Pass 1: Texture and shader address setup. 6 c/p.
+;
+; eax = Temp address.
+; ebx = [g|vl].
+; ecx = [texel|loop counter]
+; edx = Texture base address.
+; esi = [vh|ul|uh].
+; edi = Chunk setup table.
+; ebp = [dg|dvl].
+; esp = [dvh|dvl|duh].
+;
+; Always works on 4-pixel wide aligned stripes.
+;
+; Variations:
+;   4 trilinears.
+;   12 usize.
+;
+mov eax,[mask]      ; Load texture address mask.
+and eax,esi         ; Get masked texture address.
+add ebx,ebp         ; Update g,vl.
+adc esi,esp         ; Update vh,ul,uh.
+add ebx,const       ; Dither const.
+adc esi,const       ; Dither const.
+mov [edi+5],bh      ; Store shader.
+rol eax,const       ; Maneuver address around.
+mov cl,[eax+edx]    ; Get texel.
+mov [edi+1],cl      ; Store in table.
+
+;
+; Pass 2: Fog and mapping = 8 c/p.
+;
+; eax = Texture address.
+; ebx = Fog address.
+; ecx = Texel.
+; edx = 
+; esi = Chunk setup table.
+; edi = Screen destination.
+; ebp = 
+; esp = 
+;
+; Variations:
+;   Pentium and MMX.
+;   8, 16, 32-bit color.
+;   Masked, transparent, fire.
+;   1 & 4 pixel spans.
+;
+mov eax,[esi]       ; Get address of shader + texel + light.
+mov ebx,[esi+4]     ; Get address of fogger.
+mov cx, [eax*2]     ; Get 16-bit color texel.
+mov dx, [ebx*4]     ; Get fog value.
+add cx,dx           ; Merge em.
+mov [edi],cx        ; Write to screen.
+
+Pentium:
+ 256-color palettized texture + single component ramp color + ?fog?
+
+MMX:
+ 256-color palettized texture + single component ?? color + rgb light + rgb fog.
+
+;
+; Lighting bilerp pass = 24c / 8 pixels = 3 c/p.
+;
+; eax =
+; ebx = 
+; ecx = 
+; edx = 
+; esi = 
+; edi = 
+; esp = 
+; ebp = 
+;
+add al,bl
+adc cl,dl
+add ah,bh
+adc ch,dh
+mov [temp+0],cl
+mov [temp+1],ch
+mov [fdu+0],al
+mov [fdv+1],ah
+
+mov eax,[temp]
+
+fld  [eax*4 + 0x001]
+fsub [eax*4 + 0x000]
+fmul [fdu]
+fadd [eax*4 + 0x000]
+
+fld  [eax*4 + 0x101]
+fsub [eax*4 + 0x100]
+fmul [fdu]
+fadd [eax*4 + 0x100]
+
+fsub st(1)
+fmul [fdv]
+faddp st(1),st
+
+fstp [edi]
+
+Things to keep in mind:
+ - Handle both creature polys and world polys.
+ - Handle all fx.
+
+///////////////////////////////////////////////////////////////////
+5-24-97
+
+===0.864r
++	threed32.ocx, grid32.ocx, msoutl32.ocx require mfc40.dll.
++		Can eliminate 1 meg distribution size later.
+
+===0.864s
++	Cleaned up UnrealEd files.
++	Light Hue for 3DFX is strange , 0 is blue , 170 is red the numbers are different than the ramphue settings.
+
+===0.864t
++	Fixed 3dfx problem on some cards with random textures being drawn.
+
+===0.864u
++	Merged with Steven's code.
+
+===0.864v
++	Merged Robert's code.
++	Posted for testing.
+
+===0.864w
++	Fixed compiler ambiguity James discovered:
++		function f(inventory inv) {ActivateWeapon( weapon(inv) );}
+
++	StandMover   -> StepOn
++	UnStandMover -> StepOff
++	SteppedOn    -> SteppedOnBy
++	UnSteppedOn  -> SteppedOffBy
++	Added StandingCount: Count of other actors standing on this actor.
+
+///////////////////////////////////////////////////////////////////
+5-25-97
+
+===0.864x
++	Added stubs for all new floor related code.
++	physWalking handling of standing on other actors.
++	Jump must clear out Floor.
+
+====0.864y
++	Merged StepOn and StepOff into FloorChange.
++	engine function FloorChange();
++	SetFloor intrinsic with notifications.
++	SetRotation intrinsic.
+

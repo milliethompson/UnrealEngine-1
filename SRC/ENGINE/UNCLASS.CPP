@@ -90,7 +90,7 @@ void UClass::AddParentProperties()
 		{
 			checkState(i!=PROPBIN_PerFunction);
 			checkState(Bins[i]!=NULL);
-			Bins[i]->CopyDataFrom(ParentClass->Bins[i]);			
+			Bins[i]->CopyDataFrom( ParentClass->Bins[i] );
 		}
 	}
 	unguardobj;
@@ -394,7 +394,7 @@ void UClass::PostLoadHeader( DWORD PostFlags )
 {
 	guard(UClass::PostLoadHeader);
 
-	// Postload parent.
+	// Postload parent class.
 	UDatabase::PostLoadHeader(PostFlags);
 
 	// Init pointers.
@@ -566,7 +566,23 @@ void ClassTopicHandler::Get( ULevel *Level, const char *Item, FOutputDevice &Out
 		if (GetUClass(Item,"NAME=",Class)) Out.Log("1");
 		else Out.Log("0");
 	}
-	if( GetCMD(&Item,"PACKAGE") )
+	else if( GetCMD(&Item,"STATES") )
+	{
+		UClass* Class;
+		if( GetUClass( Item, "CLASS=", Class ) && Class->StackTree )
+		{
+			int n=0;
+			for( FStackNodePtr NodePtr=Class->StackTree->Element(0).ChildStates; NodePtr.Class; NodePtr=NodePtr->Next )
+			{
+				if( NodePtr->StackNodeFlags & SNODE_EditableState )
+				{
+					if( n++ > 0 ) Out.Log( "," );
+					Out.Log( NodePtr->Name() );
+				}
+			}
+		}
+	}
+	else if( GetCMD(&Item,"PACKAGE") )
 	{
 		UClass *Class;
 		if( GetUClass( Item, "CLASS=", Class ) )
@@ -709,6 +725,7 @@ void UClass::Finish()
 //
 void UClass::SerializeBin( FArchive &Ar, EPropertyBin Bin, void *Data, void *Defaults )
 {
+	FName PropertyName = NAME_None;
 	guard(UClass::SerializeBin);
 	//debugf("Serializing class %s, bin %i (%i total):",GetName(),Bin,Num);
 
@@ -719,13 +736,11 @@ void UClass::SerializeBin( FArchive &Ar, EPropertyBin Bin, void *Data, void *Def
 		if( Property.Bin==Bin )
 		{
 			// Get data pointer.
+			PropertyName  = Property.Name;
 			BYTE *Value   = (BYTE *)Data + Property.Offset;
 			BYTE *Default = Defaults ? ((BYTE*)Defaults + Property.Offset) : NULL;
 			Property.SerializeProperty( Ar, Value, Default );
-			if
-			(	(Property.Flags & CPF_Transient)
-			&&	(Ar.IsLoading())
-			&& !(It.GetClass()->ClassFlags & CLASS_Intrinsic) )
+			if( (Property.Flags & CPF_Transient) && Ar.IsLoading() )
 			{
 				// Zero-fill the non-intrinsic transient data.
 				if( Property.Type!=CPT_Bool || Property.BitMask == 1 )
@@ -735,7 +750,7 @@ void UClass::SerializeBin( FArchive &Ar, EPropertyBin Bin, void *Data, void *Def
 			}
 		}
 	}
-	unguardf(("(%s,%i)",GetName(),Bin));
+	unguardf(( "(class %s, property %s, bin %i)", GetName(), PropertyName(), Bin ));
 }
 
 /*-----------------------------------------------------------------------------

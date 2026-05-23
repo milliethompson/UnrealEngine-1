@@ -210,11 +210,6 @@ void FGlobalUnrealServer::Tick( FLOAT DeltaSeconds )
 	ScriptExecTime			= 0;
 	ActorTickTime			= 0;
 	AudioTickTime			= 0;
-	ActorCollisionFrags		= 0;
-
-	// Note: We don't refresh the cache here; we refresh it
-	// in the rendering code instead, since it's more sensible
-	// to tick it once per frame rendered than once per tick.
 
 	// Find active (input) camera:
 	ActiveCamera 	= NULL;
@@ -278,6 +273,10 @@ void FGlobalUnrealServer::Tick( FLOAT DeltaSeconds )
 					DeltaSeconds
 				);
             }
+
+			// Restart.
+			if( Level->GetLevelInfo()->bRestartLevel )
+				GUnreal.EnterWorld( "restart", 0 );
 		}
 		else
 		{

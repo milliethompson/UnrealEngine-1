@@ -109,36 +109,22 @@ class UNENGINE_API UModel : public UPrimitive
 	(
 		FCheckResult	&Result,
 		AActor			*Owner,
-		const FVector	&Location,
-		DWORD			ExtraNodeFlags
+		FVector			Location,
+		FVector			Extent,
+		DWORD           ExtraNodeFlags
 	);
 	INT LineCheck
 	(
 		FCheckResult	&Result,
 		AActor			*Owner,
-		const FVector	&Start,
-		const FVector	&End,
-		DWORD ExtraNodeFlags
-	);
-	INT BoxPointCheck
-	(
-		FCheckResult	&Result,
-		AActor			*Owner,
-		const FVector   &Point,
-		FLOAT           Radius,
-		FLOAT           Height,
+		FVector			Start,
+		FVector			End,
+		FVector			Extent,
 		DWORD           ExtraNodeFlags
 	);
-	INT BoxLineCheck
-	(
-		FCheckResult	&Result,
-		AActor			*Owner,
-		const FVector   &Start,
-		const FVector   &End,
-		FLOAT           Radius,
-		FLOAT           Height,
-		DWORD           ExtraNodeFlags
-	);
+	FBoundingBox GetCollisionBoundingBox( const AActor *Owner ) const;
+	FBoundingBox GetRenderBoundingBox( const AActor *Owner ) const;
+
 
 	// UModel interface.
 	UModel						(int Editable, int RootOutside);
@@ -183,7 +169,7 @@ class UNENGINE_API UModel : public UPrimitive
 	);
 	void PrecomputeSphereFilter
 	(
-		const FVector	&Sphere
+		const FPlane	&Sphere
 	);
 	FLightMeshIndex *GetLightMeshIndex( INDEX iSurf )
 	{

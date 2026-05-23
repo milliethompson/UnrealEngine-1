@@ -32,244 +32,7 @@ static FCollisionHash::FActorLink *GAvailable = NULL;
 #define HASH_ALL_TO_SAME_BUCKET 0 /* Should be 0 */
 
 // Global statistics.
-static int GActorsAdded=0,GFragsAdded=0,GUsed=0,GChecks=0;
-
-/*-----------------------------------------------------------------------------
-	AActor collision functions.
------------------------------------------------------------------------------*/
-
-//
-// Compute this actor's transformed collision bounding box.
-//
-inline void AActor::GetCollisionExtent( FVector &Min, FVector &Max ) const
-{
-	guardSlow(AActor::GetCollisionExtent);
-	if( !Brush || !Brush->bCheckCollision )
-	{
-		// Get simple extent of actor.
-		Min = FVector( Location.X - CollisionRadius, Location.Y - CollisionRadius, Location.Z - CollisionHeight );
-		Max = FVector( Location.X + CollisionRadius, Location.Y + CollisionRadius, Location.Z + CollisionHeight );
-	}
-	else
-	{
-		// Get extent of actor's moving brush.
-		Min = Brush->TransformedBound.Min;
-		Max = Brush->TransformedBound.Max;
-	}
-	unguardSlow;
-}
-
-//
-// See if a point is touching this actor.
-// Returns 0 if collided, 1 if outside.
-//
-INT AActor::PointCheck
-(
-	FCheckResult	&Result,
-	const FVector	&Point,
-	DWORD			ExtraNodeFlags
-)
-{
-	guardSlow(AActor::PointCheck);
-	if( !Brush || !Brush->bCheckCollision )
-	{
-		// Treat this actor as a cyllinder.
-		return
-		(		Square(Location.Z-Point.Z)                            > Square(CollisionHeight)
-		||      Square(Location.X-Point.X)+Square(Location.Y-Point.Y) > Square(CollisionRadius) );
-	}
-	else
-	{
-		// Check collision with brush.
-		//!! must transform then detransform brushspace.
-		return Brush->PointCheck( Result, this, Point, ExtraNodeFlags );
-	}
-	unguardSlow;
-}
-
-//
-// See if a line is touching this actor.
-// Returns 0 if collided, 1 if outside.
-//
-INT AActor::LineCheck
-(
-	FCheckResult	&Result,
-	const FVector	&V1,
-	const FVector	&V2,
-	DWORD ExtraNodeFlags
-)
-{
-	guardSlow(AActor::LineCheck);
-	if( !Brush || !Brush->bCheckCollision )
-	{
-		// Use box-cyllinder test.
-		return BoxLineCheck( Result, V1, V2, 0.0, 0.0, 0 );
-	}
-	else
-	{
-		// Use this actor's primitive for collision checking.
-		return 1;
-	}
-	unguardSlow;
-}
-
-//
-// See if a collision box is touching this actor.
-// Returns 0 if collided, 1 if outside.
-//
-INT AActor::BoxPointCheck
-(
-	FCheckResult	&Result,
-	const FVector   &Point,
-	FLOAT           Radius,
-	FLOAT           Height,
-	DWORD           ExtraNodeFlags
-)
-{
-	guardSlow(AActor::BoxPointCheck);
-	if( !Brush || !Brush->bCheckCollision )
-	{
-		// Treat this actor as a cyllinder.
-		return
-		(		Square(Location.Z-Point.Z)                            > Square(CollisionHeight+Height)
-		||      Square(Location.X-Point.X)+Square(Location.Y-Point.Y) > Square(CollisionRadius+Radius) );
-	}
-	else
-	{
-		// Use this actor's primitive for collision checking.
-		return 1;
-	}
-	unguardSlow;
-}
-
-//
-// See if a collision box moving along a line is touching this actor.
-// Returns 0 if collided, 1 if outside.
-//
-INT AActor::BoxLineCheck
-(
-	FCheckResult	&Result,
-	const FVector   &Start,
-	const FVector   &End,
-	FLOAT           Radius,
-	FLOAT           Height,
-	DWORD           ExtraNodeFlags
-)
-{
-	guardSlow(AActor::BoxLineCheck);
-	if( !Brush || !Brush->bCheckCollision )
-	{
-		// Treat this actor as a cyllinder.
-		FLOAT   NetRadius = Radius + CollisionRadius;
-		FLOAT   NetHeight = Height + CollisionHeight;
-
-		// Quick X reject.
-		FLOAT MaxX = Location.X + NetRadius;
-		if( Start.X>MaxX && End.X>MaxX )
-			return 1;
-		FLOAT MinX = Location.X - NetRadius;
-		if( Start.X<MinX && End.X<MinX )
-			return 1;
-
-		// Quick Y reject.
-		FLOAT MaxY = Location.Y + NetRadius;
-		if( Start.Y>MaxY && End.Y>MaxY )
-			return 1;
-		FLOAT MinY = Location.Y - NetRadius;
-		if( Start.Y<MinY && End.Y<MinY )
-			return 1;
-
-		// Quick Z reject.
-		FLOAT TopZ = Location.Z + NetHeight;
-		if( Start.Z>TopZ && End.Z>TopZ )
-			return 1;
-		FLOAT BotZ = Location.Z - NetHeight;
-		if( Start.Z<BotZ && End.Z<BotZ )
-			return 1;
-
-		// Clip to top of cyllinder.
-		FLOAT T0=0.0, T1=1.0;
-		if( Start.Z>TopZ && End.Z<TopZ )
-		{
-			FLOAT T = (TopZ - Start.Z)/(End.Z - Start.Z);
-			if( T > T0 )
-			{
-				T0 = T;
-				Result.Normal = FVector(0,0,1);
-			}
-		}
-		else if( Start.Z<TopZ && End.Z>TopZ )
-			T1 = ::Min( T1, (TopZ - Start.Z)/(End.Z - Start.Z) );
-
-		// Clip to bottom of cyllinder.
-		if( Start.Z<BotZ && End.Z>BotZ )
-		{
-			FLOAT T = (BotZ - Start.Z)/(End.Z - Start.Z);
-			if( T > T0 )
-			{
-				T0 = T;
-				Result.Normal = FVector(0,0,-1);
-			}
-		}
-		else if( Start.Z>BotZ && End.Z<BotZ )
-			T1 = ::Min( T0, (BotZ - Start.Z)/(End.Z - Start.Z) );
-		
-		// Reject.
-		if( T0 >= T1 )
-			return 1;
-
-		// Test setup.
-		FLOAT   Kx        = Start.X - Location.X;
-		FLOAT   Ky        = Start.Y - Location.Y;
-
-		// 2D circle clip about origin.
-		FLOAT   Vx        = End.X   - Start.X;
-		FLOAT   Vy        = End.Y   - Start.Y;
-		FLOAT   A         = Vx*Vx + Vy*Vy;
-		FLOAT   B         = 2.0 * (Kx*Vx + Ky*Vy);
-		FLOAT   C         = Kx*Kx + Ky*Ky - NetRadius*NetRadius;
-		FLOAT   Discrim   = B*B - 4.0*A*C;
-
-		// No intersection if discriminant is negative.
-		if( Discrim < 0 )
-			return 1;
-
-		// Unstable intersection if velocity is tiny.
-		if( A < Square(0.0001) )
-		{
-			// Outside.
-			if( C > 0 )
-				return 1;
-		}
-		else
-		{
-			// Compute intersection times.
-			Discrim           = sqrt(Discrim);
-			FLOAT R2A         = 0.5/A;
-			T1                = ::Min( T1, +(Discrim-B) * R2A );
-			FLOAT T           = -(Discrim+B) * R2A;
-			if( T > T0 )
-			{
-				T0 = T;
-				Result.Normal   = (Start + (End-Start)*T0 - Location);
-				Result.Normal.Z = 0;
-				Result.Normal.Normalize();
-			}
-			if( T0 >= T1 )
-				return 1;
-		}
-		Result.Time     = ::Max(T0-0.001,0.0);
-		Result.Location = Start + (End-Start) * Result.Time;
-		return 0;
-	}
-	else
-	{
-		// Use this actor's primitive for collision checking.
-		//!! must transform then detransform brushspace.
-		return Brush->BoxLineCheck( Result, this, Start, End, Radius, Height, ExtraNodeFlags );
-	}
-	unguardSlow;
-}
+static int GActorsAdded=0, GFragsAdded=0, GUsed=0, GChecks=0;
 
 /*-----------------------------------------------------------------------------
 	FCollisionHash init/exit.
@@ -293,7 +56,6 @@ void FCollisionHash::Init()
 #else
 			HashX[i] = HashY[i] = HashZ[i] = i;
 #endif
-
 		srand(0x1234567);
 		for( i=0; i<NUM_BUCKETS; i++ )
 		{
@@ -376,12 +138,11 @@ void FCollisionHash::GetActorExtent
 	guard(FCollisionHash::GetActorExtent);
 
 	// Get actor's bounding box.	
-	FVector Min,Max;
-	Actor->GetCollisionExtent( Min, Max );
+	FBoundingBox Box = Actor->GetPrimitive()->GetCollisionBoundingBox( Actor );
 
 	// Discretize to hash coordinates.
-	GetHashIndices( Min, X0, Y0, Z0 );
-	GetHashIndices( Max, X1, Y1, Z1 );
+	GetHashIndices( Box.Min, X0, Y0, Z0 );
+	GetHashIndices( Box.Max, X1, Y1, Z1 );
 
 	unguard;
 }
@@ -398,18 +159,14 @@ void FCollisionHash::AddActor( AActor *Actor )
 	guard(FCollisionHash::AddActor);
 	checkState(CollisionInitialized);
 	checkInput(Actor->bCollideActors);
-
 	if( Actor->bDeleteMe )
 		return;
-
-	//debugf("Adding %s",Actor->Class->GetName());
+	CheckActorNotReferenced( Actor );
 	GActorsAdded++;
 
-	// Get extent.
+	// Add actor in all the specified places.
 	INT X0,Y0,Z0,X1,Y1,Z1;
 	GetActorExtent( Actor, X0, X1, Y0, Y1, Z0, Z1 );
-
-	// Add actor in all the specified places.
 	for( INT X=X0; X<=X1; X++ )
 	{
 		for( INT Y=Y0; Y<=Y1; Y++ )
@@ -429,7 +186,7 @@ void FCollisionHash::AddActor( AActor *Actor )
 				else
 				{
 					// Allocate a new link.
-					Link        = new FActorLink( Actor, Link, iLocation );
+					Link = new FActorLink( Actor, Link, iLocation );
 				}
 				GUsed++;
 				GFragsAdded++;
@@ -446,15 +203,17 @@ void FCollisionHash::AddActor( AActor *Actor )
 void FCollisionHash::RemoveActor( AActor *Actor )
 {
 	guard(FCollisionHash::RemoveActor);
-	checkState(CollisionInitialized);
 	checkInput(Actor->bCollideActors);
-	//debugf("Removing %s",Actor->Class->GetName());
-
-	// Get extent.
-	INT X0,Y0,Z0,X1,Y1,Z1;
-	GetActorExtent( Actor, X0, X1, Y0, Y1, Z0, Z1 );
+	checkState(CollisionInitialized);
+	if( Actor->bDeleteMe )
+		return;
+	if( !GEditor && Actor->Location!=Actor->ColLocation )
+		appErrorf( "%s %s moved without proper hashing", Actor->GetClassName(), Actor->GetName() );
 
 	// Remove actor.
+	INT X0,Y0,Z0,X1,Y1,Z1;
+	INT ExpectFrags=0, FoundFrags=0;
+	GetActorExtent( Actor, X0, X1, Y0, Y1, Z0, Z1 );
 	for( INT X=X0; X<=X1; X++ )
 	{
 		for( INT Y=Y0; Y<=Y1; Y++ )
@@ -465,7 +224,7 @@ void FCollisionHash::RemoveActor( AActor *Actor )
 				FActorLink **Link = &GetHashLink( X, Y, Z, iLocation );
 				while( *Link )
 				{
-					if( (*Link)->Actor!=Actor || (*Link)->iLocation!=iLocation )
+					if( (*Link)->Actor != Actor )
 					{
 						Link = &(*Link)->Next;
 					}
@@ -481,6 +240,7 @@ void FCollisionHash::RemoveActor( AActor *Actor )
 			}
 		}
 	}
+	CheckActorNotReferenced( Actor );
 	unguard;
 }
 
@@ -492,67 +252,167 @@ void FCollisionHash::RemoveActor( AActor *Actor )
 // Make a list of all actors which overlap with a cyllinder at Location
 // with the given collision size.
 //
-int FCollisionHash::PointCheck
+FCheckResult* FCollisionHash::PointCheck
 (
-	const FVector &Location,
-	FLOAT	      Radius,
-	FLOAT	      Height,
-	AActor	      **List,
-	INT		      ListMax
+	FMemStack&		Mem,
+	FVector			Location,
+	FVector			Extent,
+	DWORD			ExtraNodeFlags,
+	ALevelInfo*		Level,
+	BOOL			bActors
 )
 {
 	guard(FCollisionHash::PointCheck);
 	checkState(CollisionInitialized);
 
-	// Update collision tag.
-	CollisionTag++;
-
-	// Get extent.
+	// Get extent indices.
 	INT X0,Y0,Z0,X1,Y1,Z1;
-	FVector Extent( Radius, Radius, Height );
 	GetHashIndices( Location - Extent, X0, Y0, Z0 );
 	GetHashIndices( Location + Extent, X1, Y1, Z1 );
-	//debugf("Size = %i",(X1+1-X0)*(Y1+1-Y0)*(Z1+1-Z0));
+	FCheckResult *Result, **PrevLink = &Result;
+	CollisionTag++;
+
+	// Check with level.
+	if( Level )
+	{
+		FCheckResult TestHit(1.0);
+		if( Level->XLevel->Model->PointCheck( TestHit, NULL, Location, Extent, 0 )==0 )
+		{
+			// Hit.
+			TestHit.Actor = Level;
+			*PrevLink     = new(GMem)FCheckResult;
+			**PrevLink    = TestHit;
+			PrevLink      = &(*PrevLink)->GetNext();
+		}
+	}
 
 	// Check all actors in this neighborhood.
-	INT ListCount = 0;
-	FLOAT RadiusSquared = Square(Radius);
-	for( INT X=X0; X<=X1; X++ )
+	if( bActors )
 	{
-		for( INT Y=Y0; Y<=Y1; Y++ )
+		for( INT X=X0; X<=X1; X++ ) for( INT Y=Y0; Y<=Y1; Y++ ) for( INT Z=Z0; Z<=Z1; Z++ )
 		{
-			for( INT Z=Z0; Z<=Z1; Z++ )
+			INT iLocation;
+			for( FActorLink *Link = GetHashLink( X, Y, Z, iLocation ); Link; Link=Link->Next )
 			{
-				INT iLocation;
-				for( FActorLink *Link = GetHashLink( X, Y, Z, iLocation ); Link; Link=Link->Next )
-				{
-					// Skip if we've already checked this actor.
-					if( Link->Actor->CollisionTag == CollisionTag )
-						continue;
-					Link->Actor->CollisionTag = CollisionTag;
+				// Skip if we've already checked this actor.
+				if( Link->Actor->CollisionTag == CollisionTag )
+					continue;
+				Link->Actor->CollisionTag = CollisionTag;
 
-					// Collision test.
-					FCheckResult Hit;
-					if( Link->Actor->BoxPointCheck( Hit, Location, Radius, Height, 0 )==0 )
-					{
-						// Hit.
-						List[ListCount++] = Link->Actor;
-						if( ListCount >= ListMax )
-							return ListCount;
-					}
+				// Collision test.
+				FCheckResult TestHit(1.0);
+				if( Link->Actor->GetPrimitive()->PointCheck( TestHit, Link->Actor, Location, Extent, 0 )==0 )
+				{
+					checkState(TestHit.Actor==Link->Actor);
+					*PrevLink  = new(GMem)FCheckResult;
+					**PrevLink = TestHit;
+					PrevLink   = &(*PrevLink)->GetNext();
 				}
 			}
 		}
 	}
-	return ListCount;
+	*PrevLink = NULL;
+	return Result;
+	unguard;
+}
+
+//
+// Check for encroached actors.
+//
+FCheckResult* FCollisionHash::EncroachmentCheck
+(
+	FMemStack&		Mem,
+	AActor*			Actor,
+	FVector			Location,
+	FRotation		Rotation,
+	DWORD			ExtraNodeFlags
+)
+{
+	guard(FCollisionHash::EncroachmentCheck);
+	checkState(CollisionInitialized);
+	checkInput(Actor!=NULL);
+
+	// Save actor's location and rotation.
+	Exchange( Location, Actor->Location );
+	Exchange( Rotation, Actor->Rotation );
+
+	// Get extent indices.
+	INT X0,Y0,Z0,X1,Y1,Z1;
+	GetActorExtent( Actor, X0, X1, Y0, Y1, Z0, Z1 );
+	FCheckResult *Result, **PrevLink = &Result;
+	CollisionTag++;
+
+	// Check all actors in this neighborhood.
+	for( INT X=X0; X<=X1; X++ ) for( INT Y=Y0; Y<=Y1; Y++ ) for( INT Z=Z0; Z<=Z1; Z++ )
+	{
+		INT iLocation;
+		for( FActorLink *Link = GetHashLink( X, Y, Z, iLocation ); Link; Link=Link->Next )
+		{
+			// Skip if we've already checked this actor.
+			if( Link->Actor->CollisionTag == CollisionTag )
+				continue;
+			Link->Actor->CollisionTag = CollisionTag;
+
+			// Collision test.
+			FCheckResult TestHit(1.0);
+			if
+			(	!Link->Actor->Brush
+			&&	Link->Actor!=Actor
+			&&	Actor->GetPrimitive()->PointCheck( TestHit, Actor, Link->Actor->Location, Link->Actor->GetCollisionExtent(), 0 )==0 )
+			{
+				TestHit.Actor     = Link->Actor;
+				TestHit.Primitive = NULL;
+				*PrevLink         = new(GMem)FCheckResult;
+				**PrevLink        = TestHit;
+				PrevLink          = &(*PrevLink)->GetNext();
+			}
+		}
+	}
+
+	// Restore actor's location and rotation.
+	Exchange( Location, Actor->Location );
+	Exchange( Rotation, Actor->Rotation );
+
+	*PrevLink = NULL;
+	return Result;
+	unguard;
+}
+
+//
+// Check for nearest hit.
+// Return 1 if no hit, 0 if hit.
+//
+int FCollisionHash::SinglePointCheck
+(
+	FCheckResult&	Hit,
+	FVector			Location,
+	FVector			Extent,
+	DWORD			ExtraNodeFlags,
+	ALevelInfo*		Level,
+	BOOL			bActors
+)
+{
+	guard(FCollisionHash::SinglePointCheck);
+	FMemMark Mark(GMem);
+	FCheckResult* Hits = PointCheck( GMem, Location, Extent, ExtraNodeFlags, Level, bActors );
+	if( !Hits )
+		return 1;
+	Hit = *Hits;
+	for( Hits = Hits->GetNext(); Hits!=NULL; Hits = Hits->GetNext() )
+		if( (Hits->Location-Location).SizeSquared() < (Hit.Location-Location).SizeSquared() )
+			Hit = *Hits;
+	Mark.Pop();
+	return 0;
 	unguard;
 }
 
 //
 // Make a time-sorted list of all actors which overlap a cyllinder moving 
-// along a line from Start to End.
+// along a line from Start to End. If LevelInfo is specified, also checks for
+// collision with the level itself and terminates collision when the trace
+// hits solid space.
 //
-//Note: This routine is very inefficient for large lines, because it checks
+// Note: This routine is very inefficient for large lines, because it checks
 // collision with all actors inside a bounding box containing the line's start
 // and end point. This is a reasonable approach for regular actor movement
 // like player walking, but it becomes very inefficient for long line traces, such
@@ -565,14 +425,14 @@ int FCollisionHash::PointCheck
 // * Stop tracing once we have hit an actor which we know is guaranteed to be the 
 //   nearest possible actor along the line.
 //
-int FCollisionHash::LineCheck
+FCheckResult* FCollisionHash::LineCheck
 (
-	FCheckResult	*Hits,
-	INT				ListMax,
-	const FVector	&Start,
-	const FVector	&End,
-	FLOAT			Radius,
-	FLOAT			Height
+	FMemStack		&Mem,
+	FVector			Start,
+	FVector			End,
+	FVector			Size,
+	BOOL			bCheckActors,
+	ALevelInfo*		LevelInfo
 )
 {
 	guard(FCollisionHash::LineCheck);
@@ -583,19 +443,22 @@ int FCollisionHash::LineCheck
 
 	// Get extent.
 	INT X0,Y0,Z0,X1,Y1,Z1;
-	FVector Min=Start; Min.UpdateMinWith(End);
-	FVector Max=Start; Max.UpdateMaxWith(End);
-	FVector Extent( Radius, Radius, Height );
-	GetHashIndices( Min - Extent, X0, Y0, Z0 );
-	GetHashIndices( Max + Extent, X1, Y1, Z1 );
-	//debugf("Size = %i",(X1+1-X0)*(Y1+1-Y0)*(Z1+1-Z0));
+	FBoundingBox Box( FBoundingBox(0) + Start + End );
+	GetHashIndices( Box.Min - Size, X0, Y0, Z0 );
+	GetHashIndices( Box.Max + Size, X1, Y1, Z1 );
+	
+	// Init hits.
+	INT NumHits=0;
+	FCheckResult Hits[64];
 
-	// Get direction.
-	FVector Vector = End - Start;
+	// Check for collision with the level, and cull the end point.
+	if( LevelInfo && LevelInfo->XLevel->Model->LineCheck( Hits[NumHits], NULL, Start, End, Size, 0 )==0 )
+	{
+		Hits[NumHits].Actor = LevelInfo;
+		End = Start + (End-Start) * Hits[NumHits++].Time;
+	}
 
-	// Check all potentially colliding actors.
-	INT ListCount = 0;
-	FLOAT RadiusSquared = Square(Radius);
+	// Check all potentially colliding actors in the hash.
 	for( INT X=X0; X<=X1; X++ )
 	{
 		for( INT Y=Y0; Y<=Y1; Y++ )
@@ -611,24 +474,32 @@ int FCollisionHash::LineCheck
 					Link->Actor->CollisionTag = CollisionTag;
 
 					// Check collision.
-					if( Link->Actor->BoxLineCheck( Hits[ListCount], Start, End, Radius, Height, 0 ) == 0 )
+					Hits[NumHits].Actor = NULL;
+					if( Link->Actor->GetPrimitive()->LineCheck( Hits[NumHits], Link->Actor, Start, End, Size, 0 )==0 )
 					{
-						// Collided.
-						Hits[ListCount].Actor = Link->Actor;
-						if( ++ListCount >= ListMax )
-							goto Filled;
+						checkState(Hits[NumHits].Actor!=NULL);
+						if( ++NumHits >= ARRAY_COUNT(Hits) )
+							goto Finished;
 					}
 				}
 			}
 		}
 	}
-	Filled:;
 
 	// Sort the list.
-	if( ListCount > 1 )
-		QSort( Hits, ListCount );
-
-	return ListCount;
+	Finished:
+	FCheckResult* Result = NULL;
+	if( NumHits > 0 )
+	{
+		Result = new(Mem,NumHits)FCheckResult;
+		QSort( Hits, NumHits );
+		for( int i=0; i<NumHits; i++ )
+		{
+			Result[i]      = Hits[i];
+			Result[i].Next = (i+1<NumHits) ? &Result[i+1] : NULL;
+		}
+	}
+	return Result;
 	unguard;
 }
 

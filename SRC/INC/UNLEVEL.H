@@ -19,6 +19,24 @@
 -----------------------------------------------------------------------------*/
 
 //
+// Trace actor options.
+//
+enum ETraceActorFlags
+{
+	// Bitflags.
+	TRACE_Pawns         = 0x01, // Check collision with pawns.
+	TRACE_Movers        = 0x02, // Check collision with movers.
+	TRACE_Level         = 0x04, // Check collision with level geometry.
+	TRACE_ZoneChanges   = 0x08, // Check collision with soft zone boundaries.
+	TRACE_Others        = 0x10, // Check collision with all other kinds of actors.
+
+	// Combinations.
+	TRACE_VisBlocking   = TRACE_Level | TRACE_Movers,
+	TRACE_AllColliding  = TRACE_Pawns | TRACE_Movers | TRACE_Level | TRACE_Others,
+	TRACE_AllEverything = TRACE_Pawns | TRACE_Movers | TRACE_Level | TRACE_ZoneChanges | TRACE_Others,
+};
+
+//
 // The level object.  Contains the level's actor list, Bsp information, and brush list.
 //
 class UNENGINE_API ULevel : public UDatabase, public FOutputDevice
@@ -35,7 +53,6 @@ class UNENGINE_API ULevel : public UDatabase, public FOutputDevice
 	// Main variables, always valid.
 	UModel*					Model;
 	TArray<UModel*>::Ptr	BrushArray;
-	TArray<UObject*>::Ptr	Misc;
 	UReachSpecs::Ptr		ReachSpecs;
 	UTextBuffer::Ptr		TextBlocks[NUM_LEVEL_TEXT_BLOCKS];
 
@@ -77,7 +94,6 @@ class UNENGINE_API ULevel : public UDatabase, public FOutputDevice
 		State			= LEVEL_Down;
 		BrushArray		= (TArray<UModel*>   *)NULL;
 		Model           = (UModel            *)NULL;
-		Misc			= (TArray<UObject*>  *)NULL;
 		ReachSpecs		= (UReachSpecs       *)NULL;
 
 		// Clear all text blocks.
@@ -98,7 +114,7 @@ class UNENGINE_API ULevel : public UDatabase, public FOutputDevice
 		UDatabase::SerializeHeader(Ar);
 
 		// ULevel.
-		Ar << AR_OBJECT(Model) << AR_OBJECT(BrushArray) << AR_OBJECT(Misc);
+		Ar << AR_OBJECT(Model) << AR_OBJECT(BrushArray);
 		Ar << ReachSpecs;
 
 		for( int i=0; i<NUM_LEVEL_TEXT_BLOCKS; i++ )
@@ -136,7 +152,7 @@ class UNENGINE_API ULevel : public UDatabase, public FOutputDevice
 	void	SetState			(ELevelState State);
 	void	Tick				(int CamerasOnly, AActor *ActiveActor,FLOAT DeltaSeconds);
 	ELevelState GetState		() {return State;}
-	void	ReconcileActors		(int Remembered);
+	void	ReconcileActors		();
 	void	RememberActors		();
 	void	DissociateActors	();
 	int		Exec				(const char *Cmd,FOutputDevice *Out=GApp);
@@ -146,20 +162,21 @@ class UNENGINE_API ULevel : public UDatabase, public FOutputDevice
 
 	// Actor-related functions, valid only when locked.
 	void	SendEx				(FName Message, PMessageParms *Parms, AActor *Actor=NULL, FName TagName=NAME_None, UClass *Class=NULL);
-	int		TestMoveActor		(AActor *Actor, FVector &Start, FVector &End);
-	int		RotateActor			(AActor *Actor, FRotation &DestRotation, int Test=0);
-	int		MoveActor			(AActor *Actor, FVector *Delta, FCheckResult &Hit, int Test=0);
-	int		FarMoveActor		(AActor *Actor, FVector *DestLocation, int Test=0);
+	int		TestMoveActor		(AActor *Actor, FVector Start, FVector End, BOOL IgnorePawns);
+	int		MoveActor			(AActor *Actor, FVector Delta, FRotation NewRotation, FCheckResult &Hit, BOOL Test=0, BOOL IgnorePawns=0, BOOL bIgnoreBases=0);
+	int		FarMoveActor		(AActor *Actor, FVector DestLocation, BOOL Test=0, BOOL bNoCheck=0);
 	int		DropToFloor			(AActor *Actor);
 	int     DestroyActor		(AActor *Actor);
 	void    CleanupDestroyed    ();
 	int		PossessActor		(APawn *Actor, UCamera *Camera);
 	UCamera*UnpossessActor		(APawn *Actor);
-	AActor* SpawnActor			(UClass *Class, AActor *Owner=NULL, FName ActorName=NAME_None, const FVector *Location=NULL, const FRotation *Rotation=NULL, AActor *Template=NULL);
-	AView*  SpawnViewActor      (UCamera *Camera,FName MatchName,AActor *Template);
+	AActor* SpawnActor			(UClass *Class, AActor *Owner=NULL, FName ActorName=NAME_None, FVector Location=FVector(0,0,0), FRotation Rotation=FRotation(0,0,0), AActor* Template=NULL);
+	AView*  SpawnViewActor      (UCamera *Camera,FName MatchName);
 	int		SpawnPlayActor		(UCamera *Camera);
-	void    SetActorZone        (AActor *Actor, BOOL bForceRefresh=0);
-	void	Trace               (FCheckResult &Hit, AActor *SourceActor, const FVector &End, const FVector &Start, BOOL TraceActors);
+	void    SetActorZone        (AActor *Actor, BOOL bTest=0, BOOL bForceRefresh=0);
+	int		Trace               (FCheckResult &Hit, AActor *SourceActor, const FVector &End, const FVector &Start, DWORD TraceFlags, FVector Extent=FVector(0,0,0) );
+	int		FindSpot			(FVector Extent, FVector &Location, BOOL bCheckActors);
+	int		CheckEncroachment	(AActor* Actor, FVector TestLocation, FRotation TestRotation);
 
 	// Collision.
 	void InitCollision()
@@ -217,18 +234,94 @@ class UNENGINE_API ULevel : public UDatabase, public FOutputDevice
 	}
 
 private:
-	// Private.
 	ELevelState				State;
-	int PlaceActor(AActor *Actor, FVector *DestLocation);
-	int		MyBoxPointCheck
-								(
-								FCheckResult	&Result,
-								AActor			*Owner,
-								const FVector   &Point,
-								FLOAT           Radius,
-								FLOAT           Height,
-								DWORD           ExtraNodeFlags
-								); //FIXME - temporary, remove
+	int MyBoxPointCheck( FCheckResult &Result, AActor* Owner, FVector Point, FVector Extent, DWORD ExtraNodeFlags ); //FIXME - temporary, remove
+};
+
+/*-----------------------------------------------------------------------------
+	FTestMove.
+-----------------------------------------------------------------------------*/
+
+//
+// Mechanism for remembering the location of actors so that
+// they can be restored after testing movement with ULevel::MoveActor.
+//
+class FTestMove
+{
+private:
+	// Information about a remembered actor.
+	class FRememberedActor
+	{
+	public:
+		// Variables.
+		AActor*				Actor;
+		FVector				Location;
+		FRotation			Rotation;
+		AZoneInfo*			Zone;
+		INT					ZoneNumber;
+		FRememberedActor*	Next;
+
+		// Constructor.
+		FRememberedActor( AActor* InActor, FRememberedActor* InNext )
+		:	Actor			(InActor)
+		,	Location		(Actor->Location)
+		,	Rotation		(Actor->Rotation)
+		,	Zone			(Actor->Zone)
+		,	ZoneNumber		(Actor->ZoneNumber)
+		,	Next			(InNext)
+		{}
+
+		// Undo.
+		void Pop()
+		{
+			Actor->Location   = Location;
+			Actor->Rotation   = Rotation;
+			Actor->Zone       = Zone;
+			Actor->ZoneNumber = ZoneNumber;
+		}
+	};
+
+	// Variables.
+	ULevel::Ptr				Level;
+	AActor*					Actor;
+	FMemStack&				Mem;
+	FMemMark				Mark;
+	FRememberedActor*		First;
+
+	// Remember an actor.
+	void RememberActor( AActor* Actor )
+	{
+		Level->Hash.RemoveActor( Actor );
+		First = new( Mem )FRememberedActor( Actor, First );
+		if( Actor->StandingCount )
+			for( int i=0; i<Level->Num; i++ )
+				if( Level(i) && Level(i)->Base==Actor )
+					RememberActor( Level(i) );
+	}
+
+public:
+	// Constructor.
+	FTestMove( ULevel::Ptr InLevel, AActor* InActor, FMemStack& InMem )
+	:	Level	(InLevel)
+	,	Actor	(InActor)
+	,	Mem		(InMem)
+	,	Mark	(Mem)
+	,	First	(NULL)
+	{
+		// Remember all actors.
+		RememberActor( Actor );
+	}
+
+	// Clean up.
+	void Pop()
+	{
+		for( FRememberedActor* Remembered=First; Remembered; Remembered=Remembered->Next )
+		{
+			Remembered->Pop();
+			Level->Hash.AddActor( Remembered->Actor );
+		}
+		Mark.Pop();
+	}
 };
 
 /*-----------------------------------------------------------------------------

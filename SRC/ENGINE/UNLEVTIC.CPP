@@ -126,37 +126,48 @@ void ULevel::Tick( int CamerasOnly, AActor *ActiveLocalPlayer, FLOAT DeltaSecond
 					// Handle all animation sequence notifys.
 					if( Actor->Mesh && Actor->bAnimNotify )
 					{
-						FMeshAnimSeq* Seq = Actor->Mesh->GetAnimSeq( Actor->AnimSequence );
+						const FMeshAnimSeq* Seq = Actor->Mesh->GetAnimSeq( Actor->AnimSequence );
 						if( Seq )
 						{
-							UMeshAnimNotifys::Ptr Notifys = Actor->Mesh->Notifys;
+							FLOAT                 BestElapsedFrames  = 100000.0;
+							FMeshAnimNotify*      BestNotify         = NULL;
+							UMeshAnimNotifys::Ptr Notifys            = Actor->Mesh->Notifys;
 							for( int i=Seq->StartNotify; i<Seq->StartNotify+Seq->NumNotifys; i++ )
 							{
 								FMeshAnimNotify &Notify = Notifys(i);
 								if( OldAnimFrame<Notify.Time && Actor->AnimFrame>=Notify.Time )
 								{
-									Seconds          = Seconds * (Actor->AnimFrame - Notify.Time) / (Actor->AnimFrame - OldAnimFrame);
-									Actor->AnimFrame = Notify.Time;
-									Actor->Process( Notifys(i).Function, NULL );
-									continue;
+									FLOAT ElapsedFrames = Notify.Time - OldAnimFrame;
+									if( BestNotify==NULL || ElapsedFrames<BestElapsedFrames )
+									{
+										BestElapsedFrames = ElapsedFrames;
+										BestNotify        = &Notify;
+									}
 								}
+							}
+							if( BestNotify )
+							{
+								Seconds          = Seconds * (Actor->AnimFrame - BestNotify->Time) / (Actor->AnimFrame - OldAnimFrame);
+								Actor->AnimFrame = BestNotify->Time;
+								Actor->Process( BestNotify->Function, NULL );
+								continue;
 							}
 						}
 					}
 
 					// Handle end of animation sequence.
-					if( Actor->AnimFrame<Actor->AnimEnd || (Actor->bAnimLoop && OldAnimFrame>=Actor->AnimEnd && Actor->AnimFrame<1.0) )
+					if( Actor->AnimFrame<Actor->AnimEnd || (Actor->bAnimLoop && OldAnimFrame>Actor->AnimEnd && Actor->AnimFrame<1.0) )
 					{
 						// We have finished the animation updating for this tick.
 						Seconds = 0.0;
 					}
-					else if( Actor->bAnimLoop && OldAnimFrame<1.0 && Actor->AnimFrame>1.0 )
+					else if( Actor->bAnimLoop && OldAnimFrame<=1.0 && Actor->AnimFrame>1.0 )
 					{
-						// Just past loop end, so loop it.
+						// Just past end, so loop it.
 						Seconds          = Seconds * (Actor->AnimFrame - 1.0) / (Actor->AnimFrame - OldAnimFrame);
 						Actor->AnimFrame = 0.0;
 					}
-					else if( OldAnimFrame<Actor->AnimEnd )
+					else if( OldAnimFrame<=Actor->AnimEnd )
 					{
 						// Just passed end-minus-one frame.
 						Seconds = Seconds * (Actor->AnimFrame - Actor->AnimEnd) / (Actor->AnimFrame - OldAnimFrame);
@@ -286,7 +297,7 @@ void ULevel::Tick( int CamerasOnly, AActor *ActiveLocalPlayer, FLOAT DeltaSecond
 					}
 
 					// Call timer routine with count of timer events that have passed.
-					Actor->Process( NAME_Timer, &PInt(TimerTicksPassed) );
+					Actor->Process( NAME_Timer, NULL );
 					if( Actor->bDeleteMe )
 						continue;
 				}
@@ -308,20 +319,25 @@ void ULevel::Tick( int CamerasOnly, AActor *ActiveLocalPlayer, FLOAT DeltaSecond
 				// Save old location for AI purposes.
 				Actor->OldLocation = Actor->Location;
 
-				if ( (Actor->Physics!=PHYS_None) && Actor->bEnginePhysics)
+				if ( Actor->Physics!=PHYS_None )
 					Actor->performPhysics(DeltaSeconds);
 
 				// update eyeheight and send visibility updates
+				// with PVS, monsters look for other monsters, rather than sending msgs
 				if (Pawn)
 				{
 					if (Pawn->SightCounter < 0.0)
-						Pawn->SightCounter = 0.1; //FIXME - make as big as possible 
+						Pawn->SightCounter = 0.2; //FIXME - make as big as possible 
 					Pawn->SightCounter = Pawn->SightCounter - DeltaSeconds; 
 					if (Pawn->bIsPlayer)
 					{
 						Actor->Process( NAME_UpdateEyeHeight, &PFloat(DeltaSeconds) );
 						Pawn->ShowSelf();
 					}
+					else if ((Pawn->SightCounter < 0.0) && (frand() < 0.1))
+					//monsters should showself to each other occasionally (every 2 sec)
+						Pawn->ShowSelf();
+
 					if ((Pawn->SightCounter < 0.0) && Pawn->IsProbing(NAME_EnemyNotVisible))
 						Pawn->CheckEnemyVisible();
 				}

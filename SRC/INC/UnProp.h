@@ -36,10 +36,12 @@ enum EPropertyFlags
 	CPF_SkipParm		= 0x0200,	// Property is a short-circuitable evaluation function parm.
 	CPF_ReturnParm		= 0x0400,	// Return value.
 	CPF_CoerceParm		= 0x0800,	// Coerce a parameter.
-	CPF_Transient       = 0x2000,   // Property is transient: shouldn't be saved, reinitialized to default at load time.
+	CPF_Intrinsic       = 0x1000,   // Property is intrinsic: C++ code is responsible for serializing it.
+	CPF_Transient       = 0x2000,   // Property is transient: shouldn't be saved, zero-filled at load time.
 
 	// Combinations of flags.
-	CPF_ParmFlags		= CPF_OptionalParm | CPF_Parm | CPF_OutParm | CPF_SkipParm | CPF_ReturnParm | CPF_CoerceParm, // All function parm flags.
+	CPF_ParmFlags = CPF_OptionalParm | CPF_Parm | CPF_OutParm | CPF_SkipParm | CPF_ReturnParm | CPF_CoerceParm,
+	CPF_PropagateFromStruct = CPF_Const | CPF_Private | CPF_Intrinsic | CPF_Transient,
 };
 
 //
@@ -101,14 +103,14 @@ public:
 	}
 
 	// Inlines.
-	void Init( EPropertyBin InBin, EPropertyType InType )
+	void Init( EPropertyBin InBin, EPropertyType InType, DWORD InFlags=0 )
 	{
 		// Set regular info.
 		Name		= NAME_None;
 		Category	= NAME_None;
 		Type		= InType;
 		Offset		= 0;
-		Flags		= 0;
+		Flags		= InFlags;
 		ArrayDim    = 1;
 		Bin			= InBin;
 		BitMask		= 0;

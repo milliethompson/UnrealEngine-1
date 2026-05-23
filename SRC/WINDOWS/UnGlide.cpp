@@ -24,24 +24,31 @@
 BOOL GGlideCheckErrors=1;
 
 // Texture upload flags.
-enum EGlideTextureFlags
+enum EGlideFlags
 {
-	GTF_Alpha		= 1,	// 5551 rgba texture.
-};
-
-// Palette upload flags.
-enum EGlidePaletteFlags
-{
-	GPF_Scale		= 1,	// Scale to improve precision.
+	GF_Alpha		  = 0x01, // 5551 rgba texture.
+	GF_NoPalette      = 0x02, // Non-palettized.
+	GF_NoScale        = 0x04, // Scale for precision adjust.
+	GF_ForceTexture   = 0x08, // Force texture to be uploaded.
+	GF_ForcePalette   = 0x10, // Force palette to be uploaded.
 };
 
 // Pixel formats.
-struct FGlide5551
+union FGlideColor
 {
-	WORD B:5;
-	WORD G:5;
-	WORD R:5;
-	WORD A:1;
+	struct
+	{
+		WORD B:5;
+		WORD G:5;
+		WORD R:5;
+		WORD A:1;
+	} Color5551;
+	struct
+	{
+		WORD B:5;
+		WORD G:6;
+		WORD R:5;
+	} Color565;
 };
 
 /*-----------------------------------------------------------------------------
@@ -213,7 +220,7 @@ public:
 	int Ok;
 	FARPROC Find( char *Name, int Num );
 	int Associate();
-} GGlide;
+};
 
 //
 // Find an entry point into the Glide DLL.
@@ -399,7 +406,7 @@ int FGlide::Associate()
 //
 // Handle a Glide error.
 //
-void GlideErrorHandler(const char *String, FxBool Fatal)
+void GlideErrorHandler( const char *String, FxBool Fatal )
 {
 	guard(GlideErrorHandler);
 	if( GGlideCheckErrors )
@@ -474,17 +481,17 @@ public:
 		// State variables.
 		UTexture	*Texture;
 		UPalette	*Palette;
-		FColor		MaxColor;
+		FColor		TextureMaxColor;
+		FColor		PaletteMaxColor;
 		FCacheItem  *TextureItem;
 		INT			iLightMesh;
-		DWORD		GlideTextureFlags;
-		DWORD		GlidePaletteFlags;
+		DWORD		GlideFlags;
 		FLOAT		Scale;
 
 		// tmu download functions.
-		DWORD DownloadTexture( UTexture *Texture, DWORD GlideTextureFlags, DWORD CacheID, INT iFirstMip, INT iLastMip, GrTexInfo *texinfo, INT UCopies, INT VCopies );
-		void DownloadLightMesh( DWORD Base, GrTexInfo *texinfo );
-		void DownloadPalette( UPalette *Palette, FColor MaxColor, DWORD GlidePaletteFlags );
+		DWORD DownloadTexture( UTexture *Texture, DWORD GlideFlags, DWORD CacheID, INT iFirstMip, INT iLastMip, GrTexInfo *texinfo, INT UCopies, INT VCopies );
+		void DownloadLightMesh( DWORD Base, GrTexInfo *texinfo, INT UCopies, INT VCopies );
+		void DownloadPalette( UPalette *Palette, FColor InPaletteMaxColor );
 
 		// State functions.
 		void Init( int Intmu, FGlideRenderDevice *InGlide )
@@ -496,7 +503,8 @@ public:
 			tmu				= Intmu;
 			Texture			= NULL;
 			Palette			= NULL;
-			MaxColor		= FColor(255,255,255,255);
+			TextureMaxColor	= FColor(255,255,255,255);
+			PaletteMaxColor = FColor(255,255,255,255);
 			TextureItem		= NULL;
 			iLightMesh		= 0;
 
@@ -506,9 +514,9 @@ public:
 			// Init cache.
 			Cache.Init
 			(
-				GGlide.grTexMaxAddress(tmu) - GGlide.grTexMinAddress(tmu) - Phudge,
+				Glide->grTexMaxAddress(tmu) - Glide->grTexMinAddress(tmu) - Phudge,
 				2048,
-				(void*)(GGlide.grTexMinAddress(tmu) + Phudge),
+				(void*)(Glide->grTexMinAddress(tmu) + Phudge),
 				2 * 1024 * 1024
 			);
 
@@ -552,7 +560,7 @@ public:
 			Cache.Flush();
 			unguard;
 		}
-		void SetLightMesh( INDEX iInLightMesh )
+		void SetLightMesh( INDEX iInLightMesh, BOOL IsDynamic )
 		{
 			guard(FGlideTMU::SetLightMesh);
 			checkInput(iInLightMesh!=INDEX_NONE);
@@ -571,49 +579,62 @@ public:
 				checkState(MaxBits<=8);
 
 				// Validate it.
-				if( texinfo.aspectRatio<GR_ASPECT_8x1 || texinfo.aspectRatio>GR_ASPECT_1x8 )
+				int UCopies=1, VCopies=1;
+				if( texinfo.aspectRatio < GR_ASPECT_8x1 )
 				{
-					debugf("Bad aspect: %i x %i",GLightManager->MeshUBits, GLightManager->MeshVBits);
-					SetTexture( GGfx.DefaultTexture, 0 );
-					return;
-					//!! Need to squish the light map into a suitable aspect ratio.
+					VCopies = VCopies << (GR_ASPECT_8x1 - texinfo.aspectRatio);
+					texinfo.aspectRatio = GR_ASPECT_8x1;
+				}
+				else if( texinfo.aspectRatio > GR_ASPECT_1x8 )
+				{
+					UCopies = UCopies << (texinfo.aspectRatio - GR_ASPECT_1x8);
+					texinfo.aspectRatio = GR_ASPECT_1x8;
 				}
 
 				// Generate texture if needed.
 				INT   OldTime;
 				DWORD CacheID = MakeCacheID( CID_3dfxLightMap, iLightMesh, 0);
-				TextureItem   = NULL; // Required for GetEx.
+				TextureItem   = NULL;
 				DWORD Address = (DWORD)Cache.GetEx( CacheID, TextureItem, OldTime, ALIGNMENT );
-				if( !Address || (GLightManager->IsDynamic && OldTime!=Cache.GetTime()) )
+				if( !Address || (IsDynamic && OldTime!=Cache.GetTime()) )
 				{
 					if( !Address ) Address = (DWORD)Cache.Create
 					(
 						CacheID, 
 						TextureItem,
-						GLightManager->MeshTileSpace * (1 + Glide->ColoredLight),
+						GLightManager->MeshTileSpace * (1 + Glide->ColoredLight) * UCopies * VCopies,
 						ALIGNMENT
 					);
-					DownloadLightMesh( Address, &texinfo );
+					DownloadLightMesh( Address, &texinfo, UCopies, VCopies );
 				}
 
 				// Make it current.
-				GGlide.grTexSource( tmu, Address, GR_MIPMAPLEVELMASK_BOTH, &texinfo );
+				Glide->grTexSource( tmu, Address, GR_MIPMAPLEVELMASK_BOTH, &texinfo );
 			}
 			unguard;
 		}
-		void SetTexture( UTexture *InTexture, DWORD InGlideTextureFlags )
+		void SetTexture( UTexture* InTexture, UPalette* InPalette, DWORD InGlideFlags )
 		{
 			guard(FGlideTMU::SetTexture);
-			if( Texture!=InTexture || GlideTextureFlags!=InGlideTextureFlags)
+			if( Texture!=InTexture || GlideFlags!=InGlideFlags || (InGlideFlags & GF_ForceTexture) )
 			{
+				// Set TextureMaxColor.
+				if( InGlideFlags & (GF_Alpha|GF_NoPalette|GF_NoScale) )
+					TextureMaxColor = FColor(255,255,255,255);
+				else
+					TextureMaxColor = InTexture->MaxColor;
+
 				// Get the texture into 3dfx memory.
 				ResetTexture();
-				Texture           = InTexture;
-				GlideTextureFlags = InGlideTextureFlags;
+				Texture    = InTexture;
+				GlideFlags = InGlideFlags;
 
 				// Make a texinfo.
 				GrTexInfo texinfo;
-				texinfo.format      = !(GlideTextureFlags&GTF_Alpha) ? GR_TEXFMT_P_8 : GR_TEXFMT_ARGB_1555;
+				texinfo.format      = (GlideFlags & GF_Alpha    ) ? GR_TEXFMT_ARGB_1555
+									: (GlideFlags & GF_NoPalette) ? GR_TEXFMT_RGB_565
+									:                               GR_TEXFMT_P_8;
+				
 				texinfo.aspectRatio = Texture->VBits + 3 - Texture->UBits;
 				int MaxBits			= Max(Texture->UBits, Texture->VBits);
 				int iFirstMip		= MaxBits<=8 ? 0                  : MaxBits-8;
@@ -636,21 +657,19 @@ public:
 				}
 
 				// Generate texture if needed.
-				DWORD CacheID = MakeCacheID( CID_3dfxTexture, Texture->GetIndex(), GlideTextureFlags );
+				DWORD CacheID = MakeCacheID( CID_3dfxTexture, Texture->GetIndex(), GlideFlags );
 				DWORD Address = (DWORD)Cache.Get( CacheID, TextureItem, ALIGNMENT );
 				if( !Address )
-					Address = DownloadTexture( Texture, GlideTextureFlags, CacheID, iFirstMip, iLastMip, &texinfo, UCopies, VCopies );
+					Address = DownloadTexture( Texture, GlideFlags, CacheID, iFirstMip, iLastMip, &texinfo, UCopies, VCopies );
 
 				// Make it current.
-				GGlide.grTexSource( tmu, Address, GR_MIPMAPLEVELMASK_BOTH, &texinfo );
+				Glide->grTexSource( tmu, Address, GR_MIPMAPLEVELMASK_BOTH, &texinfo );
 			}
-			unguard;
-		}
-		void SetPalette( UPalette *InPalette, FColor InMaxColor, DWORD InGlidePaletteFlags, int Force=0 )
-		{
-			guard(FGlideTMU::SetPalette);
-			if( Force || Palette!=InPalette || MaxColor!=InMaxColor || GlidePaletteFlags!=InGlidePaletteFlags )
-				DownloadPalette( InPalette, InMaxColor, InGlidePaletteFlags );
+			if( !(InGlideFlags & (GF_Alpha|GF_NoPalette)) )
+			{
+				if( (InGlideFlags & GF_ForcePalette) || Palette!=InPalette || PaletteMaxColor!=TextureMaxColor )
+				DownloadPalette( InPalette, TextureMaxColor );
+			}
 			unguard;
 		}
 	} States[MAX_TMUS];
@@ -665,7 +684,6 @@ public:
 		const FVector &Base, const FVector &Normal, const FVector &U, const FVector &V, FLOAT PanU, FLOAT PanV,
 		DWORD PolyFlags);
 	void DrawPolyC(UCamera *Camera,UTexture *Texture,const FTransTexture *Pts,int NumPts,DWORD PolyFlags);
-	void DrawPolyF(UCamera *Camera,const FTransform *Pts,int NumPts,FColor Color);
 	int Exec(const char *Cmd,FOutputDevice *Out);
 
 	// State cache.
@@ -674,30 +692,46 @@ public:
 	// Glide specific functions.
 	void SetBlending( DWORD PolyFlags )
 	{
-		if( !(PolyFlags & (PF_Transparent|PF_Masked)) )
+		if( !(PolyFlags & (PF_Transparent|PF_Masked|PF_InternalUnused1)) )
 		{
 			// Normal surface.
-			GGlide.grAlphaBlendFunction( GR_BLEND_ONE, GR_BLEND_ZERO, GR_BLEND_ZERO, GR_BLEND_ZERO );
+			grAlphaBlendFunction( GR_BLEND_ONE, GR_BLEND_ZERO, GR_BLEND_ZERO, GR_BLEND_ZERO );
 		}
 		else if( PolyFlags & PF_Transparent )
 		{
 			// Transparent surface.
-			GGlide.grAlphaBlendFunction( GR_BLEND_ONE, GR_BLEND_ONE, GR_BLEND_ZERO, GR_BLEND_ZERO );
+			grAlphaBlendFunction( GR_BLEND_ONE, GR_BLEND_ONE, GR_BLEND_ZERO, GR_BLEND_ZERO );
+		}
+		else if( PolyFlags & PF_InternalUnused1 )
+		{
+			// More transparent surface.
+			FColor C(0,0,0,80);
+			grConstantColorValue( *(GrColor_t*)&C );
+			guAlphaSource(GR_ALPHASOURCE_CC_ALPHA);
+			grAlphaBlendFunction( GR_BLEND_ONE, GR_BLEND_SRC_ALPHA, GR_BLEND_ZERO, GR_BLEND_ZERO );
+			grTexFilterMode( GR_TMU0, GR_TEXTUREFILTER_POINT_SAMPLED, GR_TEXTUREFILTER_POINT_SAMPLED );
 		}
 		else
 		{
 			// Masked surface.
-			GGlide.guAlphaSource( GR_ALPHASOURCE_TEXTURE_ALPHA );
-			GGlide.grAlphaBlendFunction( GR_BLEND_SRC_ALPHA, GR_BLEND_ONE_MINUS_SRC_ALPHA, GR_BLEND_ZERO, GR_BLEND_ZERO );
+			guAlphaSource( GR_ALPHASOURCE_TEXTURE_ALPHA );
+			grAlphaBlendFunction( GR_BLEND_SRC_ALPHA, GR_BLEND_ONE_MINUS_SRC_ALPHA, GR_BLEND_ZERO, GR_BLEND_ZERO );
+		}
+	}
+	void ResetBlending( DWORD PolyFlags )
+	{
+		if( PolyFlags & PF_InternalUnused1 )
+		{
+			grTexFilterMode( GR_TMU0, GR_TEXTUREFILTER_BILINEAR, GR_TEXTUREFILTER_BILINEAR );
 		}
 	}
 	void ClearZBuffer()
 	{
 		guard(FGlideRenderDevice::ClearZBuffer);
 
-		GGlide.grColorMask  ( FXFALSE, FXTRUE );
-		GGlide.grBufferClear( 0x008f8f8f, 0, GR_WDEPTHVALUE_FARTHEST );
-		GGlide.grColorMask  ( FXTRUE, FXTRUE );
+		grColorMask  ( FXFALSE, FXTRUE );
+		grBufferClear( 0x008f8f8f, 0, GR_WDEPTHVALUE_FARTHEST );
+		grColorMask  ( FXTRUE, FXTRUE );
 
 		unguard;
 	}
@@ -707,7 +741,7 @@ public:
 		if( InDepthBuffering != DepthBuffering )
 		{
 			DepthBuffering = InDepthBuffering;
-			GGlide.grDepthMask( DepthBuffering );
+			grDepthMask( DepthBuffering );
 		}
 #endif
 	}
@@ -726,17 +760,20 @@ int FGlideRenderDevice::Init3D( UCamera *Camera, int RequestX, int RequestY )
 	checkState(!Active);
 	debugf("Initializing Glide...");
 
+	// Checks.
+	checkState(sizeof(FGlideColor)==2);
+
 	// Initialize the Glide library.
-	GGlide.grGlideInit();
+	grGlideInit();
 
 	// Set error callback.
-	GGlide.grErrorSetCallback( GlideErrorHandler );
+	grErrorSetCallback( GlideErrorHandler );
 
 	// Make sure 3Dfx hardware is present.
 	GGlideCheckErrors=0;
-	if( !GGlide.grSstQueryHardware( &hwconfig ) )
+	if( !grSstQueryHardware( &hwconfig ) )
 	{
-		GGlide.grGlideShutdown();
+		grGlideShutdown();
 		debugf( "grSstQueryHardware failed" );
 		return 0;
     }
@@ -760,7 +797,7 @@ int FGlideRenderDevice::Init3D( UCamera *Camera, int RequestX, int RequestY )
 			"Glide tmu %i: tmuRev=%i tmuRam=%i Space=%i", tmu,
 			hwconfig.SSTs[0].sstBoard.VoodooConfig.tmuConfig[tmu].tmuRev,
 			hwconfig.SSTs[0].sstBoard.VoodooConfig.tmuConfig[tmu].tmuRam,
-			GGlide.grTexMaxAddress(tmu) - GGlide.grTexMinAddress(tmu)
+			grTexMaxAddress(tmu) - grTexMinAddress(tmu)
 		);
 
 	// Set variables.
@@ -770,7 +807,7 @@ int FGlideRenderDevice::Init3D( UCamera *Camera, int RequestX, int RequestY )
 	DepthBuffering	= 0;
 
 	// Select the first board.
-	GGlide.grSstSelect( 0 );
+	grSstSelect( 0 );
 
 	// Pick a refresh rate.
 	GrScreenRefresh_t Ref;
@@ -797,7 +834,7 @@ int FGlideRenderDevice::Init3D( UCamera *Camera, int RequestX, int RequestY )
 	// Open the display.
 	Retry:
 	GGlideCheckErrors=0;
-	if( !GGlide.grSstOpen( Res, Ref, GR_COLORFORMAT_ARGB, GR_ORIGIN_UPPER_LEFT, GR_SMOOTHING_ENABLE, 3 ))
+	if( !grSstOpen( Res, Ref, GR_COLORFORMAT_ARGB, GR_ORIGIN_UPPER_LEFT, GR_SMOOTHING_ENABLE, 2 ))
     {
 		if( Res != GR_RESOLUTION_512x384 )
 		{
@@ -811,49 +848,63 @@ int FGlideRenderDevice::Init3D( UCamera *Camera, int RequestX, int RequestY )
 			Ref = GR_REFRESH_72Hz;
 			goto Retry;
 		}
-		GGlide.grGlideShutdown();
+		grGlideShutdown();
 		debugf( "grSstOpen failed (%i, %i)", Ref, Res );
 		return 0;
     }
 	GGlideCheckErrors = 1;
 
 	// Set depth buffering.
-	GGlide.grDepthBufferMode( GR_DEPTHBUFFER_WBUFFER );
-	GGlide.grDepthMask( 1 );
+	grDepthBufferMode( GR_DEPTHBUFFER_WBUFFER );
+	grDepthMask( 1 );
 
 	// Set dithering.
-	GGlide.grDitherMode( GR_DITHER_4x4 ); // GR_DITHER_DISABLE GR_DITHER_2x2 GR_DITHER_4x4
+	grDitherMode( GR_DITHER_4x4 ); // GR_DITHER_DISABLE GR_DITHER_2x2 GR_DITHER_4x4
 
 	// Set gamma.
-	GGlide.grGammaCorrectionValue( 1.4 );
+	grGammaCorrectionValue( 1.4 );
+
+	// Init chroma keying and alpha testing.
+	grChromakeyValue(0);
+	grChromakeyMode(0);
+	grAlphaTestReferenceValue( 127.0 );
+
+	// Fog.
+	GrFog_t fog[GR_FOG_TABLE_SIZE];
+	for( int i=0; i<GR_FOG_TABLE_SIZE; i++ )
+	{
+		float W = guFogTableIndexToW(i);
+		fog[i]  = Clamp( 0.1f * W, 0.f, 255.f );
+	}
+	grFogTable(fog);
+	grFogColorValue(0); 
+	grFogMode(GR_FOG_DISABLE);
 
 	// Init depth buffering.
-	GGlide.grDepthBufferFunction( GR_CMP_LEQUAL ); // GR_CMP_ALWAYS
+	grDepthBufferFunction( GR_CMP_LEQUAL ); // GR_CMP_ALWAYS
 
 	for( tmu=0; tmu<NumTmu; tmu++ )
 	{
 		// Set the default mipmap LOD bias value to the approriate value for 
 		// bilinear filtering. 3dfx recommends bilinear=0.5, triliear=0.0.
 		// I use a smaller number to improve clarity in exchange for a little bit of aliasing.
-		GGlide.grTexLodBiasValue( tmu, -1.0 );
+		grTexLodBiasValue( tmu, -1.0 );
 
 		// Wrap the textures.
-		GGlide.grTexClampMode( tmu, GR_TEXTURECLAMP_WRAP, GR_TEXTURECLAMP_WRAP ); // GR_TEXTURECLAMP_CLAMP
+		grTexClampMode( tmu, GR_TEXTURECLAMP_WRAP, GR_TEXTURECLAMP_WRAP ); // GR_TEXTURECLAMP_CLAMP
 
 		// Set up the hardware to render decal textures with no iterated lighting.
-		// (There are lower level, more flexible functions for setting up the 
-		// rasterization pipeline in the hardware. . . these will do for now.)
-		GGlide.guTexCombineFunction( tmu, GR_TEXTURECOMBINE_DECAL );
+		guTexCombineFunction( tmu, GR_TEXTURECOMBINE_DECAL );
 
 		// Enable mipmapping.
-		GGlide.grTexMipMapMode( tmu, GR_MIPMAP_NEAREST, FXFALSE );
+		grTexMipMapMode( tmu, GR_MIPMAP_NEAREST, FXFALSE );
 		
 		// Dithering between mipmaps.
-		//GGlide.grHints( GR_HINT_ALLOW_MIPMAP_DITHER, 1 );
-		//GGlide.grTexMipMapMode( tmu, GR_MIPMAP_NEAREST_DITHER, FXFALSE );
+		//grHints( GR_HINT_ALLOW_MIPMAP_DITHER, 1 );
+		//grTexMipMapMode( tmu, GR_MIPMAP_NEAREST_DITHER, FXFALSE );
 
 		// Enable bilinear filtering for both minification and magnification.
-		GGlide.grTexFilterMode
+		grTexFilterMode
 		(
 			tmu, 
 			GR_TEXTUREFILTER_BILINEAR, // min. GR_TEXTUREFILTER_POINT_SAMPLED
@@ -892,7 +943,7 @@ void FGlideRenderDevice::Exit3D()
 	Active = 0;
 
 	// Shut down Glide.
-	GGlide.grGlideShutdown();
+	grGlideShutdown();
 	debugf(LOG_Exit,"Glide terminated");
 
 	unguard;
@@ -923,7 +974,7 @@ void FGlideRenderDevice::Flush3D()
 DWORD FGlideRenderDevice::FGlideTMU::DownloadTexture
 (
 	UTexture	*Texture,
-	DWORD		GlideTextureFlags,
+	DWORD		GlideFlags,
 	DWORD		CacheID,
 	INT			iFirstMip,
 	INT			iLastMip,
@@ -936,11 +987,7 @@ DWORD FGlideRenderDevice::FGlideTMU::DownloadTexture
 	Stats.TextureDownloads++;
 
 	// Compute size.
-	int Size      = 0;
-	int PixelSize = (GlideTextureFlags & GTF_Alpha) ? 2 : 1;
-	for( int i=iFirstMip; i<iLastMip; i++ )
-		Size += Align( Texture->Mips[i].Size() * UCopies * VCopies * PixelSize, (INT)ALIGNMENT );
-	debugState(Size==(int)GGlide.grTexCalcMemRequired( texinfo->smallLod, texinfo->largeLod, texinfo->aspectRatio, texinfo->format));
+	DWORD Size = Glide->grTexCalcMemRequired( texinfo->smallLod, texinfo->largeLod, texinfo->aspectRatio, texinfo->format);
 
 	// Create cache entry.
 	DWORD Result = (DWORD)Cache.Create
@@ -961,31 +1008,42 @@ DWORD FGlideRenderDevice::FGlideTMU::DownloadTexture
 		Copy = new( GMem, MaxSize )BYTE;
 
 	// Make buffer for alpha conversion.
-	FGlide5551 *Alpha        = NULL;
-	FGlide5551 *AlphaPalette = NULL;
-	if( GlideTextureFlags & GTF_Alpha )
+	FGlideColor *Alpha        = NULL;
+	FGlideColor *AlphaPalette = NULL;
+	if( GlideFlags & GF_Alpha )
 	{
-		AlphaPalette = new( GMem, Texture->Palette->Num )FGlide5551;
-		Alpha        = new( GMem, MaxSize               )FGlide5551;
+		AlphaPalette = new( GMem, Texture->Palette->Num )FGlideColor;
+		Alpha        = new( GMem, MaxSize               )FGlideColor;
 		for( int i=0; i<Texture->Palette->Num; i++ )
 		{
-			AlphaPalette[i].R = Texture->Palette(i).R >> (8-5);
-			AlphaPalette[i].G = Texture->Palette(i).G >> (8-5);
-			AlphaPalette[i].B = Texture->Palette(i).B >> (8-5);
-			AlphaPalette[i].A = 1;
+			AlphaPalette[i].Color5551.R = Texture->Palette(i).R >> (8-5);
+			AlphaPalette[i].Color5551.G = Texture->Palette(i).G >> (8-5);
+			AlphaPalette[i].Color5551.B = Texture->Palette(i).B >> (8-5);
+			AlphaPalette[i].Color5551.A = 1;
 		}
-		AlphaPalette[0].A = 0;
+		AlphaPalette[0].Color5551.A = 0;
+	}
+	else if( GlideFlags & GF_NoPalette )
+	{
+		AlphaPalette = new( GMem, Texture->Palette->Num )FGlideColor;
+		Alpha        = new( GMem, MaxSize               )FGlideColor;
+		for( int i=0; i<Texture->Palette->Num; i++ )
+		{
+			AlphaPalette[i].Color565.R = Texture->Palette(i).R >> (8-5);
+			AlphaPalette[i].Color565.G = Texture->Palette(i).G >> (8-6);
+			AlphaPalette[i].Color565.B = Texture->Palette(i).B >> (8-5);
+		}
 	}
 
 	// Download the texture's mips.
 	//debugf("%s: %i-%i",Texture->GetName(),iFirstMip,iLastMip);
-	for( i=iFirstMip; i<iLastMip; i++ )
+	for( int i=iFirstMip; i<iLastMip; i++ )
 	{
 		FMipInfo &Mip = Texture->Mips[i];
 		BYTE     *Src = &Texture->Element( Mip.Offset );
 		if( Copy )
 		{
-			BYTE *To   = Copy;
+			BYTE *To = Copy;
 			for( int j=0; j<VCopies; j++ )
 			{
 				BYTE *From = Src;
@@ -1008,7 +1066,7 @@ DWORD FGlideRenderDevice::FGlideTMU::DownloadTexture
 				Alpha[i] = AlphaPalette[Src[i]];
 			Src = (BYTE*)Alpha;
 		}
-		GGlide.grTexDownloadMipMapLevel
+		Glide->grTexDownloadMipMapLevel
 		(
 			tmu,
 			Result,
@@ -1028,7 +1086,7 @@ DWORD FGlideRenderDevice::FGlideTMU::DownloadTexture
 //
 // Download the current light mesh.
 //
-void FGlideRenderDevice::FGlideTMU::DownloadLightMesh( DWORD Base, GrTexInfo *texinfo )
+void FGlideRenderDevice::FGlideTMU::DownloadLightMesh( DWORD Base, GrTexInfo *texinfo, INT UCopies, INT VCopies )
 {
 	guard(FGlideRenderDevice::DownloadLightMesh);
 
@@ -1054,17 +1112,21 @@ void FGlideRenderDevice::FGlideTMU::DownloadLightMesh( DWORD Base, GrTexInfo *te
 			Scale[i] = (i * 255) / Max;
 
 		// Convert 8-8-8 light maps to 5-6-5.
-		Data.PtrWORD = new( GDynMem, GLightManager->MeshTileSpace )WORD;
+		Data.PtrWORD = new( GDynMem, GLightManager->MeshTileSpace * UCopies * VCopies )WORD;
 		WORD  *Dest  = Data.PtrWORD;
 		Src			 = GLightManager->Mesh;
-		for( i=0; i<GLightManager->MeshTileSpace; i++ )
+		for( i=0; i<GLightManager->MeshVTile; i++ )
 		{
-			*Dest++ = 
-			+	((Scale[Src.PtrBYTE[2]] >> 3 ) & 0x001f) // Blue.
-			+	((Scale[Src.PtrBYTE[1]] << 3 ) & 0x07e0) // Green.
-			+	((Scale[Src.PtrBYTE[0]] << 8 ) & 0xf800) // Red.
-			;
-			Src.PtrDWORD++;
+			for( int j=0; j<GLightManager->MeshUTile; j++ )
+			{
+				*Dest++ = 
+				+	((Scale[Src.PtrBYTE[2]] >> 3 ) & 0x001f) // Blue.
+				+	((Scale[Src.PtrBYTE[1]] << 3 ) & 0x07e0) // Green.
+				+	((Scale[Src.PtrBYTE[0]] << 8 ) & 0xf800) // Red.
+				;
+				Src.PtrDWORD++;
+			}
+			Dest += GLightManager->MeshUTile * (UCopies-1);
 		}
 	}
 	else
@@ -1085,13 +1147,19 @@ void FGlideRenderDevice::FGlideTMU::DownloadLightMesh( DWORD Base, GrTexInfo *te
 		Data.PtrBYTE = new(GMem,GLightManager->MeshTileSpace)BYTE;
 		BYTE  *Dest  = Data.PtrBYTE;
 		Src			 = GLightManager->Mesh.PtrFLOAT;
-		for( i=0; i<GLightManager->MeshTileSpace; i++ )
-			*Dest++ = Min(255,ftoi((*Src++ - (3<<22)) * Factor));
+		for( i=0; i<GLightManager->MeshVTile; i++ )
+		{
+			for( int j=0; j<GLightManager->MeshUTile; j++ )
+			{
+				*Dest++ = Min(255,ftoi((*Src++ - (3<<22)) * Factor));
+			}
+			Dest += GLightManager->MeshUTile * (UCopies-1);
+		}
 	}
 
 	// Download it.
 	guard(grTexDownloadMipMapLevel);
-	GGlide.grTexDownloadMipMapLevel
+	Glide->grTexDownloadMipMapLevel
 	(
 		tmu,
 		Base,
@@ -1114,8 +1182,7 @@ void FGlideRenderDevice::FGlideTMU::DownloadLightMesh( DWORD Base, GrTexInfo *te
 void FGlideRenderDevice::FGlideTMU::DownloadPalette
 (
 	UPalette	*InPalette,
-	FColor		InMaxColor,
-	DWORD		InGlidePaletteFlags
+	FColor		InPaletteMaxColor
 )
 {
 	guard(FGlideRenderDevice::DownloadPalette);
@@ -1125,20 +1192,12 @@ void FGlideRenderDevice::FGlideTMU::DownloadPalette
 
 	// Update state.
 	Palette           = InPalette;
-	MaxColor          = InMaxColor;
-	GlidePaletteFlags = InGlidePaletteFlags;
+	PaletteMaxColor   = InPaletteMaxColor;
 
 	// Set up scaling.
-	if( GlidePaletteFlags & GPF_Scale )
-	{
-		ScaleR = 255.0 / Max(MaxColor.R, (BYTE)1);
-		ScaleG = 255.0 / Max(MaxColor.G, (BYTE)1);
-		ScaleB = 255.0 / Max(MaxColor.B, (BYTE)1);
-	}
-	else
-	{
-		ScaleR = ScaleG = ScaleB = 1.0;
-	}
+	ScaleR = 255.0 / Max(PaletteMaxColor.R, (BYTE)1);
+	ScaleG = 255.0 / Max(PaletteMaxColor.G, (BYTE)1);
+	ScaleB = 255.0 / Max(PaletteMaxColor.B, (BYTE)1);
 
 	// A 3dfx palette entry is in the form of 0x00rrggbb.
 	Palette->Lock(LOCK_Read);
@@ -1152,7 +1211,7 @@ void FGlideRenderDevice::FGlideTMU::DownloadPalette
 	}
 
 	// Send the palette.
-	GGlide.grTexDownloadTablePartial
+	Glide->grTexDownloadTablePartial
 	(
 		tmu,
 		GR_TEXTABLE_PALETTE,
@@ -1180,7 +1239,7 @@ void FGlideRenderDevice::Lock3D( UCamera *Camera )
 	// Update camera sizing.
 	SavedCamera    = *Camera;
 	Camera->Stride = 1024;
-	Camera->PrecomputeRenderInfo( GGlide.grSstScreenWidth(), GGlide.grSstScreenHeight() );
+	Camera->PrecomputeRenderInfo( grSstScreenWidth(), grSstScreenHeight() );
 
 	// Note that we support colored lighting.
 	Camera->Caps |= CC_ColoredLight;
@@ -1188,14 +1247,6 @@ void FGlideRenderDevice::Lock3D( UCamera *Camera )
 
 	// Clear the Z-buffer.
 	ClearZBuffer();
-
-	// Get linear frame buffer write pointer:
-	/*
-	// No longer needed - no lfb writes.
-	GGlide.grLfbBegin();
-	GGlide.grLfbBypassMode( GR_LFBBYPASS_ENABLE );
-	Camera->Screen = Camera->RealScreen = (BYTE *)GGlide.grLfbGetWritePtr( GR_BUFFER_BACKBUFFER );
-	*/
 
 	// Init stats.
 	Stats.Init();
@@ -1212,10 +1263,6 @@ void FGlideRenderDevice::Unlock3D( UCamera *Camera, int Blit )
 	guard(FGlideRenderDevice::Unlock3D);
 	checkState(Locked);
 
-	// End linear frame buffer.
-	// No longer needed.
-	//GGlide.grLfbEnd();
-
 	// Tick each of the states.
 	for( int i=0; i<NumTmu; i++ )
 		States[i].Tick();
@@ -1225,7 +1272,7 @@ void FGlideRenderDevice::Unlock3D( UCamera *Camera, int Blit )
 	{
 		// Flip pages.
 		guard(grBufferSwap);
-		GGlide.grBufferSwap( 1 );
+		grBufferSwap( 1 );
 		unguard;
 
 		// Display stats.
@@ -1234,10 +1281,10 @@ void FGlideRenderDevice::Unlock3D( UCamera *Camera, int Blit )
 		unguard;
 
 		// Throttle if we are rendering faster than the refresh rate.
-		if( GGlide.grBufferNumPending() > 2 )
+		if( grBufferNumPending() > 2 )
 		{
 			QWORD Time = GApp->MicrosecondTime();
-			while( GApp->MicrosecondTime()-Time<100000 && GGlide.grBufferNumPending() > 2 );
+			while( GApp->MicrosecondTime()-Time<100000 && grBufferNumPending() > 2 );
 		}
 	}
 
@@ -1279,29 +1326,27 @@ void FGlideRenderDevice::DrawPolyV
 	// Check lighting.
 	BOOL  Lit        = 0;
 	FLOAT LightScale = 0.0;
-	if( GLightManager->Mesh.PtrVOID!=NULL && !(PolyFlags & PF_NoOcclude) )
+	if( GLightManager->Mesh.PtrVOID!=NULL && !(PolyFlags & PF_Unlit) /*&& !(PolyFlags & PF_NoOcclude)*/ )
 	{
 		Lit         = 1;
 		LightScale  = 256.0 / (Min(256,Max(GLightManager->MeshUTile, GLightManager->MeshVTile)) * GLightManager->MeshSpacing);
-		DrawThings += 1; //!!(NumTmu==1);
-	}
-
-	// Check bump mapping.
-	UTexture *Original = Texture;
-	BOOL Bump = 0;
-	if( (Texture->TextureFlags & TF_BumpMap) && !(PolyFlags & PF_NoOcclude) )
-	{
-		Bump    = 1;
-		Texture = GGfx.DefaultTexture;
 		DrawThings++;
 	}
+
+	BOOL Phog = 0;
+
+	// Check bump mapping.
+	if( Texture->BumpMap )
+		DrawThings++;
+
+	if( PolyFlags & PF_FakeBackdrop )
+		DrawThings++;
 
 	// Set state.
 	SetDepthBuffering( !(PolyFlags & PF_NoOcclude) );
 
 	// Setup texture.
-	States[GR_TMU0].SetTexture(Texture,(PolyFlags & PF_Masked) ? GTF_Alpha : 0);
-	States[GR_TMU0].SetPalette(Texture->Palette,Texture->MaxColor,GPF_Scale);
+	States[GR_TMU0].SetTexture( Texture, Texture->Palette, ((PolyFlags & PF_Masked) ? GF_Alpha : 0) | ((PolyFlags & PF_Transparent) ? GF_NoScale : 0) );
 
 	// Get texture scale.
 	FLOAT Scale  = States[GR_TMU0].Scale / Min(256, Max(Texture->USize, Texture->VSize));
@@ -1310,11 +1355,11 @@ void FGlideRenderDevice::DrawPolyV
 
 	// Alloc verts.
 	FMemMark Mark(GMem);
-	GrVertex *Verts=new(GMem,NumPts)GrVertex, *FarVerts=Verts, *NearVerts=NULL;
+	GrVertex *Verts = new(GMem,NumPts)GrVertex, *FarVerts=Verts, *NearVerts=NULL;
 	INT      NumFarVerts=NumPts, NumNearVerts=0;
 
 	// Near-clipping factor.
-	const FLOAT NearZ = 100.0;
+	const FLOAT NearZ = 200.0;
 	BYTE IsNear[64];
 	BYTE AllNear=1, AnyNear=0;
 
@@ -1349,196 +1394,240 @@ void FGlideRenderDevice::DrawPolyV
 		}
 	}
 
-	if( PolyFlags & PF_NoOcclude )
-		AnyNear = 0;
-
-	// To disable detail texture mapping:
-	AnyNear = 0;
-
 	// Setup for first rendering.
 	if( DrawThings > 1 )
-		GGlide.guColorCombineFunction( GR_COLORCOMBINE_DECAL_TEXTURE );
+	{
+		guColorCombineFunction( GR_COLORCOMBINE_DECAL_TEXTURE );
+		//grFogMode(GR_FOG_DISABLE);
+	}
+
+	if( (PolyFlags & PF_FakeBackdrop) || !Texture->DetailTexture )
+		AnyNear = AllNear = 0;
 
 	// Init precision adjustment.
 	struct {BYTE B,G,R,A;} FinalColor = {FullLight,FullLight,FullLight,0};
 
-	// If detail texturing, render the detail texture now.
-	if( AnyNear && !(PolyFlags & PF_NoOcclude) )
+	// Near clip to assist the detail texturing.
+	if( AllNear )
 	{
-		if( AllNear )
-		{
-			NearVerts    = Verts;
-			NumNearVerts = NumPts;
-			NumFarVerts  = 0;
-		}
-		else
-		{
-			// Clip the points so that we get a new poly with just the near ones.
-			NumNearVerts = 0;
-			NumFarVerts  = 0;
-			NearVerts    = new(GMem,NumPts+6)GrVertex;
-			FarVerts     = new(GMem,NumPts+6)GrVertex;
+		NearVerts    = Verts;
+		NumNearVerts = NumPts;
+		NumFarVerts  = 0;
+	}
+	else if( AnyNear )
+	{
+		// Clip the points so that we get a new poly with just the near ones.
+		NumNearVerts = 0;
+		NumFarVerts  = 0;
+		NearVerts    = new(GMem,NumPts+6)GrVertex;
+		FarVerts     = new(GMem,NumPts+6)GrVertex;
 
-			GrVertex *A   = &Verts[0       ];
-			GrVertex *B   = &Verts[NumPts-1];
-			for( int i=0,j=NumPts-1; i<NumPts; j=i++,B=A++ )
+		GrVertex *A   = &Verts[0       ];
+		GrVertex *B   = &Verts[NumPts-1];
+		for( int i=0,j=NumPts-1; i<NumPts; j=i++,B=A++ )
+		{
+			if( IsNear[j] ^ IsNear[i] )
 			{
-				if( IsNear[j] ^ IsNear[i] )
-				{
-					GrVertex Vert;
-					FLOAT G            = (A->z - NearZ) / (A->z - B->z);
-					FLOAT F            = 1.0 - G;
-					Vert.z             = F*A->z + G*B->z;
-					Vert.oow           = 1.0 / Vert.z;
-					Vert.x             = Mask((F*Pts[i].ScreenX*A->z + G*Pts[j].ScreenX*B->z)*Vert.oow/65536.0);
-					Vert.y             = Mask((F*Pts[i].ScreenY*A->z + G*Pts[j].ScreenY*B->z)*Vert.oow);
-					Vert.tmuvtx[0].sow = (F*A->tmuvtx[0].sow*A->z + G*B->tmuvtx[0].sow*B->z) * Vert.oow;
-					Vert.tmuvtx[0].tow = (F*A->tmuvtx[0].tow*A->z + G*B->tmuvtx[0].tow*B->z) * Vert.oow;
+				GrVertex Vert;
+				FLOAT G            = (A->z - NearZ) / (A->z - B->z);
+				FLOAT F            = 1.0 - G;
+				Vert.z             = F*A->z + G*B->z;
+				Vert.oow           = 1.0 / Vert.z;
+				Vert.x             = Mask(Camera->FXB + (F*Pts[i].ScreenX*A->z + G*Pts[j].ScreenX*B->z)*Vert.oow/65536.0);
+				Vert.y             = Mask(Camera->FYB + (F*Pts[i].ScreenY*A->z + G*Pts[j].ScreenY*B->z)*Vert.oow);
+				Vert.tmuvtx[0].sow = (F*A->tmuvtx[0].sow*A->z + G*B->tmuvtx[0].sow*B->z) * Vert.oow;
+				Vert.tmuvtx[0].tow = (F*A->tmuvtx[0].tow*A->z + G*B->tmuvtx[0].tow*B->z) * Vert.oow;
 
-					if( Lit )
-					{
-						Vert.tmuvtx[1].sow = (F*A->tmuvtx[1].sow*A->z + G*B->tmuvtx[1].sow*B->z) * Vert.oow;
-						Vert.tmuvtx[1].tow = (F*A->tmuvtx[1].tow*A->z + G*B->tmuvtx[1].tow*B->z) * Vert.oow;
-					}
+				if( Lit )
+				{
+					Vert.tmuvtx[1].sow = (F*A->tmuvtx[1].sow*A->z + G*B->tmuvtx[1].sow*B->z) * Vert.oow;
+					Vert.tmuvtx[1].tow = (F*A->tmuvtx[1].tow*A->z + G*B->tmuvtx[1].tow*B->z) * Vert.oow;
+				}
 
-					NearVerts [NumNearVerts++] = Vert;
-					FarVerts  [NumFarVerts++ ] = Vert;
-				}
-				if( IsNear[i] )
-				{
-					GrVertex &Vert     = NearVerts[NumNearVerts++];
-					Vert               = *A;
-					Vert.a             = 127;
-				}
-				else
-				{
-					GrVertex &Vert     = FarVerts[NumFarVerts++];
-					Vert               = *A;
-				}
+				NearVerts [NumNearVerts++] = Vert;
+				FarVerts  [NumFarVerts++ ] = Vert;
 			}
-		}
-
-		if( NumNearVerts )
-		{
-			// Draw the detail texture, scaled by the regular texture.
-			States[GR_TMU0].SetTexture( GGfx.DefaultTexture, 0 );//!!use 5551 to avoid pal upload
-			States[GR_TMU0].SetPalette( GGfx.DefaultTexture->Palette, Texture->MaxColor, GPF_Scale );
-			for( i=0; i<NumNearVerts; i++ )
+			if( IsNear[i] )
 			{
-				#define DETAIL_ALPHA 50
-				NearVerts[i].a              = DETAIL_ALPHA * (1.0 - NearVerts[i].z / NearZ);
-				NearVerts[i].tmuvtx[0].sow *= 8.0;
-				NearVerts[i].tmuvtx[0].tow *= 8.0;
+				GrVertex &Vert     = NearVerts[NumNearVerts++];
+				Vert               = *A;
 			}
-			GGlide.grAlphaBlendFunction( GR_BLEND_ONE, GR_BLEND_ZERO, GR_BLEND_ZERO, GR_BLEND_ZERO );
-			GGlide.grDrawPlanarPolygonVertexList( NumNearVerts, NearVerts );
-			for( i=0; i<NumNearVerts; i++ )
+			else
 			{
-				NearVerts[i].tmuvtx[0].sow /= 8.0;
-				NearVerts[i].tmuvtx[0].tow /= 8.0;
+				GrVertex &Vert     = FarVerts[NumFarVerts++];
+				Vert               = *A;
 			}
 		}
 	}
 
 	// Update precision adjustment.
-	FinalColor.R = (FinalColor.R * States[0].MaxColor.R) >> 8;
-	FinalColor.G = (FinalColor.G * States[0].MaxColor.G) >> 8;
-	FinalColor.B = (FinalColor.B * States[0].MaxColor.B) >> 8;
-
+	FinalColor.R = (FinalColor.R * States[0].TextureMaxColor.R) >> 8;
+	FinalColor.G = (FinalColor.G * States[0].TextureMaxColor.G) >> 8;
+	FinalColor.B = (FinalColor.B * States[0].TextureMaxColor.B) >> 8;
 	if( --DrawThings == 0 )
 	{
-		GGlide.grConstantColorValue( *(GrColor_t*)&FinalColor );
-		GGlide.grColorCombine( GR_COMBINE_FUNCTION_SCALE_OTHER, GR_COMBINE_FACTOR_LOCAL, GR_COMBINE_LOCAL_CONSTANT, GR_COMBINE_OTHER_TEXTURE, FXFALSE );
+		grConstantColorValue( *(GrColor_t*)&FinalColor );
+		grColorCombine( GR_COMBINE_FUNCTION_SCALE_OTHER, GR_COMBINE_FACTOR_LOCAL, GR_COMBINE_LOCAL_CONSTANT, GR_COMBINE_OTHER_TEXTURE, FXFALSE );
+		//grFogMode(GR_FOG_WITH_TABLE);
 	}
 
-	// Draw near part of the normal texture.
+	// Draw normal texture.
+	SetBlending( PolyFlags );
+	if( Lit && (PolyFlags & PF_Masked) ) grAlphaTestFunction( GR_CMP_GREATER );
+	if( NumFarVerts ) grDrawPlanarPolygonVertexList( NumFarVerts,  FarVerts );
+	if( PolyFlags & PF_Transparent )
+	{
+		for( i=0; i<NumNearVerts; i++ )
+			NearVerts[i].a = 255.f * NearVerts[i].z / NearZ;
+		guColorCombineFunction(GR_COLORCOMBINE_TEXTURE_TIMES_ALPHA);
+	}
+	if( NumNearVerts ) grDrawPlanarPolygonVertexList( NumNearVerts, NearVerts);
+	if( Lit && (PolyFlags & PF_Masked) ) grAlphaTestFunction( GR_CMP_ALWAYS );
+
+	// Handle depth buffering the appropriate areas of masked textures.
+	if( PolyFlags & PF_Masked )
+		grDepthBufferFunction( GR_CMP_EQUAL );
+
+	// Draw detail texture.
 	if( NumNearVerts )
 	{
-#if 1
-		// Alpha blend it in.
-		GGlide.grAlphaCombine( GR_COMBINE_FUNCTION_LOCAL_ALPHA, GR_COMBINE_FACTOR_ONE, GR_COMBINE_LOCAL_ITERATED, GR_COMBINE_OTHER_NONE, FXFALSE );
-		GGlide.grAlphaBlendFunction( GR_BLEND_ONE_MINUS_SRC_ALPHA, GR_BLEND_SRC_ALPHA, GR_BLEND_ZERO, GR_BLEND_ZERO );
-#else
-		// Modulation blend it in.
-		//GGlide.grAlphaCombine( GR_COMBINE_FUNCTION_LOCAL_ALPHA, GR_COMBINE_FACTOR_ONE, GR_COMBINE_LOCAL_ITERATED, GR_COMBINE_OTHER_NONE, FXFALSE );
-		//GGlide.grAlphaBlendFunction( GR_COMBINE_FUNCTION_BLEND, GR_COMBINE_FACTOR_LOCAL_ALPHA, GR_COMBINE_LOCAL_CONSTANT, GR_COMBINE_OTHER_TEXTURE );
-
-		//GGlide.grColorCombine( GR_COMBINE_FUNCTION_SCALE_OTHER, GR_COMBINE_FACTOR_LOCAL, GR_COMBINE_LOCAL_CONSTANT, GR_COMBINE_OTHER_TEXTURE, FXFALSE );
-		//DWORD D=0;
-		//GGlide.grConstantColorValue( *(GrColor_t*)&D );
-
-#endif
-		GGlide.grDrawPlanarPolygonVertexList( NumNearVerts, NearVerts);
+		// Draw the detail texture, scaled by the regular texture.
+		States[GR_TMU0].SetTexture( Texture->DetailTexture, NULL, GF_NoPalette );
+		grAlphaCombine( GR_COMBINE_FUNCTION_LOCAL_ALPHA, GR_COMBINE_FACTOR_ONE, GR_COMBINE_LOCAL_ITERATED, GR_COMBINE_OTHER_NONE, FXFALSE );
+		guColorCombineFunction( GR_COLORCOMBINE_DIFF_SPEC_A );		
+		grAlphaBlendFunction( GR_BLEND_ZERO, GR_BLEND_SRC_COLOR, GR_BLEND_ZERO, GR_BLEND_ZERO );
+		for( i=0; i<NumNearVerts; i++ )
+		{
+			FLOAT Alpha = Max( (256.f+50.f) - 50.f * (NearZ / NearVerts[i].z), 0.f );
+			NearVerts[i].r = NearVerts[i].g = NearVerts[i].b = Alpha;
+			NearVerts[i].a = 255.0 - Alpha;
+			NearVerts[i].tmuvtx[0].sow *= 8.0;
+			NearVerts[i].tmuvtx[0].tow *= 8.0;
+		}
+		grDrawPlanarPolygonVertexList( NumNearVerts, NearVerts );
+		if( DrawThings > 0 )
+			guColorCombineFunction( GR_COLORCOMBINE_DECAL_TEXTURE );
 	}
-
-	// Draw far part of the normal texture.
-	if( NumFarVerts )
+	else if( PolyFlags & PF_FakeBackdrop )
 	{
-		SetBlending(PolyFlags);
-		GGlide.grDrawPlanarPolygonVertexList( NumFarVerts,  FarVerts );
+		// Update precision adjustment.
+		FinalColor.R = (FinalColor.R * States[0].TextureMaxColor.R) >> 8;
+		FinalColor.G = (FinalColor.G * States[0].TextureMaxColor.G) >> 8;
+		FinalColor.B = (FinalColor.B * States[0].TextureMaxColor.B) >> 8;
+		if( --DrawThings == 0 )
+		{
+			grConstantColorValue( *(GrColor_t*)&FinalColor );
+			grColorCombine( GR_COMBINE_FUNCTION_SCALE_OTHER, GR_COMBINE_FACTOR_LOCAL, GR_COMBINE_LOCAL_CONSTANT, GR_COMBINE_OTHER_TEXTURE, FXFALSE );
+			//grFogMode(GR_FOG_WITH_TABLE);
+		}
+		else guColorCombineFunction( GR_COLORCOMBINE_DECAL_TEXTURE );
+
+		// Draw backdrop.
+		for( i=0; i<NumFarVerts; i++ )
+		{
+			FarVerts[i].tmuvtx[0].sow *= 0.5;
+			FarVerts[i].tmuvtx[0].tow *= 0.5;
+		}
+		grAlphaBlendFunction( GR_BLEND_ZERO, GR_BLEND_SRC_COLOR, GR_BLEND_ZERO, GR_BLEND_ZERO );
+		grDrawPlanarPolygonVertexList( NumFarVerts, FarVerts );
 	}
 
-	/*!!if( Lit && NumTmu>1 )
-		States[GR_TMU1].SetLightMesh( GLightManager->iLightMesh );*/
-
-	// Setup to modulation blend the light and bump map textures.
+	// Modulation blend the light and bump map textures.
 	if( DrawThings > 0 )
-		GGlide.grAlphaBlendFunction( GR_BLEND_ZERO, GR_BLEND_SRC_COLOR, GR_BLEND_ZERO, GR_BLEND_ZERO );
+		grAlphaBlendFunction( GR_BLEND_ZERO, GR_BLEND_SRC_COLOR, GR_BLEND_ZERO, GR_BLEND_ZERO );
 
-	// Optionally draw lighting.
-	if( Lit /*!!&& NumTmu==1*/ )
+	// Bump map.
+	if( Texture->BumpMap )
+	{
+		// Set the bump map.
+		static UPalette* BumpPalette = new("TempBumpPalette",FIND_Existing)UPalette;
+		States[GR_TMU0].SetTexture( Texture->BumpMap, Texture->BumpMap->Palette, GF_NoScale );
+
+		// Update precision adjustment.
+		if( --DrawThings == 0 )
+		{
+			grConstantColorValue( *(GrColor_t*)&FinalColor );
+			grColorCombine( GR_COMBINE_FUNCTION_SCALE_OTHER, GR_COMBINE_FACTOR_LOCAL, GR_COMBINE_LOCAL_CONSTANT, GR_COMBINE_OTHER_TEXTURE, FXFALSE );
+			//grFogMode(GR_FOG_WITH_TABLE);
+		}
+		else guColorCombineFunction( GR_COLORCOMBINE_DECAL_TEXTURE );
+
+		// Draw bump map.
+		if( NumNearVerts ) grDrawPlanarPolygonVertexList( NumNearVerts, NearVerts);
+		if( NumFarVerts  ) grDrawPlanarPolygonVertexList( NumFarVerts,  FarVerts );
+
+		// Setup for next rendering.
+		if( DrawThings > 0 ) grAlphaBlendFunction( GR_BLEND_ZERO, GR_BLEND_SRC_COLOR, GR_BLEND_ZERO, GR_BLEND_ZERO );
+	}
+
+	// Light map.
+	if( Lit )
 	{
 		// Set the light mesh.
-		States[GR_TMU0].SetLightMesh( GLightManager->iLightMesh );
-
+		States[GR_TMU0].SetLightMesh( GLightManager->iLightMesh, GLightManager->IsDynamic || (PolyFlags&PF_DynamicLight) );
+		
 		// Update precision adjustment.
 		FinalColor.R = ((INT)FinalColor.R * GLightManager->Index->InternalByte) >> 8;
 		FinalColor.G = ((INT)FinalColor.G * GLightManager->Index->InternalByte) >> 8;
 		FinalColor.B = ((INT)FinalColor.B * GLightManager->Index->InternalByte) >> 8;
 		if( --DrawThings == 0 )
 		{
-			GGlide.grConstantColorValue( *(GrColor_t*)&FinalColor );
-			GGlide.grColorCombine( GR_COMBINE_FUNCTION_SCALE_OTHER, GR_COMBINE_FACTOR_LOCAL, GR_COMBINE_LOCAL_CONSTANT, GR_COMBINE_OTHER_TEXTURE, FXFALSE );
+			grConstantColorValue( *(GrColor_t*)&FinalColor );
+			grColorCombine( GR_COMBINE_FUNCTION_SCALE_OTHER, GR_COMBINE_FACTOR_LOCAL, GR_COMBINE_LOCAL_CONSTANT, GR_COMBINE_OTHER_TEXTURE, FXFALSE );
+			//grFogMode(GR_FOG_WITH_TABLE);
 		}
 
-		// Draw light mesh.
+		// Draw light nap.
 		if( NumNearVerts )
 		{
 			for( int i=0; i<NumNearVerts; i++ )
 				NearVerts[i].tmuvtx[0] = NearVerts[i].tmuvtx[1];
-			GGlide.grDrawPlanarPolygonVertexList( NumNearVerts, NearVerts);
+			grDrawPlanarPolygonVertexList( NumNearVerts, NearVerts);
 		}
 		if( NumFarVerts )
 		{
 			for( i=0; i<NumFarVerts; i++ )
 				FarVerts[i].tmuvtx[0] = FarVerts[i].tmuvtx[1];
-			GGlide.grDrawPlanarPolygonVertexList( NumFarVerts,  FarVerts );
+			grDrawPlanarPolygonVertexList( NumFarVerts,  FarVerts );
 		}
 
 		// Setup for next rendering.
-		if( DrawThings > 0 ) GGlide.grAlphaBlendFunction( GR_BLEND_ZERO, GR_BLEND_SRC_COLOR, GR_BLEND_ZERO, GR_BLEND_ZERO );
+		if( DrawThings > 0 )
+			grAlphaBlendFunction( GR_BLEND_ZERO, GR_BLEND_SRC_COLOR, GR_BLEND_ZERO, GR_BLEND_ZERO );
 	}
 
-	// Bump map.
-	if( Bump )
+	// Phog.
+	if( Phog )
 	{
-		// Draw bump map.
-		if( --DrawThings == 0 )
+		// Set the fog mesh.
+		static UTexture *Backdrop = new("Backdrop",FIND_Existing)UTexture;
+		States[GR_TMU0].SetTexture( Backdrop, NULL, GF_NoPalette );
+
+		grAlphaBlendFunction( GR_BLEND_ONE, GR_BLEND_ONE, GR_BLEND_ZERO, GR_BLEND_ZERO );
+		guColorCombineFunction( GR_COLORCOMBINE_DECAL_TEXTURE );
+		//grFogMode(GR_FOG_DISABLE);
+
+		// Draw phog mesh.
+		if( NumNearVerts )
 		{
-			GGlide.grConstantColorValue( *(GrColor_t*)&FinalColor );
-			GGlide.grColorCombine( GR_COMBINE_FUNCTION_SCALE_OTHER, GR_COMBINE_FACTOR_LOCAL, GR_COMBINE_LOCAL_CONSTANT, GR_COMBINE_OTHER_TEXTURE, FXFALSE );
+			for( int i=0; i<NumNearVerts; i++ )
+				NearVerts[i].tmuvtx[0] = NearVerts[i].tmuvtx[1];
+			grDrawPlanarPolygonVertexList( NumNearVerts, NearVerts);
 		}
-		States[GR_TMU0].SetTexture(Original,0);
-		States[GR_TMU0].SetPalette(new("TempBumpPalette",FIND_Existing)UPalette,FColor(255,255,255,255),GPF_Scale,1);
-		GGlide.guColorCombineFunction( GR_COLORCOMBINE_DECAL_TEXTURE );
-
-		if( NumNearVerts ) GGlide.grDrawPlanarPolygonVertexList( NumNearVerts, NearVerts);
-		if( NumFarVerts  ) GGlide.grDrawPlanarPolygonVertexList( NumFarVerts,  FarVerts );
-
-		// Setup for next rendering.
-		if( DrawThings > 0 ) GGlide.grAlphaBlendFunction( GR_BLEND_ZERO, GR_BLEND_SRC_COLOR, GR_BLEND_ZERO, GR_BLEND_ZERO );
+		if( NumFarVerts )
+		{
+			for( i=0; i<NumFarVerts; i++ )
+				FarVerts[i].tmuvtx[0] = FarVerts[i].tmuvtx[1];
+			grDrawPlanarPolygonVertexList( NumFarVerts,  FarVerts );
+		}
+		DrawThings--;
 	}
 
+	if( PolyFlags & PF_Masked )
+		grDepthBufferFunction( GR_CMP_LEQUAL );
+
+	ResetBlending( PolyFlags );
+	debugState(DrawThings==0);
 	Mark.Pop();
 	unguard;
 }
@@ -1563,11 +1652,10 @@ void FGlideRenderDevice::DrawPolyC
 	checkState(Locked);
 
 	// Setup texture.
-	States[GR_TMU0].SetTexture( Texture, 0 );
-	States[GR_TMU0].SetPalette( Texture->Palette, Texture->MaxColor, 0 );
+	States[GR_TMU0].SetTexture( Texture, Texture->Palette, GF_NoScale | ((PolyFlags&PF_Masked)?GF_Alpha:0));
 
 	// Get texture scale.
-	FLOAT Scale  = States[GR_TMU0].Scale / (65536.0 * Min(256, Max(Texture->USize, Texture->VSize)));
+	FLOAT Scale = States[GR_TMU0].Scale / (65536.0 * Min(256, Max(Texture->USize, Texture->VSize)));
 
 	// Alloc verts.
 	FMemMark Mark(GMem);
@@ -1597,37 +1685,18 @@ void FGlideRenderDevice::DrawPolyC
 
 	// Update precision adjustment.
 	struct {BYTE B,G,R,A;} FinalColor = {FullLight,FullLight,FullLight,0};
-	FinalColor.R = (FinalColor.R * States[0].MaxColor.R) >> 8;
-	FinalColor.G = (FinalColor.G * States[0].MaxColor.G) >> 8;
-	FinalColor.B = (FinalColor.B * States[0].MaxColor.B) >> 8;
+	FinalColor.R = (FinalColor.R * States[0].TextureMaxColor.R) >> 8;
+	FinalColor.G = (FinalColor.G * States[0].TextureMaxColor.G) >> 8;
+	FinalColor.B = (FinalColor.B * States[0].TextureMaxColor.B) >> 8;
 
-	GGlide.guColorCombineFunction(GR_COLORCOMBINE_TEXTURE_TIMES_ITRGB);
+	guColorCombineFunction(GR_COLORCOMBINE_TEXTURE_TIMES_ITRGB);
 
 	// Draw it.
 	SetBlending(PolyFlags);
-	GGlide.grDrawPlanarPolygonVertexList( NumPts, Verts );
+	grDrawPlanarPolygonVertexList( NumPts, Verts );
+	ResetBlending( PolyFlags );
 
 	Mark.Pop();
-	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	FGlideRenderDevice flat shaded polygon drawer.
------------------------------------------------------------------------------*/
-
-//
-// Draw a flat-shaded poly.
-//
-void FGlideRenderDevice::DrawPolyF
-(
-	UCamera				*Camera,
-	const FTransform	*Pts,
-	int					NumPts,
-	FColor				Color
-)
-{
-	guard(FGlideRenderDevice::DrawPolyF);
-	checkState(Locked);
 	unguard;
 }
 
@@ -1649,7 +1718,7 @@ int FGlideRenderDevice::Exec( const char *Cmd,FOutputDevice *Out )
 		FLOAT Gamma;
 		if( GetFLOAT(Str,"GAMMA=",&Gamma) )
 		{
-			GGlide.grGammaCorrectionValue( Gamma );
+			grGammaCorrectionValue( Gamma );
 			Out->Logf("Gamma %f",Gamma);
 			Got=1;
 		}
@@ -1657,7 +1726,7 @@ int FGlideRenderDevice::Exec( const char *Cmd,FOutputDevice *Out )
 		if( GetINT(Str,"DITHER=",&Dither) && Dither==0 || Dither==2 || Dither==4 )
 		{
 			// Set dithering.
-			GGlide.grDitherMode( Dither==0 ? GR_DITHER_DISABLE : Dither==2 ? GR_DITHER_2x2 : GR_DITHER_4x4 );
+			grDitherMode( Dither==0 ? GR_DITHER_DISABLE : Dither==2 ? GR_DITHER_2x2 : GR_DITHER_4x4 );
 			Out->Logf("Dither %i",Dither);
 			Got=1;
 		}
@@ -1670,14 +1739,14 @@ int FGlideRenderDevice::Exec( const char *Cmd,FOutputDevice *Out )
 	}
 	else if( GetCMD(&Str,"MIPDITHER") )
 	{
-		GGlide.grHints( GR_HINT_ALLOW_MIPMAP_DITHER, 1 );
-		GGlide.grTexMipMapMode( GR_TMU0, GR_MIPMAP_NEAREST_DITHER, FXFALSE );
+		grHints( GR_HINT_ALLOW_MIPMAP_DITHER, 1 );
+		grTexMipMapMode( GR_TMU0, GR_MIPMAP_NEAREST_DITHER, FXFALSE );
 		Out->Logf("Dithered mipmaps");
 		return 1;
 	}
 	else if( GetCMD(&Str,"NOMIPDITHER") )
 	{
-		GGlide.grTexMipMapMode( GR_TMU0, GR_MIPMAP_NEAREST, FXFALSE );
+		grTexMipMapMode( GR_TMU0, GR_MIPMAP_NEAREST, FXFALSE );
 		Out->Logf("Undithered mipmaps");
 		return 1;
 	}
@@ -1708,17 +1777,17 @@ FRenderDevice *FindRenderDevice()
 
 	// Try dynalinking the DLL.
 	int Found3dfx = 0;
-	if( !GetParam(GApp->CmdLine,"NOGLIDE") && GGlide.Associate() )
+	if( !GetParam(GApp->CmdLine,"NOGLIDE") && GGlideRenDev.Associate() )
 	{
 		// Make sure 3Dfx hardware is present.
-		Found3dfx = GGlide.grSstQueryBoards(&GGlideRenDev.hwconfig);
+		Found3dfx = GGlideRenDev.grSstQueryBoards(&GGlideRenDev.hwconfig);
 	}
 
 	// Found it?
 	if( Found3dfx )
 	{
 		char GlideVer[80];
-		GGlide.grGlideGetVersion(GlideVer);
+		GGlideRenDev.grGlideGetVersion(GlideVer);
 		debugf( LOG_Init, "Found a 3dfx: %s", GlideVer );
 		return &GGlideRenDev;
 	}

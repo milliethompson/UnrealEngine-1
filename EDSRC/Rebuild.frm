@@ -1,6 +1,6 @@
 VERSION 5.00
-Object = "{BDC217C8-ED16-11CD-956C-0000C04E4C0A}#1.1#0"; "tabctl32.ocx"
-Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "comctl32.ocx"
+Object = "{BDC217C8-ED16-11CD-956C-0000C04E4C0A}#1.1#0"; "TABCTL32.OCX"
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "COMCTL32.OCX"
 Begin VB.Form frmRebuilder 
    BorderStyle     =   3  'Fixed Dialog
    Caption         =   "Rebuilder"
@@ -116,22 +116,23 @@ Begin VB.Form frmRebuilder
       Tab(0).Control(1)=   "Frame8"
       Tab(0).Control(1).Enabled=   0   'False
       TabCaption(1)   =   "BSP  "
+      TabPicture(1)   =   "Rebuild.frx":0326
       Tab(1).ControlCount=   4
       Tab(1).ControlEnabled=   0   'False
-      Tab(1).Control(0)=   "Frame4"
+      Tab(1).Control(0)=   "AutoLights"
       Tab(1).Control(0).Enabled=   0   'False
-      Tab(1).Control(1)=   "Frame1"
+      Tab(1).Control(1)=   "Frame3"
       Tab(1).Control(1).Enabled=   0   'False
-      Tab(1).Control(2)=   "Frame3"
+      Tab(1).Control(2)=   "Frame1"
       Tab(1).Control(2).Enabled=   0   'False
-      Tab(1).Control(3)=   "AutoLights"
-      Tab(1).Control(3).Enabled=   -1  'True
+      Tab(1).Control(3)=   "Frame4"
+      Tab(1).Control(3).Enabled=   0   'False
       TabCaption(2)   =   "Lighting  "
       Tab(2).ControlCount=   2
       Tab(2).ControlEnabled=   0   'False
-      Tab(2).Control(0)=   "Frame6"
+      Tab(2).Control(0)=   "Frame5"
       Tab(2).Control(0).Enabled=   0   'False
-      Tab(2).Control(1)=   "Frame5"
+      Tab(2).Control(1)=   "Frame6"
       Tab(2).Control(1).Enabled=   0   'False
       Begin VB.CheckBox AutoLights 
          Caption         =   "&Auto rebuild lighting"
@@ -281,6 +282,7 @@ Begin VB.Form frmRebuilder
             _ExtentX        =   5741
             _ExtentY        =   661
             _Version        =   327680
+            MouseIcon       =   "Rebuild.frx":0342
             Max             =   100
             SelStart        =   15
             TickFrequency   =   5
@@ -1584,13 +1586,11 @@ Private Sub Fronts_Change()
 End Sub
 
 Private Sub Go_Click()
-    Ed.Server.Exec "TASK BEGIN MESSAGE=" & Quotes("Rebuilding Level")
     Select Case Tab1.Tab
         Case 0: Call GoGeometry
         Case 1: Call GoBSP
         Case 2: Call GoLights
     End Select
-    Ed.Server.Exec "TASK END"
     Beep
 End Sub
 
@@ -1619,7 +1619,7 @@ Private Sub GoBSP()
         Cmd = Cmd & " OPTGEOM"
     End If
     '
-    Ed.BeginSlowTask ("Rebuilding BSP")
+    Ed.BeginSlowTask "Rebuilding BSP"
     Ed.Server.SlowExec Cmd
     Ed.EndSlowTask
     '
@@ -1667,7 +1667,6 @@ Private Sub GoLights()
 End Sub
 
 Private Sub RefreshBSPStats()
-    Exit Sub
     EdPolys.Caption = Ed.Server.GetProp("BSP", "Polys")
     Nodes.Caption = Ed.Server.GetProp("BSP", "Nodes")
     MaxDepth.Caption = Ed.Server.GetProp("BSP", "MaxDepth")

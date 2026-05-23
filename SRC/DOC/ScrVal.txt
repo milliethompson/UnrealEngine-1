@@ -1,4 +1,4 @@
-class Tester expands Pawn;
+class Tester expands Keypoint;
 //=============================================================================
 // UnrealScript validation code.
 // This torture tests the features of UnrealScript.
@@ -702,27 +702,15 @@ final function TestIntrinsics()
 
 	// IsProbing.
 	assert IsProbing(PlayerTick);
-	assert !IsProbing(MoverBump);
+	assert !IsProbing(Expired);
 	disable(PlayerTick);
 	assert !IsProbing(PlayerTick);
 	enable(PlayerTick);
 	assert IsProbing(PlayerTick);
-	enable(MoverBump);
-	assert !IsProbing(MoverBump);
-	disable(MoverBump);
-	assert !IsProbing(MoverBump);
-
-	// IsState.
-	assert IsState('TestState1');
-	assert IsState(TestState2);
-	assert !IsState('NotAState1');
-	assert !IsState('NotAState2');
-
-	assert IsState(TestState1,'Label1InState1');
-	assert IsState(TestState1,'Label2InState1');
-	assert !IsState(TestState1,'Label1InState2');
-	assert !IsState(TestState1,'Label2InState2');
-
+	enable(Expired);
+	assert !IsProbing(Expired);
+	disable(Expired);
+	assert !IsProbing(Expired);
 }
 
 //-----------------------------------------------------------------------------

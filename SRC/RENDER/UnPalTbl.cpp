@@ -73,15 +73,13 @@ RAINBOW_PTR FRender::GetPaletteLightingTable
 	int IsFogZone			= ZoneInfo && ZoneInfo->bFogZone;
 	int ZoneScalerCacheID	= MakeCacheID(CID_ZoneScaler,iZone,Camera->ColorBytes);
 
-	FCacheItem	*ZoneScalerCacheItem;
-	FVector Fog,FogDelta,Base,Scale,BaseDelta;
+	FVector Fog(0,0,0);
+	FVector Base(0,0,0);
+	FVector Scale(1,1,1);
+	FVector FogDelta,BaseDelta;
 
+	FCacheItem *ZoneScalerCacheItem;
 	RAINBOW_PTR ZoneScaler = GCache.Get( ZoneScalerCacheID, ZoneScalerCacheItem );
-
-	// Set up one-per-zone palette scaler info for all texture palettes in this zone
-	Base  = GMath.ZeroVector;
-	Fog   = GMath.ZeroVector;
-	Scale = GMath.UnitVector;
 
 	if( ZoneInfo )
 	{
@@ -116,7 +114,7 @@ RAINBOW_PTR FRender::GetPaletteLightingTable
 		BaseDelta	= -Gamma * 0x10000 * (Fog * 0.2/62.0);
 		Base		= Gamma * 0x10000 * Fog * 0.2 + Gamma * 0x10000 * Base * 0.6;
 		FogDelta	= Fog * 0.6 * 0x10000 * 0x120 / 64.0;
-		Fog         = GMath.ZeroVector;
+		Fog         = FVector(0,0,0);
 	}
 
 	// Prepare palette.

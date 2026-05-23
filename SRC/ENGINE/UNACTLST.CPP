@@ -51,7 +51,7 @@ void ExportActor
 		if
 		(	(PropertyName==NAME_None || PropertyName==Property.Name)
 		&&	(WhichBins[Property.Bin])
-		&& !(Property.Flags & (CPF_Private | CPF_Transient)) )
+		&& !(Property.Flags & (CPF_Private | CPF_Transient | CPF_Intrinsic)) )
 		{
 			if( Property.ArrayDim == 1 )
 			{
@@ -180,7 +180,7 @@ void ExportMultipleActors
 			&&	(FirstProperty.ArrayDim == 1) 
 			&&	(WhichBins[FirstProperty.Bin])
 			&&	(It1.GetFlagMask() & CPF_Edit)
-			&& !(FirstProperty.Flags & (CPF_Private|CPF_Transient))
+			&& !(FirstProperty.Flags & (CPF_Private|CPF_Transient|CPF_Intrinsic))
 			)
 			{
 				BYTE *ObjectBins[PROPBIN_MAX]; FirstActor->GetObjectBins(ObjectBins);
@@ -212,7 +212,7 @@ void ExportMultipleActors
 								&&  (Property.ArrayDim == 1)
 								&&	(WhichBins[Property.Bin])
 								&&	(It2.GetFlagMask() & CPF_Edit)
-								&& !(Property.Flags & (CPF_Private|CPF_Transient))
+								&& !(Property.Flags & (CPF_Private|CPF_Transient|CPF_Intrinsic))
 								)
 								{
 									BYTE *ObjectBins[PROPBIN_MAX]; Actor->GetObjectBins(ObjectBins);
@@ -341,7 +341,7 @@ UNENGINE_API const char *ImportActorProperties
 		FProperty &Property = It();
 		if
 		(	WhichBins[Property.Bin]
-		&& !(Property.Flags & (CPF_Private | CPF_Transient) )
+		&& !(Property.Flags & (CPF_Private|CPF_Transient|CPF_Intrinsic) )
 		&&	stricmp(Property.Name(),"Zone") )
 		{
 			char LookFor[80];
@@ -568,12 +568,7 @@ const char *ULevel::ImportActors( const char *Buffer, const char *BufferEnd, con
 					else
 					{
 						// Kill the invalid actor.
-						debugf
-						(
-							"Got an invalid actor: %s %s",
-							Actor->GetClassName(),
-							Actor->GetName()
-						);
+						debugf( "Got an invalid actor: %s %s", Actor->GetClassName(), Actor->GetName() );
 						Actor->Kill();
 						Element(iActor) = NULL;
 					}
@@ -610,14 +605,8 @@ const char *ULevel::ImportActors( const char *Buffer, const char *BufferEnd, con
 						{
 							// Old format t3d.
 							guard(RemapOldIndex);
-							if( *(INDEX*)Test == INDEX_NONE )
-							{
-								*(AActor**)Test = NULL;
-							}
-							else
-							{
-								*(AActor**)Test = Element(Remaps[*(INDEX*)Test]);
-							}
+							if( *(INDEX*)Test == INDEX_NONE )	*(AActor**)Test = NULL;
+							else								*(AActor**)Test = Element(Remaps[*(INDEX*)Test]);
 							unguard;
 						}
 						else

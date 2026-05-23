@@ -18,18 +18,9 @@
 // Constructor.
 FGlobalMath::FGlobalMath()
 :	// Initialize FVectors.
-	UnitVector			(1.0,1.0,1.0),
-	ZeroVector			(0.0,0.0,0.0),
-	XAxisVector			(1.0,0.0,0.0),
-	YAxisVector			(0.0,1.0,0.0),
-	ZAxisVector			(0.0,0.0,1.0),
 	WorldMin			(-32700.0,-32700.0,-32700.0),
 	WorldMax			(32700.0,32700.0,32700.0),
-	VectorMax			(+(FLOAT)MAXSWORD,+(FLOAT)MAXSWORD,+(FLOAT)MAXSWORD),
-	VectorMin			(-(FLOAT)MAXSWORD,-(FLOAT)MAXSWORD,-(FLOAT)MAXSWORD),
-	UnitScaleVect		(1.0,1.0,1.0),
 	// Initialize FRotations.
-	ZeroRotation		(0,0,0),
 	View0				(0x4000,0     ,0), // Up (pitch, yaw, roll).
 	View1				(0xC000,0     ,0), // Down.
 	View2				(0     ,0     ,0), // North.
@@ -37,27 +28,18 @@ FGlobalMath::FGlobalMath()
 	View4				(0     ,0xC000,0), // East.
 	View5				(0     ,0x4000,0), // West.
 	// Initialize FCoords.
-	UnitCoords			(ZeroVector,XAxisVector,YAxisVector,ZAxisVector),
-	CameraViewCoords	(ZeroVector,YAxisVector,-ZAxisVector,XAxisVector),
-	UncameraViewCoords	(ZeroVector,ZAxisVector,XAxisVector,YAxisVector),
+	UnitCoords			(FVector(0,0,0),FVector(1,0,0),FVector(0,1,0),FVector(0,0,1)),
+	CameraViewCoords	(FVector(0,0,0),FVector(0,1,0),FVector(0,0,-1),FVector(1,0,0)),
 	// Initialize FScales.
-	UnitScale			(UnitVector,0.0,SHEER_ZX)
+	UnitScale			(FVector(1,1,1),0.0,SHEER_ZX)
 {
 	// Init view rotation array.
 	Views[0]=&View0; Views[1]=&View1; Views[2]=&View2;
 	Views[3]=&View3; Views[4]=&View4; Views[5]=&View5;
 
-	// Init sin/cos signs.
-	SinSIGN[0] = SinSIGN[1] = CosSIGN[0] = CosSIGN[3] = +1.0; 
-	SinSIGN[2] = SinSIGN[3] = CosSIGN[1] = CosSIGN[2] = -1.0;
-
-	// Init sin/cos masks.
-	SinMASK[0] = SinMASK[2] = CosMASK[1] = CosMASK[3] = 0;
-	SinMASK[1] = SinMASK[3] = CosMASK[0] = CosMASK[2] = NUM_ANGLES-1;
-
 	// Init base angle table.
 	for( int i=0; i<NUM_ANGLES; i++ )
-		TrigFLOAT[i] = sin((FLOAT)i * 0.5 * PI / (FLOAT)NUM_ANGLES);
+		TrigFLOAT[i] = sin((FLOAT)i * 2.0 * PI / (FLOAT)NUM_ANGLES);
 
 	// Init square root table.
 	for( i=0; i<NUM_SQRTS; i++ )
@@ -95,7 +77,7 @@ FRotation FVector::Rotation()
 // Find good arbitrary axis vectors to represent U and V axes of a plane
 // given just the normal.
 //
-void FVector::FindBestAxisVectors(FVector &Axis1,FVector &Axis2)
+void FVector::FindBestAxisVectors( FVector &Axis1, FVector &Axis2 )
 {
 	guard(FindBestAxisVectors);
 
@@ -104,8 +86,8 @@ void FVector::FindBestAxisVectors(FVector &Axis1,FVector &Axis2)
 	FLOAT NZ=Abs(Z);
 
 	// Find best basis vectors.
-	if ((NZ>NX)&&(NZ>NY))	Axis1 = GMath.XAxisVector;
-	else					Axis1 = GMath.ZAxisVector;
+	if ((NZ>NX)&&(NZ>NY))	Axis1 = FVector(1,0,0);
+	else					Axis1 = FVector(0,0,1);
 
 	Axis1 = (Axis1 - *this * (Axis1 | *this)).Normal();
 	Axis2 = Axis1 ^ *this;
@@ -154,6 +136,7 @@ void FVector::GetHSV( BYTE H, BYTE S, BYTE V, int ColorBytes )
 	Matrix inversion.
 -----------------------------------------------------------------------------*/
 
+#if 0 /* Outdated 4x4 matrix inversion */
 // 4x4 matrix.
 struct FMatrix4
 {
@@ -236,145 +219,54 @@ struct FMatrix4
 	}
 };
 
-// Compute the inverse transpose of the 3x3 matrix defined by (V1,V2,V3) and return it
-// in (R1,R2,R3):
 FCoords FCoords::Inverse() const
 {
 	guard(FCoords::Inverse);
 
-	FMatrix4 In,Out;
+	FMatrix4 In, Out;
 
 	In.E[0][0] = XAxis.X; In.E[0][1]=XAxis.Y; In.E[0][2]=XAxis.Z; In.E[0][3]=0.0;
 	In.E[1][0] = YAxis.X; In.E[1][1]=YAxis.Y; In.E[1][2]=YAxis.Z; In.E[1][3]=0.0;
 	In.E[2][0] = ZAxis.X; In.E[2][1]=ZAxis.Y; In.E[2][2]=ZAxis.Z; In.E[2][3]=0.0;
 	In.E[3][0] = 0.0;     In.E[3][1]=0.0;     In.E[3][2]=0.0;     In.E[3][3]=1.0;
 
-	In.Inverse(Out);
+	In.Inverse( Out );
 
 	return FCoords
 	(
-		FVector(0,0,0),
+		FVector( 0, 0, 0 ),
 		FVector( Out.E[0][0], Out.E[1][0], Out.E[2][0] ),
 		FVector( Out.E[0][1], Out.E[1][1], Out.E[2][1] ),
 		FVector( Out.E[0][2], Out.E[1][2], Out.E[2][2] )
+	).Transpose();
+	unguard;
+}
+#endif
+
+//
+// Coordinate system inverse.
+//
+FCoords FCoords::Inverse() const
+{
+	FLOAT RDet = 1.0 / 
+	(	(XAxis.X * (YAxis.Y * ZAxis.Z - YAxis.Z * ZAxis.Y))
+	+	(XAxis.Y * (YAxis.Z * ZAxis.X - YAxis.X * ZAxis.Z))
+	+	(XAxis.Z * (YAxis.X * ZAxis.Y - YAxis.Y * ZAxis.X)) );
+	return FCoords
+	(	-Origin.TransformVectorBy(*this)
+	,	RDet * FVector
+		(	+(YAxis.Y * ZAxis.Z - YAxis.Z * ZAxis.Y)
+		,	+(ZAxis.Y * XAxis.Z - ZAxis.Z * XAxis.Y)
+		,	+(XAxis.Y * YAxis.Z - XAxis.Z * YAxis.Y) )
+	,	RDet * FVector
+		(	+(YAxis.Z * ZAxis.X - ZAxis.Z * YAxis.X)
+		,	+(ZAxis.Z * XAxis.X - XAxis.Z * ZAxis.X)
+		,	+(XAxis.Z * YAxis.X - XAxis.X * YAxis.Z))
+	,	RDet * FVector
+		(	+(YAxis.X * ZAxis.Y - YAxis.Y * ZAxis.X)
+		,	+(ZAxis.X * XAxis.Y - ZAxis.Y * XAxis.X)
+		,	+(XAxis.X * YAxis.Y - XAxis.Y * YAxis.X) )
 	);
-	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	FBoundingRect implementation.
------------------------------------------------------------------------------*/
-
-//
-// Initialize to an empty bound centered at 0,0,0.
-//
-void FBoundingRect::Init()
-{
-	guard(FBoundingRect::Init);
-
-	IsValid  = 0;
-	Min      = GMath.ZeroVector;
-	Max      = GMath.ZeroVector;
-
-	unguard;
-}
-
-//
-// Set the bounding rectangle with a list of points.
-//
-void FBoundingRect::Init( FVector *Points, int NumPts )
-{
-	guard(FBoundingRect::Init);
-	if( NumPts == 0 )
-	{
-		Init();
-	}
-	else
-	{
-		IsValid = 1;
-		Min     = Points[0];
-		Max     = Points[0];
-		for( int i=1; i<NumPts; i++ )
-		{
-			Min.UpdateMinWith( Points[i] );
-			Max.UpdateMaxWith( Points[i] );
-		}
-	}
-	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	FBoundingVolume implementation.
------------------------------------------------------------------------------*/
-
-//
-// Initialize to an empty bound centered at 0,0,0.
-//
-void FBoundingVolume::Init()
-{
-	guard(FBoundingVolume::Init);
-
-	FBoundingRect::Init();
-	Sphere = FPlane(0,0,0,0);
-
-	unguard;
-}
-
-//
-// Set the bounding volume with a list of points.
-// Graphics Gems I, Jack Ritter p. 301.
-//
-void FBoundingVolume::Init( FVector *Points, int NumPts )
-{
-	guard(FBoundingVolume::Init);
-
-	if( NumPts == 0 )
-	{
-		Init();
-	}
-	else
-	{
-		// Compute bounding rectangle.
-		FBoundingRect::Init( Points, NumPts );
-
-		// Compute bounding sphere.
-		FVector MinX = Points[0];
-		FVector MaxX = Points[0];
-		FVector MinY = Points[0];
-		FVector MaxY = Points[0];
-		FVector MinZ = Points[0];
-		FVector MaxZ = Points[0];
-		for( int i=1; i<NumPts; i++ )
-		{
-			FVector *P = &Points[i];
-
-			if( P->X < MinX.X ) MinX = *P;
-			if( P->X > MaxX.X ) MaxX = *P;
-			if( P->Y < MinY.Y ) MinY = *P;
-			if( P->Y > MaxY.Y ) MaxY = *P;
-			if( P->Z < MinZ.Z ) MinZ = *P;
-			if( P->Z > MaxZ.Z ) MaxZ = *P;
-		}
-		FLOAT DX = FDist( MinX, MaxX );
-		FLOAT DY = FDist( MinY, MaxY );
-		FLOAT DZ = FDist( MinZ, MaxZ );
-
-		FLOAT RSquared;
-		if	   ( DX>DY && DX>DZ )	{Sphere=FMidpoint(MinX,MaxX); RSquared=DX*DX/4.0;}
-		else if( DY>DZ )			{Sphere=FMidpoint(MinY,MaxY); RSquared=DY*DY/4.0;}
-		else						{Sphere=FMidpoint(MinZ,MaxZ); RSquared=DZ*DZ/4.0;}
-
-		for( i=0; i<NumPts; i++ )
-		{
-			FLOAT DistSquared = FDistSquared( Points[i], Sphere );
-			if( DistSquared > RSquared )
-				RSquared = DistSquared;
-		}
-
-		// For guaranteed safety.
-		Sphere.W = sqrt(RSquared) * 1.01;
-	}
-	unguard;
 }
 
 /*-----------------------------------------------------------------------------

@@ -265,14 +265,14 @@ void FProperty::ExportU( FOutputDevice &Out, BYTE *Data )
 			case CPT_Vector:
 			{
 				FVector *Temp = (FVector *)Data;
-				if( *Temp != GMath.ZeroVector ) 
+				if( *Temp != FVector(0,0,0) ) 
 					Out.Logf( "(%+013.6f,%+013.6f,%+013.6f)",Temp->X,Temp->Y,Temp->Z);
 				break;
 			}
 			case CPT_Rotation:
 			{
 				FRotation *Temp = (FRotation *)Data;
-				if ( *Temp != GMath.ZeroRotation )
+				if ( *Temp != FRotation(0,0,0) )
 					Out.Logf( "(%i,%i,%i)",Temp->Pitch,Temp->Yaw,Temp->Roll);
 				break;
 			}

@@ -184,7 +184,6 @@ public:
 	// Key accessors.
 	BYTE KeyDown( int i ) {return KeyDownTable[Clamp(i,0,IK_MAX-1)];}
 
-protected:
 	// Private variables.
 	EInputState State;
 	FLOAT Delta;

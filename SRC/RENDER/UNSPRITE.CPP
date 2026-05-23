@@ -34,12 +34,13 @@ void dynamicsLock( UModel *Model )
 	guard(dynamicsLock);
 	checkState(!GRender.DynamicsLocked);
 
-	GRender.NumDynamics 	= 0;
 	GRender.NumPostDynamics	= 0;
-	GRender.DynamicsLocked	= 1;
+	GRender.PostDynamics    = new(GDynMem,Model->Nodes->Max)FBspNode*;
+
 	GFirstSprite            = NULL;
 	GNumSprites             = 0;
 
+	GRender.DynamicsLocked	= 1;
 	unguard;
 }
 
@@ -51,19 +52,12 @@ void dynamicsUnlock( UModel *Model )
 	guard(dynamicsUnlock)
 	checkState(GRender.DynamicsLocked);
 
-	FDynamicsIndex	*DynamicsIndex;
-	FBspNode		*Node;
-
-	DynamicsIndex = GRender.DynamicsIndex;
-	for( INDEX i=0; i<GRender.NumDynamics; i++ )
+	for( INDEX i=0; i<GRender.NumPostDynamics; i++ )
 	{
-		Node 				= &Model->Nodes(DynamicsIndex->iNode);
-		Node->iDynamic[0]	= INDEX_NONE;
-		Node->iDynamic[1]	= INDEX_NONE;
-		DynamicsIndex++;
+		FBspNode* Node = GRender.PostDynamics[i];
+		Node->SetDynamic( 0, NULL );
+		Node->SetDynamic( 1, NULL );
 	}
-	GRender.NumDynamics 	= 0;
-	GRender.NumPostDynamics = 0;
 
 	GRender.DynamicsLocked  = 0;
 	unguard;
@@ -74,7 +68,7 @@ void dynamicsUnlock( UModel *Model )
 // Returns NULL if the dynamics structure is full.
 // In this case, the rendering engine must recover gracefully.
 //
-inline FDynamicsIndex* dynamicsAdd
+FDynamicsIndex* dynamicsAdd
 (
 	UModel			*Model,
 	INDEX			iNode,
@@ -86,63 +80,57 @@ inline FDynamicsIndex* dynamicsAdd
 )
 {
 	guard(dynamicsAdd);
-	
-	FBspNode		*Node = &Model->Nodes(iNode);
-	FDynamicsIndex	*Index, *TempIndex,*PrevIndex;
-	INT 			iDynamic;
+	FBspNode*       Node   = &Model->Nodes(iNode);
+	FDynamicsIndex* Index = new(GDynMem)FDynamicsIndex;
 
-	if( GRender.NumDynamics>=GRender.MaxDynamics )
-		return NULL;
-
-	iDynamic	= GRender.NumDynamics++;
-	Index    	= &GRender.DynamicsIndex[iDynamic];
+	if( !Node->iDynamic[0] && !Node->iDynamic[1] )
+		GRender.PostDynamics[GRender.NumPostDynamics++] = Node;
 
 	// Link into dynamics chain.
-	if( Z==ADD_START || Node->iDynamic[IsBack]==INDEX_NONE )
+	if( Z==ADD_START || !Node->GetDynamic(IsBack) )
 	{
 		// Add at start of list.
-		Index->iNext			= Node->iDynamic[IsBack];
-		Node->iDynamic[IsBack]	= iDynamic;
+		Index->Next	= Node->GetDynamic(IsBack);
+		Node->SetDynamic( IsBack, Index );
 	}
-	else if( Z == ADD_END )
+	else if( Z==ADD_END )
 	{
 		// Add at end of list.
-		TempIndex = &GRender.DynamicsIndex[Node->iDynamic[IsBack]];
-		while( TempIndex->iNext != INDEX_NONE )
-		{
-			TempIndex = &GRender.DynamicsIndex [TempIndex->iNext];
-		}
-		Index->iNext			= INDEX_NONE;
-		TempIndex->iNext		= iDynamic;
+		FDynamicsIndex* TempIndex = Node->GetDynamic(IsBack);
+		while( TempIndex->Next )
+			TempIndex = TempIndex->Next;
+
+		Index->Next		= NULL;
+		TempIndex->Next	= Index;
 	}
 	else
 	{
 		// Z sort them in.  Things that must remain on top, such as sprites (not chunks) are
 		// assigned a Z value of zero.
-		TempIndex = &GRender.DynamicsIndex[Node->iDynamic[IsBack]];
-		PrevIndex = NULL;
+		FDynamicsIndex* TempIndex = Node->GetDynamic(IsBack);
+		FDynamicsIndex* PrevIndex = NULL;
 
-		while( TempIndex->iNext!=INDEX_NONE && TempIndex->Z<=Z )
+		while( TempIndex->Next && TempIndex->Z<=Z )
 		{
 			PrevIndex = TempIndex;
-			TempIndex = &GRender.DynamicsIndex[TempIndex->iNext];
+			TempIndex = TempIndex->Next;
 		}
 		if( PrevIndex == NULL )
 		{
-			Index->iNext			= Node->iDynamic[IsBack];
-			Node->iDynamic[IsBack]  = iDynamic;
+			Index->Next = Node->GetDynamic(IsBack);
+			Node->SetDynamic(IsBack,Index);
 		}
 		else
 		{
-			Index->iNext			= PrevIndex->iNext;
-			PrevIndex->iNext		= iDynamic;
+			Index->Next			= PrevIndex->Next;
+			PrevIndex->Next		= Index;
 		}
 	}
-	Index->iNode    = iNode;
 	Index->Type     = Type;
 	Index->Sprite	= Sprite;
 	Index->Raster	= Raster;
 	Index->Z		= Z;
+	Index->Node		= Node;
 
 #if STATS
 	switch (Type)
@@ -489,11 +477,9 @@ void dynamicsFilter( UCamera *Camera, INDEX iNode,INT FilterDown,INT Outside )
 	guard(dynamicsFilter);
 	UModel		*Model		= Camera->Level->Model;
 	FBspNode	*Node		= &Model->Nodes(iNode);
-	INDEX		iDynamic	= Node->iDynamic[0];
 
-	while( iDynamic != INDEX_NONE )
+	for( FDynamicsIndex *Index = Node->GetDynamic(0); Index; Index=Index->Next )
 	{
-		FDynamicsIndex *Index = &GRender.DynamicsIndex[iDynamic];
 		switch( Index->Type )
 		{
 			case DY_SPRITE:
@@ -517,7 +503,6 @@ void dynamicsFilter( UCamera *Camera, INDEX iNode,INT FilterDown,INT Outside )
 				break;
 			}
 		}
-		iDynamic = Index->iNext;
 	}
 	unguard;
 }
@@ -548,19 +533,11 @@ void dynamicsPreRender
 	guard(dynamicsPreRender);
 	UModel 			*Model		= Camera->Level->Model;
 	FBspNode		*Node 		= &Model->Nodes(iNode);
-	INDEX			iDynamic	= Node->iDynamic[IsBack];
 
-	if( iDynamic != INDEX_NONE )
+	for( FDynamicsIndex	*Index = Node->GetDynamic(IsBack); Index; Index=Index->Next )
 	{
-		if (GRender.NumPostDynamics < GRender.MaxPostDynamics)
-			GRender.PostDynamics[GRender.NumPostDynamics++] = iNode;
-	}
-	while( iDynamic != INDEX_NONE )
-	{
-		FDynamicsIndex	*Index	= &GRender.DynamicsIndex [iDynamic];
-		FSprite			*Sprite = Index->Sprite;
-
-		switch (Index->Type)
+		FSprite	*Sprite = Index->Sprite;
+		switch( Index->Type )
 		{
 			case DY_FINALCHUNK:
 				if( !Index->Sprite->SpanBuffer )
@@ -608,7 +585,6 @@ void dynamicsPreRender
 			case DY_SPRITE:
 				break;
 		}
-		iDynamic = Index->iNext;
 	}
 	unguard;
 }
@@ -707,14 +683,15 @@ void FRender::DrawScaledSprite
 	INT			BlitType,
 	FSpanBuffer *SpanBuffer,
 	INT			Center,
-	INT			Highlight
+	INT			Highlight,
+	FLOAT		Z
 )
 {
 	checkInput( Texture != NULL );
 	FLOAT X1=0, X2=0, Y1=0, Y2=0;
 	guard( FRender::DrawScaledSprite );
 
-	if (Center)
+	if( Center )
 	{
 		ScreenX -= XSize * 0.5;
 		ScreenY -= YSize * 0.5;
@@ -727,7 +704,7 @@ void FRender::DrawScaledSprite
 	if ( X2 > Camera->FX ) 	X2 = Camera->FX;
 	if ( X2 <= X1 )			return;
 
-	if (SpanBuffer)
+	if( SpanBuffer )
 	{
 		if ( Y1 < SpanBuffer->StartY )	Y1 = SpanBuffer->StartY;
 		if ( Y2 > SpanBuffer->EndY   )	Y2 = SpanBuffer->EndY;
@@ -737,7 +714,7 @@ void FRender::DrawScaledSprite
 		if ( Y1 < 0.0 ) 			Y1 = 0.0;
 		if ( Y2 > Camera->FY ) 		Y2 = Camera->FY;
 	}
-	if ( Y2<=Y1 ) 
+	if( Y2<=Y1 ) 
 		return;
 
 	// Find correctly sampled U and V start and end values.
@@ -754,18 +731,18 @@ void FRender::DrawScaledSprite
 
 	// Build poly.
 	FTransTexture P[4];
-	P[0].ScreenX = X1; P[0].ScreenY = Y2; P[0].U = U1; P[0].V = V2; P[0].Color = FVector(G,G,G); P[0].Z=1000.0;
-	P[1].ScreenX = X1; P[1].ScreenY = Y1; P[1].U = U1; P[1].V = V1; P[1].Color = FVector(G,G,G); P[1].Z=1000.0;
-	P[2].ScreenX = X2; P[2].ScreenY = Y1; P[2].U = U2; P[2].V = V1; P[2].Color = FVector(G,G,G); P[2].Z=1000.0;
-	P[3].ScreenX = X2; P[3].ScreenY = Y2; P[3].U = U2; P[3].V = V2; P[3].Color = FVector(G,G,G); P[3].Z=1000.0;
+	P[0].ScreenX = X1; P[0].ScreenY = Y2; P[0].U = U1; P[0].V = V2; P[0].Color = FVector(G,G,G); P[0].Z=Z;
+	P[1].ScreenX = X1; P[1].ScreenY = Y1; P[1].U = U1; P[1].V = V1; P[1].Color = FVector(G,G,G); P[1].Z=Z;
+	P[2].ScreenX = X2; P[2].ScreenY = Y1; P[2].U = U2; P[2].V = V1; P[2].Color = FVector(G,G,G); P[2].Z=Z;
+	P[3].ScreenX = X2; P[3].ScreenY = Y2; P[3].U = U2; P[3].V = V2; P[3].Color = FVector(G,G,G); P[3].Z=Z;
 
 	// Set flags.
 	DWORD TheseFlags=0;
 	switch( BlitType )
 	{
-		case BT_None:			TheseFlags = PF_Masked | PF_NoSmooth;		break;
-		case BT_Normal:			TheseFlags = PF_Masked | 0;					break;
-		case BT_Transparent:	TheseFlags = PF_Masked | PF_Transparent;	break;
+		case BT_None:			TheseFlags = PF_Masked | PF_NoSmooth;			break;
+		case BT_Normal:			TheseFlags = PF_Masked | 0;						break;
+		case BT_Transparent:	TheseFlags = PF_InternalUnused1 | PF_NoSmooth;	break;
 	}
 
 	// Draw it.
@@ -910,20 +887,23 @@ void FRender::DrawActorSprite( UCamera *Camera,FSprite *Sprite )
 	{
 		if( Actor->Texture ) DrawScaledSprite
 		(
-			Camera,Actor->Texture,
+			Camera,
+			Actor->Texture,
 			Sprite->ScreenX,
 			Sprite->ScreenY,
-			Actor->DrawScale * Actor->Texture->USize,
-			Actor->DrawScale * Actor->Texture->VSize,
+			Sprite->DrawScale * Actor->DrawScale * Actor->Texture->USize,
+			Sprite->DrawScale * Actor->DrawScale * Actor->Texture->VSize,
 			Actor->BlitType,
 			0,
 			1,
-			Actor->bSelected && Camera->Level->GetState()!=LEVEL_UpPlay
+			Actor->bSelected && Camera->Level->GetState()!=LEVEL_UpPlay,
+			Sprite->Z
 		);
 	}
 	else if( Actor->DrawType==DT_Mesh )
 	{
-		if( Actor->Mesh ) DrawMesh ( Camera, Actor, NULL, Sprite );
+		if( Actor->Mesh )
+			DrawMesh ( Camera, Actor, NULL, Sprite );
 	}
 
 	// Draw frills.
@@ -932,7 +912,7 @@ void FRender::DrawActorSprite( UCamera *Camera,FSprite *Sprite )
 		// Radii.
 		if( Camera->Actor->ShowFlags & SHOW_ActorRadii )
 		{
-			if( !Actor->Brush || !Actor->Brush->bCheckCollision )
+			if( !Actor->Brush )
 			{
 				// Show collision radius
 				if( Actor->bCollideActors && Camera->Actor->RendMap==REN_OrthXY )
@@ -947,9 +927,8 @@ void FRender::DrawActorSprite( UCamera *Camera,FSprite *Sprite )
 			}
 			else
 			{
-				FVector Min,Max;
-				Actor->GetCollisionExtent( Min, Max );
-				DrawBox( Camera, Min, Max, ActorArrowColor, 1 );
+				FBoundingBox Box = Actor->GetPrimitive()->GetRenderBoundingBox(Actor);
+				DrawBox( Camera, Box.Min, Box.Max, ActorArrowColor, 1 );
 			}
 
 			// Show light radius.
@@ -964,7 +943,7 @@ void FRender::DrawActorSprite( UCamera *Camera,FSprite *Sprite )
 		{
 			GGfx.ArrowBrush->Location = Actor->Location;
 			GGfx.ArrowBrush->Rotation = Actor->Rotation;
-			GGfx.ArrowBrush->TransformedBound.Init(); // Don't bound-reject.
+			GGfx.ArrowBrush->TransformedBound = FBoundingVolume(0);
 			GRender.DrawBrushPolys(Camera,GGfx.ArrowBrush,ActorArrowColor,0,NULL,1,0,Actor->bSelected,0);
 		}
 	}
@@ -979,7 +958,7 @@ void FRender::DrawActorSprite( UCamera *Camera,FSprite *Sprite )
 // Draw an actor clipped to a span buffer representing the portion of
 // the actor that falls into a particular Bsp leaf.
 //
-void FRender::DrawActorChunk( UCamera *Camera,FSprite *Sprite )
+void FRender::DrawActorChunk( UCamera *Camera, FSprite *Sprite )
 {
 	guard(FRender::DrawActorChunk);
 	if (GEditor && GEditor->Scan.Active)
@@ -987,23 +966,23 @@ void FRender::DrawActorChunk( UCamera *Camera,FSprite *Sprite )
 
 	AActor *Actor = Sprite->Actor;
 	if
-	(
-			(Actor->DrawType==DT_Sprite) 
-		||	(Actor->DrawType==DT_Brush) 
-		||	(Camera->Actor->ShowFlags & SHOW_ActorIcons)
-	)
+	(	(Actor->DrawType==DT_Sprite) 
+	||	(Actor->DrawType==DT_Brush) 
+	||	(Camera->Actor->ShowFlags & SHOW_ActorIcons) )
 	{
-		if (Actor->Texture) DrawScaledSprite
+		if( Actor->Texture ) DrawScaledSprite
 		(
-			Camera,Actor->Texture,
+			Camera,
+			Actor->Texture,
 			Sprite->ScreenX,
 			Sprite->ScreenY,
-			Actor->DrawScale * Actor->Texture->USize,
-			Actor->DrawScale * Actor->Texture->VSize,
+			Sprite->DrawScale * Actor->DrawScale * Actor->Texture->USize,
+			Sprite->DrawScale * Actor->DrawScale * Actor->Texture->VSize,
 			Actor->BlitType,
 			Sprite->SpanBuffer,
 			1,
-			Actor->bSelected && Camera->Level->GetState()!=LEVEL_UpPlay
+			Actor->bSelected && Camera->Level->GetState()!=LEVEL_UpPlay,
+			Sprite->Z
 		);
 	}
 	else if( Actor->DrawType==DT_Mesh && Actor->BlitType!=BT_None && Actor->Mesh!=NULL )
@@ -1062,7 +1041,7 @@ INT FRender::SetupSprite( UCamera *Camera, FSprite *Sprite )
 				return 0;
 
 			// See if this is occluded.
-			if( !GRender.Project( Camera, &Actor->Location, &Sprite->ScreenX, &Sprite->ScreenY, &Actor->DrawScale ))  
+			if( !GRender.Project( Camera, &Actor->Location, &Sprite->ScreenX, &Sprite->ScreenY, &Sprite->DrawScale ) )
 				return 0;
 
 			// Compute sprite extent.
@@ -1070,8 +1049,8 @@ INT FRender::SetupSprite( UCamera *Camera, FSprite *Sprite )
 			(
 				Camera,
 				Sprite->ScreenX,Sprite->ScreenY,
-				Actor->DrawScale * Actor->Texture->USize,
-				Actor->DrawScale * Actor->Texture->VSize,
+				Sprite->DrawScale * Actor->DrawScale * Actor->Texture->USize,
+				Sprite->DrawScale * Actor->DrawScale * Actor->Texture->VSize,
 				&Sprite->X1,
 				&Sprite->Y1,
 				&Sprite->X2,
@@ -1107,14 +1086,10 @@ INT FRender::SetupSprite( UCamera *Camera, FSprite *Sprite )
 		}
 		else
 		{
-			// Get mesh's per-frame bounding Bound.
-			FBoundingRect Bounds    = Actor->Mesh->GetBoundingRect( Actor );
-			FCoords       BoxCoords = GMath.UnitCoords / Actor->Rotation / Actor->Mesh->RotOrigin;
-			BoxCoords.Origin        = Actor->Location;
-
 			// Try to view pyramid and span reject it.
 			FScreenBounds ScreenBounds;
-			if( !GRender.BoundVisible( Camera, &Bounds, NULL, &ScreenBounds, &BoxCoords ) )
+			FBoundingBox Bounds = Actor->Mesh->GetRenderBoundingBox( Actor );
+			if( !GRender.BoundVisible( Camera, &Bounds, NULL, &ScreenBounds ) )
 				return 0;
 
 			// Set extent.
@@ -1136,7 +1111,7 @@ INT FRender::SetupSprite( UCamera *Camera, FSprite *Sprite )
 			}
 		}
 
-		// This is potential visible.
+		// This is potentially visible.
 		debugOutput(Sprite->X1<=Sprite->X2);
 		debugOutput(Sprite->Y1<=Sprite->Y2);
 		return 1;
@@ -1222,7 +1197,7 @@ void FRender::DrawLevelActors( UCamera *Camera, AActor *Exclude )
 					AActor *OtherActor = Actors(iOther);
 					if
 					(	(OtherActor)
-					&&	(OtherActor->GetFName() == Actor->Event) 
+					&&	(OtherActor->Tag == Actor->Event) 
 					&&	((Camera->Level->GetState()==LEVEL_UpPlay)?!Actor->bHidden:!Actor->bHiddenEd)
 					&&  (!Actor->bOnlyOwnerSee || Actor->IsOwnedBy(Camera->Actor)) )
 					{

@@ -172,7 +172,7 @@ int FGlobalEditor::Exec
 		{
 			GTrans->Begin(Level,"Brush RotateRel");
 			Brush->Lock(LOCK_Trans);
-			TempRotation = GMath.ZeroRotation;
+			TempRotation = FRotation(0,0,0);
 			GetFROTATION(Str,&TempRotation,256);
 			Brush->Rotation.Pitch += TempRotation.Pitch;
 			Brush->Rotation.Yaw	+= TempRotation.Yaw;
@@ -198,7 +198,7 @@ int FGlobalEditor::Exec
 		{
 			GTrans->Begin(Level,"Brush MoveRel");
 			Brush->Lock(LOCK_Trans);
-			TempVector = GMath.ZeroVector;
+			TempVector = FVector(0,0,0);
 			GetFVECTOR(Str,&TempVector);
 			Brush->Location.AddBounded(TempVector);
 			Brush->Unlock(LOCK_Trans);
@@ -228,7 +228,7 @@ int FGlobalEditor::Exec
 			Level->Lock					(LOCK_Trans);
 
 			UClass *MoverClass	= new("Mover",FIND_Existing)UClass;
-			AActor *Actor		= Level->SpawnActor(MoverClass,NULL,NAME_None,&Brush->Location);
+			AActor *Actor		= Level->SpawnActor(MoverClass,NULL,NAME_None,Brush->Location);
 			if( Actor )
 			{
 				Actor->Rotation = Brush->Rotation;
@@ -418,16 +418,23 @@ int FGlobalEditor::Exec
 	{
 		if (GetCMD(&Str,"BUILD"))
 		{
-			int opt = 0; //assume low
-			if (GetCMD(&Str,"MEDIUMOPT"))
-				opt = 1;
+			int opt = 1; //assume medium
+			if (GetCMD(&Str,"LOWOPT"))
+				opt = 0;
 			else if (GetCMD(&Str,"HIGHOPT"))
 				opt = 2;
 
 			FPathBuilder builder;
+
+			GTrans->Begin			(Level,"Remove Paths");
+			Level->Lock				(LOCK_Trans);
+			int numpaths = builder.removePaths		(Level);
+			Level->Unlock			(LOCK_Trans);
+			GTrans->End				();
+
 			GTrans->Begin			(Level,"Build Paths");
 			Level->Lock				(LOCK_Trans);
-			int numpaths = builder.buildPaths		(Level, opt);
+			numpaths = builder.buildPaths		(Level, opt);
 			Level->Unlock			(LOCK_Trans);
 			GTrans->End				();
 			GCameraManager->RedrawLevel		(Level);
@@ -436,12 +443,26 @@ int FGlobalEditor::Exec
 		}
 		else if (GetCMD(&Str,"SHOW"))
 		{
-			Out->Log("Paths are visible!");
+			FPathBuilder builder;
+			GTrans->Begin			(Level,"Show Paths");
+			Level->Lock				(LOCK_Trans);
+			int numpaths = builder.showPaths(Level);
+			Level->Unlock			(LOCK_Trans);
+			GTrans->End				();
+			GCameraManager->RedrawLevel		(Level);
+			Out->Logf(" %d Paths are visible!", numpaths);
 			Processed=1;
 		}
 		else if (GetCMD(&Str,"HIDE"))
 		{
-			Out->Log("Paths are invisible");
+			FPathBuilder builder;
+			GTrans->Begin			(Level,"Hide Paths");
+			Level->Lock				(LOCK_Trans);
+			int numpaths = builder.hidePaths(Level);
+			Level->Unlock			(LOCK_Trans);
+			GTrans->End				();
+			GCameraManager->RedrawLevel		(Level);
+			Out->Logf(" %d Paths are hidden!", numpaths);
 			Processed=1;
 		}
 		else if (GetCMD(&Str,"REMOVE"))
@@ -451,7 +472,6 @@ int FGlobalEditor::Exec
 			Level->Lock				(LOCK_Trans);
 			int numpaths = builder.removePaths		(Level);
 			Level->Unlock			(LOCK_Trans);
-			//
 			GTrans->End				();
 			GCameraManager->RedrawLevel		(Level);
 			Out->Logf("Removed %d Paths", numpaths);
@@ -460,12 +480,18 @@ int FGlobalEditor::Exec
 		else if (GetCMD(&Str,"DEFINE"))
 		{
 			FPathBuilder builder;
+			GTrans->Begin			(Level,"UnDefine old Paths");
+			Level->Lock				(LOCK_Trans);
+			builder.undefinePaths	(Level);
+			Level->Unlock			(LOCK_Trans);
+			GTrans->End				();
+
 			GTrans->Begin			(Level,"Define Paths");
 			Level->Lock				(LOCK_Trans);
 			builder.definePaths		(Level);
 			Level->Unlock			(LOCK_Trans);
-			//
 			GTrans->End				();
+
 			GCameraManager->RedrawLevel		(Level);
 			Processed=1;
 		}
@@ -474,69 +500,56 @@ int FGlobalEditor::Exec
 	//------------------------------------------------------------------------------------
 	// Bsp
 	//
-	else if (GetCMD(&Str,"BSP"))
+	else if( GetCMD( &Str, "BSP" ) )
+	{
+		if( GetCMD( &Str, "REBUILD") ) // Bsp REBUILD [LAME/GOOD/OPTIMAL] [BALANCE=0-100] [LIGHTS] [MAPS] [REJECT]
 		{
-		if (GetCMD(&Str,"REBUILD")) // Bsp REBUILD [LAME/GOOD/OPTIMAL] [BALANCE=0-100] [LIGHTS] [MAPS] [REJECT]
-			{
 			GTrans->Reset("rebuilding Bsp"); // Not tracked transactionally
 			Out->Log("Bsp Rebuild");
 			EBspOptimization BspOpt;
-			//
+
 			if      (GetCMD(&Str,"LAME")) 		BspOpt=BSP_Lame;
 			else if (GetCMD(&Str,"GOOD"))		BspOpt=BSP_Good;
 			else if (GetCMD(&Str,"OPTIMAL"))	BspOpt=BSP_Optimal;
 			else								BspOpt=BSP_Good;
-			//
-			if (!GetWORD(Str,"BALANCE=",&Word2)) Word2=50; // Equal tendency to balance vs. minimize splits
-			//
-			GApp->BeginSlowTask	("Rebuilding Bsp",1,0);
-			//
-			GApp->StatusUpdate  ("Building polygons",0,0);
-			bspBuildFPolys		(Level->Model,1);
-			//
-			GApp->StatusUpdate  ("Merging planars",0,0);
-			bspMergeCoplanars	(Level->Model,0,0);
-			//
-			GApp->StatusUpdate  ("Partitioning",0,0);
-			bspBuild			(Level->Model,BspOpt,Word2,0);
-			//
-			if (GetSTRING(Str,"ZONES",TempStr,1))
-				{
-				GApp->StatusUpdate("Building visibility zones",0,0);
-				zoneBuild( Level );
-				};
-			if (GetSTRING(Str,"OPTGEOM",TempStr,1))
-				{
-				GApp->StatusUpdate("Optimizing geometry",0,0);
-				bspOptGeom		(Level->Model);
-				};
-			//
-			// Empty EdPolys:
-			//
-			Level->Lock	(LOCK_ReadWrite);
+
+			if( !GetWORD( Str, "BALANCE=", &Word2 ) )
+				Word2=50;
+
+			GApp->BeginSlowTask( "Rebuilding Bsp", 1, 0 );
+
+			GApp->StatusUpdate( "Building polygons", 0, 0 );
+			bspBuildFPolys( Level->Model, 1 );
+
+			GApp->StatusUpdate( "Merging planars", 0, 0 );
+			bspMergeCoplanars( Level->Model, 0, 0 );
+
+			GApp->StatusUpdate( "Partitioning", 0, 0 );
+			bspBuild( Level->Model, BspOpt, Word2, 0 );
+
+			if( GetSTRING( Str, "ZONES", TempStr, 1 ) )
+			{
+				GApp->StatusUpdate( "Building visibility zones", 0, 0 );
+				TestVisibility( Level, Level->Model, 0, 0 );
+			}
+			if( GetSTRING( Str, "OPTGEOM", TempStr, 1 ) )
+			{
+				GApp->StatusUpdate( "Optimizing geometry", 0, 0 );
+				bspOptGeom( Level->Model );
+			}
+
+			// Empty EdPolys.
+			Level->Lock( LOCK_ReadWrite );
 			Level->Model->Polys->Num = 0;
-			Level->Unlock	(LOCK_ReadWrite);
-			//
-			GApp->EndSlowTask	();
-			GCameraManager->RedrawLevel(Level);
-			GApp->EdCallback	(EDC_MapChange,0);
-			//
+			Level->Unlock( LOCK_ReadWrite );
+
+			GApp->EndSlowTask();
+			GCameraManager->RedrawLevel( Level );
+			GApp->EdCallback( EDC_MapChange, 0 );
+
 			Processed=1;
-			};
 		}
-	//------------------------------------------------------------------------------------
-	// ZONE
-	//
-	else if (GetCMD(&Str,"ZONE"))
-		{
-		GApp->BeginSlowTask	("Computing visibilty",1,0);
-		GApp->StatusUpdate	("Building visibility zones",0,0);
-		zoneBuild			(Level);
-		GApp->EndSlowTask	();
-		GCameraManager->RedrawLevel(Level);
-		GApp->EdCallback	(EDC_MapChange,0);
-		Processed=1;
-		}
+	}
 	//------------------------------------------------------------------------------------
 	// LIGHT
 	//
@@ -682,7 +695,7 @@ int FGlobalEditor::Exec
 			Level->RememberActors	();
 			Level->EmptyLevel		();
 			Level->SetState 		(LEVEL_UpEdit);
-			Level->ReconcileActors	(1);				
+			Level->ReconcileActors	();
 			//
 			GApp->EdCallback		(EDC_MapChange,0);
 			GApp->EdCallback		(EDC_SelPolyChange,0);
@@ -702,7 +715,7 @@ int FGlobalEditor::Exec
 				Level->RememberActors	();
 				GObj.AddFile 			(TempFname,NULL);
 				Level->SetState			(LEVEL_UpEdit);
-				Level->ReconcileActors	(1); // Match camera actors to existing cameras
+				Level->ReconcileActors	();
 				bspValidateBrush		(Brush,0,1);
 				GApp->EndSlowTask   	();
 				//
@@ -727,39 +740,43 @@ int FGlobalEditor::Exec
 			else Out->Log(LOG_ExecError,"Missing filename");
 			Processed=1;
 			}
-		else if (GetCMD (&Str,"IMPORT"))
-			{
+		else if( GetCMD( &Str, "IMPORT" ) )
+		{
 			Word1=1;
 			DoImportMap:
-			if (GetSTRING(Str,"FILE=",TempFname,79))
+			if( GetSTRING( Str, "FILE=", TempFname, 79 ) )
+			{
+				GTrans->Reset( "importing map" );
+				GApp->BeginSlowTask( "Importing map", 1, 0 );
+				Level->RememberActors();
+				if( Word1 )
+					Level->EmptyLevel();
+				Level->ImportFromFile( TempFname );
+				GCache.Flush();
+				csgInvalidateBsp( Level );
+				Level->SetState( LEVEL_UpEdit );
+				Level->ReconcileActors();
+				if (Word1)
 				{
-				GTrans->Reset			("importing map"); 		// Can't be transaction tracked
-				//
-				GApp->BeginSlowTask		("Importing map",1,0);
-				Level->RememberActors	();
-				if (Word1) Level->EmptyLevel();
-				Level->ImportFromFile	(TempFname);			// Import it and replace existing
-				GCache.Flush			();
-				csgInvalidateBsp 		(Level);
-				Level->SetState 		(LEVEL_UpEdit);			// Set as editing for reconciliation.
-				Level->ReconcileActors 	(1);					// Match camera actors to existing cameras
-				if (Word1) mapSelectNone(Level);
-				//
-				GApp->EndSlowTask   	();
-				GApp->EdCallback		(EDC_MapChange,0);
-				GApp->EdCallback		(EDC_SelPolyChange,0);
-				GApp->EdCallback		(EDC_SelActorChange,0);
-				Cleanse(*Out,1);
+					mapSelectNone( Level );
+					edactSelectNone( Level );
 				}
+				GApp->EndSlowTask();
+				GApp->EdCallback( EDC_MapChange, 0 );
+				GApp->EdCallback( EDC_SelPolyChange, 0 );
+				GApp->EdCallback( EDC_SelActorChange, 0 );
+				Cleanse( *Out, 1 );
+			}
 			else Out->Log(LOG_ExecError,"Missing filename");
 			Processed=1;
-			}
-		else if (GetCMD (&Str,"IMPORTADD"))
-			{
+		}
+		else if( GetCMD( &Str, "IMPORTADD" ) )
+		{
 			Word1=0;
-			mapSelectNone (Level);
-			goto DoImportMap; // Import without emptying level
-			}
+			mapSelectNone( Level );
+			edactSelectNone( Level );
+			goto DoImportMap;
+		}
 		else if (GetCMD (&Str,"EXPORT"))
 			{
 			if (GetSTRING(Str,"FILE=",TempFname,79))
@@ -1005,6 +1022,7 @@ int FGlobalEditor::Exec
 								(BYTE*)&NewBin->Element(0) + sizeof(UObject),
 								NewBin->Num                - sizeof(UObject)
 							);
+							Actor->SetClass( NewClass );
 
 							// Reimport.
 							ActorPropertiesBuffer->Lock(LOCK_Read);
@@ -1267,6 +1285,10 @@ int FGlobalEditor::Exec
 					DWORD TexFlags=0; GetDWORD(Str,"TexFlags=",&TexFlags);
 					GetDWORD(Str,"FLAGS=",&Texture->PolyFlags);
 					GetUPalette(Str,"PALETTE=",*(UPalette**)&Texture->Palette);
+					GetUTexture(Str,"BUMP=",Texture->BumpMap);
+					GetUTexture(Str,"DETAIL=",Texture->DetailTexture);
+					GetUTexture(Str,"MTEX=",Texture->MacroTexture);
+					GetUTexture(Str,"NEXT=",Texture->AnimNext);
 
 					if( !Texture->Palette && DWord2 )
 					{
@@ -1308,7 +1330,6 @@ int FGlobalEditor::Exec
 						Texture->CreateBumpMap();
 					}
 					Texture->CreateColorRange();
-					Cleanse(*Out,1);
 				}
 				else Out->Logf(LOG_ExecError,"Import texture %s from %s failed",TempName,TempFname);
 				GApp->EndSlowTask();
@@ -1353,7 +1374,7 @@ int FGlobalEditor::Exec
 				Cleanse(*Out,1);
 				GApp->EndSlowTask();
 			}
-			else Out->Log(LOG_ExecError,"Missing filename");
+			else Out->Log( LOG_ExecError, "Missing filename" );
 			Processed=1;
 		}
 		else if( GetCMD(&Str,"SaveSet") )
@@ -1518,7 +1539,7 @@ int FGlobalEditor::Exec
 				Level->RememberActors	();
 				GObj.AddFile			(TempFname,NULL);
 				GCache.Flush			();
-				Level->ReconcileActors	(1);
+				Level->ReconcileActors	();
 				GCameraManager->RedrawLevel(Level);
 				}
 			else Out->Log(LOG_ExecError,"Missing filename");
@@ -1629,7 +1650,7 @@ int FGlobalEditor::Exec
 					Class->ExportToFile( TempFname );
 				}
 			}
-			else Out->Log(LOG_ExecError,"Missing file or name");
+			else Out->Log( LOG_ExecError, "Missing file or name" );
 			Processed=1;
 		}
 		else if (GetCMD(&Str,"SET")) // CLASS SET
@@ -1648,24 +1669,26 @@ int FGlobalEditor::Exec
 			if( GetSTRING( Str, "FILE=", TempFname, 80 ))
 			{
 				Out->Logf("Loading classes from %s",TempFname);
-				if( mystrstr(TempFname,"U") ) // Import from text file
+				if( mystrstr( TempFname, "UCX") )
+				{
+					// Load from Unrealfile.
+					GObj.AddFile( TempFname, NULL );
+					Cleanse( *Out, 1 );
+				}
+				else if( mystrstr(TempFname,"U") )
 				{
 					// TempClass is a dummy class; it's import routine imports multiple, named classes
 					UClass *TempClass = new("Temp",TempFname,IMPORT_Replace)UClass;
-					if (TempClass) TempClass->Kill();
-				}
-				else if( mystrstr( TempFname, "UCX") )// Load from Unrealfile
-				{
-					GObj.AddFile(TempFname,NULL);
-					Cleanse(*Out,1);
+					if( TempClass )
+						TempClass->Kill();
 				}
 				else Out->Log(LOG_ExecError,"Unrecognized file type");
 			}
 			else Out->Log(LOG_ExecError,"Missing filename");
 			Processed=1;
 		}
-		else if (GetCMD(&Str,"NEW")) // CLASS NEW
-			{
+		else if( GetCMD(&Str,"NEW") ) // CLASS NEW
+		{
 			UClass *Parent;
 			if (GetUClass(Str,"PARENT=",Parent) && 
 				GetSTRING(Str,"NAME=",TempStr,NAME_SIZE))
@@ -1676,7 +1699,7 @@ int FGlobalEditor::Exec
 				else Out->Log( LOG_ExecError, "Class not found" );
 			}
 			Processed=1;
-			}
+		}
 		else if (GetCMD(&Str,"DELETE"))
 			{
 			UClass *Class;
@@ -1785,14 +1808,12 @@ int FGlobalEditor::Exec
 			UMesh *Mesh;
 			if( GetUMesh(Str,"MESH=",Mesh) )
 			{
-				TempVector = GMath.UnitScaleVect; GetFVECTOR(Str,&TempVector);
-				Mesh->Origin.X = TempVector.X;
-				Mesh->Origin.Y = TempVector.Y;
-				Mesh->Origin.Z = TempVector.Z;
-				Mesh->RotOrigin = GMath.ZeroRotation;
-				GetFROTATION (Str,&Mesh->RotOrigin,256);
+				Mesh->Origin    = FVector(0,0,0);
+				Mesh->RotOrigin = FRotation(0,0,0);
+				GetFVECTOR  ( Str, &Mesh->Origin );
+				GetFROTATION( Str, &Mesh->RotOrigin, 256 );
 			}
-			else Out->Log(LOG_ExecError,"Bad MESH ORIGIN");
+			else Out->Log( LOG_ExecError, "Bad MESH ORIGIN" );
 			Processed=1;
 		}
 		else if( GetCMD(&Str,"SEQUENCE") ) // MESH SEQUENCE MESH=.. SEQ=.. STARTFRAME=.. NUMFRAMES=..
@@ -1806,8 +1827,8 @@ int FGlobalEditor::Exec
 			&&	GetWORD		(Str,"STARTFRAME=",&Seq.StartFrame)
 			&&	GetWORD		(Str, "NUMFRAMES=",&Seq.NumFrames) )
 			{
-				GetFLOAT(Str,"RATE=",&Seq.Rate);
-				Mesh->AnimSeqs->AddItem(Seq);
+				GetFLOAT( Str, "RATE=", &Seq.Rate );
+				Mesh->AnimSeqs->AddItem( Seq );
 			}
 			else Out->Log(LOG_ExecError,"Bad MESH SEQUENCE");
 			Processed=1;
@@ -1835,12 +1856,12 @@ int FGlobalEditor::Exec
 							Mesh->Notifys->AddItem( Mesh->Notifys(i+Seq->StartNotify) );
 						Seq->StartNotify = NewStartNotify;
 					}
-					Mesh->Notifys->AddItem(Notify);
+					Mesh->Notifys->AddItem( Notify );
 					Seq->NumNotifys++;
 				}
-				else Out->Log(LOG_ExecError,"Unknown sequence in MESH NOTIFY");
+				else Out->Log( LOG_ExecError, "Unknown sequence in MESH NOTIFY" );
 			}
-			else Out->Log(LOG_ExecError,"Bad MESH NOTIFY");
+			else Out->Log( LOG_ExecError, "Bad MESH NOTIFY" );
 			Processed=1;
 		}
 		else if( GetCMD(&Str,"SAVE") ) // MESH SAVE MESH=.. FILE=..
@@ -1925,16 +1946,11 @@ int FGlobalEditor::Exec
 	//
 	else if( GetCMD(&Str,"SCRIPT") )
 	{
-		if( GetCMD(&Str,"COMPILE") )
+		if( GetCMD(&Str,"MAKE") )
 		{
-			UClass *Class;
-			if( GetUClass(Str,"CLASS=",Class) ) CompileScript(Class,1,0);
-			else Out->Log(LOG_ExecError,"Missing class");
-			Processed=1;
-		}
-		else if( GetCMD(&Str,"MAKE") )
-		{
+			GApp->BeginSlowTask("Compiling scripts",0,0);
 			MakeScripts(GetCMD(&Str,"ALL"));
+			GApp->EndSlowTask();
 			Processed=1;
 		}
 		else if( GetCMD(&Str,"DECOMPILE") )
@@ -1972,25 +1988,6 @@ int FGlobalEditor::Exec
 		}
 	}
 	//------------------------------------------------------------------------------------
-	// TASK: slow task status
-	//
-	else if( GetCMD(&Str,"TASK") )
-	{
-		if( GetCMD(&Str,"BEGIN") )
-		{
-			char Temp[256];
-			if( !GetSTRING( Str, "MESSAGE=", Temp, 256 ) )
-				strcpy( Temp, "Please wait..." );
-			GApp->BeginSlowTask( Temp, 1, 0 );
-			Processed=1;
-		}
-		else if( GetCMD(&Str,"END") )
-		{
-			GApp->EndSlowTask();
-			Processed=1;
-		}
-	}
-	//------------------------------------------------------------------------------------
 	// Other handlers.
 	//
 	else if( GetCMD(&Str,"MUSIC") )
@@ -2002,20 +1999,6 @@ int FGlobalEditor::Exec
 	{
 		AudioCmdLine(Str,Out);
 		return 1;
-	}
-	else if( GetCMD(&Str,"VISI") )
-	{
-		// Select the level info for visibility testing.
-		INDEX iTestNode=INDEX_NONE;
-		Level->Lock(LOCK_ReadWrite);
-		edactSelectNone(Level);
-		Level->Info->bHiddenEd = 0;
-		Level->Info->bSelected = 1;
-		Level->Unlock(LOCK_ReadWrite);
-
-		// Test visibility.
-		TestVisibility(Level->Model,iTestNode,0);
-		Processed=1;
 	}
 	//------------------------------------------------------------------------------------
 	// Done with this command.  Now note it (if we're recording a macro) and go to

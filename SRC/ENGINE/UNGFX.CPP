@@ -243,10 +243,14 @@ void FGlobalGfx::Init()
 	ScaleBoxHiColor			= COLOR(P_FIRE,0);
 	ZoneWireColor			= COLOR(P_BLUE,0);
 	MoverColor				= COLOR(P_GREEN,2);
-	OrthoBackground			= COLOR(P_BLUE,23); //COLOR(P_GREY,4);
+	OrthoBackground			= COLOR(P_GREY,4);
 
 	// Allocate global graphics array.
 	Graphics = new("Graphics",CREATE_Unique)UArray(0);
+
+	// Create cylinder object.
+	Cylinder = new("Primitive",CREATE_Unique)UPrimitive;
+	Graphics->AddItem(Cylinder);
 
 	// Init misc.
 	DefaultCameraFlags = SHOW_Frame | SHOW_Actors | SHOW_MovingBrushes;
@@ -264,24 +268,23 @@ void FGlobalGfx::Init()
 	Tables = new("GfxTables",FIND_Optional)UArray;
 	if( !Tables )
 	{
+		if( !GEditor )
+			appError( "Can't find graphics objects" );
+
 		GApp->BeginSlowTask("Building Unreal.gfx",1,0);
 		Tables = new("GfxTables",CREATE_Unique)UArray(0);
 		debug (LOG_Init,"Building Unreal.gfx");
 
-		//
 		// Regenerate all graphics tables.
-		//
-
 		DefaultPalette = new("Palette",DEFAULT_PALETTE_FNAME,IMPORT_Replace)UPalette;
 		if( !DefaultPalette )
-			appError ("Error loading default palette");
+			appError( "Error loading default palette" );
 
 		DefaultPalette->FixPalette();
 		Tables->AddItem(DefaultPalette);
 
 		// Call import script to load editor stuff (marker sprites, fonts, etc).
 		guard(GFX_BOOTSTRAP_FNAME)
-		if (!GEditor) appError("Can't find graphics objects");
 		GEditor->Exec("MACRO PLAY NAME=Startup FILE=" GFX_BOOTSTRAP_FNAME);
 		unguard;
 
@@ -294,9 +297,9 @@ void FGlobalGfx::Init()
 	Graphics->AddItem(Tables);
 
 	// Load lookup tables.
-	GObj.AddFile("Unreal.tab",NULL,1);
-	Luts = new("GfxLuts",FIND_Optional)UArray;
-	if (!Luts)
+	GObj.AddFile( "Unreal.tab", NULL, 1 );
+	Luts = new( "GfxLuts", FIND_Optional )UArray;
+	if( !Luts )
 	{
 		GApp->BeginSlowTask("Building Unreal.tab",1,0);
 		Luts = new("GfxLuts",CREATE_Unique)UArray(0);
@@ -381,7 +384,6 @@ void FGlobalGfx::Init()
 				Color.R = ((int)C1->R + (int)C2->R) / 2;
 				Color.G = ((int)C1->G + (int)C2->G) / 2;
 				Color.B = ((int)C1->B + (int)C2->B) / 2;
-				//BlendTable(i*256+j) = DefaultPalette->BestMatchInRange(Color,j);
 				BlendTable(i*256+j) = DefaultPalette->BestMatch(Color);
 			}
 		}

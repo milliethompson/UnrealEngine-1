@@ -124,6 +124,7 @@ void FGlobalEditor::LoadClasses()
 		Bootstrapping = 1;
 		GApp->BeginSlowTask("Building " DEFAULT_CLASS_FNAME,1,0);
 		Exec("MACRO PLAY NAME=Classes FILE=" CLASS_BOOTSTRAP_FNAME);
+
 		GApp->EndSlowTask();
 		Bootstrapping = 0;
 
@@ -149,7 +150,7 @@ void FGlobalEditor::Cleanse( FOutputDevice& Out, int Redraw, const char *TransRe
 	// Perform an object purge.
 	if( GApp->ServerAlive && !Bootstrapping )
 	{
-		GObj.CollectGarbage(&Out);
+		GObj.CollectGarbage( &Out );
 
 		// Reset the transaction tracking system if desired.
 		if( TransReset )

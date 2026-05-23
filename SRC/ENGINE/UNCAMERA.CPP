@@ -30,7 +30,6 @@ void UCamera::InitHeader()
 	Level       = GServer.GetLevel();
 	Actor       = NULL;
 	MiscRes		= NULL;
-	DataSize    = 0;
 	LastUpdateTime = 0;
 
 	// Default sizes (can be changed before call to pOpenCameraWindow).
@@ -79,7 +78,7 @@ UCamera::UCamera( ULevel *ThisLevel )
 	if( Level->GetState()==LEVEL_UpEdit )
 	{
 		checkState(GEditor!=NULL);
-		Actor = Level->SpawnViewActor( this, NAME_None, NULL );
+		Actor = Level->SpawnViewActor( this, NAME_None );
 		checkState(Actor!=NULL);
 	}
 	else
@@ -119,29 +118,29 @@ void UCamera::PreKill()
 	guard(UCamera::PreKill);
 
 	// Close the camera window.
-	GCameraManager->CloseCameraWindow(this);
+	GCameraManager->CloseCameraWindow( this );
 
-	// Unlink then delete actor unless camera is already locked (which happens
-	// when camera is closed upon destroying a camera actor).
+	// Unlink then delete actor.
 	if( GApp->ServerAlive )
 	{
-		Level->Lock(LOCK_ReadWrite);
+		BOOL WasLocked = Level->IsLocked();
+		if( !WasLocked ) Level->Lock(LOCK_ReadWrite);
 		Actor->Camera = NULL;
 		Level->DestroyActor( Actor );
 		Actor = NULL;
-		Level->Unlock(LOCK_ReadWrite);
+		if( !WasLocked ) Level->Unlock(LOCK_ReadWrite);
 		Console->Exit();
 	}
-	GGameBase->DestroyCameraConsole(Console);
+	GGameBase->DestroyCameraConsole( Console );
 
 	// Kill the input subsystem.
 	Input->Exit();
 
 	// Close the camera window.
-	GCameraManager->CloseCameraWindow(this);
+	GCameraManager->CloseCameraWindow( this );
 
 	// Shut down Windows objects.
-	GCameraManager->CameraArray->RemoveItem(this);
+	GCameraManager->CameraArray->RemoveItem( this );
 	Texture->Kill();
 
 	unguard;
@@ -161,7 +160,7 @@ int UCamera::Move( BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl
 	guard(UCamera::Move);
 	if( GEditor )
 	{
-		GEditor->edcamMove (this,Buttons,MouseX,MouseY,Shift,Ctrl);
+		GEditor->edcamMove( this, Buttons, MouseX, MouseY, Shift, Ctrl );
 		return 1;
 	}
 	else return 0;
@@ -171,15 +170,14 @@ int UCamera::Move( BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl
 //
 // General purpose mouse click handling. Returns 1 if processed, 0 if not.
 //
-int UCamera::Click( BYTE Buttons, SWORD MouseX, SWORD MouseY,int Shift, int Ctrl )
+int UCamera::Click( BYTE Buttons, SWORD MouseX, SWORD MouseY, int Shift, int Ctrl )
 {
 	guard(UCamera::Click);
 
 	ELevelState State = Level->GetState();
-	if( State==LEVEL_UpEdit )
+	if( GEditor )
 	{
-		if( GEditor )
-			GEditor->edcamClick( this, Buttons, MouseX, MouseY, Shift, Ctrl );
+		GEditor->edcamClick( this, Buttons, MouseX, MouseY, Shift, Ctrl );
 		return 1;
 	}
 	else return 0;
@@ -204,7 +202,6 @@ void UCamera::Draw( int Scan )
 
 	MemMark.Pop();
 	DynMark.Pop();
-
 	unguard;
 }
 
@@ -214,7 +211,11 @@ void UCamera::Draw( int Scan )
 void UCamera::BuildCoords()
 {
 	guard(UCamera::BuildCoords);
-	FCalcViewCoords(Actor->Location,Actor->ViewRotation,Coords,Uncoords);
+
+	Coords         = GMath.CameraViewCoords / Actor->ViewRotation;
+	Coords.Origin  = Actor->Location;
+	Uncoords       = Coords.Transpose();
+
 	unguard;
 }
 
@@ -222,14 +223,14 @@ void UCamera::BuildCoords()
 // If camera is in an orthogonal mode, return its viewing plane normal.
 // Otherwise, return NULL.
 //
-const FVector *UCamera::GetOrthoNormal()
+FVector UCamera::GetOrthoNormal()
 {
 	switch( Actor->RendMap )
 	{
-		case REN_OrthXY:	return &GMath.ZAxisVector;
-		case REN_OrthXZ:	return &GMath.YAxisVector;
-		case REN_OrthYZ:	return &GMath.XAxisVector;
-		default:			return NULL;
+		case REN_OrthXY:	return FVector(0,0,1);
+		case REN_OrthXZ:	return FVector(0,1,0);
+		case REN_OrthYZ:	return FVector(1,0,0);
+		default:			return FVector(0,0,0);
 	}
 }
 
@@ -330,7 +331,7 @@ int UCamera::IsWire()
 // locks the camera must check for a nonzero result, which can happen in the normal
 // course of operation.
 //
-INT UCamera::Lock(DWORD ThisLockType)
+INT UCamera::Lock( DWORD ThisLockType )
 {
 	guard(UCamera::Lock);
 	checkState(!IsLocked());
@@ -384,7 +385,7 @@ INT UCamera::Lock(DWORD ThisLockType)
 // Unlock a camera.  When unlocked, you can't access the *Screen pointer because
 // the corresponding window may have been resized or deleted.
 //
-void UCamera::Unlock(DWORD OldLockType, int Blit)
+void UCamera::Unlock( DWORD OldLockType, int Blit )
 {
 	guard(UCamera::Unlock);
 	checkState(IsLocked());
@@ -468,7 +469,20 @@ int UCamera::Exec( const char *Cmd, FOutputDevice *Out )
 	guard(UCamera::Exec);
 	const char *Str = Cmd;
 
-	if( GetCMD(&Str,"SHOWACTORS") )
+	if( Input && Input->Exec(Cmd,Out) )
+	{
+		// Input system handled it.
+		return 1;
+	}
+	else if( Level && Actor && GetCMD(&Str,"SERVER") )
+	{
+		// Send to special player-exec handler, i.e. for firing.
+		Level->Lock(LOCK_ReadWrite);
+		Level->PlayerExec( Actor, Str, Out );
+		Level->Unlock( LOCK_ReadWrite );
+		return 1;
+	}
+	else if( GetCMD(&Str,"SHOWACTORS") )
 	{
 		Actor->ShowFlags |= SHOW_Actors;
 		return 1;
@@ -523,19 +537,6 @@ int UCamera::Exec( const char *Cmd, FOutputDevice *Out )
 	else if( Console && Console->Exec(Cmd,Out) )
 	{
 		// Camera console handled it.
-		return 1;
-	}
-	else if( Input && Input->Exec(Cmd,Out) )
-	{
-		// Input system handled it.
-		return 1;
-	}
-	else if( Level && Actor && GetCMD(&Str,"SERVER") )
-	{
-		// Send to special player-exec handler, i.e. for firing.
-		Level->Lock(LOCK_ReadWrite);
-		Level->PlayerExec( Actor, Str, Out );
-		Level->Unlock( LOCK_ReadWrite );
 		return 1;
 	}
 	else
@@ -655,6 +656,9 @@ void UCamera::ReadInput( PPlayerTick &Move, FLOAT DeltaSeconds, FOutputDevice *O
 	guard(UCamera::ReadInput);
 	checkState(Input!=NULL);
 	checkState(Console!=NULL);
+
+	// Update platform specific camera input.
+	GCameraManager->UpdateCameraInput( this );
 
 	// Get input from input system.
 	Input->ReadInput( Move, DeltaSeconds, Out );

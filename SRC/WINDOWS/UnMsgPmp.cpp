@@ -24,7 +24,7 @@
 void CUnrealWnApp::MessagePump()
 {
 	guard(CUnrealWnApp::MessagePump);
-	SQWORD OldTime = Platform.MicrosecondTime(),NewTime;
+	SQWORD OldTime = Platform.MicrosecondTime(), NewTime;
 	static DWORD ThreadId = GetCurrentThreadId();
 
 	for( ; ; )
@@ -40,17 +40,24 @@ void CUnrealWnApp::MessagePump()
 				return;
 
 			RouteMessage( &Msg );
-			if( Msg.message == WM_MOUSEMOVE )
+
+			if( Msg.message==WM_MOUSEMOVE )
+			{
+				while( PeekMessage( &Msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE ) )
+					RouteMessage( &Msg );
 				break;
+			}
 		}
 
 		// Update the world.
 		NewTime = Platform.MicrosecondTime();
-		GServer.Tick((float)(NewTime - OldTime)/1000000.0);
+		GServer.Tick( (float)(NewTime - OldTime)/1000000.0 );
 		OldTime = NewTime;
 
 		// Update audio.
+		clock(GServer.AudioTickTime);
 		GAudio.Tick();
+		unclock(GServer.AudioTickTime);
 
 		// Render everything.
 		GCameraManager->Tick();
@@ -66,7 +73,7 @@ void CUnrealWnApp::MessagePump()
 		else if( HasFocus && !HadFocus )
 		{
 			// Boost our priority back to normal.
-			SetThreadPriority( THREAD_PRIORITY_ABOVE_NORMAL );
+			SetThreadPriority( THREAD_PRIORITY_HIGHEST );
 		}
 		if( !HasFocus )
 		{

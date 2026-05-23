@@ -87,6 +87,7 @@ Global Const SHOW_REALTIME = &H4000    ' Update window in realtime
 Global Const SHOW_NOCAPTURE = &H8000   ' No mouse capture
 
 Global Const SHOW_NORMAL = SHOW_FRAME + SHOW_ACTORS + SHOW_BRUSH
+Global Const SHOW_FREE = SHOW_FRAME + SHOW_ACTORS + SHOW_MENU + SHOW_BACKDROP
 
 ' Scroll Bar Constants
 Public Const SB_HORZ = 0
@@ -188,7 +189,7 @@ Public Const HWND_NOTOPMOST = -2
 
 ' Win32 API imports:
 Declare Function GetWindowLong Lib "user32" Alias "GetWindowLongA" (ByVal hwnd As Long, ByVal nIndex As Long) As Long
-Declare Function SetWindowWord Lib "user32" (ByVal hwnd As Long, ByVal Index As Long, ByVal wNewWord As Integer) As Integer
+Declare Function SetWindowWord Lib "user32" (ByVal hwnd As Long, ByVal index As Long, ByVal wNewWord As Integer) As Integer
 Declare Function RedrawWindow Lib "user32" (ByVal hwnd As Long, ByVal lprcUpdate As Long, ByVal hrgnUpdate As Long, ByVal fuRedraw As Long) As Long
 Declare Function UpdateWindow Lib "user32" (ByVal hwnd As Long) As Long
 Declare Function GdiFlush Lib "gdi32" () As Long

@@ -36,9 +36,17 @@ public:
 class FSpan
 {
 public:
-	int		Start;			// Starting X value.
-	int		End;			// Ending X value.
-	FSpan	*Next;			// NULL = no more.
+	// Variables.
+	int Start, End;
+	FSpan* Next;
+
+	// Constructors.
+	FSpan()
+	{}
+	FSpan( int InStart, int InEnd )
+	:	Start		(InStart)
+	,	End			(InEnd)
+	{}
 };
 
 //
@@ -48,13 +56,37 @@ public:
 class FSpanBuffer
 {
 public:
-	int		StartY;			// Starting Y value.
-	int		EndY;			// Last Y value + 1.
-	int		ValidLines;		// Number of lines at beginning (for screen).
-	int		Churn;			// Number of lines added since start.
-	FSpan	**Index;		// Contains (EndY-StartY) units pointing to first span or NULL.
-	FMemStack *Mem;			// Memory pool everything is stored in.
-	FMemMark Mark;			// Top of memory pool marker.
+	int			StartY;		// Starting Y value.
+	int			EndY;		// Last Y value + 1.
+	int			ValidLines;	// Number of lines at beginning (for screen).
+	int			xChurn;		// Number of lines added since start.
+	FSpan**		Index;		// Contains (EndY-StartY) units pointing to first span or NULL.
+	FMemStack*	Mem;		// Memory pool everything is stored in.
+	FMemMark	Mark;		// Top of memory pool marker.
+
+	// Constructors.
+	FSpanBuffer()
+	{}
+	FSpanBuffer( const FSpanBuffer& Source, FMemStack& InMem )
+	:	StartY		(Source.StartY)
+	,	EndY		(Source.EndY)
+	,	ValidLines	(Source.ValidLines)
+	,	xChurn		(0)
+	,	Index		(new(InMem,EndY-StartY)FSpan*)
+	,	Mem			(&InMem)
+	,	Mark		(InMem)
+	{
+		for( int i=0; i<EndY-StartY; i++ )
+		{
+			FSpan **PrevLink = &Index[i];
+			for( FSpan* Other=Source.Index[i]; Other; Other=Other->Next )
+			{
+				*PrevLink = new( *Mem, 1, 4 )FSpan( Other->Start, Other->End );
+				PrevLink  = &(*PrevLink)->Next;
+			}
+			*PrevLink = NULL;
+		}
+	}
 
 	// Allocation.
 	void AllocIndex				(int AllocStartY, int AllocEndY, FMemStack *Mem);
@@ -74,8 +106,8 @@ public:
 	int  CopyFromRasterUpdate	(FSpanBuffer &ScreenSpanBuffer,class FRasterPoly &Raster);
 
 	// Rectangle/lattice operations.
-	int  CalcRectFrom			(const FSpanBuffer &Source,BYTE GridXBits,BYTE GridYBits, FMemStack *Mem);
-	void CalcLatticeFrom		(const FSpanBuffer &Source,								  FMemStack *Mem);
+	int  CalcRectFrom			(const FSpanBuffer &Source, BYTE GridXBits, BYTE GridYBits, FMemStack *Mem);
+	void CalcLatticeFrom		(const FSpanBuffer &Source, FMemStack *Mem);
 
 	// Occlusion.
 	int	 BoxIsVisible           (int X1, int Y1, int X2, int Y2);

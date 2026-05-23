@@ -74,10 +74,11 @@ private:
 	FLOAT		LastTimeSeconds;
 	FLOAT		Fade;
 	FLOAT		ConsolePos,ConsoleDest;
-	UTexture	*StatusBar;				// Status bar picture
-	UTexture	*StatusSmallBar;		// Smaller version of StatusBar.
-	UTexture	*ConBackground;			// Player console background texture
-	UTexture	*Border;				// Screen border when sized down
+	UTexture	*StatusBar;
+	UTexture	*StatusSmallBar;
+	UTexture	*ConBackground;
+	UTexture	*Border;
+	UTexture	*Hud;
 
 	void	ShowStat	(UCamera *Camera,int *StatYL,const char *Str);
 	void	DrawStats 	(UCamera *Camera);

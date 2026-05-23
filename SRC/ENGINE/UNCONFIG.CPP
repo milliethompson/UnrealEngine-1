@@ -365,7 +365,18 @@ static FKeyValues::TStringList AudioPairs()
     Pairs.Add(Pair);
     sprintf( Pair, "UseDirectSound=%s", FParse::BooleanText(GAudio.DirectSoundFlagGet()) );
     Pairs.Add(Pair);
-    //todo? Add sampling rate value...
+    sprintf( Pair, "EnableFilter=%s", FParse::BooleanText(GAudio.FilterFlagGet()) );
+    Pairs.Add(Pair);
+    sprintf( Pair, "Enable16Bit=%s", FParse::BooleanText(GAudio.Use16BitFlagGet()) );
+    Pairs.Add(Pair);
+    sprintf( Pair, "EnableSurround=%s", FParse::BooleanText(GAudio.SurroundFlagGet()) );
+    Pairs.Add(Pair);
+    sprintf( Pair, "MixingRate=%i", GAudio.MixingRateGet() );
+    Pairs.Add(Pair);
+    sprintf( Pair, "SfxMute=%s", FParse::BooleanText(GAudio.SfxIsMuted()) );
+    Pairs.Add(Pair);
+    sprintf( Pair, "MusicMute=%s", FParse::BooleanText(GAudio.MusicIsMuted()) );
+    Pairs.Add(Pair);
     return Pairs;
 }
 

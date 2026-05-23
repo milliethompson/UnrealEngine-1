@@ -25,57 +25,24 @@
 public:
 
 	// AActor inlines.
-	inline class APawn *GetPlayer() const;
-	inline class ULevel *GetLevel() const;
-	inline BOOL IsPlayer() const;
-	inline BOOL IsOwnedBy( const AActor *TestOwner ) const;
-	inline BOOL IsOverlapping( const AActor *Other ) const;
-	inline FLOAT WorldLightRadius() const {return 25.0 * ((int)LightRadius+1);}
-	inline FLOAT WorldSoundRadius() const {return 25.0 * ((int)SoundRadius+1);}
-	inline FLOAT WorldVolumetricRadius() const {return 25.0 * ((int)VolumeRadius+1);}
-	inline BOOL IsBlockedBy( const AActor *Other ) const;
+	class APawn *GetPlayer() const;
+	class ULevel *GetLevel() const;
+	BOOL IsPlayer() const;
+	BOOL IsOwnedBy( const AActor *TestOwner ) const;
+	FLOAT WorldLightRadius() const {return 25.0 * ((int)LightRadius+1);}
+	FLOAT WorldSoundRadius() const {return 25.0 * ((int)SoundRadius+1);}
+	FLOAT WorldVolumetricRadius() const {return 25.0 * ((int)VolumeRadius+1);}
+	BOOL IsBlockedBy( const AActor *Other ) const;
+	BOOL IsIn( const AZoneInfo *Other ) const;
+	BOOL IsBasedOn( const AActor *Other ) const;
+	FCoords ToLocal() const;
+	FCoords ToWorld() const;
+	FVector GetCollisionExtent() const {return FVector(CollisionRadius,CollisionRadius,CollisionHeight);}
 
 	// AActor collision functions.
-	void GetCollisionExtent
-	(
-		FVector &Min,
-		FVector &Max
-	) const;
-	void GetCoordinates
-	(
-		FCoords &Coords,
-		FCoords &Uncoords
-	) const;
-	INT PointCheck
-	(
-		FCheckResult	&Result,
-		const FVector	&Location,
-		DWORD			ExtraNodeFlags
-	);
-	INT LineCheck
-	(
-		FCheckResult	&Result,
-		const FVector	&V1,
-		const FVector	&V2,
-		DWORD ExtraNodeFlags
-	);
-	INT BoxPointCheck
-	(
-		FCheckResult	&Result,
-		const FVector   &Point,
-		FLOAT           Radius,
-		FLOAT           Height,
-		DWORD           ExtraNodeFlags
-	);
-	INT BoxLineCheck
-	(
-		FCheckResult	&Result,
-		const FVector   &Start,
-		const FVector   &End,
-		FLOAT           Radius,
-		FLOAT           Height,
-		DWORD           ExtraNodeFlags
-	);
+	UPrimitive* GetPrimitive() const;
+	BOOL IsOverlapping ( const AActor *Other ) const;
+
 
 	// AActor general functions.
 	void BeginTouch(AActor *Other);
@@ -88,7 +55,7 @@ public:
 	int  GotoState(FName State);
 	int  GotoLabel(FName Label);
 	void SetCollision(BOOL NewCollideActors,BOOL NewBlockActors,BOOL NewBlockPlayers);
-	void SetFloor(AActor *NewFloor);
+	void SetBase(AActor *NewBase);
 
 	// AActor audio.
 	void UpdateSound();
@@ -96,15 +63,19 @@ public:
 	void PrimitiveSound( USound *Sound, FLOAT Volume=1.f, FLOAT Pitch=1.f );
 	void SetAmbientSound( USound *NewAmbient );
 
-	// Physics functions.
+		//physics functions
+	void setPhysics(BYTE NewPhysics, AActor *NewFloor = NULL);
 	void performPhysics(FLOAT DeltaSeconds);
 	void physProjectile(FLOAT deltaTime);
 	void physFalling(FLOAT deltaTime);
-	void physicsRotation(FLOAT deltaTime, FVector &OldVelocity);
+	void physRolling(FLOAT deltaTime);
+	void physicsRotation(FLOAT deltaTime, FVector OldVelocity);
 	int fixedTurn(int current, int desired, int deltaRate, int fixed, int clockwise); 
 	void Bump(AActor *Bumped);
-	inline FLOAT FloorZ(FVector Location);  
-	inline void TwoWallAdjust(FVector &DesiredDir, FVector &Delta, FVector &HitNormal, FVector &OldHitNormal, FLOAT HitTime);
+	FLOAT FloorZ(FVector Location);  
+	void TwoWallAdjust(FVector &DesiredDir, FVector &Delta, FVector &HitNormal, FVector &OldHitNormal, FLOAT HitTime);
+	void physPathing(float DeltaTime);
+	void physMovingBrush(float DeltaTime);
 
 	//AI functions
 	void CheckNoiseHearing(FLOAT Loudness);

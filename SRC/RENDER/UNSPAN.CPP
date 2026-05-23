@@ -52,8 +52,10 @@
 #undef ASM
 #define ASM 0
 
-// Activation of individual external MASM alternatives from UnSpanX.asm.
+#undef STAT
+#define STAT(x)
 
+// Activation of individual external MASM alternatives from UnSpanX.asm.
 #if ASM
 #define CFRU_ASM   // CopyFromRasterUpdate.
 #define RECT_ASM   // CalcRectFrom.
@@ -127,7 +129,7 @@ void FSpanBuffer::AllocAndInitIndex(int AllocStartY, int AllocEndY, FMemStack *M
     guard(FSpanBuffer::AllocAndInitIndex);
 
     AllocIndex(AllocStartY,AllocEndY,MemStack);
-    memset(Index,0,(AllocEndY-AllocStartY) * sizeof(FSpan *));
+    memset( Index, 0, (AllocEndY-AllocStartY) * sizeof(FSpan *) );
 
     unguard;
 }
@@ -157,7 +159,6 @@ void FSpanBuffer::AllocIndexForScreen(int SXR,int SYR, FMemStack *MemStack)
         List [i].End    = SXR;          // Exclusive (half-open interval)
         List [i].Next   = NULL;
     }
-    STAT(Churn = SYR);
     STAT(GStat.SpanTotalChurn += SYR;)
     unguard;
 }
@@ -427,7 +428,6 @@ int FSpanBuffer::CopyFromRasterUpdate(FSpanBuffer &Screen, FRasterPoly &Raster)
                 ScreenSpan->End      = Line->Start.X;
 
                 Screen.ValidLines++;
-                STAT(Screen.Churn++;)
                 STAT(GStat.SpanTotalChurn++;)
 
                 goto NextLine; // Done (everything is clean).
@@ -516,8 +516,7 @@ int FSpanBuffer::CopyFromRaster( FSpanBuffer &Screen, FRasterPoly &Raster )
 
  	TempIndex = &Index [0];
 
-    // Extra check for OurStart>OurEnd = screen and rasterpoly don't
-    // overlap, so all-null output.
+    // Extra check for OurStart>OurEnd = screen and rasterpoly don't overlap, so all-null output.
     if( OurStart>=OurEnd )
     {
     	for( i=StartY; i<EndY; i++ )
@@ -669,8 +668,6 @@ int FSpanBuffer::CopyFromRange( FSpanBuffer &Screen, int Y1, int Y2, FMemStack *
 //
 // Merge two span buffers into a new (newly-allocated) span buffer.
 //
-// Status: Very seldom-called; doesn't need to be optimized.
-//
 void FSpanBuffer::MergeFrom
 (
 	const FSpanBuffer	&Source1,
@@ -804,7 +801,7 @@ void FSpanBuffer::MergeWith(const FSpanBuffer &Other)
     guard(FSpanBuffer::MergeWith);
 
 #ifdef MW_ASM
-    MergeWithMASM( this, Other ); // validlines: 1944claimed, 162 really
+    MergeWithMASM( this, Other ); // validlines: 1944 claimed, 162 really
 #else
 
     // See if the existing span's index is large enough to hold the merged result.
@@ -908,6 +905,7 @@ void FSpanBuffer::MergeWith(const FSpanBuffer &Other)
 #if CHECK_ALL
     AssertGoodEnough("MergeWith");
 #endif
+
     unguard;
     STAT(unclockSlow(GStat.MergeWith));
 }
@@ -930,7 +928,7 @@ void FSpanBuffer::CopyIndexFrom( const FSpanBuffer &Source, FMemStack *Mem )
     EndY     = Source.EndY;
  
     Index = new(*Mem,Source.EndY-Source.StartY)FSpan*;
-    memcpy(&Index[0],&Source.Index[0],(Source.EndY-Source.StartY)*sizeof(FSpan *));
+    memcpy( &Index[0], &Source.Index[0], (Source.EndY-Source.StartY) * sizeof(FSpan *) );
 
 	unguard;
     STAT(unclockSlow(GStat.CopyIndexFrom));

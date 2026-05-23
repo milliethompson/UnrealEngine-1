@@ -169,7 +169,7 @@ public:
 class FTransSample : public FTransform
 {
 public:
-	FVector		Normal;	// Vertex normal at this point.
+	FVector		Norm;	// Vertex normal at this point.
 	FVector		Color;	// Illuminated color of this point.
 
 	// Operators.
@@ -202,29 +202,31 @@ public:
 class FTransTexture : public FTransSample
 {
 public:
-	FLOAT   U;  // Texture U value at point * 65536.0.
-	FLOAT	V;  // Texture V value at point * 65536.0.
+	FLOAT U,V; // Texture coordinates * 65536.0.
 
 	// Operators.
-	FTransTexture inline operator+( const FTransTexture &T ) const
+	FTransTexture inline operator+( const FTransTexture &F ) const
 	{
 		FTransTexture Temp;
-		Temp.X = X + T.X; Temp.Y = Y + T.Y; Temp.Z = Z + T.Z;
-		Temp.U = U + T.U; Temp.V = V + T.V; Temp.Color = Color + T.Color;
+		Temp.X = X + F.X; Temp.Y = Y + F.Y; Temp.Z = Z + F.Z;
+		Temp.U = U + F.U; Temp.V = V + F.V;
+		Temp.Color = Color + F.Color;
 		return Temp;
 	}
-	FTransTexture inline operator-( const FTransTexture &T ) const
+	FTransTexture inline operator-( const FTransTexture &F ) const
 	{
 		FTransTexture Temp;
-		Temp.X = X - T.X; Temp.Y = Y - T.Y; Temp.Z = Z - T.Z;
-		Temp.U = U - T.U; Temp.V = V - T.V; Temp.Color = Color - T.Color;
+		Temp.X = X - F.X; Temp.Y = Y - F.Y; Temp.Z = Z - F.Z;
+		Temp.U = U - F.U; Temp.V = V - F.V;
+		Temp.Color = Color - F.Color;
 		return Temp;
 	}
 	FTransTexture inline operator*( FLOAT Scale ) const
 	{
 		FTransTexture Temp;
 		Temp.X = X * Scale; Temp.Y = Y * Scale; Temp.Z = Z * Scale;
-		Temp.U = U * Scale; Temp.V = V * Scale; Temp.Color = Color * Scale;
+		Temp.U = U * Scale; Temp.V = V * Scale;
+		Temp.Color = Color * Scale;
 		return Temp;
 	}
 };
@@ -265,7 +267,8 @@ public:
 			FLOAT	Pad0,PointSize,Pad1,Pad2,Pad3;
 			INT		U,V,G;
 			FLOAT	FloatG;
-			FPlane  Loc;
+			FVector Loc;
+			FLOAT   W;
 		};
 		struct // 24 bytes.
 		{
@@ -334,7 +337,7 @@ public:
 	INT				X1,Y1;				// Top left corner on screen.
 	INT				X2,Y2;				// Bottom right corner, X2 must be >= X1, Y2 >= Y1.
 	FLOAT 			ScreenX,ScreenY;	// Fractionally-accurate screen location of center.
-	FLOAT			Z;					// Screenspace Z location.
+	FLOAT			DrawScale,Z;		// Screenspace Z location.
 	FTransform		Verts[4];			// Vertices of projection plane for filtering.
 };
 
@@ -348,8 +351,8 @@ struct FDynamicsIndex
 	FSprite				*Sprite;	// Pointer to dynamic data, NULL=none.
 	class FRasterPoly	*Raster;	// Rasterization this is clipped to, NULL=none.
 	FLOAT				Z;			// For sorting.
-	INDEX				iNode;		// Node the contents correspond to.
-	INDEX				iNext;		// Index of next dynamic contents in list or INDEX_NONE.
+	FDynamicsIndex		*Next;		// Index of next dynamic contents in list or INDEX_NONE.
+	FBspNode			*Node;		// Generating node.
 };
 
 enum EDynamicsType
@@ -406,7 +409,6 @@ struct FBspDrawList
 		INT NodesTotal;			// Total nodes in Bsp.
 
 		// Occlusion stats
-		INT NodesBehind;		// Nodes totally behind viewer.
 		INT BoxChecks;			// Number of bounding boxes checked.
 		INT BoxSkipped;			// Boxes skipped due to nodes being visible on the prev. frame.
 		INT BoxBacks;			// Bsp node bounding boxes behind the player.
@@ -675,7 +677,7 @@ public:
 	// Major rendering functions.
 	virtual void DrawWorld(UCamera *Camera)=0;
 	virtual void DrawActor(UCamera *Camera,AActor *Actor)=0;
-	virtual void DrawScaledSprite(UCamera *Camera, UTexture *Texture, FLOAT ScreenX, FLOAT ScreenY, FLOAT XSize, FLOAT YSize, INT BlitType,FSpanBuffer *SpanBuffer,INT Center,INT Highlight)=0;
+	virtual void DrawScaledSprite(UCamera *Camera, UTexture *Texture, FLOAT ScreenX, FLOAT ScreenY, FLOAT XSize, FLOAT YSize, INT BlitType,FSpanBuffer *SpanBuffer,INT Center,INT Highlight,FLOAT Z)=0;
 	virtual void DrawTiledTextureBlock(UCamera *Camera,UTexture *Texture,INT X, INT XL, INT Y, INT YL,INT U,INT V)=0;
 
 	// Texture locking/unlocking functions called by the engine only.
@@ -693,7 +695,7 @@ public:
 	virtual void DrawLevelBrushes(UCamera *Camera)=0;
 	virtual void DrawMovingBrushWires(UCamera *Camera)=0;
 	virtual void DrawActiveBrush(UCamera *Camera)=0;
-	virtual void DrawBoundingRect(UCamera *Camera,FBoundingRect *Bound)=0;
+	virtual void DrawBoundingBox(UCamera *Camera,FBoundingBox *Bound)=0;
 	virtual int  Deproject(UCamera *Camera,INT ScreenX,INT ScreenY,FVector *V,INT UseEdScan,FLOAT Radius)=0;
 	virtual void InitTransforms(UModel *Model)=0;
 	virtual void ExitTransforms()=0;
@@ -733,7 +735,7 @@ public:
 	friend void DrawSoftwareTexturedBspSurf( UCamera* Camera, FBspDrawList* Draw );
 	friend void TexSetup( UCamera *Camera );
 	friend void rendDrawAcrossSetup(UCamera *Camera, UTexture *Texture, UPalette *Palette, DWORD ThesePolyFlags, DWORD NotPolyFlags);
-	
+
 	// Constants.
 	enum EDrawRaster
 	{
@@ -753,7 +755,7 @@ public:
 	void PostRender(UCamera *Camera);
 	void DrawWorld(UCamera *Camera);
 	void DrawActor(UCamera *Camera,AActor *Actor);
-	void DrawScaledSprite(UCamera *Camera, UTexture *Texture, FLOAT ScreenX, FLOAT ScreenY, FLOAT XSize, FLOAT YSize, INT BlitType,FSpanBuffer *SpanBuffer,INT Center,INT Highlight);
+	void DrawScaledSprite(UCamera *Camera, UTexture *Texture, FLOAT ScreenX, FLOAT ScreenY, FLOAT XSize, FLOAT YSize, INT BlitType,FSpanBuffer *SpanBuffer,INT Center,INT Highlight,FLOAT Z);
 	void DrawTiledTextureBlock(UCamera *Camera,UTexture *Texture,INT X, INT XL, INT Y, INT YL,INT U,INT V);
 	void PostLockTexture(FTextureInfo &TextureInfo, UTexture *Camera);
 	void PreUnlockTexture(FTextureInfo &TextureInfo);
@@ -765,7 +767,7 @@ public:
 	void DrawLevelBrushes(UCamera *Camera);
 	void DrawMovingBrushWires(UCamera *Camera);
 	void DrawActiveBrush(UCamera *Camera);
-	void DrawBoundingRect(UCamera *Camera,FBoundingRect *Bound);
+	void DrawBoundingBox(UCamera *Camera,FBoundingBox *Bound);
 	int	Deproject(UCamera *Camera,INT ScreenX,INT ScreenY,FVector *V,INT UseEdScan,FLOAT Radius);
 	void InitTransforms(UModel *Model);
 	void ExitTransforms();
@@ -811,16 +813,12 @@ private:
 
 	// Variables.
 	FGlobalBlit		*GBlitPtr;
-	INDEX			NumDynamics;
 	INT 			DynamicsLocked;
-	INDEX			MaxDynamics;
 	INDEX			NumPostDynamics;
-	INDEX			MaxPostDynamics;
-	FDynamicsIndex	*DynamicsIndex;
-	INDEX			*PostDynamics;
+	FBspNode		**PostDynamics;
 
 	INT 			RendIter,TemporalIter,ShowLattice,Antialias;
-	INT 			DoDither,ShowChunks,Temporal;
+	INT 			DoDither,ShowChunks,Temporal,Curvy;
 	INT 			Toggle,Extra1,Extra2,Extra3,Extra4,LeakCheck;
 	INT 			QuickStats,AllStats;
 	INT				Pad[6];
@@ -896,7 +894,7 @@ private:
 	void DrawBox			(UCamera *Camera, const FVector &Min, const FVector &Max, INT Color, INT Dotted);
 
 	INT  Project			(UCamera *Camera, FVector *V, FLOAT *ScreenX, FLOAT *ScreenY, FLOAT *Scale);
-	INT  BoundVisible 		(UCamera *Camera, FBoundingRect *Bound, FSpanBuffer *SpanBuffer, FScreenBounds *Results,FCoords *Rotation);
+	INT  BoundVisible 		(UCamera *Camera, FBoundingBox *Bound, FSpanBuffer *SpanBuffer, FScreenBounds *Results);
 	INT  OrthoClip			(UCamera *Camera, const FVector &P1, const FVector &P2, FLOAT *ScreenX1, FLOAT *ScreenY1, FLOAT *ScreenX2, FLOAT *ScreenY2);
 	void DrawOrthoLine		(UCamera *Camera, const FVector &P1, const FVector &P2, INT Color, INT Dotted, FLOAT Brightness);
 

@@ -46,19 +46,19 @@ int UNENGINE_API FPathBuilder::buildPaths (ULevel *ownerLevel, int optimization)
 	getScout();
 
 	//base path building on human sized scout
-	FLOAT humanRadius = 18; //FIXME - get from class
-	FLOAT humanHeight = 30;
+	humanRadius = 46; //FIXME - get from human class + 6, for now use skaarj
+	FLOAT humanHeight = 30; 
+	Scout->SetCollision(1, 1, 1);
+	changeScoutExtent(humanRadius, humanHeight);
 
-	Scout->CollisionRadius = humanRadius;
-	Scout->CollisionHeight = humanHeight;
-	Scout->JumpZ = 0;
-	Scout->SetCollision(1, 1, 1); 
+	Scout->JumpZ = -1.0; //NO jumping
 	Scout->GroundSpeed = 320; //FIXME?
 	Scout->MaxStepHeight = 24; //FIXME
 	//DebugFloat("collision radius", Scout->CollisionRadius);
 	//DebugFloat("collision height", Scout->CollisionHeight);
+	optlevel = optimization;
 	numpaths = numpaths + createPaths(optimization);
-
+	Level->DestroyActor(Scout);
 	return numpaths;
 	unguard;
 }
@@ -82,6 +82,76 @@ int UNENGINE_API FPathBuilder::removePaths (ULevel *ownerLevel)
 	unguard;
 }
 
+int UNENGINE_API FPathBuilder::showPaths (ULevel *ownerLevel)
+{
+	guard(FPathBuilder::showPaths);
+	Level = ownerLevel;
+	int shown = 0;
+
+	for (INDEX i=0; i<Level->Num; i++)
+	{
+		AActor *Actor = Level->Element(i); 
+		if (Actor && Actor->IsA("PathNode"))
+		{
+			shown++;
+			Actor->DrawType = DT_Sprite; 
+		}
+	}
+	return shown;
+	unguard;
+}
+
+int UNENGINE_API FPathBuilder::hidePaths (ULevel *ownerLevel)
+{
+	guard(FPathBuilder::hidePaths);
+	Level = ownerLevel;
+	int shown = 0;
+
+	for (INDEX i=0; i<Level->Num; i++)
+	{
+		AActor *Actor = Level->Element(i); 
+		if (Actor && Actor->IsA("PathNode"))
+		{
+			shown++;
+			Actor->DrawType = DT_None; 
+		}
+	}
+	return shown;
+	unguard;
+}
+
+void UNENGINE_API FPathBuilder::undefinePaths (ULevel *ownerLevel)
+{
+	guard(FPathBuilder::undefinePaths);
+	Level = ownerLevel;
+
+	//remove all reachspecs
+	debugf("Remove old reachspecs");
+	INDEX num = Level->ReachSpecs->Num;
+	while (Level->ReachSpecs->Num > 0)
+	{
+		Level->ReachSpecs->Remove(0, Level->ReachSpecs->Num);
+	}
+
+	//clear pathnodes
+	for (INDEX i=0; i<Level->Num; i++)
+	{
+		AActor *Actor = Level->Element(i); 
+		if (Actor && Actor->IsA("CreaturePoint"))
+		{
+			((ACreaturePoint *)Actor)->bPathsDefined = 0;
+			for (INDEX i=0; i<16; i++)
+			{
+				((ACreaturePoint *)Actor)->Paths[i] = -1;
+				((ACreaturePoint *)Actor)->upstreamPaths[i] = -1;
+			}
+		}
+	}
+
+	debugf("Removed %d reachspecs", num);
+	unguard;
+}
+
 void UNENGINE_API FPathBuilder::definePaths (ULevel *ownerLevel)
 {
 	guard(FPathBuilder::definePaths);
@@ -93,9 +163,13 @@ void UNENGINE_API FPathBuilder::definePaths (ULevel *ownerLevel)
 	for (INDEX i=0; i<Level->Num; i++)
 	{
 		AActor *Actor = Level->Element(i); 
-		if (Actor && Actor->IsA("PathNode"))
-			addReachSpecs((APathNode *)Actor);
+		if (Actor && Actor->IsA("Creaturepoint"))
+		{
+			((ACreaturePoint *)Actor)->bPathsDefined = 1;
+			addReachSpecs(Actor);
+		}
 	}
+	Level->DestroyActor(Scout);
 	debugf("All done");
 	unguard;
 }
@@ -103,43 +177,62 @@ void UNENGINE_API FPathBuilder::definePaths (ULevel *ownerLevel)
 //------------------------------------------------------------------------------------------------
 //Private methods
 
+void FPathBuilder::changeScoutExtent(FLOAT Radius, FLOAT Height)
+{
+	guard(FPathBuilder::changeScoutExtent);
+
+	Level->Hash.RemoveActor( Scout );
+	Scout->CollisionRadius = Radius;
+	Scout->CollisionHeight = Height;
+	Level->Hash.AddActor( Scout );
+
+	unguard;
+}
 /* add reachspecs to path for every path reachable from it. Also add the reachspec to that
 paths upstreamPath list
 */
-void FPathBuilder::addReachSpecs(APathNode *node)
+void FPathBuilder::addReachSpecs(AActor *start)
 {
 	guard(FPathBuilder::addReachspecs);
 
 	int n = 0;
 	INDEX j;
 	FReachSpec newSpec;
+	ACreaturePoint *node = (ACreaturePoint *)start;
 	debugf("Add Reachspecs for node at (%f, %f, %f)", node->Location.X,node->Location.Y,node->Location.Z);
 	for (INDEX i=0; i<Level->Num; i++)
 	{
 		AActor *Actor = Level->Element(i); 
-		if (Actor && Actor->IsA("PathNode") && (Actor != node))
+		if (Actor && Actor->IsA("CreaturePoint") && (Actor != node))
 		{
 			newSpec.Init();
 			if (newSpec.defineFor(node, Actor, Scout))
 			{
-				int iSpec = Level->ReachSpecs->Add(1);
-				debugf("Add reachspec %d to node at (%f, %f, %f)", iSpec, Actor->Location.X,Actor->Location.Y,Actor->Location.Z);
-				Level->ReachSpecs->Element(iSpec) = newSpec;
-				node->Paths[n] = iSpec;
-				n++;
-				j = 0;
-				while (j < 16) //find a spot on Actor's upstream list
+				if (n < 16)
 				{
-					if (((APathNode *)Actor)->upstreamPaths[j] == -1)
+					int iSpec = Level->ReachSpecs->Add(1);
+					debugf("Add reachspec %d to node at (%f, %f, %f)", iSpec, Actor->Location.X,Actor->Location.Y,Actor->Location.Z);
+					Level->ReachSpecs->Element(iSpec) = newSpec;
+					node->Paths[n] = iSpec;
+					j = 0;
+					while (j < 16) //find a spot on Actor's upstream list
 					{
-						((APathNode *)Actor)->upstreamPaths[j] = iSpec;
-						j = 16;
+						if (((ACreaturePoint *)Actor)->upstreamPaths[j] == -1)
+						{
+							((ACreaturePoint *)Actor)->upstreamPaths[j] = iSpec;
+							j = 16;
+						}
+						j++;
 					}
-					j++;
 				}
+				else
+					debugf("Ran out of Reachspecs %d",n+1);
+
+				n++;
 			}
 		}
 	}
+	debugf("DONE adding");
 	unguard;
 }
 
@@ -163,10 +256,10 @@ int FPathBuilder::createPaths (int optimization)
 			{
 				DebugPrint("Found a Pathnode");
 				newMarker = addMarker();
-				pathMarkers[newMarker].initialize(Actor->Location,GMath.ZeroVector,1,1,1);
+				pathMarkers[newMarker].initialize(Actor->Location,FVector(0,0,0),1,1,1);
 				pathMarkers[newMarker].permanent = 1;
 			}
-			else if (Actor->IsA("Pawn"))
+			else if (Actor->IsA("Pawn") && !Actor->IsA("Scout"))
 				Actor->SetCollision(0, 0, 0); //temporarily turn off Pawn collision while placing paths
 		}
 	}
@@ -223,6 +316,13 @@ int FPathBuilder::createPaths (int optimization)
 		}
 	}
 
+	// pre-merge "identical paths"
+	for (i=0; i<numMarkers; i++)  
+	{
+		if (pathMarkers[i].leftTurn)
+			premergePath(i);
+	}
+
 	//try to move left turn markers out from walls
 	for (i=0; i<numMarkers; i++)  
 	{
@@ -267,14 +367,17 @@ void FPathBuilder::newPath(FVector spot)
 {
 	guard(FPathBuilder::newPath);
 	
+	if (Scout->CollisionHeight < 48) // fixme - base on Skaarj final height
+		spot.Z = spot.Z + 48 - Scout->CollisionHeight;
 	UClass *pathClass = new("PathNode",FIND_Existing)UClass;
-	APathNode *addedPath = (APathNode *)Level->SpawnActor(pathClass, NULL, NAME_None, &spot);
+	APathNode *addedPath = (APathNode *)Level->SpawnActor(pathClass, NULL, NAME_None, spot);
 	//clear pathnode reachspec lists
 	for (INDEX i=0; i<16; i++)
 	{
 		addedPath->Paths[i] = -1;
 		addedPath->upstreamPaths[i] = -1;
 	}
+	addedPath->bPathsDefined = 0;
 	return;
 	unguard;
 	};
@@ -310,17 +413,46 @@ void FPathBuilder::createPathsFrom(FVector start)
 {
 	guard(FPathBuilder::createPathsFrom);
 	
-	if (Level->FarMoveActor(Scout, &start)) //move Scout to starting point
+	if (Level->FarMoveActor(Scout, start)) //move Scout to starting point
 	{
 		debugf("Scout found valid start"); 
-		if (Level->DropToFloor(Scout))
+		//slide down to floor
+		FCheckResult Hit(1.0);
+		FVector Down = FVector(0,0, -50);
+		Hit.Normal.Z = 0.0;
+		INT iters = 0;
+		while (Hit.Normal.Z < 0.7)
+		{
+			Level->MoveActor(Scout, Down, Scout->Rotation, Hit, 1,1);
+			if ((Hit.Time < 1.0) && (Hit.Normal.Z < 0.7)) 
+			{
+				//adjust and try again
+				FVector OldHitNormal = Hit.Normal;
+				FVector Delta = (Down - Hit.Normal * (Down | Hit.Normal)) * (1.0 - Hit.Time);
+				if( (Delta | Down) >= 0 )
+				{
+					Level->MoveActor(Scout, Delta, Scout->Rotation, Hit, 1,1);
+					if ((Hit.Time < 1.0) && (Hit.Normal.Z < 0.7))
+					{
+						FVector downDir = Down.Normal();
+						Scout->TwoWallAdjust(downDir, Delta, Hit.Normal, OldHitNormal, Hit.Time);
+						Level->MoveActor(Scout, Delta, Scout->Rotation, Hit, 1,1);
+					}
+				}
+			}
+			iters++;
+			if (iters >= 50)
+				Hit.Normal.Z = 1.0;
+		}
+		if (iters < 50)
 		{
 			debugf("scout placed on valid floor");
 			//Move in x direction to nearest barrier, then explore it
-			FVector moveDirection = GMath.ZeroVector;
-			moveDirection.X = 1.0;
+			FVector moveDirection = FVector(1,0,0);
 			exploreWall(moveDirection);
-		} 
+		}
+		else 
+			debugf("No valid floor found");
  	}
 	else 
 		debugf("Scout didn't fit");
@@ -329,14 +461,110 @@ void FPathBuilder::createPathsFrom(FVector start)
 	unguard;
 }
 
+/* adjustPath()
+adjust the left turn marker out from its corner
+FIXME - use farmoves instead of walk?
+*/
+void FPathBuilder::adjustPath(INDEX iMarker)
+{
+	guard(FPathBuilder::adjustPath);
+	
+	FPathMarker *marker = &pathMarkers[iMarker];
+	
+	FVector OutDir;
+	FVector NonWallDir;
+	NonWallDir.X = marker->Direction.Y;
+	NonWallDir.Y = -1.0 * marker->Direction.X;
+	NonWallDir.Z = 0.0;
+
+	if (optlevel == 0)
+		optlevel = 1; //always check when adjusting
+
+	if (marker->stair)
+		return; //don't adjust at all - FIXME adjust if doesn't screw up smaller creatures (check bottom)
+	else
+	{
+		OutDir.X = 0.707106781 * (marker->Direction.X + marker->Direction.Y);
+		OutDir.Y = 0.707106781 * (marker->Direction.Y - marker->Direction.X);
+		OutDir.Z = 0.0;
+	}
+
+	changeScoutExtent(humanRadius, Scout->CollisionHeight);
+	markReachable(marker->Location);  //mark all markers reachable from this marker
+	marker->leftTurn = 0; //don't use as waypoint
+	marker->radius = humanRadius;
+	FLOAT DesiredRadius = MAXCOMMONRADIUS;
+	FVector GoodSpot = marker->Location;
+	FLOAT AdjustSize = 0.5 * (DesiredRadius - humanRadius);
+
+	while ((AdjustSize > 1.0) && (DesiredRadius <= MAXCOMMONRADIUS)) 
+	{
+		changeScoutExtent(DesiredRadius, Scout->CollisionHeight);
+		FVector DesiredAdjust = OutDir * 1.415 * (DesiredRadius - humanRadius);
+		FVector testSpot = marker->Location + DesiredAdjust;
+		int success = 0;
+		if (Level->FarMoveActor(Scout, testSpot))
+		{
+			//test if can reach old marker, at human radius
+			changeScoutExtent(humanRadius, Scout->CollisionHeight);
+			Level->DropToFloor(Scout); 
+			if (fullyReachable(Scout->Location, marker->Location))
+			{
+				if (!needPath(Scout->Location))
+				{
+					success = 1;
+					debugf("works with radius %f", DesiredRadius);
+					GoodSpot = Scout->Location;
+					marker->radius = DesiredRadius;
+					DesiredRadius += AdjustSize;
+					AdjustSize *= 0.5;
+				}
+			}
+		}
+
+		if (!success)
+		{
+			DesiredRadius -= AdjustSize;
+			AdjustSize *= 0.5;
+		}
+	}
+	
+	FVector Adjustment = GoodSpot - marker->Location;
+	DebugInt("Adjusted path ", iMarker);
+	DebugFloat("By ", Adjustment.Size()); 
+	marker->Location = GoodSpot;
+	marker->leftTurn = 1;
+	unguard;
+}
+
+/* checkmergeSpot()
+worker function for mergePath()
+*/
+
 int FPathBuilder::checkmergeSpot(const FVector &spot, FPathMarker *path1, FPathMarker *path2)
 {
 	guard(FPathBuilder::checkmergeSpot);
 	int acceptable = 1;
+	FLOAT oldRadius = Scout->CollisionRadius;
+	
 	for (INDEX i=0; i<numMarkers; i++) //check if reachable path list changed
 	{
 		if (acceptable && pathMarkers[i].visible && pathMarkers[i].beacon)
 		{
+			changeScoutExtent(humanRadius, Scout->CollisionHeight);
+			if (!fullyReachable(spot,pathMarkers[i].Location))
+			{
+				path1->leftTurn = 0;
+				path2->leftTurn = 0; //don't use either of these as a waypoint
+				acceptable = findPathTo(pathMarkers[i].Location);
+				path1->leftTurn = 1;
+				path2->leftTurn = 1;
+			}
+			//if (!acceptable) DebugVector("failed because of",pathMarkers[i].Location);
+		}
+		if (acceptable && pathMarkers[i].bigvisible && pathMarkers[i].leftTurn)
+		{
+			changeScoutExtent(Max(path1->radius, path2->radius), Scout->CollisionHeight);
 			if (!fullyReachable(spot,pathMarkers[i].Location))
 			{
 				path1->leftTurn = 0;
@@ -348,90 +576,86 @@ int FPathBuilder::checkmergeSpot(const FVector &spot, FPathMarker *path1, FPathM
 			//if (!acceptable) DebugVector("failed because of",pathMarkers[i].Location);
 		}
 	}
+	changeScoutExtent(oldRadius, Scout->CollisionHeight);
 	return acceptable;
 	unguard;
 }
 
-/* adjustPath()
-adjust the left turn marker out from its corner
-*/
-void FPathBuilder::adjustPath(INDEX iMarker)
+int FPathBuilder::markReachableFromTwo(FPathMarker *path1, FPathMarker *path2)
 {
-	guard(FPathBuilder::adjustPath);
-	
-	FPathMarker *marker = &pathMarkers[iMarker];
-	Level->FarMoveActor(Scout, &marker->Location);
-	Level->DropToFloor(Scout); //FIXME - why do I need this?
-	FVector OutDir;
-	OutDir.X = 0.707106781 * (marker->Direction.X + marker->Direction.Y);
-	OutDir.Y = 0.707106781 * (marker->Direction.Y - marker->Direction.X);
-	OutDir.Z = 0.0;
-	int stillmoving = 1;
-	markReachable(marker->Location);  //mark all markers reachable from marker
-	marker->leftTurn = 0; //don't use as waypoint
-	FVector Destination = Scout->Location + OutDir * 1.414 * (MAXCOMMONRADIUS - Scout->CollisionRadius);
-	FVector GoodSpot = marker->Location;
+	guard(FPathBuilder::markReachableFromTwo);
 
-	while (stillmoving) 
+	FLOAT oldRadius = Scout->CollisionRadius;
+	//mark human reachable as visible
+	Scout->CollisionRadius = humanRadius;
+	markReachable(path1->Location);  //mark all markers reachable from marker 1
+	int addedmarkers = 0;
+	for (INDEX j=0; j<numMarkers; j++) // add those reachable from marker 2
 	{
-		stillmoving = walkToward(Destination,Scout->CollisionRadius * 0.25);
-		if (needPath(Scout->Location))
-			stillmoving = 0;
-		else
-			GoodSpot = Scout->Location; 
-		FVector Distance = Destination - Scout->Location;
-		if (Distance.SizeSquared() < 1.0)
-			stillmoving = 0;
+		if (!pathMarkers[j].visible && pathMarkers[j].beacon)
+		{
+			pathMarkers[j].visible = fullyReachable(path2->Location, pathMarkers[j].Location);
+			if (pathMarkers[j].visible)
+				addedmarkers = 1;
+		}
 	}
 
-	FVector Adjustment = GoodSpot - marker->Location;
-	DebugInt("Adjusted path ", iMarker);
-	DebugFloat("By ", Adjustment.Size()); 
-	marker->Location = GoodSpot;
-	marker->leftTurn = 1;
+	// mark big radius reachable leftturns as bigvisible
+	changeScoutExtent(Max(path1->radius, path2->radius), Scout->CollisionHeight);
+	if (Scout->CollisionRadius > humanRadius)
+	{
+		for (INDEX i=0; i<numMarkers; i++) 
+		{
+			if (pathMarkers[i].leftTurn) 
+				pathMarkers[i].bigvisible = fullyReachable(path1->Location,pathMarkers[i].Location);
+		}
+		for (j=0; j<numMarkers; j++) // add those reachable from marker 2
+		{
+			if (!pathMarkers[j].bigvisible && pathMarkers[j].leftTurn)
+			{
+				pathMarkers[j].bigvisible = fullyReachable(path2->Location, pathMarkers[j].Location);
+				if (pathMarkers[j].bigvisible)
+					addedmarkers = 1;
+			}
+		}
+	}
+	changeScoutExtent(oldRadius, Scout->CollisionHeight);
+	return addedmarkers;
 	unguard;
 }
 
-/* mergePath()
-examine reachable path nodes. Try to merge this pathnode with another pathnode.  
-Between it and every nearby reachable permanent pathnode, look for a point at which
-all beacon pathnodes reachable from either can be reached from this point 
+/* premergePath()
+look for other nearby nodes that are identical in terms of reachability, and merge these
 */
-void FPathBuilder::mergePath(INDEX iMarker)
+
+void FPathBuilder::premergePath(INDEX iMarker)
 {
-	guard(FPathBuilder::mergePath);
+	guard(FPathBuilder::premergePath);
 	
 	FPathMarker *marker = &pathMarkers[iMarker];
-	float maxmergesqr = 16 * MAXWAYPOINTDIST * MAXWAYPOINTDIST * Scout->CollisionRadius * Scout->CollisionRadius;
+	marker->radius = humanRadius;
+	float maxmergesqr = MAXCOMMONRADIUS * MAXCOMMONRADIUS; //fixme reduce to just MAXRADIUS squared?
 	for (INDEX i=0; i<numMarkers; i++) 
 	{
 		FPathMarker *candidate = &pathMarkers[i];
 		if (candidate->leftTurn && !candidate->permanent && (i != iMarker))
 		{
 			FVector direction = marker->Location - candidate->Location;
+			changeScoutExtent(humanRadius, Scout->CollisionHeight);
+			candidate->radius = humanRadius;
 			if (direction.SizeSquared() < maxmergesqr )  
 				if (fullyReachable(marker->Location, candidate->Location))
 				{
-					DebugVector("Try to merge path at", marker->Location);
+					DebugVector("Try to pre-merge path at", marker->Location);
 					DebugVector("And path at", candidate->Location);
-					markReachable(marker->Location);  //mark all markers reachable from marker
-					int addedmarkers = 0;
-					for (INDEX j=0; j<numMarkers; j++) // add those reachable from candidate 
-					{
-						if (!pathMarkers[j].visible && pathMarkers[j].beacon)
-						{
-							pathMarkers[j].visible = fullyReachable(candidate->Location, pathMarkers[j].Location);
-							if (pathMarkers[j].visible)
-								addedmarkers = 1;
-						}
-					}
+					int addedmarkers = markReachableFromTwo(marker, candidate);  //mark all markers reachable from marker
 					int acceptable = 0;
 					if (marker->permanent) //then can't move it
 					{
 						acceptable = !addedmarkers;
 						if (acceptable)
 						{
-							Level->FarMoveActor(Scout, &marker->Location);
+							Level->FarMoveActor(Scout, marker->Location);
 							Level->DropToFloor(Scout); //FIXME - why do I need this?
 						}
 					}
@@ -447,14 +671,14 @@ void FPathBuilder::mergePath(INDEX iMarker)
 						dir.Normalize();
 
 						FVector end = start + dir * 0.5 * span.Size();
-						Level->FarMoveActor(Scout, &start);
+						Level->FarMoveActor(Scout, start);
 						Level->DropToFloor(Scout); //FIXME - why do I need this?
 						int stillmoving = 1;
 						while (stillmoving) 
 						{
 							acceptable = checkmergeSpot(Scout->Location, marker, candidate);
 							if (!acceptable) 
-								stillmoving = walkToward(end,Scout->CollisionRadius * 0.25);
+								stillmoving = walkToward(end,6.5); //SEPJUN
 							else
 								stillmoving = 0;
 						}
@@ -462,14 +686,106 @@ void FPathBuilder::mergePath(INDEX iMarker)
 						if (!acceptable)
 						{
 							end = start - dir * 0.5 * span.Size();
-							Level->FarMoveActor(Scout, &start);
+							Level->FarMoveActor(Scout, start);
 							Level->DropToFloor(Scout); //FIXME - why do I need this?
 							int stillmoving = 1;
 							while (stillmoving) 
 							{
 								acceptable = checkmergeSpot(Scout->Location, marker, candidate);
 								if (!acceptable) 
-									stillmoving = walkToward(end,Scout->CollisionRadius * 0.25);
+									stillmoving = walkToward(end,6.5); //SEPJUN
+								else
+									stillmoving = 0;
+							}
+						}
+					}
+				
+					if (acceptable) //found an acceptable merge point
+						{
+							DebugVector("Successful merge at", Scout->Location);
+							marker->Location = Scout->Location; //move to merge point
+							candidate->leftTurn = 0; //mark other node for removal
+							candidate->beacon = 0; //other node no longer beacon
+						}
+				}
+		}
+	}
+	
+	return;
+	unguard;
+}
+/* mergePath()
+examine reachable path nodes. Try to merge this pathnode with another pathnode.  
+Between it and every nearby reachable permanent pathnode, look for a point at which
+all beacon pathnodes reachable from either can be reached from this point 
+
+To be merged, the candidate point must support full reachability both at a human radius, and at the
+maximum of the two path node radii.
+*/
+void FPathBuilder::mergePath(INDEX iMarker)
+{
+	guard(FPathBuilder::mergePath);
+	
+	FPathMarker *marker = &pathMarkers[iMarker];
+	float maxmergesqr = 4 * MAXCOMMONRADIUS * MAXCOMMONRADIUS; //fixme reduce to just MAXRADIUS squared?
+	for (INDEX i=0; i<numMarkers; i++) 
+	{
+		FPathMarker *candidate = &pathMarkers[i];
+		if (candidate->leftTurn && !candidate->permanent && (i != iMarker))
+		{
+			FVector direction = marker->Location - candidate->Location;
+			changeScoutExtent(Max(marker->radius, candidate->radius), Scout->CollisionHeight);
+			if (direction.SizeSquared() < maxmergesqr )  
+				if (fullyReachable(marker->Location, candidate->Location))
+				{
+					DebugVector("Try to merge path at", marker->Location);
+					DebugVector("And path at", candidate->Location);
+					int addedmarkers = markReachableFromTwo(marker, candidate);  //mark all markers reachable from marker
+					int acceptable = 0;
+					if (marker->permanent) //then can't move it
+					{
+						acceptable = !addedmarkers;
+						if (acceptable)
+						{
+							Level->FarMoveActor(Scout, marker->Location);
+							Level->DropToFloor(Scout); //FIXME - why do I need this?
+						}
+					}
+					else //try to find suitable in-between point
+					{
+						FVector span = candidate->Location - marker->Location;
+						FVector start = 0.5 * (marker->Location + candidate->Location);
+						//First try between the two
+						FVector dir;
+						dir.X = -1.0/span.Y;
+						dir.Y = span.X;
+						dir.Z = 0.0;
+						dir.Normalize();
+
+						FVector end = start + dir * 0.5 * span.Size();
+						Level->FarMoveActor(Scout, start);
+						Level->DropToFloor(Scout); //FIXME - why do I need this?
+						int stillmoving = 1;
+						while (stillmoving) 
+						{
+							acceptable = checkmergeSpot(Scout->Location, marker, candidate);
+							if (!acceptable) 
+								stillmoving = walkToward(end,6.5); //SEPJUN
+							else
+								stillmoving = 0;
+						}
+
+						if (!acceptable)
+						{
+							end = start - dir * 0.5 * span.Size();
+							Level->FarMoveActor(Scout, start);
+							Level->DropToFloor(Scout); //FIXME - why do I need this?
+							int stillmoving = 1;
+							while (stillmoving) 
+							{
+								acceptable = checkmergeSpot(Scout->Location, marker, candidate);
+								if (!acceptable) 
+									stillmoving = walkToward(end,6.5); //SEPJUN
 								else
 									stillmoving = 0;
 							}
@@ -478,14 +794,14 @@ void FPathBuilder::mergePath(INDEX iMarker)
 						if (!acceptable)
 						{
 							end = marker->Location;
-							Level->FarMoveActor(Scout, &start);
+							Level->FarMoveActor(Scout, start);
 							Level->DropToFloor(Scout); //FIXME - why do I need this?
 							int stillmoving = 1;
 							while (stillmoving) 
 							{
 								acceptable = checkmergeSpot(Scout->Location, marker, candidate);
 								if (!acceptable) 
-									stillmoving = walkToward(end,Scout->CollisionRadius * 0.25);
+									stillmoving = walkToward(end,6.5); //SEPJUN
 								else
 									stillmoving = 0;
 							}
@@ -494,14 +810,14 @@ void FPathBuilder::mergePath(INDEX iMarker)
 						if (!acceptable)
 						{
 							end = candidate->Location;
-							Level->FarMoveActor(Scout, &start);
+							Level->FarMoveActor(Scout, start);
 							Level->DropToFloor(Scout); //FIXME - why do I need this?
 							int stillmoving = 1;
 							while (stillmoving) 
 							{
 								acceptable = checkmergeSpot(Scout->Location, marker, candidate);
 								if (!acceptable) 
-									stillmoving = walkToward(end,Scout->CollisionRadius * 0.25);
+									stillmoving = walkToward(end,6.5); //SEPJUN
 								else
 									stillmoving = 0;
 							}
@@ -532,7 +848,8 @@ void FPathBuilder::checkObstructionFrom(FPathMarker *marker)
 {
 	guard(FPathBuilder::checkObstructionFrom);
 
-	Level->FarMoveActor(Scout, &marker->Location);
+	if (!Level->FarMoveActor(Scout, marker->Location, 0 ,1))
+		debugf("obstruction far move failed");
 	Level->DropToFloor(Scout); //FIXME - why do I need this?
 	if (marker->leftTurn) //if this is a left turn marker, then walk at current direction (look for outside wall)
 	{
@@ -541,13 +858,13 @@ void FPathBuilder::checkObstructionFrom(FPathMarker *marker)
 	}
 	else
 	{
-		markReachable(marker->Location);
-		Scout->walkMove(marker->Direction * Scout->CollisionRadius); //move to spot where obstruction was observed	
+		markLeftReachable(marker->Location);
+		Scout->walkMove(marker->Direction * 16.0); //move to spot where obstruction was observed	
 	
 		for (INDEX i=0; i<numMarkers; i++) //check if visible+reachable path list changed
 		{
 			FPathMarker *checkMarker = &pathMarkers[i];
-			if (checkMarker->visible && checkMarker->beacon)
+			if (checkMarker->visible && checkMarker->leftTurn)
 				if (!fullyReachable(Scout->Location,checkMarker->Location)) //vis+reach changed - examine obstruction
 					if (!findPathTo(checkMarker->Location))
 					{
@@ -569,14 +886,14 @@ void FPathBuilder::exploreWall(const FVector &moveDirection)
 	int stillmoving = 1;
 	DebugVector("Move dir",moveDirection);
 	while (stillmoving == 1)
-		stillmoving = Scout->walkMove(moveDirection * Scout->CollisionRadius);
+		stillmoving = Scout->walkMove(moveDirection * 16.0); //SEPJUN
 		
 	DebugVector("Start location", Scout->Location);
 
 	//  follow wall
-	FVector newDirection = GMath.ZeroVector;
-	newDirection.X = moveDirection.Y; 
-	newDirection.Y = -1.0 * moveDirection.X; //turn clockwise 90 degrees
+	FVector newDirection = FVector(moveDirection.Y, -moveDirection.X, 0);
+	//newDirection.X = moveDirection.Y; 
+	//newDirection.Y = -1.0 * moveDirection.X; //turn clockwise 90 degrees
 	nearestThirtyAngle(newDirection); //FIXME don't do this if I use normal to wall
 	int oldMarkers = numMarkers;
 	followWall(newDirection); 
@@ -596,6 +913,9 @@ int FPathBuilder::needPath(const FVector &start)
 {
 	guard(FPathBuilder::needPath);
 
+	if (optlevel == 0)
+		return 0;
+
 	int need = 0;
 	for (INDEX i=0; i<numMarkers; i++) //check if visible+reachable path list changed
 	{
@@ -607,6 +927,23 @@ int FPathBuilder::needPath(const FVector &start)
 	unguard;
 }
 
+int FPathBuilder::sawNewLeft(const FVector &start)
+{
+	guard(FPathBuilder::sawNewLeft);
+
+	if (optlevel == 0)
+		return 0;
+
+	int seen = 0;
+	for (INDEX i=0; i<numMarkers; i++) //check if visible+reachable path list changed
+	{
+		if (!seen && !pathMarkers[i].visible && !pathMarkers[i].routable && pathMarkers[i].leftTurn)
+			if (fullyReachable(start,pathMarkers[i].Location))
+				seen = 1; //vis+reach changed - look for an acceptable waypoint
+	}
+	return seen;
+	unguard;
+}
 /*
 markReachable()
 marks all beacon paths and markers as reachable or not from start.
@@ -626,6 +963,46 @@ void FPathBuilder::markReachable(const FVector &start)
 	unguard;
 }
 
+/*
+markLeftReachable()
+marks all left turn markers as reachable or not from start.
+*/
+
+void FPathBuilder::markLeftReachable(const FVector &start)
+{
+	guard(FPathBuilder::markLeftReachable);
+
+	if (optlevel == 0)
+		return;
+
+	FCheckResult Hit(1.0);
+	for (INDEX i=0; i<numMarkers; i++) 
+	{
+		if (pathMarkers[i].leftTurn) 
+		{
+			pathMarkers[i].visible = 0;
+			pathMarkers[i].routable = 0;
+			if (fullyReachable(start,pathMarkers[i].Location))
+			{
+				pathMarkers[i].visible = 1;
+				//debugf("Marked %d as reachable", i);
+			}
+			else 
+			{
+				Level->Trace(Hit, Scout, pathMarkers[i].Location, start, TRACE_Level); //VisBlocking); 
+				if (Hit.Time == 1.0)
+					pathMarkers[i].routable = findPathTo(pathMarkers[i].Location);
+				else
+					pathMarkers[i].routable = 1;
+			}
+		}
+		else
+			pathMarkers[i].visible = 0;
+	}
+
+	return;
+	unguard;
+}
 /* oneWaypointTo()
 looks for a NEARBY permanent waypoint which will reach to upstream spot.  Since scout has just made a left turn,
 we are looking for a closeby waypoint which was also dropped as a result of the left turn (perhaps with
@@ -704,10 +1081,30 @@ void FPathBuilder::followWall(FVector currentDirection)
 	FVector startLocation = Scout->Location;
 	int keepMapping = 1;
 	DebugVector("Following wall", currentDirection);
+	int stepcount = 0;
+	FCheckResult Hit(1.0);
+	FVector Up(0,0,2);
+	FVector Down(0,0,-2);
+	FVector oldPosition = Scout->Location + FVector(2,2,2);
+	int rampStuck = 0;
+	int newTurn = 0;
+	FVector realPosition = Scout->Location;
 
 	while (keepMapping)
 	{
-		FVector oldPosition = Scout->Location;
+		//Level->MoveActor(Scout, Up, Hit, 1, 1); //check good floor
+		//Level->MoveActor(Scout, Down, Hit, 1, 1); 
+		//Level->MoveActor(Scout, Hit.Normal, Hit, 1, 1);
+
+		//if (stepcount > 5)
+		//{
+		//debugf("walked to %f %f %f", Scout->Location.X, Scout->Location.Y, Scout->Location.Z);
+		//	stepcount = 0;
+		//}
+		if (!newTurn && (oldPosition - Scout->Location).Size2D() < 2.0)
+			rampStuck = 1; //FIXME - change how I handle ramps in physics (slide up them)
+		newTurn = 0;
+		oldPosition = Scout->Location;
 		FVector oldDirection = currentDirection;
 		if (checkLeftPassage(currentDirection)) //made a left turn
 		{
@@ -716,27 +1113,68 @@ void FPathBuilder::followWall(FVector currentDirection)
 				if (!oneWaypointTo(upstreamSpot)) //check if there is a nearby legal waypoint 
 				{
 					upstreamSpot = oldPosition;
+					newTurn = 1;
 					LastDropped = addMarker();
 					turnedLeft = 1;
 					pathMarkers[LastDropped].initialize(oldPosition,oldDirection,1,1,1);
 					NetYaw = 0.0;
 					startLocation = oldPosition;
-					DebugPrint("made left turn marker");
+					debugf("made left turn marker %d",LastDropped);
+					stepcount = 0;
 				}
 		}
 		else
 		{
-			stillmoving = Scout->walkMove(currentDirection * Scout->CollisionRadius);
+			if (rampStuck)
+			{
+				//Level->FarMoveActor(Scout, realPosition, 1, 1);
+				//Level->MoveActor(Scout, Up, Hit, 1, 1); //check good floor
+				//Level->MoveActor(Scout, Down, Hit, 1, 1); 
+				//if (Hit.Normal.Z < 1.0)
+				//	Level->MoveActor(Scout, Hit.Normal, Hit, 1, 1);
+
+				debugf("Ramp Stuck!");
+				rampStuck = 0;
+			}
+			stillmoving = Scout->walkMove(currentDirection * 16.0);
+			realPosition = Scout->Location;
+
 			if (stillmoving == 1) //check for interior obstructions
 			{	
-				markReachable(oldPosition); //mark all visible/reachable turn and permanent paths from oldPosition
+				markLeftReachable(oldPosition); //mark all visible/reachable turn and permanent paths from oldPosition
 				if (needPath(Scout->Location)) //check if I need an obstruction marker at oldPosition
 				{
+ 					if (!fullyReachable(Scout->Location, upstreamSpot) && !oneWaypointTo(upstreamSpot)
+						&& (Abs(upstreamSpot.Z - Scout->Location.Z) > 1 + Scout->MaxStepHeight))
+					{
+							LastDropped = addMarker(); //its a stairway/ramp
+							pathMarkers[LastDropped].initialize(oldPosition,oldDirection,0,1,1);
+							pathMarkers->stair = 1;
+							upstreamSpot = oldPosition;
+							NetYaw = 0.0;
+							startLocation = oldPosition;
+							DebugVector("marked stairway at", oldPosition);
+							stepcount = 0;
+					}
+					else
+					{
+						newTurn = 1;
+						LastDropped = addMarker();
+						pathMarkers[LastDropped].initialize(oldPosition,oldDirection,1,0,0);
+						NetYaw = 0.0;
+						startLocation = oldPosition;
+						DebugVector("marked obstruction at", oldPosition);
+						stepcount = 0;
+					}
+				}
+				else if (sawNewLeft(Scout->Location))
+				{
 					LastDropped = addMarker();
-					pathMarkers[LastDropped].initialize(oldPosition,oldDirection,1,0,0);
+					pathMarkers[LastDropped].initialize(Scout->Location,-1 * currentDirection,1,0,0);
 					NetYaw = 0.0;
-					startLocation = oldPosition;
-					DebugVector("marked obstruction at", oldPosition);
+					startLocation = Scout->Location;
+					DebugVector("marked out new obstruction at", Scout->Location);
+					stepcount = 0;
 				}
 			}
 		}
@@ -746,7 +1184,8 @@ void FPathBuilder::followWall(FVector currentDirection)
 			turning = 0; //not in a turn
 			//Stop if I touch a marker with the same direction as my current direction
 			FLOAT touchRangeSquared = Scout->CollisionRadius * Scout->CollisionRadius * 0.25 * 0.25;
-			for (INDEX i=0; i<numMarkers; i++) 
+			INDEX i = 0;
+			while (i<numMarkers) 
 			{
 				if (i != LastDropped) //Don't touch last dropped
 				{
@@ -758,9 +1197,15 @@ void FPathBuilder::followWall(FVector currentDirection)
 						tempV.Normalize();
 						DebugVector("Relative direction is", tempV);
 						keepMapping = !tempV.IsNearlyZero(); //check if direction same as when path was laid
-						if (!keepMapping) DebugVector("Touched a compatible marker at", pathMarkers[i].Location);
+						if (!keepMapping) 
+						{
+							i = numMarkers;
+							DebugVector("Touched a compatible marker at", pathMarkers[i].Location);
+							stepcount = 0;
+						}
 					}
 				}
+				i++;
 			}
 		}	
 		else //adjust direction clockwise (I couldn't go forward or left)
@@ -770,7 +1215,9 @@ void FPathBuilder::followWall(FVector currentDirection)
 			//temporarily - just rotate around slowly (30 degrees at a time)
 			//if current direction isn't multiple of 30, first correct to nearest 30 (so compatible path checks will work)
 			upstreamSpot = Scout->Location; //set anchor at turn point
+			newTurn = 1;
 			DebugVector("turn right at", Scout->Location);
+			stepcount = 0;
 			if ((!turning) && (turnedLeft)) //check if its a stairstep right turn (odd angled wall)
 					if (fullyReachable(Scout->Location, pathMarkers[LastRightTurn].Location))
 					{
@@ -793,13 +1240,32 @@ void FPathBuilder::followWall(FVector currentDirection)
 			{
 				newDirection.Y = COS30 * currentDirection.Y - 0.5 * currentDirection.X;
 				newDirection.X = COS30 * currentDirection.X + 0.5 * currentDirection.Y;
-				NetYaw = NetYaw + 30.0;
+				newDirection.Z = 0.0;
+				currentDirection = newDirection.Normal();
+				stillmoving = 1;
+				NetYaw += 30.0;
 			}
 			else //correct clockwise to nearest multiple of 30 
 			{
 				newDirection = currentDirection;
 				nearestThirtyAngle(newDirection);
+				newDirection.Z = 0.0;
+				FVector OldDirection = currentDirection;
+				currentDirection = newDirection.Normal();
+				stillmoving = 1;
+				FLOAT CosTurn = OldDirection | currentDirection;
+				if (CosTurn < 0.9)
+					NetYaw += 25.0;
+				else if (CosTurn < 0.95)
+					NetYaw += 18.0;
+				else if (CosTurn < 0.98)
+					NetYaw += 11.0;
+				else if (CosTurn < 0.995)
+					NetYaw += 6.0;
+				else
+					NetYaw += 3.0;
 			}
+
 			newDirection.Z = 0.0;
 			currentDirection = newDirection.Normal();
 			stillmoving = 1;
@@ -978,6 +1444,44 @@ int FPathBuilder::findPathTo(const FVector &Destination)
 	unguard;
 }
 
+/* checkLeft()
+Worker function for checkLeftPassage()
+*/
+int FPathBuilder::checkLeft(FVector &leftDirection, FVector &currentDirection)
+{
+	guard(FPathBuilder::checkLeft);
+	int leftTurn = 0;
+	FVector oldLocation = Scout->Location;
+
+	int walkresult = Scout->walkMove(leftDirection * 16.0); 
+	if (walkresult == 1) //check if it was a full move
+	{
+		FVector move = Scout->Location - oldLocation;
+		walkresult = (move.Size() > 10.0);  //FIXME - problem with steep slopes?
+	}
+	if (walkresult == 1) //explore this path
+	{
+		DebugVector("Follow left passage", leftDirection);
+		DebugVector("Turned left at", oldLocation);
+//		Scout->walkMove(currentDirection * 4.0); //stay out from wall a little
+		currentDirection.X = leftDirection.X;
+		currentDirection.Y = leftDirection.Y;
+		leftDirection.X = -1.0 * currentDirection.Y; //turn left 90 degrees
+		leftDirection.Y = currentDirection.X;
+		Scout->walkMove(leftDirection * 16.0); //get all the way over to wall
+		leftTurn = 1;
+		DebugVector("New location",Scout->Location);
+	}
+	/* else if (walkresult == -1) //FIXME: mark ledge?
+	{
+	} */
+	else
+		Level->FarMoveActor(Scout, oldLocation, 0, 1); //no left passage, go back to exploration
+
+	return leftTurn;
+	unguard;
+}
+
 /* checkLeftPassage()
 Looks for a left turn.  Returns 1 if left turn was made, zero otherwise.
 If possible, changes currentDirection, and moves Scout 
@@ -992,33 +1496,24 @@ int FPathBuilder::checkLeftPassage(FVector &currentDirection)
 	leftDirection.Y = currentDirection.X;
 	leftDirection.Z = 0;
 	int leftTurn = 0;
+	int stillmoving = 1;
 
-	int walkresult = Scout->walkMove(leftDirection * Scout->CollisionRadius); 
-	if (walkresult == 1) //check if it was a full move
+	leftTurn = checkLeft(leftDirection, currentDirection);
+
+	if (!leftTurn)
 	{
-		FVector move = Scout->Location - oldLocation;
-		walkresult = (move.Size() > 0.7 * Scout->CollisionRadius);  //FIXME - problem with steep slopes?
+		stillmoving = Scout->walkMove(currentDirection * 6.0); //SEPJUN
+		leftTurn = checkLeft(leftDirection, currentDirection);
 	}
-	if (walkresult == 1) //explore this path
+
+	if (!leftTurn && stillmoving)
 	{
-		DebugVector("Follow left passage", leftDirection);
-		DebugVector("Turned left at", oldLocation);
-		currentDirection.X = leftDirection.X;
-		currentDirection.Y = leftDirection.Y;
-		leftDirection.X = -1.0 * currentDirection.Y; //turn left 90 degrees
-		leftDirection.Y = currentDirection.X;
-		Scout->walkMove(leftDirection * Scout->CollisionRadius); //get all the way over to wall (max one collisionradius back)
-		leftTurn = 1;
-		DebugVector("New location",Scout->Location);
+		stillmoving = Scout->walkMove(currentDirection * 6.0); //SEPJUN
+		leftTurn = checkLeft(leftDirection, currentDirection);
 	}
-	/* else if (walkresult == -1) //FIXME: mark ledge?
-	{
-	} */
-	else
-	{
-		Level->FarMoveActor(Scout, &oldLocation); //no left passage, go back to exploration
-		Level->DropToFloor(Scout); //FIXME - why do I need this?
-	}
+
+	if (!leftTurn)
+		Level->FarMoveActor(Scout, oldLocation, 0, 1);
 
 	return leftTurn;
 	unguard;
@@ -1032,30 +1527,52 @@ int FPathBuilder::fullyReachable(FVector start,FVector destination)
 	guard(FPathBuilder::fullyReachable);
 
 	FVector oldPosition = Scout->Location;
-	Level->FarMoveActor(Scout,&start);
-	Scout->Physics = PHYS_Flying;
-	int result = Scout->pointReachable(destination); 
+	changeScoutExtent(Scout->CollisionRadius - 6.0, Scout->CollisionHeight);
+	int result = Level->FarMoveActor(Scout,start);
+	if (Scout->Physics != PHYS_Walking)
+		debugf("Scout Physics is %d", Scout->Physics);
 
 	Scout->Physics = PHYS_Walking;
 	if (result)
 		result = Scout->pointReachable(destination); 
 
-	if (result) //FIXME - remove the symmetric check- shouldn't be needed
+	if (result) //symmetric check
 	{
-		Level->FarMoveActor(Scout,&destination);
+		Level->FarMoveActor(Scout,destination);
 		Level->DropToFloor(Scout); //FIXME - why do I need this?
 		result = result	&& (Scout->walkReachable(start));
-		if (!result) DebugPrint("Movement not symmetric!");
+		//if (!result) DebugPrint("Movement not symmetric!");
 	}
-	Level->FarMoveActor(Scout,&oldPosition);
+	Level->FarMoveActor(Scout,oldPosition, 0, 1);
+
+	changeScoutExtent(Scout->CollisionRadius + 6.0, Scout->CollisionHeight);
 
 	return result; 
 	unguard;
 }
 
-//FIXME - methods below here should be AActor members
+int FPathBuilder::outReachable(FVector start,FVector destination)
+{
+	guard(FPathBuilder::outReachable);
+
+	FVector oldPosition = Scout->Location;
+	changeScoutExtent(Scout->CollisionRadius - 6.0, Scout->CollisionHeight);
+	int result = Level->FarMoveActor(Scout,start);
+	if (Scout->Physics != PHYS_Walking)
+		debugf("Scout Physics is %d", Scout->Physics);
+
+	Scout->Physics = PHYS_Walking;
+	if (result)
+		result = Scout->pointReachable(destination); 
+
+	changeScoutExtent(Scout->CollisionRadius + 6.0, Scout->CollisionHeight);
+	Level->FarMoveActor(Scout,oldPosition, 0, 1);
+
+	return result; 
+	unguard;
+}
 /* walkToward()
-walk iActor toward a point.  Returns 1 if iActor successfully moved
+walk Scout toward a point.  Returns 1 if Scout successfully moved
 */
 inline int FPathBuilder::walkToward(const FVector &Destination, FLOAT Movesize)
 {
@@ -1065,7 +1582,7 @@ inline int FPathBuilder::walkToward(const FVector &Destination, FLOAT Movesize)
 	FLOAT DistanceSquared = Direction.SizeSquared();
 	int success = 0;
 
-	if (DistanceSquared > 1.0) //move not too small to do
+	if (DistanceSquared > 1.0) //move not too small to do //FIXME - match with walkmove threshold (4.1?)
 	{
 		if (DistanceSquared < Movesize * Movesize)
 			success = (Scout->walkMove(Direction) == 1);

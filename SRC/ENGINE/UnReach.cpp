@@ -94,6 +94,18 @@ int FReachSpec::operator== (const FReachSpec &Spec)
 	unguard;
 }
 
+void FReachSpec::changeScoutExtent(APawn * Scout, FLOAT Radius, FLOAT Height)
+{
+	guard(FReachSpec::changeScoutExtent);
+
+	Scout->GetLevel()->Hash.RemoveActor( Scout );
+	Scout->CollisionRadius = Radius;
+	Scout->CollisionHeight = Height;
+	Scout->GetLevel()->Hash.AddActor( Scout );
+
+	unguard;
+}
+
 /* defineFor()
 initialize the reachspec for a  traversal from start actor to end actor.
 Note - this must be a direct traversal (no routing).
@@ -127,8 +139,11 @@ int FReachSpec::defineFor(AActor * begin, AActor * dest, APawn * Scout)
 		distance = path.Size(); //fixme - reachable code should calculate
 		//FIXME = reachable code should determine zones too (and send back info)
 		//or just fail on unacceptable? (lava)
-		//maybe reachable code builds reachspec as it goes along
+		//maybe reachable code builds ReachInfo as it goes along
 	}
+
+	/*
+	FIXMEs - get rid of testmoveactor?
 
 	Scout->Physics = PHYS_Flying;
 	if (findBestReachable(Start->Location, End->Location,Scout))
@@ -143,16 +158,16 @@ int FReachSpec::defineFor(AActor * begin, AActor * dest, APawn * Scout)
 			distance = path.Size(); //fixme - reachable code should calculate
 		}
 	}
+	*/
 
 	return result; 
 	unguard;
 }
 
-int FReachSpec::findBestReachable(FVector &Start, FVector &Destination, APawn * Scout)
+int FReachSpec::findBestReachable(FVector &begin, FVector &Destination, APawn * Scout)
 {
 	guard(FReachSpec::findBestReachable);
-	Scout->CollisionRadius = 18; //FIXME - get from human (min reachability determination)
-	Scout->CollisionHeight = 30;
+	changeScoutExtent(Scout, 18.0, 30.0);
 
 	int result = 0;
 	FLOAT stepsize = MAXCOMMONRADIUS - Scout->CollisionRadius;
@@ -160,17 +175,19 @@ int FReachSpec::findBestReachable(FVector &Start, FVector &Destination, APawn * 
 	int stilltrying = 1;
 	FLOAT bestRadius = 0;
 	FLOAT bestHeight = 0;
-
+	//debugf("Find reachspec from %f %f %f to %f %f %f", begin.X, begin.Y, begin.Z,
+	//	Destination.X, Destination.Y, Destination.Z);
 	while (stilltrying) //find out max radius
 	{
-		success = Scout->GetLevel()->FarMoveActor( Scout, &Start);
+		success = Scout->GetLevel()->FarMoveActor( Scout, begin);
 		if (success)
 			success = Scout->pointReachable(Destination);
+
 		if (success)
 		{
 			result = 1;
 			bestRadius = Scout->CollisionRadius;
-			Scout->CollisionRadius += stepsize; 
+			changeScoutExtent(Scout, Scout->CollisionRadius + stepsize, Scout->CollisionHeight);
 			stepsize *= 0.5;
 			if (stepsize < 2)
 				stilltrying = 0;
@@ -179,7 +196,7 @@ int FReachSpec::findBestReachable(FVector &Start, FVector &Destination, APawn * 
 		}
 		else
 		{
-			Scout->CollisionRadius -= stepsize; 
+			changeScoutExtent(Scout, Scout->CollisionRadius - stepsize, Scout->CollisionHeight);
 			stepsize *= 0.5;
 			if (stepsize < 2)
 				stilltrying = 0;
@@ -190,31 +207,30 @@ int FReachSpec::findBestReachable(FVector &Start, FVector &Destination, APawn * 
 	
 	if (result)
 	{
-		Scout->CollisionRadius = bestRadius;
+		changeScoutExtent(Scout, bestRadius, Scout->CollisionHeight + 4);
 		bestHeight = Scout->CollisionHeight;
-		Scout->CollisionHeight += 4;
 		stilltrying = 1;
-		stepsize = 60.0 - Scout->CollisionHeight; //FIXME MAXCOMMONHEIGHT
+		stepsize = MAXCOMMONHEIGHT - Scout->CollisionHeight; 
 	}
 
 	while (stilltrying) //find out max height
 	{
-		success = Scout->GetLevel()->FarMoveActor( Scout, &Start);
+		success = Scout->GetLevel()->FarMoveActor( Scout, begin);
 		if (success)
 			success = Scout->pointReachable(Destination);
 		if (success)
 		{
 			bestHeight = Scout->CollisionHeight;
-			Scout->CollisionHeight += stepsize; 
+			changeScoutExtent(Scout, Scout->CollisionRadius, Scout->CollisionHeight + stepsize);
 			stepsize *= 0.5;
 			if (stepsize < 1.0)
 				stilltrying = 0;
-			else if (Scout->CollisionHeight > 60.0) //FIXME MAXCOMMONHEIGHT
+			else if (Scout->CollisionHeight > MAXCOMMONHEIGHT) 
 				stilltrying = 0;
 		}
 		else
 		{
-			Scout->CollisionHeight -= stepsize; 
+			changeScoutExtent(Scout, Scout->CollisionRadius, Scout->CollisionHeight - stepsize);
 			stepsize *= 0.5;
 			if (stepsize < 1.0)
 				stilltrying = 0;
@@ -223,7 +239,7 @@ int FReachSpec::findBestReachable(FVector &Start, FVector &Destination, APawn * 
 		}
 	}
 
-	Scout->CollisionHeight = bestHeight;
+			changeScoutExtent(Scout, Scout->CollisionRadius, bestHeight);
 
 	return result; 
 	unguard;

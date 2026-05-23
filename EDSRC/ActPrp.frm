@@ -1,6 +1,6 @@
 VERSION 5.00
 Object = "{A8B3B723-0B5A-101B-B22E-00AA0037B2FC}#1.0#0"; "GRID32.OCX"
-Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "comctl32.ocx"
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "COMCTL32.OCX"
 Begin VB.Form frmActorProperties 
    BorderStyle     =   5  'Sizable ToolWindow
    Caption         =   "Actor Properties"
@@ -210,6 +210,7 @@ Dim Modified As Boolean
 Dim PressedEsc As Boolean
 Dim GPropString As String
 Dim GCatString As String
+Dim GClassStates As String
 Dim Sliding As Integer
 Dim Resizing As Integer
 Dim ScreenRows As Integer
@@ -252,8 +253,10 @@ Public Sub GetSelectedActors()
         S = Ed.Server.GetProp("Actor", "ClassSelected")
         If S <> "" Then
             Caption = S & " Properties (" & Trim(Str(N)) & " selected)"
+            GClassStates = Ed.Server.GetProp("Class", "States Class=" & Quotes(S))
         Else
             Caption = "Actor Properties (" & Trim(Str(N)) & " selected)"
+            GClassStates = ""
         End If
         '
         ParsePropList
@@ -271,6 +274,7 @@ Public Sub GetClassDefaultActor(ClassName As String)
     GActorPropsAction = AP_Class
     GPropString = "DefaultProperties CLASS=" & Quotes(ClassName)
     GCatString = "DefaultPropCats CLASS=" & Quotes(ClassName)
+    GClassStates = Ed.Server.GetProp("Class", "States Class=" & Quotes(ClassName))
     '
     Caption = ClassName + ": Default Properties"
     '
@@ -484,7 +488,14 @@ End Sub
 Private Sub peCombo_Click()
     If SettingCombo = 0 Then
         SettingCombo = SettingCombo + 1
-        If peCombo.ListIndex >= 0 Then SetValue (Str(Val(peCombo.Text)))
+        If peCombo.ListIndex >= 0 Then
+            Select Case UCase(PropType())
+                Case "BYTE"
+                    SetValue (Str(Val(peCombo.Text)))
+                Case "NAME"
+                    SetValue (Quotes(peCombo.Text))
+            End Select
+        End If
         SetGridSelection (0)
         SettingCombo = SettingCombo - 1
     End If
@@ -545,10 +556,19 @@ Private Sub PropGrid_DblClick()
             peText.SelStart = 0
             peText.SelLength = Len(peText.Text)
         Case "ACTOR":
-        Case "NAME":
             peText.SetFocus
             peText.SelStart = 0
             peText.SelLength = Len(peText.Text)
+        Case "NAME":
+            If UCase(PropName()) <> "STATE" Then
+                peText.SetFocus
+                peText.SelStart = 0
+                peText.SelLength = Len(peText.Text)
+            Else
+                ' Advance to next item
+                peCombo.SetFocus
+                peCombo.ListIndex = (peCombo.ListIndex + 1) Mod peCombo.ListCount
+            End If
         Case "STRING":
             peText.SetFocus
             peText.SelStart = 0
@@ -565,7 +585,7 @@ Private Sub PropGrid_DblClick()
             End If
         Case Else: ' All resource types
             If UCase(PropName()) = "CLASS" Then
-                Call frmClassBrowser.LaunchScriptEd(GetValue(), "", 0, 0)
+                Call frmClassBrowser.LaunchScriptEd(GetValue(), "", 0, 0, "")
             Else
                 peBrowse_Click
             End If
@@ -602,9 +622,13 @@ Private Sub PropGrid_Click()
             peText.Text = GetValue()
             peText.SetFocus
         Case "NAME":
-            SetExactValue (peText.Text)
-            peText.Text = GetValue()
-            peText.SetFocus
+            If UCase(PropName()) <> "STATE" Then
+                SetExactValue (peText.Text)
+                peText.Text = GetValue()
+                peText.SetFocus
+            Else
+                peCombo.SetFocus
+            End If
         Case "STRING":
             SetValue (Quotes(peText.Text))
             peText.Text = GetValue()
@@ -882,7 +906,7 @@ End Sub
 
 Private Sub BeginEdit()
     Dim StartPos As Integer, NewProp As Integer, N As Integer
-    Dim Temp As String, Tag As String
+    Dim Temp As String, Tag As String, V As String, It As Integer
     '
     Scrolling = Scrolling + 1
     '
@@ -912,9 +936,8 @@ Private Sub BeginEdit()
         Else
             NothingButton.SetFocus
             peComboHolder.Top = StartPos
-            '
-            ' Fill combo with enum tags:
-            '
+            
+            ' Fill combo with enum tags.
             SettingCombo = SettingCombo + 1
             peCombo.Clear
             Temp = Ed.Server.GetProp("Enum", Temp)
@@ -954,13 +977,46 @@ Private Sub BeginEdit()
         peText.SelLength = 0
         peText.SetFocus
     Case "ACTOR":
-    Case "NAME":
         peText.Top = StartPos + 2 * Screen.TwipsPerPixelY
         peText.Text = GetValue()
         peText.Visible = True
         peText.SelStart = 0
         peText.SelLength = 0
         peText.SetFocus
+    Case "NAME":
+        If UCase(PropName()) <> "STATE" Then
+            peText.Top = StartPos + 2 * Screen.TwipsPerPixelY
+            peText.Text = GetValue()
+            peText.Visible = True
+            peText.SelStart = 0
+            peText.SelLength = 0
+            peText.SetFocus
+        Else
+            NothingButton.SetFocus
+            peComboHolder.Top = StartPos
+            
+            ' Fill combo with enum tags.
+            SettingCombo = SettingCombo + 1
+            peCombo.Clear
+            Temp = GClassStates
+            V = GetValue()
+            It = 0
+            peCombo.AddItem "None"
+            N = 1
+            Do
+                Tag = GrabCommaString(Temp)
+                If Tag <> "" Then
+                    peCombo.AddItem Tag
+                    If UCase(Tag) = UCase(V) Then
+                        It = N
+                    End If
+                    N = N + 1
+                End If
+            Loop While Temp <> ""
+            peCombo.ListIndex = It
+            peComboHolder.Visible = True
+            SettingCombo = SettingCombo - 1
+        End If
     Case "STRING":
         peText.Top = StartPos + 2 * Screen.TwipsPerPixelY
         peText.Text = GetValue()
@@ -1014,9 +1070,15 @@ Private Sub EndEdit(Abort As Boolean)
         If Modified And Not Abort Then SetValue (peText.Text)
         peText.Visible = False
     Case "ACTOR":
-    Case "NAME":
         If Modified And Not Abort Then SetExactValue (peText.Text)
         peText.Visible = False
+    Case "NAME":
+        If UCase(PropName()) <> "STATE" Then
+            If Modified And Not Abort Then SetExactValue (peText.Text)
+            peText.Visible = False
+        Else
+            peComboHolder.Visible = False
+        End If
     Case "STRING":
         If Modified And Not Abort Then SetValue (Quotes(peText.Text))
         peText.Visible = False
@@ -1087,7 +1149,6 @@ Private Sub SetExactValue(Value As String)
     '
     Scrolling = Scrolling - 1
     SetGridSelection (0)
-    DoEvents
     Ed.Server.Exec "LEVEL REDRAW"
 End Sub
 
@@ -1149,8 +1210,8 @@ Private Sub peBrowse_Click()
             Ed.SetBrowserTopic ("Textures")
         Case "Class":
             Ed.SetBrowserTopic ("Classes")
-        Case "Ambient":
-            Ed.SetBrowserTopic ("Ambient")
+        Case "Music":
+            Ed.SetBrowserTopic ("Music")
         Case "Sound":
             Ed.SetBrowserTopic ("SoundFX")
         Case "Mesh":

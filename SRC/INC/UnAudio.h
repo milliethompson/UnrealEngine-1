@@ -182,7 +182,9 @@ void	SoundEngSetOrigin(double x, double y, double z,
 int	SoundEngSoundPlayLocated(int sid, int actid,
 				double x, double y, double z);
 int	SoundEngSoundPlayLocatedEx(int sid, int actid,
-				double x, double y, double z, double pitchm);
+				double x, double y, double z,
+				double pitchm, double radius,
+				double fScale);
 void	SoundEngSoundMoveLocated(int pid,
 				double x, double y, double z);
 void	SoundEngActorMove(int actid, double x, double y, double z,
@@ -195,14 +197,17 @@ char *	SoundEngMusicGetSongPtr(void);
 
 int	SoundEngMusicVolumeSet(int newvol);
 int	SoundEngMusicVolumeGet(void);
+int	SoundEngMusicMute(int bMute);
 int	SoundEngSfxVolumeSet(int newvol);
 int	SoundEngSfxVolumeGet(void);
+int	SoundEngSfxMute(int bMute);
 
 void	SoundEngMusicFade(int fFadeOut);
 void	SoundEngSfxFade(int fFadeOut);
 
 int	SoundEngDirectSoundFlagSet(int val);
 int	SoundEngDirectSoundFlagGet(void);
+void	SoundEngSetDirectSoundOwnerWnd(void *hWnd);
 
 int	SoundEngFilterFlagSet(int val);
 int	SoundEngFilterFlagGet(void);
@@ -218,6 +223,9 @@ void	SoundEngReverbParamsSet(int space, int depth);
 DWORD	SoundEngMixingRateSet(DWORD val);
 DWORD	SoundEngMixingRateGet(void);
 int	SoundEngNumChannelsSet(int val);
+
+void	SoundEngPanExaggerationSet(double val);
+void	SoundEngDopplerExaggerationSet(double val);
 
 void	SoundEngPause(void);
 void	SoundEngUnPause(void);

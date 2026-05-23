@@ -1,17 +1,17 @@
-DeclareClass Name=Sound
-DeclareClass Name=Mesh
 DeclareClass Name=Texture
-DeclareClass Name=Class
+DeclareClass Name=Sound
 DeclareClass Name=Script
 DeclareClass Name=Pawn
+DeclareClass Name=Mesh
+DeclareClass Name=Class
 DeclareClass Name=Inventory
-DeclareClass Name=TentacleProjectile
 DeclareClass Name=Weapon
+DeclareClass Name=EightBall
+DeclareClass Name=StingerProjectile
 DeclareClass Name=Pickup
 DeclareClass Name=PowerUp
 DeclareClass Name=AutoMag
 DeclareClass Name=QuadShot
-DeclareClass Name=FlameGun
 DeclareClass Name=Stinger
 DeclareClass Name=Ammo
 DeclareClass Name=Clip
@@ -19,13 +19,35 @@ DeclareClass Name=Health
 DeclareClass Name=Shells
 DeclareClass Name=StingerAmmo
 DeclareClass Name=Armor
-DeclareClass Name=detect
-DeclareClass Name=heart
-DeclareClass Name=flashl
-DeclareClass Name=razor
-DeclareClass Name=eightbal
-DeclareClass Name=flamet
-DeclareClass Name=rifle
+DeclareClass Name=Burst
+DeclareClass Name=rocket
+DeclareClass Name=RazorBlade
+DeclareClass Name=ImpalerBolt
+DeclareClass Name=EnergyBolt
+DeclareClass Name=FlakShell
+DeclareClass Name=ShellCase
+DeclareClass Name=Grenade
+DeclareClass Name=TeleportProj
+DeclareClass Name=Chunk1
+DeclareClass Name=Chunk2
+DeclareClass Name=Chunk3
+DeclareClass Name=Chunk4
+DeclareClass Name=ShellCase2
+DeclareClass Name=RifleShellCase
+DeclareClass Name=RazorJack
+DeclareClass Name=FlakCannon
+DeclareClass Name=WeaponLight
+DeclareClass Name=SightLight
+DeclareClass Name=TinyBurst
+DeclareClass Name=Detector
+DeclareClass Name=Flashlight
+DeclareClass Name=Lava_Boots
+DeclareClass Name=Rifle
+DeclareClass Name=Flamethrower
+DeclareClass Name=Impaler
+DeclareClass Name=TeleportGun
+DeclareClass Name=Stunner
+DeclareClass Name=Heart
 
 Begin Class Name=Inventory
    Begin Text
@@ -38,7 +60,7 @@ class Inventory expands Actor
 	abstract
 	package(UnEngine);
 
-#exec Texture Import File=..\Graphics\S_Pickup.pcx Name=S_Pickup Palette=Palette Mips=Off Flags=2
+#exec Texture Import File=..\Graphics\S_Pickup.pcx Name=S_Pickup Family=!Sprites Palette=Palette Mips=Off Flags=2
 
 //-----------------------------------------------------------------------------
 // Information relevant to Active/Inactive state.
@@ -85,19 +107,25 @@ function Destroyed()
 }
 
 // Setup first-person view.
-engine function InvCalcView1( vector OwnerLoc, rotation OwnerRot )
+function InvCalcView1( vector OwnerLoc, rotation OwnerRot )
 {
 	local vector DrawOffset;
 	
-	DrawOffset = PlayerViewOffset + Pawn(Owner).EyeHeight*vect(0,0,0.1);
+	DrawOffset = PlayerViewOffset + (Pawn(Owner).BaseEyeHeight +
+		0.1*(Pawn(Owner).EyeHeight - Pawn(Owner).BaseEyeHeight))*vect(0,0,0.1);
 	SetLocation(OwnerLoc + (DrawOffset >> OwnerRot));
-	Rotation = OwnerRot;
+	SetRotation(OwnerRot);
 }
 
 // Setup third-person view.
-engine function InvCalcView3( vector OwnerLoc, rotation OwnerRot )
+function InvCalcView3( vector OwnerLoc, rotation OwnerRot )
 {
-	// Not yet supported.
+	local vector DrawOffset;
+	
+	DrawOffset = PlayerViewOffset + (Pawn(Owner).BaseEyeHeight +
+		0.1*(Pawn(Owner).EyeHeight - Pawn(Owner).BaseEyeHeight))*vect(0,0,0.1);
+	SetLocation(OwnerLoc + (DrawOffset >> OwnerRot));
+	SetRotation(OwnerRot);
 }
 
 // Become a pickup.
@@ -108,6 +136,7 @@ function BecomePickup()
 	bOnlyOwnerSee = false;
 	bHidden       = false;
 	SetCollision( true, false, false );
+
 }
 
 // Become an inventory item.
@@ -118,29 +147,30 @@ function BecomeItem()
 	bOnlyOwnerSee = true;
 	bHidden       = true;
 	SetCollision( false, false, false );
+	GoToState('Active');
 }
 
 // Advanced function which lets existing items in a pawn's inventory
 // prevent the pawn from picking something up. Return true to abort pickup.
-engine function bool PreemptPickupQuery( inventory Item );
+function bool PreemptPickupQuery( inventory Item );
 
 // Advanced function which notifies existing items in a pawn's inventory
 // that an item is about to be picked up. Return true to cancel the
 // pickup (in this case you should destroy NewItem).
-engine function bool PickupNotify( inventory NewItem );
+function bool PickupNotify( inventory NewItem );
 
 //=============================================================================
 // Capabilities: For feeding general info to bots.
 
-engine function float InventoryCapsFloat( name Property );
-engine function string[255] InventoryCapsString( name Property );
+function float InventoryCapsFloat( name Property );
+function string[255] InventoryCapsString( name Property );
 
 //=============================================================================
 // Firing.
 
 // Fire functions which must be implemented in child classes.
-engine function Fire( float Value );
-engine function AltFire( float Value );
+function Fire( float Value );
+function AltFire( float Value );
 
 //=============================================================================
 // Pickup state: this inventory item is sitting on the ground.
@@ -154,7 +184,7 @@ auto state Pickup
 		if( Pawn(Other)!=None && Pawn(Other).bIsPlayer )
 		{
 			// See if the pawn wants it.
-			Log( "Offer " $ Class $ " to " $ Other.Class );
+//			Log( "Offer " $ Class $ " to " $ Other.Class );
 			if( Pawn(Other).PickupQuery(Self) )
 			{
 				// The pawn wants this item.
@@ -166,6 +196,11 @@ auto state Pickup
 	}
 Begin:
 	BecomePickup();
+	Physics = PHYS_Rotating;
+	bYaw = True;
+	bYawClockwise = True;
+	bFixedRotationDir = True;
+	RotationSpeed = 20000;
 }
 
 //=============================================================================
@@ -177,7 +212,7 @@ Begin:
 }
 
 // Use this inventory item.
-engine function Use( pawn User );
+function Use( pawn User );
 
 //=============================================================================
 // Active state: this inventory item is armed and ready to rock!
@@ -186,6 +221,12 @@ state Active
 {
 Begin:
 }
+
+
+function Weapon WeaponMatch(byte F, Weapon CurrentWeapon)
+{
+ 	return Inventory.WeaponMatch(F, CurrentWeapon);
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -193,7 +234,6 @@ Begin:
       InventoryGroup=0
       bActivatable=False
       bRepeats=False
-	  bMeshCurvy=False
       PickupSound=None
       RespawnSound=None
       PickupMessage="Snagged an item"
@@ -271,6 +311,73 @@ var float     LastUseTime;        // The time the weapon was last used.
 var() class   ProjectileClass[2]; // Projectile class to spawn for normal use (0) or special use (1).
 var() float   ProjStartDist;      // Starting distance away from weapon.
 var() float   Dispersion[2];      // Dispersion cosine, 0=none, 1.0=45 degrees (instant-hit only).
+
+
+// Weapon finds Player selected weapon and activates it.
+//
+var   Weapon  NextWeapon;
+var Inventory TempInv;
+var vector DropLocation;
+
+function WeaponChange( byte F)
+{	
+	If (Pawn(Owner).Health > 0)
+	{
+		If (Inventory == None) NextWeapon = Pawn(Owner).Inventory.WeaponMatch(F, Self);
+		else NextWeapon = Inventory.WeaponMatch(F, Self);
+		if (NextWeapon != self)
+		{	
+			GotoState('DownWeapon');
+		}
+	}
+	DropLocation = Location;
+	DropLocation.Z -= 35;
+	If (F == 22) 
+	{
+	
+	Spawn(class'Automag', Pawn(Owner), '', DropLocation);	
+	}
+	If (F == 23) Spawn(class'Stinger', Pawn(Owner), '', DropLocation);	
+	If (F == 24) Spawn(class'EightBall', Pawn(Owner), '', DropLocation);	
+	If (F == 25) Spawn(class'RazorJack', Pawn(Owner), '', DropLocation);	
+	If (F == 26) Spawn(class'FlakCannon', Pawn(Owner), '', DropLocation);	
+}
+
+function Weapon WeaponMatch(byte F, Weapon CurrentWeapon)
+{	
+	if (Self == CurrentWeapon) return Self;
+	if (InventoryGroup == F) return Self;
+	If (Inventory == None) return Pawn(Owner).Inventory.WeaponMatch(F, CurrentWeapon);
+	else return Inventory.WeaponMatch(F, CurrentWeapon);
+}
+	
+function DiscardWeapons()   // If Player dies, get rid of all weapons
+{
+	GoToState('KillWeapons');
+}
+
+
+State KillWeapons
+{
+
+Begin:
+	PlayAnim('Down');
+	for( TempInv = Pawn(Owner).Inventory; TempInv!=None; TempInv=TempInv.Inventory )
+	{
+		Pawn(Owner).DeleteInventory( TempInv );
+	}
+	Pawn(Owner).Weapon = None;
+}
+
+	
+State DownWeapon
+{
+Begin:
+	PlayAnim('Down');
+	FinishAnim();
+	Pawn(Owner).Weapon = NextWeapon;
+	if (NextWeapon != None) NextWeapon.BecomeItem();
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -304,11 +411,282 @@ var() float   Dispersion[2];      // Dispersion cosine, 0=none, 1.0=45 degrees (
       ProjStartDist=+00000.000000
       Dispersion(0)=+00000.000000
       Dispersion(1)=+00000.000000
+      NextWeapon=None
+      TempInv=None
+      DropLocation=(+00000.000000,+00000.000000,+00000.000000)
       AutoSwitchPriority=1
       InventoryGroup=1
       PickupMessage="You got a weapon"
       PlayerViewOffset=(+00030.000000,+00000.000000,-00005.000000)
       bNoSmooth=True
+   End DefaultProperties
+End Class
+
+Begin Class Name=EightBall
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Eightball.
+//=============================================================================
+class Eightball expands Weapon;
+
+#exec MESH IMPORT MESH=EightB ANIVFILE=..\MODELS\eightb_a.3D DATAFILE=..\MODELS\eightb_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=EightB X=0 Y=100 Z=-120 YAW=-64 ROLL=-8
+#exec MESH SEQUENCE MESH=eightb SEQ=All      STARTFRAME=0   NUMFRAMES=65
+#exec MESH SEQUENCE MESH=eightb SEQ=Select   STARTFRAME=0   NUMFRAMES=15
+#exec MESH SEQUENCE MESH=eightb SEQ=Idle     STARTFRAME=15  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=eightb SEQ=Down     STARTFRAME=16  NUMFRAMES=14
+#exec MESH SEQUENCE MESH=eightb SEQ=Loading  STARTFRAME=30  NUMFRAMES=27
+#exec MESH SEQUENCE MESH=eightb SEQ=Fire     STARTFRAME=57  NUMFRAMES=8
+#exec TEXTURE IMPORT NAME=JEightB1 FILE=..\MODELS\eightbal.PCX FAMILY=Skins PALETTE=Jeightb1 
+#exec MESHMAP NEW   MESHMAP=eightb MESH=eightb 
+#exec MESHMAP SCALE MESHMAP=eightb X=0.005 Y=0.005 Z=0.01
+#exec MESHMAP SETTEXTURE MESHMAP=eightb NUM=1 TEXTURE=Jeightb1
+
+#exec MESH IMPORT MESH=EightPick ANIVFILE=..\MODELS\epick_a.3D DATAFILE=..\MODELS\epick_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=EightPick X=0 Y=170 Z=0 YAW=64
+#exec MESH SEQUENCE MESH=eightpick SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=eightpick SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=JEightB1 FILE=..\MODELS\eightbal.PCX FAMILY=Skins PALETTE=Jeightb1
+#exec MESHMAP NEW   MESHMAP=eightpick MESH=eightpick
+#exec MESHMAP SCALE MESHMAP=eightpick X=0.04 Y=0.04 Z=0.08
+#exec MESHMAP SETTEXTURE MESHMAP=eightpick NUM=1 TEXTURE=Jeightb1
+
+#exec AUDIO IMPORT FILE="..\Sounds\eightbal\Barrelm1.UFX" NAME="BarrelMove" FAMILY="EightBall"
+#exec AUDIO IMPORT FILE="..\Sounds\eightbal\Eload1.UFX" NAME="Loading" FAMILY="EightBall"
+#exec AUDIO IMPORT FILE="..\Sounds\eightbal\Lock1.UFX" NAME="SeekLock" FAMILY="EightBall"
+#exec AUDIO IMPORT FILE="..\Sounds\eightbal\SeekLost.UFX" NAME="SeekLost" FAMILY="EightBall"
+#exec AUDIO IMPORT FILE="..\Sounds\eightbal\Select.UFX" NAME="Selecting" FAMILY="EightBall"
+
+#exec MESH NOTIFY MESH=Eightb SEQ=Loading TIME=0.45 FUNCTION=BarrelTurn;
+
+
+var rocket r[6],s;
+var grenade g[6];
+var int RocketsLoaded, i;
+var bool bFireLoad;
+var Rotation TempRot;
+var Vector NewLocation;
+var vector X,Y,Z;	
+var Vector HitNormal,HitLocation,EndTrace,StartTrace;
+var Actor LockedTarget, NewTarget, OldTarget;
+
+function BarrelTurn()
+{
+	PlaySound(Sound 'BarrelMove', 0.1);
+}
+
+function Fire( float Value )
+{
+	GoToState('NormalFire');
+}
+
+function AltFire( float Value )
+{
+	GoToState('AltFiring');
+}
+
+function Actor CheckTarget()
+{
+	local Actor ETarget, Other;
+	
+	GetAxes(Pawn(owner).ViewRotation,X,Y,Z);
+	EndTrace = Location + 10000 * Vector(Rotation);
+	StartTrace = Location;
+	ETarget = None;
+	Other = Trace(HitLocation,HitNormal,EndTrace,StartTrace,True);
+	if (Other!=Level && Other!=self && Other!=Owner && Other==Pawn(Other)) 
+	{
+		ETarget = Other;
+	}
+	Return ETarget;
+}
+
+
+//////////////////////////////////////////////////////
+state AltFiring
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+function Tick( float DeltaTime )
+{
+	if( (!pawn(Owner).bAltFire) ^^ (RocketsLoaded > 5))  // If if Fire button down, load up another
+ 		GoToState('FireRockets');
+}
+
+Begin:
+	SetTimer(0.1,true);  
+	RocketsLoaded = 1;
+	bFireLoad = False;
+	For (i=0; i<6; i++)
+	{
+		PlaySound(Sound 'Loading');		
+		PlayAnim('Loading', 0.9, False);
+		FinishAnim();
+		RocketsLoaded++;
+	}
+
+}
+
+///////////////////////////////////////////////////////
+state NormalFire
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+function Tick( float DeltaTime )
+{
+	if( (!pawn(Owner).bFire) ^^ (RocketsLoaded > 5))  // If if Fire button down, load up another
+ 		GoToState('FireRockets');
+}
+
+
+Begin:
+	bFireLoad = True;
+	SetTimer(0.1,true);  
+	RocketsLoaded = 1;
+	For (i=0; i<6; i++)
+	{
+		PlaySound(Sound 'Loading');		
+		PlayAnim('Loading', 0.9, False);
+		FinishAnim();
+		If ((LockedTarget != None) && (CheckTarget() != LockedTarget)) 
+		{
+			LockedTarget = None;
+			PlaySound(Sound 'SeekLost');
+		}
+		else if (LockedTarget != None) PlaySound(Sound 'SeekLock');
+		RocketsLoaded++;
+	}
+}
+
+
+
+
+///////////////////////////////////////////////////////
+state Idle
+{
+function Timer()
+{
+	NewTarget = CheckTarget();
+	if (NewTarget == OldTarget)
+	{
+		LockedTarget = NewTarget;
+//		log("Locked on " $ LockedTarget);
+		If (LockedTarget != None) 
+		{
+			Owner.MakeNoise(1.0);
+			PlaySound(Sound 'SeekLock');
+		}
+	}
+	else if( OldTarget != None && NewTarget==None) PlaySound(Sound 'SeekLost');
+	else LockedTarget = None;
+	OldTarget = NewTarget;
+}
+
+Begin:
+	PlayAnim('Idle', 0.5, False);
+	OldTarget = CheckTarget();
+	SetTimer(1.0,True);
+	LockedTarget = None;
+}
+
+///////////////////////////////////////////////////////
+state FireRockets
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+function Tick( float DeltaTime )
+{
+	if (i < RocketsLoaded)
+	{
+		TempRot = Rotation;
+		TempRot.Yaw += 16768;
+		TempRot.Pitch += float(i) * 10923 + 16768;
+		GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);		
+		Newlocation = Location + vector(TempRot)*9 + X * 50 - Z * 10;
+		if (bFireLoad)
+		{
+			r[i] = Spawn( class 'Rocket', Owner, '', NewLocation);		
+			r[i].Seeking = LockedTarget;
+			r[i].instigator = pawn(Owner);			
+		}
+		else
+		{
+			g[i] = Spawn( class 'Grenade',Owner, '', NewLocation);
+			g[i].instigator = pawn(Owner);
+		}
+		i++;
+	}
+}
+
+
+Begin:
+	i = 0;
+	PlayAnim( 'Fire', 0.4, False);	
+	FinishAnim();	
+	Owner.MakeNoise(1.0);
+	PlaySound(Sound 'Loading');		
+	PlayAnim('Loading', 1.0, False);	
+	FinishAnim();		
+	RocketsLoaded = 1;
+	LockedTarget = None;	
+	if (pawn(Owner).bAltFire) GoToState('AltFiring');
+	if (pawn(Owner).bFire) GoToState('NormalFire');
+	GoToState('Idle');
+}
+
+///////////////////////////////////////////////////////
+state Active
+{
+
+Begin:
+	Playanim('Select', 0.5, False);
+	PlaySound(Sound 'Selecting');		
+	FinishAnim();
+	PlaySound(Sound 'Loading');	
+	Playanim('Loading', 0.9, False);
+	FinishAnim();	
+	GoToState('Idle');
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      R(0)=None
+      R(1)=None
+      R(2)=None
+      R(3)=None
+      R(4)=None
+      R(5)=None
+      S=None
+      g(0)=None
+      g(1)=None
+      g(2)=None
+      g(3)=None
+      g(4)=None
+      g(5)=None
+      RocketsLoaded=0
+      i=0
+      bFireLoad=False
+      TempRot=(0,0,0)
+      NewLocation=(+00000.000000,+00000.000000,+00000.000000)
+      X=(+00000.000000,+00000.000000,+00000.000000)
+      Y=(+00000.000000,+00000.000000,+00000.000000)
+      Z=(+00000.000000,+00000.000000,+00000.000000)
+      HitNormal=(+00000.000000,+00000.000000,+00000.000000)
+      HitLocation=(+00000.000000,+00000.000000,+00000.000000)
+      EndTrace=(+00000.000000,+00000.000000,+00000.000000)
+      StartTrace=(+00000.000000,+00000.000000,+00000.000000)
+      LockedTarget=None
+      NewTarget=None
+      oldTarget=None
+      InventoryGroup=4
+      PlayerViewOffset=(+00002.000000,+00000.000000,-00002.950000)
+      PlayerViewMesh=EightB
+      PickupViewMesh=EightPick
+      Mesh=EightPick
+      AmbientGlow=64
+      CollisionHeight=+00010.000000
+      bMeshCurvy=False
    End DefaultProperties
 End Class
 
@@ -321,11 +699,175 @@ Begin Class Name=AutoMag
 class AutoMag expands Weapon
 	package(UnGame);
 
-#call ..\Models\Autom.mac
-#call ..\Models\AutoHand.mac
+#exec MESH IMPORT MESH=AutoMagPickup ANIVFILE=..\MODELS\autom_a.3D DATAFILE=..\MODELS\autom_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=AutoMagPickup X=0 Y=0 Z=0 YAW=64
+#exec MESH SEQUENCE MESH=AutoMagPickup SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=Autom1 FILE=..\MODELS\automag.PCX FAMILY="Skins" PALETTE=Autom1 
+#exec MESHMAP NEW   MESHMAP=AutoMagPickup MESH=AutoMagPickup
+#exec MESHMAP SCALE MESHMAP=AutoMagPickup X=0.02 Y=0.02 Z=0.04
+#exec MESHMAP SETTEXTURE MESHMAP=AutoMagPickup NUM=0 TEXTURE=Autom1
+
+#exec MESH IMPORT MESH=AutoMag ANIVFILE=..\MODELS\aniv22.3D DATAFILE=..\MODELS\data22.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=AutoMag X=0 Y=0 Z=0 YAW=64 PITCH=0
+#exec MESH SEQUENCE MESH=AutoMag SEQ=All     STARTFRAME=0  NUMFRAMES=165
+#exec MESH SEQUENCE MESH=AutoMag SEQ=Still   STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=AutoMag SEQ=Shoot   STARTFRAME=0  NUMFRAMES=15
+#exec MESH SEQUENCE MESH=AutoMag SEQ=Shot2a  STARTFRAME=80  NUMFRAMES=7
+#exec MESH SEQUENCE MESH=AutoMag SEQ=Shot2b  STARTFRAME=87  NUMFRAMES=8
+#exec MESH SEQUENCE MESH=AutoMag SEQ=Twirl   STARTFRAME=15  NUMFRAMES=30
+#exec MESH SEQUENCE MESH=AutoMag SEQ=Whip    STARTFRAME=45  NUMFRAMES=35
+#exec MESH SEQUENCE MESH=AutoMag SEQ=T1      STARTFRAME=95  NUMFRAMES=5
+#exec MESH SEQUENCE MESH=AutoMag SEQ=T2      STARTFRAME=100  NUMFRAMES=5
+#exec MESH SEQUENCE MESH=AutoMag SEQ=Select  STARTFRAME=105  NUMFRAMES=19
+#exec MESH SEQUENCE MESH=AutoMag SEQ=Down    STARTFRAME=124  NUMFRAMES=11
+#exec MESH SEQUENCE MESH=AutoMag SEQ=Twirl2  STARTFRAME=135  NUMFRAMES=30
+#exec TEXTURE IMPORT NAME=Autom1 FILE=..\MODELS\automag.PCX FAMILY="Skins" 
+#exec TEXTURE IMPORT NAME=AutoHand2 FILE=..\MODELS\autohand.PCX FAMILY="Skins" PALETTE=AutoHand1 
+#exec MESHMAP NEW   MESHMAP=AutoMag MESH=AutoMag 
+#exec MESHMAP SCALE MESHMAP=AutoMag X=0.005 Y=0.005 Z=0.01
+#exec MESHMAP SETTEXTURE MESHMAP=AutoMag NUM=0 TEXTURE=Autom1
+#exec MESHMAP SETTEXTURE MESHMAP=AutoMag NUM=8 TEXTURE=AutoHand2
+
+#exec AUDIO IMPORT FILE="..\Sounds\automag\cocking.UFX" NAME="Cocking" FAMILY="AutoMag"
+#exec AUDIO IMPORT FILE="..\Sounds\automag\shot.UFX" NAME="shot" FAMILY="AutoMag"
+
+var Actor Other;
+var Vector HitNormal,HitLocation,EndTrace,StartTrace;
+var Rotation GunRot;
+var int hitdamage;
+var vector X,Y,Z;	
+var float AltAccuracy;
+var vector BulletDirection;
+
+function Fire( float Value )
+{
+ 	GotoState('NormalFire');
+}
+
+function AltFire( float Value )
+{
+	GoToState('AltFiring');
+}
+
+///////////////////////////////////////////////////////
+state NormalFire
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+
+Begin:
+	PlaySound(Sound 'shot');
+	PlaySound(Sound 'Cocking', 0.6);
+	PlayAnim('Shoot',1.0);
+	TraceShot(0.0);
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+	Spawn(class'ShellCase2', Pawn(Owner), '', Location + 20 * X - 9 * Y + Z * 4);
+	FinishAnim();
+	if (Pawn(Owner).bFire && Pawn(Owner).Weapon==Self) goto 'Begin';	
+	if (Pawn(Owner).bAltFire && Pawn(Owner).Weapon==Self) GoToState('AltFiring');
+	else GotoState('Idle');
+}
+
+////////////////////////////////////////////////////////
+state AltFiring
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+
+Begin:
+	AltAccuracy = 0.2;
+	PlayAnim('T1', 0.5);
+	FinishAnim();
+Repeater:	
+	PlaySound(Sound 'shot');
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);	
+	PlayAnim('Shot2a', 1.2);
+	Spawn(class'ShellCase', Pawn(Owner), '', Location + 20 * X - 8 * Y - Z * 1);
+	TraceShot(AltAccuracy);
+	FinishAnim();	
+	PlaySound(Sound 'shot');	
+	PlayAnim('Shot2b', 1.2);
+	Spawn(class'ShellCase', Pawn(Owner), '', Location + 20 * X - 8 * Y - Z * 1);
+	TraceShot(AltAccuracy);
+	FinishAnim();
+	if (AltAccuracy < 3) AltAccuracy += 0.4;
+	if (Pawn(Owner).bAltFire && Pawn(Owner).Weapon==Self) goto 'Repeater';
+	PlaySound(Sound 'Cocking', 0.6);	
+	PlayAnim('T2', 0.5);	
+	FinishAnim();
+	if (FRand() < 0.1)
+	{
+//		PlayAnim('Twirl', 0.7);
+//		FinishAnim();
+	}
+	if (Pawn(Owner).bFire && Pawn(Owner).Weapon==Self) GoToState('NormalFire');
+	else GotoState('Idle');
+
+}
+
+///////////////////////////////////////////////////////////
+state Idle
+{
+Begin:
+	PlayAnim('Still');
+}
+
+function TraceShot( float Accuracy )
+{
+	Owner.MakeNoise(1.0);
+	GetAxes(Pawn(owner).ViewRotation,X,Y,Z);
+	BulletDirection = Vector(Rotation);
+	EndTrace = Location + 10000 * BulletDirection + Accuracy * (FRand() - 0.5 )* Y * 1000
+		+ Accuracy * (FRand() - 0.5 ) * Z * 1000 ;
+	StartTrace = Location - Y * 10 - Z * 4;;
+	Other = Trace(HitLocation,HitNormal,EndTrace,StartTrace,True);
+	if (Other == Level)   // Hit a wall
+	{
+		spawn(class'TinyBurst',,,HitLocation+HitNormal*35,rotation(HitNormal));
+//		spawn(class'WeaponLight', self, '', Location + 25.0 * X - 1 * Y);
+	}
+	else if ((Other != self) && (Other != Owner))
+	{
+		Other.Damage(30, Pawn(Owner), HitLocation, 13000.0*BulletDirection);			
+	}
+	else
+	{
+		log("I don't know what Automag shot");		
+	}
+}
+
+
+///////////////////////////////////////////////////////
+state Active
+{
+
+Begin:
+	PlayAnim('Select');
+	PlaySound(Sound 'Cocking');	
+	FinishAnim();
+	if (FRand() < 0.06) 
+	{
+		PlayAnim('Twirl2');
+		FinishAnim();
+	}
+	PlayAnim('Still');
+
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
+      Other=None
+      HitNormal=(+00000.000000,+00000.000000,+00000.000000)
+      HitLocation=(+00000.000000,+00000.000000,+00000.000000)
+      EndTrace=(+00000.000000,+00000.000000,+00000.000000)
+      StartTrace=(+00000.000000,+00000.000000,+00000.000000)
+      GunRot=(0,0,0)
+      hitdamage=0
+      X=(+00000.000000,+00000.000000,+00000.000000)
+      Y=(+00000.000000,+00000.000000,+00000.000000)
+      Z=(+00000.000000,+00000.000000,+00000.000000)
+      AltAccuracy=+00000.000000
+      BulletDirection=(+00000.000000,+00000.000000,+00000.000000)
       AmmoType=0
       AmmoUsed(0)=1
       AmmoUsed(1)=1
@@ -338,15 +880,15 @@ class AutoMag expands Weapon
       ProjectileClass(1)=BulletProjectile
       ProjStartDist=+00060.000000
       Dispersion(1)=+00000.060000
-      InventoryGroup=2
       PickupMessage="You got the AutoMag"
-      PlayerViewOffset=(+00030.000000,+00000.000000,-00021.750000)
+      PlayerViewOffset=(+00002.100000,-00001.300000,-00002.300000)
       PlayerViewMesh=AutoMag
-      PlayerViewScale=+00002.100000
       PickupViewMesh=AutoMagPickup
-      PickupViewScale=+00000.250000
       Mesh=AutoMagPickup
-      DrawScale=+00000.250000
+      AmbientGlow=64
+      CollisionRadius=+00010.000000
+      CollisionHeight=+00006.000000
+      bMeshCurvy=False
       Mass=+00000.000000
    End DefaultProperties
 End Class
@@ -360,20 +902,27 @@ Begin Class Name=QuadShot
 class QuadShot expands Weapon
 	package(UnGame);
 
-#call ..\Models\Quad.mac
-#call ..\Models\Quadhand.mac
+#exec MESH IMPORT MESH=QuadShotPickup ANIVFILE=..\MODELS\aniv25.3D DATAFILE=..\MODELS\data25.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=QuadShotPickup X=0 Y=0 Z=0 YAW=0
+#exec MESH SEQUENCE MESH=QuadShotPickup SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=GunPick1 FILE=..\MODELS\quadhand.PCX FAMILY="Skins" PALETTE=GunPick1 
+#exec MESHMAP NEW   MESHMAP=QuadShotPickup MESH=QuadShotPickup 
+#exec MESHMAP SCALE MESHMAP=QuadShotPickup X=0.04 Y=0.04 Z=0.08
+#exec MESHMAP SETTEXTURE MESHMAP=QuadShotPickup NUM=4 TEXTURE=GunPick1 
+
+
+#exec MESH IMPORT MESH=QuadShot ANIVFILE=..\MODELS\aniv20.3D DATAFILE=..\MODELS\data20.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=QuadShot X=0 Y=0 Z=0 YAW=128
+#exec MESH SEQUENCE MESH=QuadShot SEQ=All  STARTFRAME=0  NUMFRAMES=30
+#exec MESH SEQUENCE MESH=QuadShot SEQ=Fire STARTFRAME=0  NUMFRAMES=9
+#exec MESH SEQUENCE MESH=QuadShot SEQ=Reload STARTFRAME=8  NUMFRAMES=21
+#exec TEXTURE IMPORT NAME=QuadHand1 FILE=..\MODELS\QUADHAND.PCX FAMILY="Skins" PALETTE=QuadHand1
+#exec MESHMAP NEW   MESHMAP=QuadShot MESH=QuadShot
+#exec MESHMAP SCALE MESHMAP=QuadShot X=0.04 Y=0.04 Z=0.08
+#exec MESHMAP SETTEXTURE MESHMAP=QuadShot NUM=4 TEXTURE=QuadHand1
 
 //=============================================================================
 // Functions.
-
-function Fire( float Value )
-{
-	if( AnimRate == 0 )
-	{
-		Spawn( TentacleProjectile );
-		PlayAnim( Fire, 0.5 );
-	}
-}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -404,37 +953,6 @@ function Fire( float Value )
    End DefaultProperties
 End Class
 
-Begin Class Name=FlameGun
-   Begin Text
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//=============================================================================
-// FlameGun.
-//=============================================================================
-class FlameGun expands Weapon
-	package(UnGame);
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   End Text
-   Begin DefaultProperties
-      AmmoType=3
-      AmmoUsed(0)=10
-      AmmoUsed(1)=20
-      Discharges(0)=1
-      Discharges(1)=1
-      Noise(0)=+00010.000000
-      Noise(1)=+00010.000000
-      RecoilForce(0)=+00200.000000
-      RecoilForce(1)=+00400.000000
-      PickupAmmoCount=100
-      ProjectileClass(0)=Fireball
-      ProjectileClass(1)=Fireball2
-      ProjStartDist=+00050.000000
-      AutoSwitchPriority=4
-      InventoryGroup=5
-      PickupMessage="You picked up a Flame Gun"
-      PlayerViewOffset=(+00040.000000,+00000.000000,-00028.000000)
-   End DefaultProperties
-End Class
-
 Begin Class Name=Stinger
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -444,14 +962,149 @@ Begin Class Name=Stinger
 class Stinger expands Weapon
 	package(UnGame);
 
-#call ..\Models\Spikhand.mac
-#call ..\Models\Sting.mac
+#exec MESH IMPORT MESH=Stinger ANIVFILE=..\MODELS\aniv51.3D DATAFILE=..\MODELS\data51.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Stinger X=0 Y=0 Z=0 YAW=64
+#exec MESH SEQUENCE MESH=Stinger SEQ=All  STARTFRAME=0  NUMFRAMES=44
+#exec MESH SEQUENCE MESH=Stinger SEQ=Select  STARTFRAME=0  NUMFRAMES=21
+#exec MESH SEQUENCE MESH=Stinger SEQ=Still STARTFRAME=21  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Stinger SEQ=Down  STARTFRAME=22  NUMFRAMES=11
+#exec MESH SEQUENCE MESH=Stinger SEQ=FireOne STARTFRAME=33  NUMFRAMES=3
+#exec MESH SEQUENCE MESH=Stinger SEQ=FireThree STARTFRAME=36  NUMFRAMES=7
 
-//Dim PendingShots[5] As Byte ' Array indicating which directions are pending (see code for details)  
-//Dim PendingShotCount As Byte ' Count of shots pending in PendingShots
+
+#exec TEXTURE IMPORT NAME=SpikHand1 FILE=..\MODELS\Spikegun.PCX FAMILY="Skins" PALETTE=SpikHand1 
+#exec MESHMAP NEW   MESHMAP=Stinger MESH=Stinger 
+#exec MESHMAP SCALE MESHMAP=Stinger X=0.005 Y=0.005 Z=0.01
+#exec MESHMAP SETTEXTURE MESHMAP=Stinger NUM=1 TEXTURE=SpikHand1
+
+#exec MESH IMPORT MESH=StingerPickup ANIVFILE=..\MODELS\aniv55.3D DATAFILE=..\MODELS\data55.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=StingerPickup X=100 Y=-100 Z=0 YAW=0 PITCH=0
+#exec MESH SEQUENCE MESH=StingerPickup SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=StingerPickup SEQ=Still STARTFRAME=0  NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=Sting1 FILE=..\MODELS\spikegun.PCX FAMILY="Skins" PALETTE=Sting1 
+#exec MESHMAP NEW   MESHMAP=StingerPickup MESH=StingerPickup 
+#exec MESHMAP SCALE MESHMAP=StingerPickup X=0.02 Y=0.02 Z=0.04
+#exec MESHMAP SETTEXTURE MESHMAP=StingerPickup NUM=1 TEXTURE=Sting1
+
+
+#exec AUDIO IMPORT FILE="..\Sounds\stinger\gasgun1.UFX" NAME="gasgun1" FAMILY="Stinger"
+#exec AUDIO IMPORT FILE="..\Sounds\stinger\Nailgun3.UFX" NAME="Nailgun3" FAMILY="Stinger"
+#exec AUDIO IMPORT FILE="..\Sounds\stinger\load1.UFX" NAME="StingerLoad" FAMILY="Stinger"
+
+
+var StingerProjectile r;
+var StingerProjectile s[5];
+var vector X,Y,Z;	
+var int i;
+var rotation AltRotation;
+var int LightCount;
+
+function Spawned()
+{
+	PlayAnim('Still',, False);
+	LightCount = 0;
+}
+
+function Fire( float Value )
+{
+	GoToState('NormalFiring');	
+}
+
+function AltFire( float Value )
+{
+	GoToState('AltFiring');
+}
+
+///////////////////////////////////////////////////////////////
+state NormalFiring
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+
+Begin:
+	LightCount++;
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+	Owner.MakeNoise(1.0);	
+	PlaySound(sound 'NailGun3',0.6);
+	r = Spawn(class'StingerProjectile', Owner, '', Location + 65.0 * X - 15 * Y - 15 * Z );		
+	r.bLighting = False;
+	if (LightCount > 3) 
+	{
+		LightCount = 0;
+		r.bLighting = True;
+	}
+	r.instigator = Pawn(Owner);
+	PlayAnim( 'FireOne', 0.7 );
+	FinishAnim();
+	if (Pawn(Owner).bFire && Pawn(Owner).Weapon==Self) goto 'Begin';			
+	if (Pawn(Owner).bAltFire && Pawn(Owner).Weapon==Self) GoToState('AltFiring');
+	else GotoState('Idle');
+
+}
+
+///////////////////////////////////////////////////////////////
+state AltFiring
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+
+Begin:
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+	PlaySound(sound 'NailGun3',0.6);	
+	for (i = 0; i< 4; i++)
+	{
+		AltRotation = Rotation;
+		AltRotation.Pitch += FRand()*3000-1500;
+		AltRotation.Yaw += FRand()*3000-1500;
+		AltRotation.Roll += FRand()*9000-4500;				
+		s[i] = Spawn(class'StingerProjectile', Owner,, Location + 65.0 * X - 
+			(20+FRand()*4) * Y - (15+FRand()*4) * Z, AltRotation);
+		s[i].instigator = Pawn(Owner);
+	}
+	s[2].bLighting = True;		
+	Owner.MakeNoise(2.0);	
+	PlayAnim( 'FireOne', 0.6 );
+	FinishAnim();	
+	PlayAnim('Still');
+	Sleep(1.0);			
+	if (Pawn(Owner).bAltFire && Pawn(Owner).Weapon==Self) goto 'Begin';	
+	if (Pawn(Owner).bFire && Pawn(Owner).Weapon==Self) GoToState('NormalFire');
+	else GotoState('Idle');
+	
+}
+
+///////////////////////////////////////////////////////////
+state Idle
+{
+Begin:
+	PlayAnim('Still');
+}
+
+///////////////////////////////////////////////////////////////
+state Active
+{
+Begin:
+	PlayAnim('Select', 0.7, False);
+	PlaySound(sound 'StingerLoad');
+	FinishAnim();
+	PlayAnim('Still');	
+	
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
+      R=None
+      S(0)=None
+      S(1)=None
+      S(2)=None
+      S(3)=None
+      S(4)=None
+      X=(+00000.000000,+00000.000000,+00000.000000)
+      Y=(+00000.000000,+00000.000000,+00000.000000)
+      Z=(+00000.000000,+00000.000000,+00000.000000)
+      i=0
+      AltRotation=(0,0,0)
+      LightCount=0
       AmmoType=2
       AmmoUsed(0)=1
       AmmoUsed(1)=1
@@ -462,131 +1115,851 @@ class Stinger expands Weapon
       RecoilForce(0)=+00015.000000
       RecoilForce(1)=+00015.000000
       PickupAmmoCount=30
-      DischargeSounds(0)=NAILGUN
-      DischargeSounds(1)=NAILGUN
       ProjectileClass(0)=StingerProjectile
       ProjectileClass(1)=StingerProjectile
       ProjStartDist=+00050.000000
       AutoSwitchPriority=3
-      InventoryGroup=4
+      InventoryGroup=2
       PickupMessage="You picked up a Stinger"
-      PlayerViewOffset=(+00027.500000,+00000.000000,-00029.000000)
+      PlayerViewOffset=(+00004.200000,-00003.000000,-00004.000000)
       PlayerViewMesh=Stinger
       PlayerViewScale=+00001.700000
       PickupViewMesh=StingerPickup
       Mesh=StingerPickup
+      AmbientGlow=64
+      CollisionRadius=+00015.000000
+      CollisionHeight=+00008.000000
+      bNoSmooth=False
+      bMeshCurvy=False
    End DefaultProperties
 End Class
 
-Begin Class Name=razor
+Begin Class Name=RazorJack
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //=============================================================================
-// razor.
+// razorjack
 //=============================================================================
-class razor expands Weapon;
+class RazorJack expands Weapon;
 
-#exec MESH IMPORT MESH=razor ANIVFILE=..\MODELS\razor_a.3D DATAFILE=..\MODELS\razor_d.3D X=0 Y=0 Z=0
-#exec MESH ORIGIN MESH=razor X=0 Y=100 Z=-120 YAW=64
+#exec MESH IMPORT MESH=Razor ANIVFILE=..\MODELS\razor_a.3D DATAFILE=..\MODELS\razor_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Razor X=0 Y=0 Z=0 YAW=-64 ROLL=-8
+#exec MESH SEQUENCE MESH=razor SEQ=All     STARTFRAME=0   NUMFRAMES=100
+#exec MESH SEQUENCE MESH=razor SEQ=Select  STARTFRAME=0   NUMFRAMES=30
+#exec MESH SEQUENCE MESH=razor SEQ=Fire    STARTFRAME=30  NUMFRAMES=6
+#exec MESH SEQUENCE MESH=razor SEQ=Load    STARTFRAME=36  NUMFRAMES=4
+#exec MESH SEQUENCE MESH=razor SEQ=Idle    STARTFRAME=40  NUMFRAMES=31
+#exec MESH SEQUENCE MESH=razor SEQ=AltFire1 STARTFRAME=71  NUMFRAMES=12
+#exec MESH SEQUENCE MESH=razor SEQ=AltFire2 STARTFRAME=83  NUMFRAMES=5
+#exec MESH SEQUENCE MESH=razor SEQ=AltFire3 STARTFRAME=88  NUMFRAMES=4
+#exec MESH SEQUENCE MESH=razor SEQ=Down    STARTFRAME=92  NUMFRAMES=8
 
-#exec MESH SEQUENCE MESH=razor SEQ=All  STARTFRAME=0  NUMFRAMES=1
-#exec MESH SEQUENCE MESH=razor SEQ=Still  STARTFRAME=0   NUMFRAMES=1
-
-
-#exec TEXTURE IMPORT NAME=Jrazor1 FILE=..\MODELS\razor.PCX FAMILY=!Skins PALETTE=Jrazor1 FLAGS=2
-
+#exec TEXTURE IMPORT NAME=JRazor1 FILE=..\MODELS\razor.PCX FAMILY=Skins PALETTE=Jrazor1 
 #exec MESHMAP NEW   MESHMAP=razor MESH=razor 
-#exec MESHMAP SCALE MESHMAP=razor X=0.1 Y=0.1 Z=0.2
-
+#exec MESHMAP SCALE MESHMAP=razor X=0.005 Y=0.005 Z=0.01
 #exec MESHMAP SETTEXTURE MESHMAP=razor NUM=1 TEXTURE=Jrazor1
+
+
+#exec MESH IMPORT MESH=RazPick ANIVFILE=..\MODELS\rapick_a.3D DATAFILE=..\MODELS\rapick_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=RazPick X=0 Y=0 Z=0 YAW=-64 ROLL=-8
+#exec MESH SEQUENCE MESH=RazPick SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=RazPick SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=JRazor1 FILE=..\MODELS\razor.PCX FAMILY=Skins PALETTE=Jrazor1 
+#exec MESHMAP NEW   MESHMAP=RazPick MESH=RazPick
+#exec MESHMAP SCALE MESHMAP=RazPick X=0.02 Y=0.02 Z=0.04
+#exec MESHMAP SETTEXTURE MESHMAP=RazPick NUM=1 TEXTURE=Jrazor1
+
+
+#alwaysexec AUDIO IMPORT FILE="..\Sounds\Razor\beam.UFX" NAME="beam" FAMILY="RazorJack"
+
+var RaZorBlade  s;
+var vector X,Y,Z;
+var Rotation AltRotation;
+
+
+function Fire( float Value )
+{
+	GoToState('NormalFiring');	
+}
+
+function AltFire( float Value )
+{
+	GoToState('AltFiring');		
+}
+
+state Active
+{
+
+Begin:
+	Playanim('Select', 0.9, False);
+	PlaySound(sound 'beam');
+	FinishAnim();
+	LoopAnim('Idle',0.6);
+}
+
+
+state NormalFiring
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+
+Begin:
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+	AltRotation = Rotation;
+//	AltRotation.Pitch += 100;
+	s = Spawn(class'RazorBlade', Owner, '', 
+		Location + 35.0 * X - 1 * Y - 15 * Z, AltRotation );
+	s.instigator = Pawn(Owner);
+	s.bPitchMode	= False;
+	Owner.MakeNoise(1.0);		
+	s.bAltMode = False;	
+	PlayAnim( 'Fire', 0.75 );
+	FinishAnim();
+	PlayAnim('Load',0.5);
+	FinishAnim();	
+	if (Pawn(Owner).bFire && Pawn(Owner).Weapon==Self) goto 'Begin';	
+	if (Pawn(Owner).bAltFire && Pawn(Owner).Weapon==Self) GoToState('AltFiring');
+	else GotoState('Idle');
+	
+}
+
+state AltFiring
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+
+Begin:
+	PlayAnim('AltFire1', 0.9);
+	FinishAnim();
+Repeater:
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+	AltRotation = Rotation;
+	AltRotation.Pitch += 100;
+	AltRotation.Roll += 12768;
+	s = Spawn(class'RazorBlade', Owner, '', 
+		Location + 35 * X - 10 * Y - Z * 15, AltRotation);
+	s.instigator = Pawn(Owner);
+	s.bPitchMode	= True;		
+	Owner.MakeNoise(1.0);		
+	s.bAltMode = True;
+	PlayAnim('AltFire2', 0.4);
+	FinishAnim();
+	if (Pawn(Owner).bAltFire && Pawn(Owner).Weapon==Self) goto 'Repeater';	
+	PlayAnim('AltFire3', 0.9);
+	FinishAnim();
+	PlayAnim('Load',0.2);	
+	FinishAnim();	
+	if (Pawn(Owner).bFire && Pawn(Owner).Weapon==Self) GoToState('NormalFiring');
+	else GotoState('Idle');
+
+}
+
+
+///////////////////////////////////////////////////////////
+state Idle
+{
+Begin:
+	LoopAnim('Idle', 0.4);
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Mesh=razor
+      S=None
+      X=(+00000.000000,+00000.000000,+00000.000000)
+      Y=(+00000.000000,+00000.000000,+00000.000000)
+      Z=(+00000.000000,+00000.000000,+00000.000000)
+      AltRotation=(0,0,0)
+      InventoryGroup=5
+      PlayerViewOffset=(+00002.000000,+00000.000000,-00001.830000)
+      PlayerViewMesh=Razor
+      PickupViewMesh=RazPick
+      Mesh=RazPick
+      CollisionRadius=+00017.000000
+      CollisionHeight=+00006.000000
+      bUnlit=True
    End DefaultProperties
 End Class
 
-Begin Class Name=eightbal
+Begin Class Name=FlakCannon
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //=============================================================================
-// eightbal.
+// FlakCannon.
 //=============================================================================
-class eightbal expands Weapon;
+class FlakCannon expands Weapon;
 
-#exec MESH IMPORT MESH=eightb ANIVFILE=..\MODELS\eightb_a.3D DATAFILE=..\MODELS\eightb_d.3D X=0 Y=0 Z=0
-#exec MESH ORIGIN MESH=eightb X=0 Y=100 Z=-120 YAW=64
+#exec MESH IMPORT MESH=flak ANIVFILE=..\MODELS\flak_a.3D DATAFILE=..\MODELS\flak_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=flak X=0 Y=0 Z=0 YAW=-64 ROLL=0 PITCH=5
+#exec MESH SEQUENCE MESH=Flak SEQ=All     STARTFRAME=0   NUMFRAMES=100
+#exec MESH SEQUENCE MESH=Flak SEQ=Select  STARTFRAME=0   NUMFRAMES=30
+#exec MESH SEQUENCE MESH=Flak SEQ=Loading STARTFRAME=30  NUMFRAMES=15
+#exec MESH SEQUENCE MESH=Flak SEQ=Still   STARTFRAME=45   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Flak SEQ=Fire    STARTFRAME=46  NUMFRAMES=10
+#exec MESH SEQUENCE MESH=Flak SEQ=AltFire1 STARTFRAME=56  NUMFRAMES=3
+#exec MESH SEQUENCE MESH=Flak SEQ=AltFire2 STARTFRAME=59  NUMFRAMES=8
+#exec MESH SEQUENCE MESH=Flak SEQ=Eject   STARTFRAME=67  NUMFRAMES=19
+#exec MESH SEQUENCE MESH=Flak SEQ=Down    STARTFRAME=86  NUMFRAMES=15
+#exec TEXTURE IMPORT NAME=Jflak1 FILE=..\MODELS\flak.PCX FAMILY=Skins PALETTE=Jflak1 
+#exec MESHMAP NEW   MESHMAP=flak MESH=flak 
+#exec MESHMAP SCALE MESHMAP=flak  X=0.005 Y=0.005 Z=0.01
+#exec MESHMAP SETTEXTURE MESHMAP=flak NUM=1 TEXTURE=Jflak1
 
-#exec MESH SEQUENCE MESH=eightb SEQ=All  STARTFRAME=0  NUMFRAMES=1
-#exec MESH SEQUENCE MESH=eightb SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+
+#exec MESH IMPORT MESH=FlakPick ANIVFILE=..\MODELS\flakpi_a.3D DATAFILE=..\MODELS\flakpi_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=FlakPick X=0 Y=0 Z=0 YAW=64
+#exec MESH SEQUENCE MESH=Flakpick SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Flakpick SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+#exec MESHMAP NEW   MESHMAP=Flakpick MESH=Flakpick
+#exec MESHMAP SCALE MESHMAP=Flakpick X=0.06 Y=0.06 Z=0.12
+#exec MESHMAP SETTEXTURE MESHMAP=Flakpick NUM=1 TEXTURE=JFlak1
+
+#exec AUDIO IMPORT FILE="..\Sounds\flak\Explode1.UFX" NAME="Explode1" FAMILY="flak"
+#exec AUDIO IMPORT FILE="..\Sounds\flak\hidraul2.UFX" NAME="Hidraul2" FAMILY="flak"
+#exec AUDIO IMPORT FILE="..\Sounds\flak\load1.UFX" NAME="load1" FAMILY="flak"
+#exec AUDIO IMPORT FILE="..\Sounds\flak\click.UFX" NAME="click" FAMILY="flak"
+#exec AUDIO IMPORT FILE="..\Sounds\flak\shot1.UFX" NAME="shot1" FAMILY="flak"
+#exec AUDIO IMPORT FILE="..\Sounds\flak\shot2.UFX" NAME="shot2" FAMILY="flak"
+#exec AUDIO IMPORT FILE="..\Sounds\flak\barrelm1.UFX" NAME="barrelm1" FAMILY="flak"
+#exec AUDIO IMPORT FILE="..\Sounds\flak\pdown.UFX" NAME="pdown" FAMILY="flak"
+#exec AUDIO IMPORT FILE="..\Sounds\flak\expl2.UFX" NAME="expl2" FAMILY="flak"
+#exec AUDIO IMPORT FILE="..\Sounds\flak\thumps.UFX" NAME="Thumps" FAMILY="flak"
+#exec AUDIO IMPORT FILE="..\Sounds\flak\hiss1.UFX" NAME="Hiss" FAMILY="flak"
+
+var chunk1 s1,s5;
+var chunk2 s2,s6;
+var chunk3 s3,s7;
+var chunk4 s4,s8;
+var FlakShell s9;
+var vector X,Y,Z;	
 
 
-#exec TEXTURE IMPORT NAME=Jeightb1 FILE=..\MODELS\eightbal.PCX FAMILY=!Skins PALETTE=Jeightb1 FLAGS=2
+function Fire( float Value )
+{
+	GoToState('NormalFire');
+}
 
-#exec MESHMAP NEW   MESHMAP=eightb MESH=eightb 
-#exec MESHMAP SCALE MESHMAP=eightb X=0.1 Y=0.1 Z=0.2
+function AltFire( float Value )
+{
+	GoToState('AltFiring');		
+}
 
-#exec MESHMAP SETTEXTURE MESHMAP=eightb NUM=1 TEXTURE=Jeightb1
+////////////////////////////////////////////////////////////
+state AltFiring
+{
+function Fire( float Value ){ }
+function AltFire( float Value ){ }
+
+Begin:
+	PlaySound(sound 'Hiss', 0.2);
+	PlayAnim('AltFire1', 0.5, True);
+	PlaySound(sound 'explode1', 1.0);
+	FinishAnim();
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);	
+	s9 = Spawn(class'FlakShell', Owner, '', Location + 40.0 * X - 16 * Y - 20 * Z);
+	s9.instigator = Pawn(Owner);
+	PlayAnim('AltFire2', 0.5, True);
+	FinishAnim();
+	PlayAnim('Loading',0.5);	
+	PlaySound(sound 'Load1', 0.1);	
+	FinishAnim();
+	if (Pawn(Owner).bAltFire) goto 'Begin';
+	if (Pawn(Owner).bFire) GoToState('NormalFire');
+	else GotoState('Idle');
+}
+
+/////////////////////////////////////////////////////////////
+state NormalFire
+{
+function Fire( float Value ){ }
+function AltFire( float Value ){ }
+
+Begin:
+	Owner.MakeNoise(2.0);
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+	s1 = Spawn( class 'Chunk1', Owner, '', Location + 30.0 * X - 9 * Y - 9 * Z);
+	s1.instigator = Pawn(Owner);
+	s2 = Spawn( class 'Chunk2', Owner, '', Location + 30.0 * X - 9 * Y - 8 * Z);
+	s2.instigator = Pawn(Owner);
+	s3 = Spawn( class 'Chunk3', Owner, '', Location + 30.0 * X - 7 * Y - 7 * Z);
+	s3.instigator = Pawn(Owner);
+	s4 = Spawn( class 'Chunk4', Owner, '', Location + 30.0 * X - 10 * Y - 8 * Z);
+	s4.instigator = Pawn(Owner);
+	s5 = Spawn( class 'Chunk1', Owner, '', Location + 30.0 * X - 7 * Y - 9 * Z);
+	s5.instigator = Pawn(Owner);
+	s6 = Spawn( class 'Chunk2', Owner, '', Location + 30.0 * X - 9 * Y - 8 * Z);
+	s6.instigator = Pawn(Owner);
+	s7 = Spawn( class 'Chunk3', Owner, '', Location + 30.0 * X - 8 * Y - 9 * Z);
+	s7.instigator = Pawn(Owner);
+	s8 = Spawn( class 'Chunk4', Owner, '', Location + 30.0 * X - 7 * Y - 7 * Z);
+	s8.instigator = Pawn(Owner);
+	PlayAnim( 'Fire', 0.6, True);
+	PlaySound(sound 'Shot1',1.0);	
+	FinishAnim();
+	PlayAnim('Eject',0.8);
+	PlaySound(sound 'Click',0.5);	
+	FinishAnim();
+	PlayAnim('Loading',0.8);
+	PlaySound(sound 'load1', 0.1);		
+	FinishAnim();
+	if (Pawn(Owner).bFire && Pawn(Owner).Weapon==Self) goto 'Begin';
+	if (Pawn(Owner).bAltFire && Pawn(Owner).Weapon==Self) GoToState('AltFiring');
+	else GotoState('Idle');
+	
+}
+
+///////////////////////////////////////////////////////////
+state Idle
+{
+Begin:
+	PlayAnim('Still');
+}
+
+
+////////////////////////////////////////////////////////////////
+state Active
+{
+Begin:
+	Playanim('Select', 0.8, False);
+	PlaySound(sound 'Hidraul2',0.2);		
+	FinishAnim();
+	PlayAnim('Loading', 0.8);
+	PlaySound(sound 'pdown',0.3);		
+	PlaySound(sound 'Load1',0.4);	
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Mesh=eightb
+      s1=None
+      s5=None
+      s2=None
+      s6=None
+      s3=None
+      s7=None
+      s4=None
+      s8=None
+      s9=None
+      X=(+00000.000000,+00000.000000,+00000.000000)
+      Y=(+00000.000000,+00000.000000,+00000.000000)
+      Z=(+00000.000000,+00000.000000,+00000.000000)
+      AutoSwitchPriority=65
+      InventoryGroup=3
+      PlayerViewOffset=(+00002.100000,-00001.500000,-00002.500000)
+      PlayerViewMesh=flak
+      PlayerViewScale=+00001.200000
+      PickupViewMesh=FlakPick
+      Mesh=FlakPick
+      CollisionRadius=+00020.000000
+      CollisionHeight=+00023.000000
+      bUnlit=True
+      bMeshCurvy=False
    End DefaultProperties
 End Class
 
-Begin Class Name=flamet
+Begin Class Name=Rifle
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //=============================================================================
-// flamet.
+// Rifle.
 //=============================================================================
-class flamet expands Weapon;
+class Rifle expands Weapon;
 
-#exec MESH IMPORT MESH=flamet ANIVFILE=..\MODELS\flamet_a.3D DATAFILE=..\MODELS\flamet_d.3D X=0 Y=0 Z=0
-#exec MESH ORIGIN MESH=flamet X=0 Y=100 Z=-120 YAW=64
+#exec MESH IMPORT MESH=Rifle ANIVFILE=..\MODELS\Rifle_a.3D DATAFILE=..\MODELS\Rifle_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Rifle X=0 Y=0 Z=0 YAW=-60 PITCH=8 ROLL=-5
+#exec MESH SEQUENCE MESH=Rifle SEQ=All         STARTFRAME=0   NUMFRAMES=101
+#exec MESH SEQUENCE MESH=Rifle SEQ=Select      STARTFRAME=0   NUMFRAMES=20
+#exec MESH SEQUENCE MESH=Rifle SEQ=Still       STARTFRAME=20  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Rifle SEQ=Fire        STARTFRAME=21  NUMFRAMES=10
+#exec MESH SEQUENCE MESH=Rifle SEQ=ScopeFire   STARTFRAME=31  NUMFRAMES=10
+#exec MESH SEQUENCE MESH=Rifle SEQ=ScopeUp     STARTFRAME=41  NUMFRAMES=14
+#exec MESH SEQUENCE MESH=Rifle SEQ=StillScope  STARTFRAME=55  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Rifle SEQ=Down        STARTFRAME=56  NUMFRAMES=15
+#exec MESH SEQUENCE MESH=Rifle SEQ=DownNoScope STARTFRAME=71  NUMFRAMES=15
+#exec MESH SEQUENCE MESH=Rifle SEQ=ScopeDown   STARTFRAME=86  NUMFRAMES=15
+#exec TEXTURE IMPORT NAME=JRifle1 FILE=..\MODELS\Rifle.PCX FAMILY=Skins PALETTE=JRifle1 
+#exec MESHMAP NEW   MESHMAP=Rifle MESH=Rifle
+#exec MESHMAP SCALE MESHMAP=Rifle X=0.005 Y=0.004 Z=0.01
+#exec MESHMAP SETTEXTURE MESHMAP=Rifle NUM=1 TEXTURE=JRifle1
 
-#exec MESH SEQUENCE MESH=flamet SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH IMPORT MESH=RiPick ANIVFILE=..\MODELS\RiPick_a.3D DATAFILE=..\MODELS\RiPick_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=RiPick X=0 Y=0 Z=0 YAW=-64 
+#exec MESH SEQUENCE MESH=RiPick SEQ=All         STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=RiPick SEQ=Still       STARTFRAME=0   NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=JRifle1 FILE=..\MODELS\Rifle.PCX FAMILY=Skins PALETTE=JRifle1 
+#exec MESHMAP NEW   MESHMAP=RiPick MESH=RiPick
+#exec MESHMAP SCALE MESHMAP=RiPick X=0.045 Y=0.045 Z=0.09
+#exec MESHMAP SETTEXTURE MESHMAP=RiPick NUM=1 TEXTURE=JRifle1
+
+
+var Actor Other;
+var WeaponLight RifleLight;
+var Vector HitNormal,HitLocation,EndTrace,StartTrace,X,Y,Z,NewHitLocation;
+var Rotation BeamRot;
+var WeaponLight r;
+var bool bScopeUp;
+var SightLight s;
+var int i;
+var vector BulletDirection;
+
+function Fire( float Value )
+{
+	GoToState('NormalFire');
+}
+
+function AltFire( float Value )
+{
+	GoToState('AltFiring');	
+}
+
+function Tick( float DeltaTime )
+{
+	If (bScopeUp)
+	{
+		GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+		EndTrace = Location + 10000* Vector(Rotation) + Z * 2 ;
+		Trace(NewHitLocation,HitNormal,EndTrace,, True);
+		NewHitLocation -= HitNormal * 10;
+		s.Move(NewHitLocation - HitLocation);
+		HitLocation = NewHitLocation;
+	}
+}
+
+
+///////////////////////////////////////////////////////
+state AltFiring
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+
+Begin:
+	if (bScopeUp) 
+	{
+		bScopeUp = False;
+		PlayAnim('ScopeDown', 0.7, True);
+		SetTimer(0, False);
+		s.Destroy();
+	}
+	else
+	{
+		bScopeUp = True;
+		PlayAnim('ScopeUp', 0.7, False);
+		log("Beam Spawned");
+		GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+		EndTrace = Location + 10000* Vector(Rotation) + Z * 2 ;
+		Trace(HitLocation,HitNormal,EndTrace);
+		HitLocation += HitNormal * 10;
+		s = Spawn(class'SightLight',Owner, '', HitLocation);		
+	}	
+	FinishAnim();
+	GotoState('Idle');	
+}
+
+///////////////////////////////////////////////////////
+state NormalFire
+{
+
+
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+
+Begin:
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+	BulletDirection = Vector(Rotation);
+	EndTrace = Location + 10000*BulletDirection;
+	StartTrace = Location - Y * 5 - 2 * Z;
+	Other = Trace(HitLocation,HitNormal,EndTrace,StartTrace, True);
+	Owner.MakeNoise(1.0);
+	
+	if (Other == Level)   // Hit a wall
+	{
+		spawn(class'Burst',,,HitLocation+HitNormal*10);		
+	}
+	else if ((Other != self) && (Other != Owner))
+	{
+		Other.Damage(30,  Pawn(Owner), HitLocation, 25000.0*BulletDirection);	
+	}
+	else
+	{
+		log("Don't know what Rifle shot");		
+	}
+	RifleLight = spawn(class'WeaponLight', self, '', Location + 25.0 * X - 1 * Y);
+	Spawn(class'RifleShellCase', self, '', Location + 30 * X - 15 * Y - Z * 1);
+//	RifleLight.floor = self;
+
+	if (bScopeUp) 
+	{
+		PlayAnim('ScopeFire', 0.7, True);
+	}
+	else
+	{
+		PlayAnim('Fire', 0.7, True);
+	}
+	FinishAnim();
+	if (Pawn(Owner).bFire) goto 'Begin';	
+	GotoState('Idle');	
+}
+
+///////////////////////////////////////////////////////////
+state Idle
+{
+Begin:
+	if (bScopeUp) 
+	{
+		PlayAnim('StillScope');
+	}
+	else
+	{
+		PlayAnim('Still');
+	}
+
+}
+
+
+
+///////////////////////////////////////////////////////
+state Active
+{
+Begin:
+	Playanim('Select', 0.6, False);
+	FinishAnim();
+	PlayAnim('Still');	
+	bScopeUp = False;
+}
+
+
+State DownWeapon
+{
+Begin:
+	if (bScopeUp)	PlayAnim('Down');
+	else PlayAnim('DownNoScope');
+	
+	FinishAnim();
+	Pawn(Owner).Weapon = NextWeapon;
+	NextWeapon.BecomeItem();
+	
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Other=None
+      RifleLight=None
+      HitNormal=(+00000.000000,+00000.000000,+00000.000000)
+      HitLocation=(+00000.000000,+00000.000000,+00000.000000)
+      EndTrace=(+00000.000000,+00000.000000,+00000.000000)
+      StartTrace=(+00000.000000,+00000.000000,+00000.000000)
+      X=(+00000.000000,+00000.000000,+00000.000000)
+      Y=(+00000.000000,+00000.000000,+00000.000000)
+      Z=(+00000.000000,+00000.000000,+00000.000000)
+      NewHitLocation=(+00000.000000,+00000.000000,+00000.000000)
+      BeamRot=(0,0,0)
+      R=None
+      bScopeUp=False
+      S=None
+      i=0
+      BulletDirection=(+00000.000000,+00000.000000,+00000.000000)
+      AutoSwitchPriority=97
+      InventoryGroup=8
+      PlayerViewOffset=(+00001.700000,-00000.400000,-00003.000000)
+      PlayerViewMesh=Rifle
+      PickupViewMesh=RiPick
+      Mesh=RiPick
+      AmbientGlow=64
+      CollisionRadius=+00028.000000
+      CollisionHeight=+00008.000000
+      bNoSmooth=False
+      bMeshCurvy=False
+   End DefaultProperties
+End Class
+
+Begin Class Name=Flamethrower
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// flamethrower.
+//=============================================================================
+class Flamethrower expands Weapon;
+
+#exec MESH IMPORT MESH=Flamet ANIVFILE=..\MODELS\flamet_a.3D DATAFILE=..\MODELS\flamet_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Flamet X=0 Y=0 Z=0 YAW=-64
+#exec MESH SEQUENCE MESH=flamet SEQ=All    STARTFRAME=0   NUMFRAMES=1
 #exec MESH SEQUENCE MESH=flamet SEQ=Still  STARTFRAME=0   NUMFRAMES=1
-
-
-#exec TEXTURE IMPORT NAME=Jflamet1 FILE=..\MODELS\flamet.PCX FAMILY=!Skins PALETTE=Jflamet1 FLAGS=2
-
+#exec TEXTURE IMPORT NAME=JFlameT1 FILE=..\MODELS\flamet.PCX FAMILY=Skins PALETTE=Jflamet1 
 #exec MESHMAP NEW   MESHMAP=flamet MESH=flamet 
-#exec MESHMAP SCALE MESHMAP=flamet X=0.1 Y=0.1 Z=0.2
-
+#exec MESHMAP SCALE MESHMAP=flamet X=0.005 Y=0.005 Z=0.01
 #exec MESHMAP SETTEXTURE MESHMAP=flamet NUM=1 TEXTURE=Jflamet1
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Mesh=flamet
+      InventoryGroup=6
+      PlayerViewOffset=(+00002.000000,-00001.000000,-00003.000000)
+      PlayerViewMesh=Flamet
+      PickupViewMesh=Flamet
+      Mesh=Flamet
    End DefaultProperties
 End Class
 
-Begin Class Name=rifle
+Begin Class Name=Impaler
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //=============================================================================
-// rifle.
+// Impaler.
 //=============================================================================
-class rifle expands Weapon;
+class Impaler expands Weapon;
 
-#exec MESH IMPORT MESH=Rifle ANIVFILE=..\MODELS\Rifle_a.3D DATAFILE=..\MODELS\Rifle_d.3D X=0 Y=0 Z=0
-#exec MESH ORIGIN MESH=Rifle X=0 Y=100 Z=-120 YAW=64
+#exec MESH IMPORT MESH=Impale ANIVFILE=..\MODELS\Impale_a.3D DATAFILE=..\MODELS\Impale_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Impale X=0 Y=0 Z=0 YAW=-62 ROLL=0 PITCH=10
 
-#exec MESH SEQUENCE MESH=Rifle SEQ=All  STARTFRAME=0  NUMFRAMES=1
-#exec MESH SEQUENCE MESH=Rifle SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=Impale SEQ=All      STARTFRAME=0   NUMFRAMES=38
+#exec MESH SEQUENCE MESH=Impale SEQ=Idle     STARTFRAME=0   NUMFRAMES=18
+#exec MESH SEQUENCE MESH=Impale SEQ=Still    STARTFRAME=18  NUMFRAMES=2
+#exec MESH SEQUENCE MESH=Impale SEQ=BigFire  STARTFRAME=20  NUMFRAMES=6
+#exec MESH SEQUENCE MESH=Impale SEQ=Still2   STARTFRAME=26  NUMFRAMES=2
+#exec MESH SEQUENCE MESH=Impale SEQ=SmlFire  STARTFRAME=28  NUMFRAMES=5
+#exec MESH SEQUENCE MESH=Impale SEQ=Grow     STARTFRAME=33  NUMFRAMES=5
 
+#exec TEXTURE IMPORT NAME=JImpale1 FILE=..\MODELS\Impaler.PCX FAMILY=Skins PALETTE=JImpale1 
+#exec MESHMAP NEW   MESHMAP=Impale MESH=Impale 
+#exec MESHMAP SCALE MESHMAP=Impale X=0.005 Y=0.005 Z=0.01
+#exec MESHMAP SETTEXTURE MESHMAP=Impale NUM=1 TEXTURE=JImpale1
 
-#exec TEXTURE IMPORT NAME=JRifle1 FILE=..\MODELS\Rifle.PCX FAMILY=!Skins PALETTE=JRifle1 FLAGS=2
+var EnergyBolt r;
+var ImpalerBolt I;
+var vector X,Y,Z;
 
-#exec MESHMAP NEW   MESHMAP=Rifle MESH=Rifle
-#exec MESHMAP SCALE MESHMAP=Rifle X=0.1 Y=0.1 Z=0.2
+function Fire( float Value )
+{
+	GoToState('NormalFire');	
+}
 
-#exec MESHMAP SETTEXTURE MESHMAP=Rifle NUM=1 TEXTURE=JRifle1
+function AltFire( float Value )
+{
+	GoToState('AltFiring');	
+}
+
+//////////////////////////////////////////////////////
+state AltFiring
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+
+Begin:
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+	Owner.MakeNoise(1.0);	
+	I = Spawn(class'ImpalerBolt', Owner, '', Location + 35 * X - 20 * Y - 25 * Z);
+	PlayAnim( 'BigFire', 0.5 );
+	FinishAnim();
+	if (Pawn(Owner).bAltFire) goto 'Begin';	
+	GoToState('Idle');
+
+}
+
+//////////////////////////////////////////////////////
+state NormalFire
+{
+function Fire( float Value ){ }
+function AltFire( float Value ) { }
+
+Begin:
+	GetAxes(Pawn(Owner).ViewRotation,X,Y,Z);
+	Owner.MakeNoise(1.0);	
+	r = Spawn(class'EnergyBolt', Owner, '', Location + 35 * X - 20 * Y - 25 * Z);	
+	PlayAnim( 'SmlFire', 0.5 );
+	FinishAnim();	
+	if (Pawn(Owner).bFire) goto 'Begin';		
+	GoToState('Idle');	
+}
+
+//////////////////////////////////////////////////////
+state Active
+{
+Begin:
+	FinishAnim();
+	LoopAnim('Idle', 0.4);
+}
+
+//////////////////////////////////////////////////////
+state Idle
+{
+Begin:
+	LoopAnim('Idle', 0.4);
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Mesh=rifle
+      R=None
+      i=None
+      X=(+00000.000000,+00000.000000,+00000.000000)
+      Y=(+00000.000000,+00000.000000,+00000.000000)
+      Z=(+00000.000000,+00000.000000,+00000.000000)
+      InventoryGroup=7
+      PickupMessage="You picked up the Impaler"
+      PlayerViewOffset=(+00002.000000,-00001.700000,-00003.700000)
+      PlayerViewMesh=Impale
+      PickupViewMesh=Impale
+      PickupViewScale=+00020.000000
+      Mesh=Impale
+      DrawScale=+00009.000000
+      AmbientGlow=64
+      Fatness=128
+      CollisionHeight=+00010.000000
+      bMeshCurvy=False
+   End DefaultProperties
+End Class
+
+Begin Class Name=TeleportGun
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// TeleportGun.
+//=============================================================================
+class TeleportGun expands Weapon;
+
+#exec MESH IMPORT MESH=QuadShotPickup ANIVFILE=..\MODELS\aniv25.3D DATAFILE=..\MODELS\data25.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=QuadShotPickup X=0 Y=0 Z=0 YAW=0
+#exec MESH SEQUENCE MESH=QuadShotPickup SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=GunPick1 FILE=..\MODELS\quadhand.PCX FAMILY="Skins" PALETTE=GunPick1 
+#exec MESHMAP NEW   MESHMAP=QuadShotPickup MESH=QuadShotPickup 
+#exec MESHMAP SCALE MESHMAP=QuadShotPickup X=0.04 Y=0.04 Z=0.08
+#exec MESHMAP SETTEXTURE MESHMAP=QuadShotPickup NUM=4 TEXTURE=GunPick1 
+
+
+#exec MESH IMPORT MESH=QuadShot ANIVFILE=..\MODELS\aniv20.3D DATAFILE=..\MODELS\data20.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=QuadShot X=0 Y=0 Z=0 YAW=128
+#exec MESH SEQUENCE MESH=QuadShot SEQ=All  STARTFRAME=0  NUMFRAMES=30
+#exec MESH SEQUENCE MESH=QuadShot SEQ=Fire STARTFRAME=0  NUMFRAMES=9
+#exec MESH SEQUENCE MESH=QuadShot SEQ=Reload STARTFRAME=8  NUMFRAMES=21
+#exec TEXTURE IMPORT NAME=QuadHand1 FILE=..\MODELS\QUADHAND.PCX FAMILY="Skins" PALETTE=QuadHand1
+#exec MESHMAP NEW   MESHMAP=QuadShot MESH=QuadShot
+#exec MESHMAP SCALE MESHMAP=QuadShot X=0.04 Y=0.04 Z=0.08
+#exec MESHMAP SETTEXTURE MESHMAP=QuadShot NUM=4 TEXTURE=QuadHand1
+
+var Actor goalProj;
+
+function InvCalcView1( vector OwnerLoc, rotation OwnerRot )
+{
+	local vector DrawOffset;
+	
+	DrawOffset = PlayerViewOffset + Pawn(Owner).EyeHeight*vect(0,0,0.1);
+	SetRotation(OwnerRot);
+}
+
+function Fire( float Value )
+{
+	if (goalProj == None)
+		goalProj = Spawn(class 'TeleportProj',owner,'',owner.location);
+		else
+		{
+		log("teleport");
+		Owner.SetLocation(goalProj.Location);
+		goalProj = None;
+		}
+}
+
+/*
+function AltFire( float Value )
+{
+	if (goalProj != None)
+		SetLocation(goalProj.Location);
+}
+*/
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      goalProj=None
+   End DefaultProperties
+End Class
+
+Begin Class Name=Stunner
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Stunner.
+//=============================================================================
+class Stunner expands Weapon;
+
+#exec MESH IMPORT MESH=stun ANIVFILE=..\MODELS\stun_a.3D DATAFILE=..\MODELS\stun_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=stun X=0 Y=0 Z=0 YAW=-64 ROLL=-7 PITCH=0
+#exec MESH SEQUENCE MESH=stun SEQ=All      STARTFRAME=0   NUMFRAMES=80
+#exec MESH SEQUENCE MESH=stun SEQ=Hidden   STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=stun SEQ=Still    STARTFRAME=1   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=stun SEQ=Charging STARTFRAME=2   NUMFRAMES=21
+#exec MESH SEQUENCE MESH=stun SEQ=Stab     STARTFRAME=23  NUMFRAMES=1
+#exec MESH SEQUENCE MESH=stun SEQ=Shaking  STARTFRAME=24  NUMFRAMES=19
+#exec MESH SEQUENCE MESH=stun SEQ=Down     STARTFRAME=43  NUMFRAMES=12
+#exec MESH SEQUENCE MESH=stun SEQ=Select   STARTFRAME=55  NUMFRAMES=25
+
+#exec TEXTURE IMPORT NAME=Jstunner1 FILE=..\MODELS\stunner.PCX FAMILY=Skins PALETTE=Jstunner1 
+#exec MESHMAP NEW   MESHMAP=stun MESH=stun 
+#exec MESHMAP SCALE MESHMAP=stun  X=0.005 Y=0.005 Z=0.01
+#exec MESHMAP SETTEXTURE MESHMAP=stun NUM=1 TEXTURE=Jstunner1
+
+#exec MESH IMPORT MESH=stunPick ANIVFILE=..\MODELS\stunp_a.3D DATAFILE=..\MODELS\stunp_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=stunPick X=0 Y=0 Z=0 YAW=64
+#exec MESH SEQUENCE MESH=stunpick SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=stunpick SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+#exec MESHMAP NEW   MESHMAP=stunpick MESH=stunpick
+#exec MESHMAP SCALE MESHMAP=stunpick X=0.06 Y=0.06 Z=0.12
+#exec MESHMAP SETTEXTURE MESHMAP=stunpick NUM=1 TEXTURE=Jstunner1
+
+
+var int Charge;
+
+
+state Active
+{
+Begin:
+	Playanim('Select', 0.3);
+}
+
+
+function Fire( float Value )
+{
+	if( AnimRate == 0 )
+	{
+		Charge = 1;
+		SetTimer(0.1,true);  
+		PlayAnim('Charging',0.33);
+	}
+}
+
+function Timer()
+{
+	if ((!pawn(Owner).bFire) && Charge > 0)
+	{
+		GoToState ('FireCharge');
+			
+	}
+	else if (pawn(Owner).bfire)
+	{
+		Charge ++;
+		If (Charge == 25) LoopAnim('Shaking',0.8);
+		If (Charge == 50) GoToState ('FireCharge');
+	}
+}
+
+
+state FireCharge
+{
+Begin:
+	Charge = 0;
+	PlayAnim('Stab', 0.3);
+	FinishAnim();
+	PlayAnim('Still');	
+	MakeNoise(1.0);	
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Charge=0
+      InventoryGroup=9
+      PlayerViewOffset=(+00001.600000,+00000.000000,-00003.000000)
+      PlayerViewMesh=stun
+      PickupViewMesh=stunPick
+      Mesh=stunPick
+      AmbientGlow=64
+      CollisionRadius=+00020.000000
+      CollisionHeight=+00010.000000
+      bNoSmooth=False
+      bMeshCurvy=False
    End DefaultProperties
 End Class
 
@@ -599,6 +1972,29 @@ Begin Class Name=Pickup
 class Pickup expands Inventory
 	abstract
 	package(UnEngine);
+
+
+auto state Pickup
+{
+	// When touched by an actor.
+	function Touch( actor Other )
+	{
+		// If touched by a pawn, let him pick this up.
+		if( Pawn(Other)!=None && Pawn(Other).bIsPlayer )
+		{
+			// See if the pawn wants it.
+//			Log( "Offer " $ Class $ " to " $ Other.Class );
+			if( Pawn(Other).PickupQuery(Self) )
+			{
+				// The pawn wants this item.
+				Pawn(Other).AddInventory(Self);//!!
+				GoToState ('PickupFunction');
+			}
+		}
+	}
+Begin:
+	BecomePickup();
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -656,7 +2052,33 @@ Begin Class Name=Health
 class Health expands PowerUp 
 	package(UnGame);
 
-#call ..\Models\Health.mac
+
+#exec MESH IMPORT MESH=Health ANIVFILE=..\MODELS\aniv38.3D DATAFILE=..\MODELS\data38.3D X=0 Y=0 Z=0
+#exec  MESH ORIGIN MESH=Health X=0 Y=0 Z=0 YAW=0
+#exec  MESH SEQUENCE MESH=Health SEQ=All    STARTFRAME=0  NUMFRAMES=1
+#exec  TEXTURE IMPORT NAME=Jhealth1 FILE=..\MODELS\health.PCX FAMILY="Skins" PALETTE=Jhealth1 FLAGS=2
+#exec  MESHMAP NEW   MESHMAP=Health MESH=Health 
+#exec  MESHMAP SCALE MESHMAP=Health X=0.025 Y=0.025 Z=0.05
+#exec  MESHMAP SETTEXTURE MESHMAP=Health NUM=0 TEXTURE=Jhealth1
+
+State PickupFunction
+{
+
+function Touch (Actor Other)
+{
+
+	log(Other.Class$" touched Health");
+
+	if (Pawn(Other).bIsPlayer)
+	{
+		Pawn(Other).Health += 20;
+		bOnlyOwnerSee = true;
+		bHidden       = true;
+		SetCollision( false, false, false );
+		Destroy();
+	}
+}
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -665,7 +2087,8 @@ class Health expands PowerUp
       PickupViewMesh=Health
       PickupViewScale=+00001.500000
       Mesh=Health
-      DrawScale=+00001.500000
+      CollisionRadius=+00015.000000
+      CollisionHeight=+00010.000000
       Mass=+00000.000000
    End DefaultProperties
 End Class
@@ -679,10 +2102,33 @@ Begin Class Name=Armor
 class Armor expands PowerUp 
 	package(UnGame);
 
-#call ..\Models\Armor.mac
+#exec MESH IMPORT MESH=Armor ANIVFILE=..\MODELS\aniv36.3D DATAFILE=..\MODELS\data36.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Armor X=0 Y=0 Z=0 YAW=0
+#exec MESH SEQUENCE MESH=Armor SEQ=All    STARTFRAME=0  NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=Jarmor1 FILE=..\MODELS\armor.PCX FAMILY="Skins" PALETTE=Jarmor1 FLAGS=2
+#exec MESHMAP NEW   MESHMAP=Armor MESH=Armor 
+#exec MESHMAP SCALE MESHMAP=Armor X=0.02 Y=0.02 Z=0.04
+#exec MESHMAP SETTEXTURE MESHMAP=Armor NUM=7 TEXTURE=Jarmor1
+
+var float ArmorStrength;
+
+State PickupFunction
+{
+
+function Touch (Actor Other)
+{
+	local int hitdamage;
+	log(Other.Class$" touched Armor");
+
+//	if (Pawn(Other).bIsPlayer)
+//	{
+//	}
+}
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
+      ArmorStrength=+00000.000000
       Armor(0)=+00040.000000
       Armor(1)=+00040.000000
       Armor(2)=+00040.000000
@@ -691,35 +2137,31 @@ class Armor expands PowerUp
       PickupViewMesh=Armor
       PickupViewScale=+00002.000000
       Mesh=Armor
-      DrawScale=+00002.000000
+      CollisionRadius=+00016.000000
+      CollisionHeight=+00012.000000
    End DefaultProperties
 End Class
 
-Begin Class Name=heart
+Begin Class Name=Heart
    Begin Text
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //=============================================================================
 // heart.
 //=============================================================================
-class heart expands Powerup;
+class Heart expands Powerup;
 
-#exec MESH IMPORT MESH=heart ANIVFILE=..\MODELS\heart_a.3D DATAFILE=..\MODELS\heart_d.3D X=0 Y=0 Z=0
-#exec MESH ORIGIN MESH=heart X=0 Y=100 Z=-120 YAW=64
-
-#exec MESH SEQUENCE MESH=heart SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH IMPORT MESH=Heart ANIVFILE=..\MODELS\heart_a.3D DATAFILE=..\MODELS\heart_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Heart X=0 Y=100 Z=-120 YAW=64
+#exec MESH SEQUENCE MESH=heart SEQ=All    STARTFRAME=0   NUMFRAMES=1
 #exec MESH SEQUENCE MESH=heart SEQ=Still  STARTFRAME=0   NUMFRAMES=1
-
-
-#exec TEXTURE IMPORT NAME=Jheart1 FILE=..\MODELS\heart.PCX FAMILY=!Skins PALETTE=Jheart1 FLAGS=2
-
+#exec TEXTURE IMPORT NAME=JHeart1 FILE=..\MODELS\heart.PCX FAMILY=Skins PALETTE=Jheart1 FLAGS=2
 #exec MESHMAP NEW   MESHMAP=heart MESH=heart
 #exec MESHMAP SCALE MESHMAP=heart X=0.1 Y=0.1 Z=0.2
-
 #exec MESHMAP SETTEXTURE MESHMAP=heart NUM=1 TEXTURE=Jheart1
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Mesh=heart
+      Mesh=Heart
    End DefaultProperties
 End Class
 
@@ -750,7 +2192,13 @@ Begin Class Name=Clip
 class Clip expands Ammo
 	package(UnGame);
 
-#call ..\Models\Clip.mac
+#exec MESH IMPORT MESH=Clip ANIVFILE=..\MODELS\aniv35.3D DATAFILE=..\MODELS\data35.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Clip X=0 Y=100 Z=400 YAW=0
+#exec MESH SEQUENCE MESH=Clip SEQ=All    STARTFRAME=0  NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=Jclip1 FILE=..\MODELS\clip.PCX FAMILY="Skins" PALETTE=Jclip1 FLAGS=2
+#exec MESHMAP NEW   MESHMAP=Clip MESH=Clip 
+#exec MESHMAP SCALE MESHMAP=Clip X=0.045 Y=0.045 Z=0.09
+#exec MESHMAP SETTEXTURE MESHMAP=Clip NUM=2 TEXTURE=Jclip1
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -758,7 +2206,6 @@ class Clip expands Ammo
       PickupViewMesh=Clip
       PickupViewScale=+00003.000000
       Mesh=Clip
-      DrawScale=+00003.000000
       Mass=+00000.000000
    End DefaultProperties
 End Class
@@ -772,7 +2219,13 @@ Begin Class Name=Shells
 class Shells expands Ammo
 	package(UnGame);
 
-#call ..\Models\Shells.mac
+#exec MESH IMPORT MESH=Shells ANIVFILE=..\MODELS\aniv34.3D DATAFILE=..\MODELS\data34.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Shells X=0 Y=100 Z=400 YAW=0
+#exec MESH SEQUENCE MESH=Shells SEQ=All    STARTFRAME=0  NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=Jshells1 FILE=..\MODELS\shells.PCX FAMILY="Skins" PALETTE=Jshells1 FLAGS=2
+#exec MESHMAP NEW   MESHMAP=Shells MESH=Shells 
+#exec MESHMAP SCALE MESHMAP=Shells X=0.03 Y=0.03 Z=0.06
+#exec MESHMAP SETTEXTURE MESHMAP=Shells NUM=4 TEXTURE=Jshells1
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -780,7 +2233,6 @@ class Shells expands Ammo
       PickupViewMesh=Shells
       PickupViewScale=+00002.000000
       Mesh=Shells
-      DrawScale=+00002.000000
       Mass=+00000.000000
    End DefaultProperties
 End Class
@@ -794,7 +2246,13 @@ Begin Class Name=StingerAmmo
 class StingerAmmo expands Ammo
 	package(UnGame);
 
-#call ..\Models\Tarypick.mac
+#exec MESH IMPORT MESH=TarydiumPickup ANIVFILE=..\MODELS\aniv54.3D DATAFILE=..\MODELS\data54.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=TarydiumPickup X=0 Y=100 Z=400 YAW=0
+#exec MESH SEQUENCE MESH=TarydiumPickup SEQ=All    STARTFRAME=0  NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=JTaryPick1 FILE=..\MODELS\Shells.PCX FAMILY="Skins" PALETTE=JTaryPick1 FLAGS=2
+#exec MESHMAP NEW   MESHMAP=TarydiumPickup MESH=TarydiumPickup 
+#exec MESHMAP SCALE MESHMAP=TarydiumPickup X=0.045 Y=0.045 Z=0.09
+#exec MESHMAP SETTEXTURE MESHMAP=TarydiumPickup NUM=4 TEXTURE=JTaryPick1
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -802,7 +2260,6 @@ class StingerAmmo expands Ammo
       PickupViewMesh=TarydiumPickup
       PickupViewScale=+00003.000000
       Mesh=TarydiumPickup
-      DrawScale=+00003.000000
       Mass=+00000.000000
    End DefaultProperties
 End Class
@@ -814,23 +2271,21 @@ Begin Class Name=Detector
 // Motion detector
 //=============================================================================
 class Detector expands Inventory;
-#exec MESH IMPORT MESH=detect ANIVFILE=..\MODELS\detect_a.3D DATAFILE=..\MODELS\detect_d.3D X=0 Y=0 Z=0
-#exec MESH ORIGIN MESH=detect X=0 Y=100 Z=-120 YAW=64
 
-#exec MESH SEQUENCE MESH=detect SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH IMPORT MESH=Detect ANIVFILE=..\MODELS\detect_a.3D DATAFILE=..\MODELS\detect_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Detect X=60 Y=20 Z=0 YAW=64
+#exec MESH SEQUENCE MESH=detect SEQ=All    STARTFRAME=0   NUMFRAMES=1
 #exec MESH SEQUENCE MESH=detect SEQ=Still  STARTFRAME=0   NUMFRAMES=1
-
-
-#exec TEXTURE IMPORT NAME=Jdetect1 FILE=..\MODELS\detect.PCX FAMILY=!Skins PALETTE=Jdetect1 FLAGS=2
-
+#exec TEXTURE IMPORT NAME=JDetect1 FILE=..\MODELS\detect.PCX FAMILY=Skins PALETTE=Jdetect1 FLAGS=2
 #exec MESHMAP NEW   MESHMAP=detect MESH=detect
-#exec MESHMAP SCALE MESHMAP=detect X=0.1 Y=0.1 Z=0.2
-
+#exec MESHMAP SCALE MESHMAP=detect X=0.02 Y=0.02 Z=0.04
 #exec MESHMAP SETTEXTURE MESHMAP=detect NUM=1 TEXTURE=Jdetect1
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Mesh=detect
+      Mesh=Detect
+      CollisionRadius=+00010.000000
+      CollisionHeight=+00006.000000
    End DefaultProperties
 End Class
 
@@ -842,23 +2297,45 @@ Begin Class Name=Flashlight
 //=============================================================================
 class Flashlight expands Inventory;
 
-#exec MESH IMPORT MESH=flashl ANIVFILE=..\MODELS\flashl_a.3D DATAFILE=..\MODELS\flashl_d.3D X=0 Y=0 Z=0
-#exec MESH ORIGIN MESH=flashl X=0 Y=100 Z=-120 YAW=64
-
-#exec MESH SEQUENCE MESH=flashl SEQ=All  STARTFRAME=0  NUMFRAMES=1
+#exec MESH IMPORT MESH=Flashl ANIVFILE=..\MODELS\flashl_a.3D DATAFILE=..\MODELS\flashl_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=Flashl X=0 Y=0 Z=0 YAW=64
+#exec MESH SEQUENCE MESH=flashl SEQ=All    STARTFRAME=0  NUMFRAMES=1
 #exec MESH SEQUENCE MESH=flashl SEQ=Still  STARTFRAME=0  NUMFRAMES=1
-
-
-#exec TEXTURE IMPORT NAME=Jflashl1 FILE=..\MODELS\flashl.PCX FAMILY=!Skins PALETTE=Jflashl1 FLAGS=2
-
-#exec MESHMAP NEW   MESHMAP=flashl MESH=flashl 
-#exec MESHMAP SCALE MESHMAP=flashl X=0.1 Y=0.1 Z=0.2
-
+#exec TEXTURE IMPORT NAME=JFlashl1 FILE=..\MODELS\flashl.PCX FAMILY=Skins PALETTE=Jflashl1 FLAGS=2
+#exec MESHMAP NEW   MESHMAP=Flashl MESH=flashl 
+#exec MESHMAP SCALE MESHMAP=Flashl X=0.02 Y=0.02 Z=0.04
 #exec MESHMAP SETTEXTURE MESHMAP=flashl NUM=1 TEXTURE=Jflashl1
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Mesh=flashl
+      Mesh=Flashl
+      CollisionRadius=+00017.000000
+      CollisionHeight=+00005.000000
+   End DefaultProperties
+End Class
+
+Begin Class Name=Lava_Boots
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// Lava_Boots.
+//=============================================================================
+class Lava_Boots expands Inventory;
+
+#exec MESH IMPORT MESH=lboot ANIVFILE=..\MODELS\boot_a.3D DATAFILE=..\MODELS\boot_d.3D X=0 Y=0 Z=0
+#exec MESH ORIGIN MESH=lboot X=-70 Y=150 Z=-50 YAW=64
+#exec MESH SEQUENCE MESH=lboot SEQ=All    STARTFRAME=0   NUMFRAMES=1
+#exec MESH SEQUENCE MESH=lboot SEQ=Still  STARTFRAME=0   NUMFRAMES=1
+#exec TEXTURE IMPORT NAME=Jlboot1 FILE=..\MODELS\boot.PCX FAMILY=Skins PALETTE=Jlboot1 FLAGS=2
+#exec MESHMAP NEW   MESHMAP=lboot MESH=lboot
+#exec MESHMAP SCALE MESHMAP=lboot X=0.05 Y=0.05 Z=0.1
+#exec MESHMAP SETTEXTURE MESHMAP=lboot NUM=1 TEXTURE=Jlboot1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+      Mesh=lboot
+      CollisionRadius=+00024.000000
+      CollisionHeight=+00012.000000
    End DefaultProperties
 End Class
 

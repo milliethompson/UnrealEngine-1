@@ -137,9 +137,9 @@ void FGlobalEditor::constraintInit(FConstraints *Const)
 	guard(FGlobalEditor::constraintInit);
 	memset (Const,0,sizeof (FConstraints));
 
-	Const->Grid					= GMath.ZeroVector;
-	Const->GridBase				= GMath.ZeroVector;
-	Const->RotGrid				= GMath.ZeroRotation;
+	Const->Grid					= FVector(0,0,0);
+	Const->GridBase				= FVector(0,0,0);
+	Const->RotGrid				= FRotation(0,0,0);
 	Const->SnapDist				= 0.0;
 
 	Const->Flags				= 0;

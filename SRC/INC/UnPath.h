@@ -15,7 +15,8 @@
 #define DEBUGGINGPATHS  1 //1 to put path info in log
 #define MAXMARKERS 3000 //bound number of turn markers
 #define MAXREACHSPECS 3000 //bound number of reachspecs 
-#define MAXCOMMONRADIUS 54 //max radius to consider in building paths
+#define MAXCOMMONRADIUS 56 //max radius to consider in building paths
+#define MAXCOMMONHEIGHT 60
 #define COS30 0.8660254 
 
 //Reachability flags - using bits to save space
@@ -97,11 +98,15 @@ class FPathMarker
 public:
 	FVector Location;
 	FVector Direction;
-	int visible;
-	int marked;
-	int beacon;
-	int leftTurn;
-	int permanent;
+	DWORD visible:1;
+	DWORD marked:1;
+	DWORD bigvisible:1;
+	DWORD beacon:1;
+	DWORD leftTurn:1;
+	DWORD permanent:1;
+	DWORD stair:1;
+	DWORD routable:1;
+	FLOAT radius;
 	FLOAT budget;
 
 	inline void initialize(const FVector &spot, const FVector &dir, int mrk, const int beac, int left)
@@ -109,8 +114,10 @@ public:
 		Location = spot;
 		Direction = dir;
 		marked = mrk;
+		bigvisible = 0;
 		beacon = beac;
 		permanent = 0;
+		stair = 0;
 		leftTurn = left;
 	}
 
@@ -130,14 +137,20 @@ public:
 	
 	int buildPaths (ULevel *ownerLevel, int optimization);
 	int removePaths (ULevel *ownerLevel);
+	int showPaths (ULevel *ownerLevel);
+	int hidePaths (ULevel *ownerLevel);
 	void definePaths (ULevel *ownerLevel);
+	void undefinePaths (ULevel *ownerLevel);
 
 private:
 	FPathMarker *pathMarkers;
 	ULevel * Level; //owning level - FIXME - can use GLevel
 	APawn * Scout;
 	INDEX	numMarkers;
+	FLOAT humanRadius;
+	int optlevel;
 
+	void changeScoutExtent(FLOAT Radius, FLOAT Height);
 	int createPaths (int optimization);
 	void	newPath(FVector spot);
 	void getScout();
@@ -145,21 +158,27 @@ private:
 	void createPathsFrom(FVector start);
 	void checkObstructionFrom(FPathMarker *marker);
 	int checkmergeSpot(const FVector &spot, FPathMarker *path1, FPathMarker *path2);
+	void premergePath(INDEX iMarker);
 	void mergePath(INDEX iMarker);
 	void adjustPath(INDEX iMarker);
 	void exploreWall(const FVector &moveDirection);
 	inline int walkToward(const FVector &Destination, FLOAT Movesize);
 	void followWall(FVector currentDirection);
+	int checkLeft(FVector &leftDirection, FVector &currentDirection);
 	int checkLeftPassage(FVector &currentDirection);
+	int outReachable(FVector start, FVector destination);
 	int fullyReachable(FVector start, FVector destination);
 	int needPath(const FVector &start);
+	int sawNewLeft(const FVector &start);
 	int oneWaypointTo(const FVector &upstreamSpot);
+	void markLeftReachable(const FVector &start);
 	void markReachable(const FVector &start);
+	int markReachableFromTwo(FPathMarker *path1, FPathMarker *path2);
 	int tryPathThrough(FPathMarker *Waypoint, const FVector &Destination, FLOAT budget);
 	int findPathTo(const FVector &Destination);
 	int angleNearThirty(FVector dir);
 	void nearestThirtyAngle (FVector &currentDirection);
-	void addReachSpecs(APathNode * node);
+	void addReachSpecs(AActor * start);
 };
 
 class UNENGINE_API FReachSpec
@@ -205,6 +224,7 @@ public:
 	FLOAT dropZ;
 	DWORD reachFlags; //see defined bits above
 
+	void changeScoutExtent(APawn * Scout, FLOAT Radius, FLOAT Height);
 	int findBestReachable(FVector &Start, FVector &Destination, APawn * Scout);
 };
 

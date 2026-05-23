@@ -68,17 +68,14 @@ void FMeshIlluminator::AllocateLightCamera(ULevel *ThisLevel)
 	guard(FMeshIlluminator::AllocateLightCamera);
 
 	Camera = new("Raytracer",CREATE_Replace)UCamera(ThisLevel);
-	if( !Camera ) appError ("AllocateLightCamera: NewCamera failed");
-
 	Camera->X					= 128;
 	Camera->Y					= 128;
 	Camera->Actor->ShowFlags	= 0;
 	Camera->Actor->RendMap		= REN_PlainTex;
 
 	Camera->OpenWindow(0,1); // Open a temporary (non-visible) camera
-
 	Camera->Lock(LOCK_ReadWrite);
-	Level		= Camera->Level;
+	Level = Camera->Level;
 
 	unguard;
 }
@@ -127,22 +124,16 @@ void FMeshIlluminator::ComputeLightVisibility( AActor *Actor )
 
 		SetCameraView( i, &Actor->Location );
 		GEdRend->InitTransforms( Level->Model );
-
-		for( FBspDrawList *DrawList = GEdRend->OccludeBsp(Camera,NULL);
-			DrawList != NULL; DrawList = DrawList->Next)
+		for( FBspDrawList *DrawList = GEdRend->OccludeBsp(Camera,NULL); DrawList != NULL; DrawList = DrawList->Next )
 		{
 			FBspSurf &Poly = Level->Model->Surfs(DrawList->iSurf);
+			FBspNode &Node = Level->Model->Nodes(DrawList->iNode);
 			if( Poly.iLightMesh!=INDEX_NONE && 
 				(Actor->bSpecialLit ? (Poly.PolyFlags&PF_SpecialLit) : !(Poly.PolyFlags&PF_SpecialLit)))
 			{
-				if ((Actor->LightRadius==0) || (FPointPlaneDist
-					(
-					Actor->Location,
-					Points (Poly.pBase),
-					Vectors(Poly.vNormal)
-					) <= Actor->WorldLightRadius()))
+				if( Actor->LightRadius==0 || Abs(Node.Plane.PlaneDot(Actor->Location))<= Actor->WorldLightRadius() )
 				{
-					FLightMeshIndex *Index = &LightMesh(Poly.iLightMesh);
+					FLightMeshIndex* Index = &LightMesh(Poly.iLightMesh);
 					if( Index->NumStaticLights < Index->MAX_POLY_LIGHTS )
 					{
 						int Duplicate=0;
@@ -163,7 +154,7 @@ void FMeshIlluminator::ComputeLightVisibility( AActor *Actor )
 		GEdRend->ExitTransforms();
 		MemMark.Pop();
 		DynMemMark.Pop();
-		}
+	}
 	unguard;
 }
 
@@ -176,6 +167,7 @@ int FMeshIlluminator::ComputeAllLightVisibility( int Selected )
 	guard(FMeshIlluminator::ComputeAllLightVisibility);
 	int n=0;
 	
+	SQWORD Time = GApp->MicrosecondTime();
 	for( int i=0; i<Level->Num; i++ )
 	{
 		if( (i&15)==0 )
@@ -196,6 +188,8 @@ int FMeshIlluminator::ComputeAllLightVisibility( int Selected )
 			}
 		}
 	}
+	Time = GApp->MicrosecondTime() - Time;
+	debugf( "Occluded %i views in %f sec (%f msec per light)", n*6, (float)Time/1000000.0, (float)Time/1000.0/n/6 );
 	return n;
 	unguard;
 }
@@ -353,7 +347,7 @@ void FMeshIlluminator::LightBspSurf( INDEX iSurf )
 	int			ByteSize	    = ((Index->MeshUSize+7)>>3) * Index->MeshVSize;
 
 	// Calculate inverse U & V axes which map texels onto pixels.
-	FCoords TexCoords    = FCoords( FVector(0,0,0), TextureU, TextureV, Normal ).Inverse();
+	FCoords TexCoords    = FCoords( FVector(0,0,0), TextureU, TextureV, Normal ).Inverse().Transpose();
 	FVector	InverseUAxis = TexCoords.XAxis * 65536.0;
 	FVector InverseVAxis = TexCoords.YAxis * 65536.0;
 
@@ -382,7 +376,8 @@ void FMeshIlluminator::LightBspSurf( INDEX iSurf )
 				BYTE M = 1;
 				for( int ByteUCounter=0; ByteUCounter < 8; ByteUCounter++ )
 				{
-					if( Level->Model->LineCheck( Hit, NULL, Vertex, *Light, NF_NotLightBlocking ) )
+					if( Level->Model->LineCheck( Hit, NULL, Vertex, *Light, FVector(0,0,0), NF_NotVisBlocking ) )
+					//FCheckResult Hit; if( Level->Trace( Hit, Actor, Vertex, *Light, TRACE_All ) )
 						B |= M;
 					M = M << 1;
 					RaysTraced++;
@@ -397,7 +392,6 @@ void FMeshIlluminator::LightBspSurf( INDEX iSurf )
 	if( iSurf >= Level->Model->Surfs->Num )
 		Surf.Actor->Process( NAME_RaytraceWorld, NULL );
 #endif
-
 	unguard;
 }
 

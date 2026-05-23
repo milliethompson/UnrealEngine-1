@@ -47,9 +47,7 @@ void RenderTriangle
 		RasterTexSetup.Setup( Camera, Pts, NumPts, &GMem );
 		RasterTexSetup.Generate( RasterTexPoly );
 		if( PolyFlags & PF_TwoSided )
-		{
 			RasterTexPoly->ForceForwardFace();
-		}
 		if 
 		(	(Camera->Actor->RendMap != REN_Polys   )
 		&&	(Camera->Actor->RendMap != REN_PolyCuts)
@@ -107,7 +105,7 @@ void Shade
 	{
 		// Lit.
 		//FLOAT G = 0.5 - Min(0.5,0.00035*Location.Z);
-		FLOAT G = Square(Square(Point | Point.Normal)/Point.SizeSquared());
+		FLOAT G = Square(Square(Point | Point.Norm)/Point.SizeSquared());
 		Color.R = Color.G = Color.B = Min
 		(
 			256.0 * 61.0, 256.0 + 60.0 * 256.0 * G + (Owner->AmbientGlow<<6)
@@ -162,10 +160,12 @@ void RenderSubsurface
 		// Compute side distances.
 		for( int i=0,j=2; i<3; j=i++ )
 		{
-			FLOAT Dist  = Square(Pts[j].ScreenX-Pts[i].ScreenX) + Square(Pts[j].ScreenY-Pts[i].ScreenY);
-			CutSide[j]  = Dist > Square(32.f);
-			Alpha[j]    = Min( Dist / Square(32.f) - 1.f, 1.f );
-			Cuts       += (CutSide[j]<<j);
+			FLOAT Dist   = FDistSquared(Pts[j],Pts[i]);
+			FLOAT Curvy  = (Pts[j].Norm ^ Pts[i].Norm).SizeSquared();
+			FLOAT Thresh = 50.0 * Camera->FX * sqrt(Dist * Curvy) / Max(1.f, Pts[j].Z + Pts[i].Z);
+			Alpha[j]     = Min( Thresh / Square(32.f) - 1.f, 1.f );
+			CutSide[j]   = Alpha[j]>0.0;
+			Cuts        += (CutSide[j]<<j);
 		}
 	}
 
@@ -183,7 +183,7 @@ void RenderSubsurface
 	};
 
 	// See if it should be subdivided.
-	if( Cuts && SubCount>0 && Owner->bMeshCurvy )
+	if( Cuts && SubCount>0 && GRender.Curvy && Owner->bMeshCurvy )
 	{
 		for( int i=0,j=2; i<3; j=i++ ) if( CutSide[j] )
 		{
@@ -192,24 +192,31 @@ void RenderSubsurface
 			MidPt = (Pts[j]+Pts[i])*0.5;
 
 			// Compute midpoint normal.
-			MidPt.Normal  = Pts[j].Normal+Pts[i].Normal;
-			MidPt.Normal *= DivSqrtApprox( MidPt.Normal.SizeSquared() );
+			MidPt.Norm  = Pts[j].Norm + Pts[i].Norm;
+			MidPt.Norm *= DivSqrtApprox( MidPt.Norm.SizeSquared() );
+
+			// Enviro map it.
+			if( Owner->bMeshEnviroMap )
+			{
+				MidPt.U += (MidPt.Norm.X * 256 * 65536.0 - MidPt.U) * Alpha[j];
+				MidPt.V += (MidPt.Norm.Y * 256 * 65536.0 - MidPt.V) * Alpha[j];
+			}
 
 			// Shade the midpoint.
 			FVector MidShade;
 			Shade( MidShade, MidPt, Camera, Owner );
-			MidPt.Color = MidPt.Color + (MidShade - MidPt.Color) * Alpha[j];
-			FLOAT Dist  = Square(Pts[j].ScreenX-Pts[i].ScreenX) + Square(Pts[j].ScreenY-Pts[i].ScreenY);
+			MidPt.Color += (MidShade - MidPt.Color) * Alpha[j];
+			FLOAT Dist   = Square(Pts[j].ScreenX-Pts[i].ScreenX) + Square(Pts[j].ScreenY-Pts[i].ScreenY);
 
 			// Curve the midpoint.
 			(FVector&)MidPt
 			+=	0.15
 			*	Alpha[j]
-			*	(FVector&)MidPt.Normal
+			*	(FVector&)MidPt.Norm
 			*	SqrtApprox
 				(
 					(Pts[j]-Pts[i]).SizeSquared()
-				*	(Pts[i].Normal^Pts[j].Normal).SizeSquared()
+				*	(Pts[i].Norm ^ Pts[j].Norm).SizeSquared()
 				);
 
 			// Outcode and optionally transform midpoint.
@@ -268,18 +275,32 @@ void FRender::DrawMesh
 )
 {
 	guard(FRender::DrawMesh);
-	UMesh				*Mesh = Owner->Mesh;
-	FPoly				EdPoly;
-	FCoords				Coords;
-	FTransform			*V1,*V2,*V3;
-	FMeshTriSort 		*TriTop;
-	WORD				Color;
-	INT 				i,j,k;
+	UMesh			*Mesh = Owner->Mesh;
+	FPoly			EdPoly;
+	FCoords			Coords;
+	FTransform		*V1,*V2,*V3;
+	FMeshTriSort 	*TriTop;
+	WORD			Color;
+	INT 			i,j,k;
 
 	// Lock the mesh map.
 	Mesh->Lock( LOCK_Read );
 	BOOL Fatten   = Owner->Fatness!=0;
 	FLOAT Fatness = (Owner->Fatness/16.0)-8.0;
+	
+	// Get environment map.
+	UTexture *EnvironmentMap = NULL;
+	if( Owner->bMeshEnviroMap )
+	{
+		if( !Owner->bEnviroZone && Owner->Skin )
+			EnvironmentMap = Owner->Skin;
+		else if( Owner->Zone && Owner->Zone->EnvironmentMap )
+			EnvironmentMap = Owner->Zone->EnvironmentMap;
+		else if( Owner->Level->EnvironmentMap )
+			EnvironmentMap = Owner->Level->EnvironmentMap;
+		else
+			EnvironmentMap = Owner->Level->SkyTexture;
+	}
 
 	// Process special poly flags.
 	DWORD ExtraFlags = Owner->bNoSmooth ? PF_NoSmooth : 0;
@@ -325,7 +346,7 @@ void FRender::DrawMesh
 		INT VisibleTriangles = 0;
 		if( Outcode == 0 )
 		{
-			// Set up list for triangle sorting, adding all non-backfaced triangles.
+			// Set up list for triangle sorting, adding all possibly visible triangles.
 			TriTop = &TriPool[0];
 			for( i=0; i<Mesh->Tris->Max; i++ )
 			{
@@ -343,16 +364,16 @@ void FRender::DrawMesh
 					// Set the sort key.
 					if( GCameraManager->RenDev )
 					{
-						UTexture *T = Mesh->Textures(Tri.TextureNum);
+						UTexture *T = Mesh->GetTexture( Tri.TextureNum, Owner );
 						TriTop->Key = T ? ((T->Palette->GetIndex() << 16) + T->GetIndex()) : 0;
 					}
 					else
 					{
 						TriTop->Key = ftoi
-						(
+						(   1024 * (
 							Samples[Tri.iVertex[0]].Z +
 							Samples[Tri.iVertex[1]].Z +
-							Samples[Tri.iVertex[2]].Z
+							Samples[Tri.iVertex[2]].Z )
 						);
 					}
 
@@ -395,16 +416,16 @@ void FRender::DrawMesh
 					if( Vert.Color.R == -1 )
 					{
 						// Compute vertex normal.
-						Vert.Normal = GMath.ZeroVector;
+						Vert.Norm = FVector(0,0,0);
 						FMeshVertConnect &Connect = Mesh->Connects(iVert);
 						for( k=0; k<Connect.NumVertTriangles; k++ )
-							Vert.Normal += TriNormals[Mesh->VertLinks(Connect.TriangleListOffset + k)];
-						Vert.Normal *= DivSqrtApprox(Vert.Normal.SizeSquared());
+							Vert.Norm += TriNormals[Mesh->VertLinks(Connect.TriangleListOffset + k)];
+						Vert.Norm *= DivSqrtApprox(Vert.Norm.SizeSquared());
 
 						// Fatten it if desired.
 						if( Fatten )
 						{
-							(FVector&)Vert += Vert.Normal * Fatness;
+							(FVector&)Vert += Vert.Norm * Fatness;
 							Vert.ComputeOutcode( Camera );
 						}
 
@@ -428,19 +449,20 @@ void FRender::DrawMesh
 					(FTransSample&)Pts[j] = Samples[Tri.iVertex[j]];
 					Pts[j].U = Tri.Tex[j].U * 65536.0;
 					Pts[j].V = Tri.Tex[j].V * 65536.0;
+					if( Owner->bMeshEnviroMap )
+					{
+						Pts[j].U = Pts[j].Norm.X * 256 * 65536.0;
+						Pts[j].V = Pts[j].Norm.Y * 256 * 65536.0;
+					}
 				}
 
 				// Get texture.
-				UTexture *Texture = Mesh->Textures( Tri.TextureNum );
-				if( !Texture ) 
-					Texture = GGfx.DefaultTexture;
-				
-				// Render triangle.
+				UTexture *Texture = Mesh->GetTexture( Tri.TextureNum, Owner );
 				RenderSubsurface
 				(
 					Camera,
 					Owner,
-					Texture, 
+					Texture,
 					SpanBuffer, 
 					Sprite->Zone, 
 					Pts, 

@@ -24,6 +24,11 @@ HISTORY:
 #include "UnAudio.h"		/* Declarations for using UnAudio.lib */
 #include "UnConfig.h"
 
+// The symbol TEST enables a little bit of code that
+// I use for debugging.  This should be commented out
+// for normal use.
+#define TEST
+
 /********************************* HEADERS *********************************/
 
 	/* See "UnFGAud.h" for public declarations and prototypes */
@@ -73,7 +78,7 @@ plog(char *msg)
 {
 	if (msg[0] != '\0' && msg[strlen(msg) - 1] == '\n')
 		msg[strlen(msg) - 1] = '\0';
-	debugf(LOG_Debug, "%s", msg);
+	debugf(LOG_Info, "%s", msg);
 } /* End plog() */
 
 /*************************************************************************
@@ -113,18 +118,17 @@ FGlobalAudio::Init(int MakeActive)
 //	SoundEngLogDetail(1);
 	plog("FGlobalAudio::Init()\n");
 
-    // Stuff added by Mark: to be checked by Ammon...
-    // Comment from Ammon:  This looks reasonable to me
-    {
-        //todo: Clean-up - these strings are both here and in unconfig.cpp...
-        MusicVolumeSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "MusicVolume", 42 ) );        
-        SfxVolumeSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "SoundVolume", 127 ) );        
-        DirectSoundFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "UseDirectSound", TRUE ) );
-        FilterFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "EnableFilter", TRUE ) );
-        Use16BitFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "Enable16Bit", TRUE ) );
-        SurroundFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "EnableSurround", TRUE ) );
-        MixingRateSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "MixingRate", 22050 ) );        
-    }
+	/* Read audio settings from Unreal configuration file. */
+	/* NOTE:  The strings that write these settings are in UnConfig.cpp */
+	MusicVolumeSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "MusicVolume", 42 ) );        
+	SfxVolumeSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "SoundVolume", 127 ) );        
+	DirectSoundFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "UseDirectSound", TRUE ) );
+	FilterFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "EnableFilter", TRUE ) );
+	Use16BitFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "Enable16Bit", TRUE ) );
+	SurroundFlagSet( GConfiguration.GetBoolean( FConfiguration::AudioSection, "EnableSurround", TRUE ) );
+	MixingRateSet( GConfiguration.GetInteger( FConfiguration::AudioSection, "MixingRate", 22050 ) );
+	SfxMute( GConfiguration.GetInteger( FConfiguration::AudioSection, "SfxMute", 0));
+	MusicMute( GConfiguration.GetInteger( FConfiguration::AudioSection, "MusicMute", 0));
 
 	/* Initialize sound engine. */
 	if (!SoundEngGlobalInit(MakeActive))
@@ -252,6 +256,9 @@ FGlobalAudio::InitLevel(int MaxIndices)
 
 	USound *Sound;	/* Used for object enumeration loop. */
 	int	count;	/* Count of objects. */
+#ifdef TEST
+	USound *TmpSound = NULL;
+#endif /* TEST */
 
 	plog("FGlobalAudio::InitLevel()\n");
 
@@ -264,13 +271,24 @@ FGlobalAudio::InitLevel(int MaxIndices)
 		** Load this sound into sound engine, saving
 		** the sound ID returned by the sound engine.
 		*/
-//		bug("Registering %s",Sound->Name);
 		Sound->SoundID = SoundEngSoundRegister(Sound->GetData());
 		if (Sound->SoundID == -1)
 		{
 			appErrorf("Failed registering %s",Sound->GetName());
 		}
-//		bug("Registered %s",Sound->Name);
+
+#ifdef TEST
+		debugf(LOG_Info, "Registered sound %s", Sound->GetName());
+		// Look for the sound object TESTSND, which is
+		// a continuously looping sound that I stick
+		// into Unreal.ucx for debugging purposes.
+		if (stricmp(Sound->GetName(), "TESTSND") == 0)
+		{
+			debugf(LOG_Info, "Found test sound");
+			TmpSound = Sound;
+		}
+#endif /* TEST */
+
 		count++;
 	}
 	END_FOR_ALL_TYPED_OBJECTS;
@@ -281,6 +299,26 @@ FGlobalAudio::InitLevel(int MaxIndices)
 		/* Failed init. */
 		return 0;
 	}
+
+#ifdef TEST
+	// Play the test sound, unless it wasn't found.
+	if (TmpSound != NULL)
+	{
+//		FVector *Src = new FVector((FLOAT)17.0, (FLOAT)-5.0, (FLOAT)-95.0);
+		FVector *Src = new FVector((FLOAT)60.0, (FLOAT)-108.0, (FLOAT)-113.0);
+		debugf(LOG_Info, "Playing test sound");
+		PlaySfxLocated(Src,	/* Location. */
+			TmpSound,	/* Sound. */
+			4095,		/* Actor. */
+			0.0,		/* Radius. */
+			1.0,		/* fScale. */
+			1.0);		/* fPitchmod. */
+	}
+	else
+	{
+		debugf(LOG_Info, "Didn't find test sound");
+	}
+#endif /* TEST */
 
 	return 1;
 	unguard;
@@ -345,6 +383,21 @@ FGlobalAudio::Tick(void)
 
 	/* Update count of times called. */
 	num_ticks++;
+
+#ifdef TEST
+#if 0
+	// Test SfxMoveActor
+	{
+//		FVector *Src = new FVector((FLOAT)17.0, (FLOAT)-5.0, (FLOAT)-95.0);
+		FVector *Src = new FVector((FLOAT)60.0, (FLOAT)-108.0, (FLOAT)-113.0);
+		SfxMoveActor(
+			4095,		/* Actor. */
+			Src, 		/* Where. */
+//			0.25);		/* Fscale. */
+			1.0);		/* Fscale. */
+	}
+#endif
+#endif /* TEST */
 
 	/* Force sound engine update. */
 	SoundEngUpdate();
@@ -433,9 +486,11 @@ FGlobalAudio::PlaySfxOrigined(const FVector *Source, USound *usnd,
 				Source->X,	/* World location */
 				Source->Y,
 				Source->Z,
-				fPitchmod);
-	SoundEngSoundSetRadius(pid, SoundRadius);
-	SoundEngSoundScaleVolume(pid, fScale);
+				fPitchmod,
+				SoundRadius,
+				fScale);
+//	SoundEngSoundSetRadius(pid, SoundRadius);
+//	SoundEngSoundScaleVolume(pid, fScale);
 
 	return pid;
 
@@ -500,9 +555,11 @@ FGlobalAudio::PlaySfxLocated(const FVector *Source, USound *usnd,
 				Source->X,	/* World location */
 				Source->Y,
 				Source->Z,
-				fPitchmod);
-	SoundEngSoundSetRadius(pid, SoundRadius);
-	SoundEngSoundScaleVolume(pid, fScale);
+				fPitchmod,
+				SoundRadius,
+				fScale);
+//	SoundEngSoundSetRadius(pid, SoundRadius);
+//	SoundEngSoundScaleVolume(pid, fScale);
 
 	return pid;
 
@@ -649,6 +706,10 @@ FGlobalAudio::MusicVolumeSet(INT NewVol)
 {
 	guard(FGlobalAudio::MusicVolumeSet);
 
+	if (NewVol < 0)
+		NewVol = 0;
+	if (NewVol > MAX_MUSIC_VOLUME)
+		NewVol = MAX_MUSIC_VOLUME;
 	return SoundEngMusicVolumeSet(NewVol);
 
 	unguard;
@@ -695,6 +756,10 @@ FGlobalAudio::SfxVolumeSet(INT NewVol)
 {
 	guard(FGlobalAudio::SfxVolumeSet);
 
+	if (NewVol < 0)
+		NewVol = 0;
+	if (NewVol > MAX_SFX_VOLUME)
+		NewVol = MAX_SFX_VOLUME;
 	return SoundEngSfxVolumeSet(NewVol);
 
 	unguard;
@@ -739,6 +804,7 @@ FGlobalAudio::SfxVolumeGet(void)
 void
 FGlobalAudio::MusicFade(INT fFadeOut)
 {
+	fFadeOut &= 1;
 	SoundEngMusicFade(fFadeOut);
 } /* End FGlobalAudio::MusicFade() */
 
@@ -759,6 +825,7 @@ FGlobalAudio::MusicFade(INT fFadeOut)
 void
 FGlobalAudio::SfxFade(INT fFadeOut)
 {
+	fFadeOut &= 1;
 	SoundEngSfxFade(fFadeOut);
 } /* End FGlobalAudio::SfxFade() */
 
@@ -792,6 +859,14 @@ FGlobalAudio::SfxFade(INT fFadeOut)
 void
 FGlobalAudio::ReverbParamsSet(INT Space, INT Depth)
 {
+	if (Space < 0)
+		Space = 0;
+	if (Space > 5000)
+		Space = 5000;
+	if (Depth < 1)
+		Depth = 1;
+	if (Depth > 99)
+		Depth = 99;
 	SoundEngReverbParamsSet(Space, Depth);
 } /* End FGlobalAudio::ReverbParamsSet() */
 
@@ -841,10 +916,35 @@ FGlobalAudio::DirectSoundFlagSet(INT val)
 {
 	guard(FGlobalAudio::DirectSoundFlagSet);
 
+	val &= 1;
 	return SoundEngDirectSoundFlagSet(val);
 
 	unguard;
 } /* End FGlobalAudio::DirectSoundFlagSet() */
+
+/*
+** FGlobalAudio::DirectSoundOwnerWindowSet:
+** Specifies to the audio system the handle of the
+** window that "owns" the DirectSound subsystem.
+** This is required in order for DirectSound to be
+** utilized.
+**
+** Parameters:
+**	Name	Description
+**	----	-----------
+**	hWnd	Window handle (cast to void *) of the
+**		window that is to be the DirectSound
+**		"owner" window (i.e. Unreal's main
+**		display window).
+**
+** Returns:
+**	NONE
+*/
+void
+FGlobalAudio::DirectSoundOwnerWindowSet(void *hWnd)
+{
+	SoundEngSetDirectSoundOwnerWnd(hWnd);
+} /* End FGlobalAudio::DirectSoundOwnerWindowSet() */
 
 /*
 ** FGlobalAudio::FilterFlagGet:
@@ -892,6 +992,7 @@ FGlobalAudio::FilterFlagSet(INT val)
 {
 	guard(FGlobalAudio::FilterFlagSet);
 
+	val &= 1;
 	return SoundEngFilterFlagSet(val);
 
 	unguard;
@@ -943,6 +1044,7 @@ FGlobalAudio::Use16BitFlagSet(INT val)
 {
 	guard(FGlobalAudio::Use16BitFlagSet);
 
+	val &= 1;
 	return SoundEng16BitFlagSet(val);
 
 	unguard;
@@ -993,6 +1095,7 @@ FGlobalAudio::SurroundFlagSet(INT val)
 {
 	guard(FGlobalAudio::SurroundFlagSet);
 
+	val &= 1;
 	return SoundEngSurroundFlagSet(val);
 
 	unguard;
@@ -1017,6 +1120,10 @@ FGlobalAudio::MixingRateSet(INT val)
 {
 	guard(FGlobalAudio::MixingRateSet);
 
+	if (val < 11000)
+		val = 11000;
+	if (val > 44100)
+		val = 44100;
 	return SoundEngMixingRateSet(val);
 
 	unguard;
@@ -1112,6 +1219,126 @@ FGlobalAudio::SpecifySong(UMusic *pSong)
 	unguard;
 } /* End FGlobalAudio::SpecifySong() */
 
+/*
+** MusicMute:
+** Turns muting of music on or off.
+**
+** Parameters:
+**	Value	Meaning
+**	-----	-------
+**	bMute	Flag; 0 = unmute; 1 = mute.
+**
+** Returns:
+**	NONE
+*/
+void
+FGlobalAudio::MusicMute(INT bMute)
+{
+	bMute &= 1;
+	SoundEngMusicMute(bMute);
+} /* End FGlobalAudio::MusicMute() */
+
+/*
+** MusicIsMuted:
+** Determines if music is currently muted.
+**
+** Parameters:
+**	NONE
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	1	Muted.
+**	0	Not muted.
+*/
+INT
+FGlobalAudio::MusicIsMuted(void)
+{
+	return SoundEngMusicMute(-1);
+} /* End FGlobalAudio::MusicIsMuted() */
+
+/*
+** SfxMute:
+** Turns muting of sound effects on or off.
+**
+** Parameters:
+**	Value	Meaning
+**	-----	-------
+**	bMute	Flag; 0 = unmute; 1 = mute.
+**
+** Returns:
+**	NONE
+*/
+void
+FGlobalAudio::SfxMute(INT bMute)
+{
+	bMute &= 1;
+	SoundEngSfxMute(bMute);
+} /* End FGlobalAudio::SfxMute() */
+
+/*
+** SfxIsMuted:
+** Determines if sound effects are currently muted.
+**
+** Parameters:
+**	NONE
+**
+** Returns:
+**	Value	Meaning
+**	-----	-------
+**	1	Muted.
+**	0	Not muted.
+*/
+INT
+FGlobalAudio::SfxIsMuted(void)
+{
+	return SoundEngSfxMute(-1);
+} /* End FGlobalAudio::SfxIsMuted() */
+
+/*
+** PanExaggerationSet:
+** Specify exaggeration factor for panning calculations
+** for located sounds.
+**
+** Parameters:
+**	Name	Description
+**	----	-----------
+**	val	Exaggeration multiplier.
+**		1.0 = normal
+**		0.5 = less panning
+**		2.0 = more panning
+**
+** Returns:
+**	NONE
+*/
+void
+FGlobalAudio::PanExaggerationSet(FLOAT val)
+{
+	SoundEngPanExaggerationSet((double)val);
+} /* End FGlobalAudio::PanExaggerationSet() */
+
+/*
+** DopplerExaggerationSet:
+** Specify exaggeration factor for Doppler shift effects
+** for located sounds.
+**
+** Parameters:
+**	Name	Description
+**	----	-----------
+**	val	Exaggeration multiplier.
+**		1.0 = normal shifting
+**		0.5 = less shifting
+**		2.0 = more shifting
+**
+** Returns:
+**	NONE
+*/
+void
+FGlobalAudio::DopplerExaggerationSet(FLOAT val)
+{
+	SoundEngDopplerExaggerationSet((double)val);
+} /* End FGlobalAudio::DopplerExaggerationSet() */
+
 /*******************************************************************
                       Unreal console handler
 *******************************************************************/
@@ -1157,11 +1384,6 @@ FGlobalAudio::Exec(const char *Cmd,FOutputDevice *Out)
 			Out->Log("Sound system debug level reset");
 		}
 		return 1;
-	}
-	else if (GetCMD(&Str, "HELP"))
-	{
-		Out->Log("   AUDIOLOG LEVEL=n - Specify sound system log detail level, where 'n' is 1 to 9");
-		return 0;
 	}
 	else
 	{

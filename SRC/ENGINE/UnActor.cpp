@@ -17,6 +17,62 @@
 IMPLEMENT_CLASS(AActor);
 
 /*-----------------------------------------------------------------------------
+	Coordinate systems.
+-----------------------------------------------------------------------------*/
+
+//
+// Get forward coordinate system.
+//
+inline FCoords AActor::ToLocal() const
+{
+	if( !Brush ) return GMath.UnitCoords / Rotation / Location;
+	//else         return GMath.UnitCoords / -Brush->PrePivot / Brush->Scale / Brush->Rotation / Brush->PostScale / (Brush->Location + Brush->PostPivot);
+	else         return GMath.UnitCoords / -Brush->PrePivot / Brush->Scale / Rotation / Brush->PostScale / (Location + Brush->PostPivot);
+	//else         return GMath.UnitCoords / Rotation / Location;
+}
+
+//
+// Get reverse coordinate system.
+//
+inline FCoords AActor::ToWorld() const
+{
+	if( !Brush ) return GMath.UnitCoords * Location * Rotation;
+	//else         return GMath.UnitCoords * (Brush->Location + Brush->PostPivot) * Brush->PostScale * Brush->Rotation * Brush->Scale * -Brush->PrePivot;
+	else         return GMath.UnitCoords * (Location + Brush->PostPivot) * Brush->PostScale * Rotation * Brush->Scale * -Brush->PrePivot;
+	//else         return GMath.UnitCoords * Location * Rotation;
+}
+
+/*-----------------------------------------------------------------------------
+	AActor collision functions.
+-----------------------------------------------------------------------------*/
+
+//
+// Return whether this actor overlaps another.
+//
+BOOL AActor::IsOverlapping( const AActor *Other ) const
+{
+	guardSlow(AActor::IsOverlapping);
+	debugInput(Other!=NULL);
+
+	if( !Brush && !Other->Brush && Other!=Level )
+	{
+		// See if cylinder actors are overlapping.
+		return
+			Square(Location.X      - Other->Location.X)
+		+	Square(Location.Y      - Other->Location.Y)
+		<	Square(CollisionRadius + Other->CollisionRadius) 
+		&&	Square(Location.Z      - Other->Location.Z)
+		<	Square(CollisionHeight + Other->CollisionHeight);
+	}
+	else
+	{
+		// We cannot detect whether these actors are overlapping so we say they aren't.
+		return 0;
+	}
+	unguardSlow;
+}
+
+/*-----------------------------------------------------------------------------
 	Actor touch minions.
 -----------------------------------------------------------------------------*/
 
@@ -33,6 +89,7 @@ IMPLEMENT_CLASS(AActor);
 void AActor::BeginTouch( AActor *Other )
 {
 	guard(AActor::BeginTouch);
+	checkState(Other!=this);
 
 	// See if a touch slot is available in Actor.
 	int Available=-1;
@@ -83,6 +140,7 @@ void AActor::BeginTouch( AActor *Other )
 void AActor::EndTouch( AActor *Other, BOOL NoNotifySelf )
 {
 	guard(AActor::EndTouch);
+	checkState(Other!=this);
 
 	// Notify Actor.
 	for( int i=0; i<ARRAY_COUNT(Touching); i++ )
@@ -186,15 +244,34 @@ void AActor::SetOwner( AActor *NewOwner )
 }
 
 //
-// Change the actor's floor.
+// Change the actor's base.
 //
-void AActor::SetFloor( AActor *NewFloor )
+void AActor::SetBase( AActor *NewBase )
 {
-	guard(AActor::SetFloor);
+	guard(AActor::SetBase);
+	//debugf("SetBase %s -> %s",GetName(),NewBase ? NewBase->GetName() : "NULL");
+	if( NewBase != Base )
+	{
+		// Notify old base, unless it's the level.
+		if( Base && Base!=Level )
+		{
+			Base->StandingCount--;
+			Base->Process( NAME_Detach, &PActor(this) );
+		}
 
-	//todo!!
-	Floor = NewFloor;
+		// Set base.
+		Base = NewBase;
 
+		// Notify new base, unless it's the level.
+		if( Base && Base!=Level )
+		{
+			Base->StandingCount++;
+			Base->Process( NAME_Attach, &PActor(this) );
+		}
+
+		// Notify this actor of his new floor.
+		Process( NAME_BaseChange, NULL );
+	}
 	unguard;
 }
 

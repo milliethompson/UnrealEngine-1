@@ -19,7 +19,7 @@ Resource2=IDR_LOG
 Resource3=IDR_CONACCEL
 Resource4=IDD_PASSWORD
 Resource5=IDD_PROPERTIES_PREFERENCES
-Resource6=IDD_LOG
+Resource6=IDR_EDITORCAM
 Class4=CPasswordDlg
 Resource7=IDD_SLOWTASK
 Resource8=IDD_ACTION_SELECTION
@@ -34,7 +34,7 @@ Resource16=IDD_AUDIO
 Resource17=IDD_ACTION_TUTORIAL
 Resource18=IDR_PLAYERCAM
 Class5=CUnrealServer
-Resource19=IDR_EDITORCAM
+Resource19=IDD_LOG
 
 [CLS:CUnrealWnApp]
 Type=0

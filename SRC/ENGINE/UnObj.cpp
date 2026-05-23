@@ -27,7 +27,14 @@
 	Statics.
 -----------------------------------------------------------------------------*/
 
+// Object class autoregistry.
 UClass *FGlobalObjectManager::AutoRegister=NULL;
+
+// Global object hashing.
+static INT ObjectHashOf( class UClass* Class, FName Name )
+{
+	return (Class->GetIndex() + 457*Name.GetIndex()) & (FGlobalObjectManager::HASH_COUNT-1);
+}
 
 /*-----------------------------------------------------------------------------
 	UObjectBase implementation.
@@ -234,7 +241,6 @@ void UObject::PostLoadHeader( DWORD PostFlags )
 
 	// Set up execution stack.
 	MainStack.Object = this;
-	MainStack.InitVfCache();
 
 	// Clear all non-persistent flags.
 	ClearFlags( RF_TransHeader );
@@ -400,8 +406,25 @@ void UObject::Kill()
 		PreKill();
 		appFree(this);
 		GObj.ResArray[ThisIndex] = NULL;
+
+		guard(Traverse);
+		INT iHash = ObjectHashOf( ThisClass, ThisName );
+		for( FObjectHashLink** Link = &GObj.ResHash[iHash]; *Link!=NULL; Link=&(*Link)->HashNext )
+		{
+			guard(Unhash);
+			if( (*Link)->Object == this )
+			{
+				FObjectHashLink* Test = *Link;
+				*Link                 = (*Link)->HashNext;
+				delete Test;
+				break;
+			}
+			unguard;
+		}
+		checkState(Link!=NULL);
+		unguard;
 	}
-	unguardf(("(%s %s)",ThisClass->GetName(),ThisName()));
+	unguardf(( "(%s %s)", ThisClass->GetName(), ThisName() ));
 }
 
 //
@@ -543,26 +566,36 @@ INT UObject::Lock( DWORD NewLockType )
 {
 	guard(UObject::Lock);
 	checkState(NewLockType & LOCK_Read);
-
 	if( (NewLockType & LOCK_Read)==LOCK_Read )
 	{
 		// Lock for reading.
 		ReadLocks++;
 	}
-
 	if( (NewLockType & LOCK_Trans)==LOCK_Trans )
 	{
 		// Lock transactionally.
 		checkState(GTrans != NULL);
 		TransLocks++;
 	}
-
 	if( (NewLockType & LOCK_ReadWrite)==LOCK_ReadWrite )
 	{
 		// Lock for writing and save header if transactional.
 		WriteLocks++;
 		ModifyHeader();
 	}
+	return 1;
+	unguardobj;
+}
+
+//
+// Lock the object for reading.
+//
+INT UObject::ReadLock() const
+{
+	guard(UObject::ReadLock);
+
+	// Lock for reading.
+	ReadLocks++;
 
 	return 1;
 	unguardobj;
@@ -575,24 +608,34 @@ void UObject::Unlock( DWORD OldLockType )
 {
 	guard(UObject::Unlock);
 	checkState(OldLockType & LOCK_Read);
-
 	if( (OldLockType & LOCK_Trans)==LOCK_Trans )
 	{
 		TransLocks--;
 		checkState(TransLocks>=0);
 	}
-
 	if( (OldLockType & LOCK_ReadWrite)==LOCK_ReadWrite )
 	{
 		WriteLocks--;
 		checkState(WriteLocks>=0);
 	}
-
 	if( (OldLockType & LOCK_Read)==LOCK_Read )
 	{
 		ReadLocks--;
 		checkState(ReadLocks>=0);
 	}
+	unguardobj;
+}
+
+//
+// Unlock the object for reading.
+//
+void UObject::ReadUnlock() const
+{
+	guard(UObject::ReadUnlock);
+
+	ReadLocks--;
+	checkState(ReadLocks>=0);
+
 	unguardobj;
 }
 
@@ -860,21 +903,20 @@ IMPLEMENT_CLASS(UDatabase);
 //
 // Find an object.
 //
-UObject *FGlobalObjectManager::FindObject( const char *Name, UClass *Type, EFindObject FindType )
+UObject* FGlobalObjectManager::FindObject( const char *Name, UClass *Class, EFindObject FindType )
 {
 	guard(FGlobalObjectManager::Find);
 
-	// Try to find it.
-	for( int i=0; i<MaxRes; i++ )
-	{
-		UObject *Res = ResArray[i];
-		if( Res && Res->GetClass()==Type && stricmp( Name, Res->GetName() )==0 )
-			return Res;
-	}
+	// Find it.
+	FName FindName(Name,FNAME_Find);
+	if( FindName != NAME_None )
+		for( FObjectHashLink* Link = ResHash[ObjectHashOf(Class,FindName)]; Link!=NULL; Link=Link->HashNext )
+			if( Link->Object->Class==Class && Link->Object->Name==FindName )
+				return Link->Object;
 
 	// Error if required but not found.
-	if( FindType==FIND_Existing )
-		appErrorf( "Can't find %s %s", Type->GetName(), Name );
+	if( FindType == FIND_Existing )
+		appErrorf( "Can't find %s %s", Class->GetName(), Name );
 
 	// Return not found.
 	return NULL;
@@ -898,28 +940,37 @@ void FGlobalObjectManager::Init()
 	// Allocate all tables.
 	MaxRes      = 1024;
 	ResArray	= appMallocArray( MaxRes, UObject*, "ResArray" );
+	ResHash     = appMallocArray( HASH_COUNT, FObjectHashLink*, "ResHash" );
 
 	// Init objects.
 	for( INDEX i=0; i<MaxRes; i++ )
 		ResArray[i] = NULL;
+	for( i=0; i<HASH_COUNT; i++ )
+		ResHash[i] = NULL;
 
-	// Add all autoregister classes.
+	// Add all autoregister classes, class first.
 	INT NumClasses=0;
-	for( UClass *Class=AutoRegister; Class!=NULL; Class=Class->ResNextAutoReg )
+	for( int Pass=0; Pass<2; Pass++ )
 	{
-		// Validate it.
-		if( !(Class->ClassFlags & CLASS_Intrinsic) )
-			appErrorf( "Class %s needs CLASS_Intrinsic", Class->GetName() );
-		if( Class->GetFName() == NAME_None )
-			appErrorf( "An autoregistered class is unnamed" );
+		for( UClass *Class=AutoRegister; Class!=NULL; Class=Class->ResNextAutoReg )
+		{
+			if( Pass==0 ? Class->GetFName()==NAME_Class : Class->GetFName()!=NAME_Class )
+			{
+				// Validate it.
+				if( !(Class->ClassFlags & CLASS_Intrinsic) )
+					appErrorf( "Class %s needs CLASS_Intrinsic", Class->GetName() );
+				if( Class->GetFName() == NAME_None )
+					appErrorf( "An autoregistered class is unnamed" );
 
-		// Set size of the new data defined in this class, relative to its parent class.
-		Class->ResThisHeaderSize = Class->ResFullHeaderSize;
-		if( Class->ParentClass )
-			Class->ResThisHeaderSize -= Class->ParentClass->ResFullHeaderSize;
+				// Set size of the new data defined in this class, relative to its parent class.
+				Class->ResThisHeaderSize = Class->ResFullHeaderSize;
+				if( Class->ParentClass )
+					Class->ResThisHeaderSize -= Class->ParentClass->ResFullHeaderSize;
 
-		// Add to the global object table.
-		AddObject(Class);
+				// Add to the global object table.
+				AddObject(Class);
+			}
+		}
 	}
 
 	// Allocate hardcoded objects.
@@ -937,7 +988,7 @@ void FGlobalObjectManager::Exit()
 	guard(FGlobalObjectManager::Exit);
 
 	// Kill all unclaimed objects.
-	CollectGarbage(GApp);
+	CollectGarbage( GApp );
 
 	// Kill the root object.
 	Root->Kill();
@@ -957,6 +1008,7 @@ void FGlobalObjectManager::Exit()
 	// Shit down names.
 	FName::ExitSubsystem();
 
+	appFree( ResHash  );
 	appFree( ResArray );
 	
 	debug (LOG_Exit,"Object subsystem successfully closed.");
@@ -1013,7 +1065,7 @@ int FGlobalObjectManager::Exec(const char *Cmd,FOutputDevice *Out)
 		if( GetCMD(&Str,"GARBAGE") )
 		{
 			// Purge unclaimed objects.
-			CollectGarbage(Out);
+			CollectGarbage( Out );
 			return 1;
 		}
 		else if( GetCMD(&Str,"HASH") )
@@ -1133,10 +1185,10 @@ int FGlobalObjectManager::AddFile( const char* Filename, ULinkerLoad** LinkerPar
 class FArchiveSaveTagExports : public FArchive
 {
 public:
-	FArchiveSaveTagExports(UObject *InParentRes)
-	:	OurFlags(InParentRes->GetFlags() & RF_LoadContextFlags) {}
+	FArchiveSaveTagExports( UObject *InParentRes )
+	:	OurFlags( InParentRes->GetFlags() & RF_LoadContextFlags ) {}
 private:
-	FArchive& operator<< ( UObject *&Res )
+	FArchive& operator<<( UObject *&Res )
 	{
 		guard(FArchiveSaveTagExports<<Obj);
 		if( Res && !(Res->GetClassFlags() & CLASS_Transient) )
@@ -1145,9 +1197,9 @@ private:
 			if( Res->GetFlags() & RF_NotForEdit   ) FlagMask &= ~RF_LoadForEdit;
 			if( Res->GetFlags() & RF_NotForClient ) FlagMask &= ~RF_LoadForClient;
 			if( Res->GetFlags() & RF_NotForServer ) FlagMask &= ~RF_LoadForServer;
-			if(
-				(Res->GetFlags() & RF_TagExp) != RF_TagExp
-			||	(Res->GetFlags() & FlagMask ) != FlagMask)
+			if
+			(	(Res->GetFlags() & RF_TagExp) != RF_TagExp
+			||	(Res->GetFlags() & FlagMask ) != FlagMask )
 			{
 				// Tag for export and set the appropriate context flags.
 				Res->SetFlags(RF_TagExp | FlagMask);
@@ -1161,7 +1213,7 @@ private:
 		return *this;
 		unguard;
 	}
-	FArchive& operator<< ( FName &Name )
+	FArchive& operator<<( FName &Name )
 	{
 		guard(FArchiveSaveTagExports::Name);
 
@@ -1231,9 +1283,9 @@ void FGlobalObjectManager::TagImports( DWORD ClassSkipFlags )
 		if( Res->Flags & RF_TagExp )
 		{
 			// Build list.
-			FArchiveSaveTagImports Ar(CLASS_Transient);
-			Res->SerializeHeader(Ar);
-			Res->SerializeData(Ar);
+			FArchiveSaveTagImports Ar( CLASS_Transient );
+			Res->SerializeHeader( Ar );
+			Res->SerializeData( Ar );
 		}
 	}
 	END_FOR_ALL_OBJECTS;
@@ -1273,25 +1325,14 @@ int FGlobalObjectManager::SaveTagged( const char *Filename, int NoWarn )
 		Summary.NumNames          = 0;
 		strncpy( Summary.Tag, UNREALFILE_TAG,NAME_SIZE );
 
-		UObject *Res;
-		FOR_ALL_OBJECTS(Res)
-		{
-			// Make sure we export resource class names.
-			/*
-			if( Res->Flags & (RF_TagExp|RF_TagImp) )
-				Res->Class->GetFName().SetFlags
-				(
-					RF_TagExp | (Res->Class->GetFlags() & RF_LoadContextFlags)
-				);
-			*/
-		}
-		END_FOR_ALL_OBJECTS;
-
 		// Compute object stats.
+		UObject *Res;
 		FOR_ALL_OBJECTS(Res)
 		{
 			if( Res->Flags & (RF_TagExp|RF_TagImp) )
 				Summary.NumObjects++;
+			//if( Res->Flags & (RF_TagExp|RF_TagImp) )
+			//	Res->Class->GetFName().SetFlags ( RF_TagExp | (Res->Class->GetFlags() & RF_LoadContextFlags) );
 		}
 		END_FOR_ALL_OBJECTS;
 
@@ -1586,6 +1627,7 @@ char *FGlobalObjectManager::MakeUniqueObjectName
 	End = &NewBase[strlen(NewBase)];
 	while( End>NewBase && isdigit(End[-1]) )
 		End--;
+	TempInt = atoi(End);//!!
 	*End = 0;
 
 	// Append numbers to base name.
@@ -1824,7 +1866,7 @@ void FGlobalObjectManager::AddObject( UObject *Res )
 	{
 		Index     = MaxRes;
 		MaxRes   += 256 + (MaxRes/4);
-		ResArray  = (UObject **)appRealloc(ResArray,MaxRes * sizeof(UObject **),"ResArray");
+		ResArray  = (UObject **)appRealloc( ResArray, MaxRes * sizeof(UObject **), "ResArray" );
 		for( int i=Index; i<MaxRes; i++ )
 			ResArray[i] = NULL;
 	}
@@ -1832,6 +1874,10 @@ void FGlobalObjectManager::AddObject( UObject *Res )
 	// Add to global table here.
 	ResArray[Index]	= Res;
 	Res->Index      = Index;
+
+	// Add to hash.
+	INT iHash      = ObjectHashOf( Res->GetClass(), Res->GetFName() );
+	ResHash[iHash] = new FObjectHashLink( Res, ResHash[iHash] );
 
 	unguard;
 }
@@ -1861,7 +1907,7 @@ UObject *FGlobalObjectManager::CreateObject
 		appErrorf( "Can't allocate %s: class %s is abstract", Name ? Name : "(null)", Type->GetName() );
 
 	// Compose name.
-	if( !Name || (Create==CREATE_MakeUnique && FindObject(Name,Type,FIND_Optional)) )
+	if( !Name || Create==CREATE_MakeUnique )
 	{
 		// Must create a unique name.
 		if( !Name )
@@ -1879,7 +1925,7 @@ UObject *FGlobalObjectManager::CreateObject
 	{
 		// Object doesn't already exist.
 		Index = INDEX_NONE;
-		Res   = (UObject *)appMalloc(Type->ResFullHeaderSize,"Res(%s)",Name);
+		Res   = (UObject *)appMalloc( Type->ResFullHeaderSize, "Res(%s)", Name );
 	}
 	else if( Create == CREATE_Unique )
 	{
@@ -2358,8 +2404,9 @@ void EnumTopicHandler::Get(ULevel *Level, const char *Item, FOutputDevice &Out)
 	{
 		for( int i=0; i<Enum->Num; i++ )
 		{
-			if (i>0) Out.Logf(",");
-			Out.Logf("%i - %s",i,Enum->Element(i)());
+			if( i > 0 )
+				Out.Logf(",");
+			Out.Logf( "%i - %s", i, Enum->Element(i)() );
 		}
 	}
 	unguard;

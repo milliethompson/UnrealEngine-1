@@ -872,15 +872,16 @@ void FMovingBrushTracker::AddPolyFragment
 	Node = &Level->Model->Nodes(iNode);
 
 	// Set node's info.
-	Node->iSurf       	= iAddSurf;
-	Node->iDynamic[0]	= INDEX_NONE;
-	Node->iDynamic[1] 	= INDEX_NONE;
-	Node->NodeFlags   	= NF_IsNew | NF_Sporadic;
-	Node->iBound		= INDEX_NONE;
-	Node->ZoneMask		= Parent->ZoneMask;
-	Node->NumVertices	= EdPoly->NumVertices;
+	Node->iSurf       	  = iAddSurf;
+	Node->iDynamic[0]	  = 0;
+	Node->iDynamic[1] 	  = 0;
+	Node->NodeFlags   	  = NF_IsNew;
+	Node->iCollisionBound = INDEX_NONE;
+	Node->iRenderBound    = INDEX_NONE;
+	Node->ZoneMask		  = Parent->ZoneMask;
+	Node->NumVertices	  = EdPoly->NumVertices;
 
-	if( (iCoplanarParent==INDEX_NONE) || Different )
+	if( iCoplanarParent==INDEX_NONE || Different )
 	{
 		Node->iZone[0] = Node->iZone[1]	= ZoneParent->iZone[ZoneFront];
 	}
@@ -933,7 +934,7 @@ void FMovingBrushTracker::AddPolyFragment
 	else				 Parent->iBack  = iNode;
 
 	*iActorNodePrevLink = iNode;
-	iActorNodePrevLink  = &Node->iBound;
+	iActorNodePrevLink  = &Node->iRenderBound;
 
 	return;
 
@@ -971,30 +972,26 @@ void FMovingBrushTracker::FilterFPoly
 	{
 		// Must split to avoid vertex overflow.
 		TempFrontEdPoly = new(GMem)FPoly;
-		EdPoly->SplitInHalf(TempFrontEdPoly);
-		FilterFPoly(iNode,iCoplanarParent,TempFrontEdPoly,Outside);
+		EdPoly->SplitInHalf( TempFrontEdPoly );
+		FilterFPoly( iNode, iCoplanarParent, TempFrontEdPoly, Outside );
 	}
-#if CHECK_ALL
-#if PRECOMPUTE_FILTER
-	if( Surf->PolyFlags & (PF_IsFront | PF_IsBack) )
-	{
-		// Filter status was precomputed based on bounding sphere.
-		if (Surf->PolyFlags & PF_IsFront) goto Front;
-		else goto Back;
-	}
-#endif
+#if PRECOMPUTE_FILTER && !CHECK_ALL
+	if( Node->NodeFlags & NF_IsFront )
+		goto Front;
+	else if( Node->NodeFlags & NF_IsBack )
+		goto Back;
 #endif
 	SplitResult = EdPoly->SplitWithPlaneFast
 	(
-		Level->Model->Points  (Surf->pBase),
-		Level->Model->Vectors (Surf->vNormal),
+		FPlane( Level->Model->Points(Surf->pBase), Level->Model->Vectors(Surf->vNormal) ),
 		TempFrontEdPoly,
 		TempBackEdPoly
 	);
 	if( SplitResult == SP_Front )
-		{
-#if CHECK_ALL
-		if (Surf->PolyFlags & PF_IsBack) appError("Precompute error 1");
+	{
+#if CHECK_ALL && PRECOMPUTE_FILTER
+		if( Node->NodeFlags & NF_IsBack )
+			appError("Precompute error 1");
 #endif
 		Front:
 		Outside = Outside || Node->IsCsg();
@@ -1003,12 +1000,14 @@ void FMovingBrushTracker::FilterFPoly
 			iNode = Node->iFront;
 			goto FilterLoop;
 		}
-		else if (Outside) AddPolyFragment(iNode,iCoplanarParent,1,EdPoly);
+		else if( Outside )
+			AddPolyFragment(iNode,iCoplanarParent,1,EdPoly);
 	}
 	else if( SplitResult == SP_Back )
 	{
-#if CHECK_ALL
-		if (Surf->PolyFlags & PF_IsFront) appError("Precompute error 2");
+#if CHECK_ALL && PRECOMPUTE_FILTER
+		if( Node->NodeFlags & NF_IsFront )
+			appError("Precompute error 2");
 #endif
 		Back:
 		Outside = Outside && !Node->IsCsg();
@@ -1017,25 +1016,31 @@ void FMovingBrushTracker::FilterFPoly
 			iNode = Node->iBack;
 			goto FilterLoop;
 		}
-		else if (Outside) AddPolyFragment(iNode,iCoplanarParent,0,EdPoly);
+		else if( Outside )
+			AddPolyFragment(iNode,iCoplanarParent,0,EdPoly);
 	}
 	else if( SplitResult == SP_Coplanar )
 	{
-#if CHECK_ALL
-		if (Surf->PolyFlags & (PF_IsFront | PF_IsBack)) appError("Precompute error 3");
+#if CHECK_ALL && PRECOMPUTE_FILTER
+		if( Node->NodeFlags & (NF_IsFront | NF_IsBack) )
+			appError("Precompute error 3");
 #endif
-		if ((Level->Model->Vectors(Surf->vNormal) | FPolyNormal) >= 0.0) iCoplanarParent = iNode;
+		if( (Level->Model->Vectors(Surf->vNormal) | FPolyNormal) >= 0.0 )
+			iCoplanarParent = iNode;
 		goto Front;
 	}
 	else if( SplitResult == SP_Split )
 	{
-#if CHECK_ALL
-		if (Surf->PolyFlags & (PF_IsFront | PF_IsBack)) appError("Precompute error 4");
+#if CHECK_ALL && PRECOMPUTE_FILTER
+		if( Node->NodeFlags & (NF_IsFront | NF_IsBack) )
+			appError("Precompute error 4");
 #endif
 
 		// Handle front fragment.
-		if (Node->iFront != INDEX_NONE) FilterFPoly(Node->iFront,iCoplanarParent,TempFrontEdPoly,Outside || Node->IsCsg());
-		else if (Outside || Node->IsCsg()) AddPolyFragment(iNode,iCoplanarParent,1,TempFrontEdPoly);
+		if( Node->iFront != INDEX_NONE )
+			FilterFPoly( Node->iFront, iCoplanarParent, TempFrontEdPoly, Outside || Node->IsCsg() );
+		else if( Outside || Node->IsCsg() )
+			AddPolyFragment( iNode, iCoplanarParent, 1, TempFrontEdPoly );
 
 		// Handle back fragment.
 		EdPoly			= TempBackEdPoly;
@@ -1099,7 +1104,6 @@ void FMovingBrushTracker::AddActorBrush( AActor *Actor )
 	// to the Brush's current rotation:
 	FModelCoords Coords;
 	FLOAT    Orientation = Brush->BuildCoords(&Coords,NULL);
-	FVector  Location    = Brush->Location + Brush->PostPivot;
 
 	int Total=0;
 	for( int i=0; i<Brush->Polys->Num; i++ )
@@ -1112,16 +1116,16 @@ void FMovingBrushTracker::AddActorBrush( AActor *Actor )
 	for( i=0; i<Brush->Polys->Num; i++ )
 	{
 		TransformedPolys[i] = Brush->Polys(i);
-		TransformedPolys[i].Transform( Coords, &Brush->PrePivot, &Location, Orientation );
+		TransformedPolys[i].Transform( Coords, Brush->PrePivot, Brush->Location + Brush->PostPivot, Orientation );
 #if PRECOMPUTE_FILTER
 		for( int j=0; j<TransformedPolys[i].NumVertices; j++ )
 			Points[Count++] = TransformedPolys[i].Vertex[j];
 #endif
 	}
 #if PRECOMPUTE_FILTER
-	checkState(Count==Total);
+	debugState(Count==Total);
 	FBoundingVolume Bound;
-	Bound.Init( Points, Total );
+	Bound = FBoundingVolume( Total, Points );
 	Level->Model->PrecomputeSphereFilter( Bound.Sphere );
 #endif
 
@@ -1133,7 +1137,8 @@ void FMovingBrushTracker::AddActorBrush( AActor *Actor )
 		FBspSurf *Surf  = &Level->Model->Surfs(iSurf);
 
 #if CHECK_ALL
-		if (SurfOwners[iSurf-Level->Model->Surfs->Num]!=Actor) appError( "iSurfOwner mismatch" );
+		if( SurfOwners[iSurf-Level->Model->Surfs->Num] != Actor )
+			appError( "iSurfOwner mismatch" );
 #endif
 
 		FPolyNormal = Poly->Normal;
@@ -1146,11 +1151,8 @@ void FMovingBrushTracker::AddActorBrush( AActor *Actor )
 		// corresponding VertPools and points) for all outside leaves the FPoly fragments fall into:
 		guard(Filtering);
 		{
-			// Scrub precompute info from surface.
-			Surf->PolyFlags &= ~(PF_IsFront | PF_IsBack);
-
 			iAddSurf = iSurf;
-			if (Level->Model->Nodes->Num > 0 )
+			if( Level->Model->Nodes->Num > 0 )
 				FilterFPoly( 0, INDEX_NONE, Poly, 1 );
 
 		}
@@ -1166,11 +1168,12 @@ void FMovingBrushTracker::AddActorBrush( AActor *Actor )
 		FBspNode *Node   = &Level->Model->Nodes(iNode);
 
 #if CHECK_ALL
-		if (NodeOwners[iNode-Level->Model->Nodes->Num]!=Actor) appError( "Add node inconsistency" );
+		if( NodeOwners[iNode-Level->Model->Nodes->Num]!=Actor )
+			appError( "Add node inconsistency" );
 #endif
 
 		Node->NodeFlags &= ~NF_IsNew;
-		iNode            = Node->iBound;
+		iNode            = Node->iRenderBound;
 	}
 
 	Brush->Unlock(LOCK_ReadWrite);
@@ -1253,7 +1256,7 @@ void FMovingBrushTracker::FlushActorBrush( AActor *Actor, int Group )
 		}
 		FreeVertPoolIndex    (Node->iVertPool,Node->NumVertices);
 		FreeNodeIndex        (iNode);
-		iNode = Node->iBound;
+		iNode = Node->iRenderBound;
 	}
 	unguard;
 }

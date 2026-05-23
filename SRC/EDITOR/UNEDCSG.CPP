@@ -27,12 +27,13 @@ void FGlobalEditor::csgPrepMovingBrush( UModel *Brush )
 {
 	guard(FGlobalEditor::csgPropMovingBrush);
 	debugf("Preparing moving brush %s", Brush->GetName() );
+	Brush->RootOutside = 1;
 
 	// Build bounding box.
-	Brush->BuildBound(1);
+	Brush->BuildBound( 1 );
 
 	// Allocate databases.
-	Brush->AllocDatabases(0);
+	Brush->AllocDatabases( 0 );
 
 	// Build BSP for the brush.
 	bspBuild( Brush, BSP_Good, 15, 1 );
@@ -93,7 +94,7 @@ UModel *FGlobalEditor::csgDuplicateBrush
 
 	// If it's a moving brush, prep it.
 	if( IsMovingBrush )
-		csgPrepMovingBrush(NewBrush);
+		csgPrepMovingBrush( NewBrush );
 
 	return NewBrush;
 	unguard;
@@ -324,58 +325,58 @@ int FGlobalEditor::polyFindMaster(UModel *Model, INDEX iSurf, FPoly &Poly)
 //
 // Doesn't do any transaction tracking.  Assumes you've called transSelectedBspSurfs.
 //
-void FGlobalEditor::polyUpdateMaster(UModel *Model,INDEX iSurf,int UpdateTexCoords,int UpdateBase)
-	{
+void FGlobalEditor::polyUpdateMaster
+(
+	UModel*	Model,
+	INDEX	iSurf,
+	INT		UpdateTexCoords,
+	INT		UpdateBase
+)
+{
 	guard(FGlobalEditor::polyUpdateMaster);
-	FPoly			*MasterEdPoly,*BrushEdPolys;
-	UModel			*MasterBrush;
-	UPolys			*EdPolysHeader;
-	FModelCoords	Uncoords;
-	//
+
 	FBspSurf &Poly = Model->Surfs(iSurf);
-	if (!Poly.Brush) return;
-	//
-	MasterBrush		= Poly.Brush;
-	EdPolysHeader	= MasterBrush->Polys;
-	//
-	MasterBrush->Polys->Lock(LOCK_ReadWrite);
-	BrushEdPolys	= &MasterBrush->Polys->Element(0);
-	//
-	if (UpdateTexCoords || UpdateBase) Poly.Brush->BuildCoords(NULL,&Uncoords);
-	//
-	INDEX iEdPoly = Poly.iBrushPoly;
-	while (iEdPoly < EdPolysHeader->Num)
+	if( !Poly.Brush )
+		return;
+
+	Poly.Brush->Polys->Lock( LOCK_Trans );
+
+	FModelCoords Uncoords;
+	if( UpdateTexCoords || UpdateBase )
+		Poly.Brush->BuildCoords( NULL, &Uncoords );
+
+	for( INDEX iEdPoly = Poly.iBrushPoly; iEdPoly < Poly.Brush->Polys->Num; iEdPoly++ )
+	{
+		FPoly& MasterEdPoly = Poly.Brush->Polys->Element(iEdPoly);
+		if( iEdPoly==Poly.iBrushPoly || MasterEdPoly.iLink==Poly.iBrushPoly )
 		{
-		MasterEdPoly = &BrushEdPolys[iEdPoly];
-		//
-		MasterEdPoly->Texture   = Poly.Texture;
-		MasterEdPoly->PanU      = Poly.PanU;
-		MasterEdPoly->PanV      = Poly.PanV;
-		MasterEdPoly->PolyFlags = Poly.PolyFlags & ~(PF_EdCut|PF_EdProcessed|PF_Selected|PF_Memorized);
-		//
-		if (UpdateTexCoords || UpdateBase)
+			Poly.Brush->Polys->ModifyItem(iEdPoly);
+
+			MasterEdPoly.Texture   = Poly.Texture;
+			MasterEdPoly.PanU      = Poly.PanU;
+			MasterEdPoly.PanV      = Poly.PanV;
+			MasterEdPoly.PolyFlags = Poly.PolyFlags & ~(PF_NoEdit);
+
+			if( UpdateTexCoords || UpdateBase )
 			{
-			if (UpdateTexCoords)
+				if( UpdateTexCoords )
 				{
-				MasterEdPoly->TextureU = Model->Vectors(Poly.vTextureU).TransformVectorBy(Uncoords.VectorXform);
-				MasterEdPoly->TextureV = Model->Vectors(Poly.vTextureV).TransformVectorBy(Uncoords.VectorXform);
-				};
-			if (UpdateBase)
+					MasterEdPoly.TextureU = Model->Vectors(Poly.vTextureU).TransformVectorBy(Uncoords.VectorXform);
+					MasterEdPoly.TextureV = Model->Vectors(Poly.vTextureV).TransformVectorBy(Uncoords.VectorXform);
+				}
+				if( UpdateBase )
 				{
-				MasterEdPoly->Base
-				=	(Model->Points(Poly.pBase) - MasterBrush->Location - MasterBrush->PostPivot)
-				.	TransformVectorBy(Uncoords.PointXform)
-				+	MasterBrush->PrePivot;
-				};
-			};
-		while (++iEdPoly < EdPolysHeader->Num)
-			{
-			if (BrushEdPolys[iEdPoly].iLink == Poly.iBrushPoly) break;
-			};
-		};
-	MasterBrush->Polys->Unlock(LOCK_ReadWrite);
+					MasterEdPoly.Base
+					=	(Model->Points(Poly.pBase) - Poly.Brush->Location - Poly.Brush->PostPivot)
+					.	TransformVectorBy(Uncoords.PointXform)
+					+	Poly.Brush->PrePivot;
+				}
+			}
+		}
+	}
+	Poly.Brush->Polys->Unlock( LOCK_Trans );
 	unguard;
-	};
+}
 
 //
 // Find all Bsp polys with flags such that SetBits are clear or ClearBits are set.
@@ -1434,13 +1435,13 @@ void FGlobalEditor::polyTexAlign(UModel *Model,ETexAlign TexAlignType,DWORD Texe
 					//
 					Orientation = Poly->Brush->BuildCoords (&Coords,&Uncoords);
 					//
-					EdPoly.TextureU  = GMath.ZeroVector;
-					EdPoly.TextureV  = GMath.ZeroVector;
+					EdPoly.TextureU  = FVector(0,0,0);
+					EdPoly.TextureV  = FVector(0,0,0);
 					EdPoly.Base      = EdPoly.Vertex[0];
 					EdPoly.PanU      = 0;
 					EdPoly.PanV      = 0;
-					EdPoly.Finalize  (0);
-					EdPoly.Transform (Coords,&GMath.ZeroVector,&GMath.ZeroVector,Orientation);
+					EdPoly.Finalize( 0 );
+					EdPoly.Transform( Coords, FVector(0,0,0), FVector(0,0,0), Orientation );
 					//
 		      		Poly->vTextureU 	= bspAddVector (Model,&EdPoly.TextureU,0);
 	      			Poly->vTextureV 	= bspAddVector (Model,&EdPoly.TextureV,0);
@@ -1460,7 +1461,7 @@ void FGlobalEditor::polyTexAlign(UModel *Model,ETexAlign TexAlignType,DWORD Texe
 						Base           	= Model->Points(Poly->pBase);
 						OldBase         = Base;
 						BaseZ          	= (Base | Normal) / Normal.Z;
-						Base       		= GMath.ZeroVector;
+						Base       		= FVector(0,0,0);
 						Base.Z     		= BaseZ;
 			      		Poly->pBase 	= bspAddPoint (Model,&Base,1);
 						//

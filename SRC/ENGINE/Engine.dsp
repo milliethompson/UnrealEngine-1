@@ -42,7 +42,7 @@ RSC=rc.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir "."
 # ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
-# ADD CPP /nologo /GB /Zp4 /MD /W4 /WX /vd0 /GX /O2 /Ob2 /I "..\Inc" /I "..\Inc\3dfx" /D "COMPILING_ENGINE" /D "RELEASE" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Yu"Unreal.h" /FD /QIfdiv- /c
+# ADD CPP /nologo /Zp4 /MD /W4 /WX /vd0 /GX /O2 /Ob2 /I "..\Inc" /I "..\Inc\3dfx" /D "COMPILING_ENGINE" /D "RELEASE" /D "NDEBUG" /D "WIN32" /D "_WINDOWS" /Yu"Unreal.h" /FD /QIfdiv- /c
 # SUBTRACT CPP /Fr
 # ADD BASE MTL /nologo /D "NDEBUG" /win32
 # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
@@ -80,7 +80,7 @@ BSC32=bscmake.exe
 # ADD BSC32 /nologo
 LINK32=link.exe
 # ADD BASE LINK32 kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:windows /dll /debug /machine:I386
-# ADD LINK32 ..\Lib\UnAudio.lib winmm.lib kernel32.lib user32.lib gdi32.lib /nologo /base:"0x1200000" /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"LIBC" /out:"..\..\System\dEngine.dll"
+# ADD LINK32 winmm.lib kernel32.lib user32.lib gdi32.lib ..\Lib\UnAudio.lib /nologo /base:"0x1200000" /subsystem:windows /dll /debug /machine:I386 /nodefaultlib:"LIBC" /out:"..\..\System\dEngine.dll"
 # SUBTRACT LINK32 /incremental:no
 
 !ENDIF 
@@ -278,6 +278,10 @@ SOURCE=.\UnDynBSP.cpp
 
 !ENDIF 
 
+# End Source File
+# Begin Source File
+
+SOURCE=..\Inc\UnEditor.h
 # End Source File
 # Begin Source File
 
@@ -606,6 +610,10 @@ SOURCE=.\UnPrefer.cpp
 # End Source File
 # Begin Source File
 
+SOURCE=.\UnPrim.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\UnProp.cpp
 
 !IF  "$(CFG)" == "Engine - Win32 Release"
@@ -665,6 +673,7 @@ SOURCE=.\UnScript.cpp
 !IF  "$(CFG)" == "Engine - Win32 Release"
 
 # ADD CPP /O2
+# SUBTRACT CPP /FA<none>
 
 !ELSEIF  "$(CFG)" == "Engine - Win32 Debug"
 

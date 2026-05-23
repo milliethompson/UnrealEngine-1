@@ -301,7 +301,7 @@ Private Sub Settings_Click()
         OneSided.Value = True
     Case "Water":
         Regular.Value = True
-        ZonePortal.Value = 0
+        ZonePortal.Value = 1
         Transparent.Value = 1
         Invisible.Value = 0
         NonSolid.Value = True

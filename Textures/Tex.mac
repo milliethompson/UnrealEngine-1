@@ -1,0 +1,49 @@
+;============================================================================
+; Macro to import textures into UnrealEd.
+; Comments are preceded by the ";" character.
+;
+; To execute this macro in UnrealEd, go to Window/Log, and in the log window
+; type the following commands:
+;     MACRO PLAY FILE=..\Textures\Tex.mac
+; (Note: This will play the macro file, but it won't update the UnrealEd user interface).
+;
+; The options for the "Texture Import" command are:
+;
+;    File=   the name of the file to import.
+;    Name=   the name of the texture as it appears in UnrealEd.
+;    Set=    the name of the texture set it should appear in.
+;    Mips=   this should always be 1.
+;    Detail= the name of the detail texture to apply.
+;    Bump=   optional name of bump map to associate with the texture.
+;    Detail= optional name of detail texture to associate with the texture.
+;    Next=   optional name of the next texture in the animation sequence.
+;    MTex=   optional name of the macrotexture to associate with the texture.
+;    Flags= is a set of bit flags (add the following options together):
+;       2 = masked
+;       4 = transparent
+;    TexFlags= is a set of bit flags:
+;       2 = bump map
+;
+; The options for the "Texture SaveSet" command are:
+;    Set= is the name of the texture set to save.
+;    File= is the name of the .utx file to save to.
+;============================================================================
+
+;
+; Detail textures.
+;
+
+; General detail textures.
+Texture Import File="..\Textures\Detail\DMarble.pcx" Name="DMarble" Set="Detail" Mips=1 Flags=0 TexFlags=0
+Texture Import File="..\Textures\Detail\DMarble.pcx" Name="DMarble" Set="Detail" Mips=1 Flags=0 TexFlags=0
+Texture SaveSet Set="Detail" FILE="..\Textures\Detail.utx"
+
+;
+; The "Ancient" texture set.
+;
+
+; ABase.
+Texture Import File="..\Textures\Ancient\ABase\ABasic3.pcx" Name="ABasic3" Set="ABase" Detail="DMarble" Mips=1 Flags=0 TexFlags=0
+Texture Import File="..\Textures\Ancient\ABase\ABasic4.pcx" Name="ABasic4" Set="ABase" Detail="JFlameBall1" Mips=1 Flags=0 TexFlags=0
+Texture Import File="..\Textures\Ancient\ABase\Basic1.pcx"  Name="ABasic1" Set="ABase" Detail="Backdrop" Mips=1 Flags=0 TexFlags=0
+Texture SaveSet Set="ABase" FILE="..\Textures\ABase.utx"

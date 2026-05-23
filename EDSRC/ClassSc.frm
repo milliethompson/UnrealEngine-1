@@ -1,8 +1,8 @@
 VERSION 5.00
-Object = "{3B7C8863-D78F-101B-B9B5-04021C009402}#1.1#0"; "richtx32.ocx"
+Object = "{3B7C8863-D78F-101B-B9B5-04021C009402}#1.1#0"; "RICHTX32.OCX"
 Begin VB.Form frmScriptEd 
    Caption         =   "Class Script Editor"
-   ClientHeight    =   7335
+   ClientHeight    =   6300
    ClientLeft      =   3570
    ClientTop       =   6435
    ClientWidth     =   7935
@@ -10,14 +10,46 @@ Begin VB.Form frmScriptEd
    LinkTopic       =   "Form1"
    MDIChild        =   -1  'True
    PaletteMode     =   1  'UseZOrder
-   ScaleHeight     =   7335
+   ScaleHeight     =   6300
    ScaleWidth      =   7935
    ShowInTaskbar   =   0   'False
+   Begin VB.CheckBox ErrorClose 
+      Caption         =   "Error:"
+      Height          =   255
+      Left            =   120
+      TabIndex        =   2
+      TabStop         =   0   'False
+      Top             =   20
+      Visible         =   0   'False
+      Width           =   735
+   End
+   Begin VB.TextBox ErrorBox 
+      BackColor       =   &H000000FF&
+      BeginProperty Font 
+         Name            =   "Courier New"
+         Size            =   8.25
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      ForeColor       =   &H00000000&
+      Height          =   285
+      Left            =   840
+      Locked          =   -1  'True
+      TabIndex        =   1
+      TabStop         =   0   'False
+      Text            =   "Error"
+      Top             =   0
+      Visible         =   0   'False
+      Width           =   7095
+   End
    Begin RichTextLib.RichTextBox EditBox 
       Height          =   5775
       Left            =   0
       TabIndex        =   0
-      Top             =   0
+      Top             =   240
       Width           =   7935
       _ExtentX        =   13996
       _ExtentY        =   10186
@@ -52,6 +84,7 @@ Dim LastUndo As Long
 Dim CurUndo As Long
 Dim Sizing As Boolean
 Dim Changed As Boolean
+Dim Resizing As Boolean
 
 Dim Undo(20) As String
 Dim UndoPos(20) As Long
@@ -87,10 +120,12 @@ Public Sub LoadAll()
     EnableRedraw (EditBox.hwnd)
     EditBox.Refresh
 
+    DoResize
 End Sub
 
 ' Save everything.
 Public Sub PreSave()
+    MarkUndo
     Call Ed.Server.SetProp("TEXT", Caption, EditBox.Text)
     Call Ed.Server.SetProp("TEXTPOS", Caption, Str(EditBox.SelStart))
     Call Ed.Server.SetProp("TEXTTOP", Caption, Str(SendMessage(EditBox.hwnd, EM_GETFIRSTVISIBLELINE, 0, 0)))
@@ -98,6 +133,7 @@ End Sub
 
 ' Set selection start, end, and length.
 Public Sub GotoText(Start As Long, Length As Long)
+    Show
     EditBox.SetFocus
     EditBox.SelStart = Start
     EditBox.SelLength = Length
@@ -106,7 +142,6 @@ End Sub
 
 ' Set script editable flag.
 Private Sub SetScriptControls(Flag As Boolean, EditFlag As Boolean)
-    frmMain.ScriptMenu.Visible = Flag
     frmMain.EditCopy.Visible = Flag
     frmMain.EditFind.Visible = Flag
     frmMain.EditFindNext.Visible = Flag
@@ -118,6 +153,13 @@ End Sub
 
 Private Sub EditBox_Change()
     Changed = True
+End Sub
+
+Private Sub ErrorClose_Click()
+    If Not Resizing Then
+        ErrorBox.Text = ""
+        DoResize
+    End If
 End Sub
 
 Private Sub Form_Activate()
@@ -138,41 +180,37 @@ Public Sub ScriptEditDefaults_Click()
     frmActorProperties.GetClassDefaultActor (Caption)
 End Sub
 
-Private Sub SaveState(Index As Long)
-    UndoPos(Index) = EditBox.SelStart
-    'MsgBox "Saving " & Index & ": " & EditBox.SelStart & " - " & UndoPos(Index)
-    UndoLength(Index) = EditBox.SelLength
-    UndoTop(Index) = SendMessage(EditBox.hwnd, EM_GETFIRSTVISIBLELINE, 0, 0)
-    Undo(Index) = EditBox.TextRTF
+Private Sub SaveState(index As Long)
+    UndoPos(index) = EditBox.SelStart
+    UndoLength(index) = EditBox.SelLength
+    UndoTop(index) = SendMessage(EditBox.hwnd, EM_GETFIRSTVISIBLELINE, 0, 0)
+    Undo(index) = EditBox.TextRTF
 End Sub
 
 Private Sub MarkUndo()
-    
     LastUndo = (CurUndo + 1) Mod 20
-        
+
     SaveState (LastUndo)
     If LastUndo = FirstUndo Then
         FirstUndo = (FirstUndo + 1) Mod 20
     End If
-    
+
     CurUndo = LastUndo
     Changed = False
-
 End Sub
 
-Private Sub PerformDo(Index As Long, CursorDelta As Long)
+Private Sub PerformDo(index As Long, CursorDelta As Long)
     Dim CursorIndex As Long
-    CursorIndex = (Index + CursorDelta + 20) Mod 20
-    
+    CursorIndex = (index + CursorDelta + 20) Mod 20
+
     DisableRedraw (EditBox.hwnd)
-    
-    EditBox.TextRTF = Undo(Index)
+
+    EditBox.TextRTF = Undo(index)
     EditBox.SetFocus
     EditBox.SelStart = UndoPos(CursorIndex)
     EditBox.SelLength = UndoLength(CursorIndex)
     Call SendMessage(EditBox.hwnd, EM_SCROLLCARET, 0, 0)
-    SetTop (UndoTop(Index))
-    'MsgBox "Getting " & Index & ": " & EditBox.SelStart & " - " & UndoPos(Index)
+    SetTop (UndoTop(index))
 
     EnableRedraw (EditBox.hwnd)
     EditBox.Refresh
@@ -180,7 +218,6 @@ End Sub
 
 Public Sub EditUndo_Click()
     If CurUndo <> FirstUndo And Not EditBox.Locked Then
-
         If Changed Then
             MarkUndo
         End If
@@ -271,7 +308,7 @@ Done:
     ElseIf KeyCode = 46 Then
         ' Del.
         MarkUndo
-    ElseIf KeyCode = 90 Then
+    ElseIf KeyCode = 90 And (Shift And vbCtrlMask) Then
         ' Ctrl-Z.
         EditUndo_Click
         KeyCode = 0
@@ -443,7 +480,8 @@ Private Sub Form_Resize()
     End If
 End Sub
 
-Private Sub DoResize()
+Public Sub DoResize()
+    Resizing = True
     Dim MustExit As Boolean
     If WindowState = 1 Then Exit Sub
     If Width < 320 * Screen.TwipsPerPixelX Then
@@ -454,10 +492,25 @@ Private Sub DoResize()
         Height = 240 * Screen.TwipsPerPixelY
         MustExit = True
     End If
-    If MustExit Then Exit Sub
+    If MustExit Then GoTo Out
 
     EditBox.Width = ScaleWidth
-    EditBox.Height = ScaleHeight - EditBox.Top
+    ErrorBox.Width = ScaleWidth - ErrorBox.Left
+    If ErrorBox.Text = "" Then
+        EditBox.Top = 0
+        EditBox.Height = ScaleHeight - EditBox.Top
+        ErrorBox.Visible = False
+        ErrorClose.Visible = False
+        ErrorClose.Value = 1
+    Else
+        EditBox.Top = ErrorBox.Top + ErrorBox.Height
+        EditBox.Height = ScaleHeight - EditBox.Top
+        ErrorBox.Visible = True
+        ErrorClose.Visible = True
+        ErrorClose.Value = 1
+    End If
+Out:
+    Resizing = False
 End Sub
 
 Private Sub Form_Unload(Cancel As Integer)
@@ -465,29 +518,6 @@ Private Sub Form_Unload(Cancel As Integer)
     Form_Deactivate
     Call Ed.EndOnTop(Me)
     Call RemoveMiscForm(Me)
-End Sub
-
-Sub StartCompile()
-    MarkUndo
-    PreSaveAll
-    Call frmResults.UpdateStatus("Compiling...")
-End Sub
-
-Sub EndCompile()
-    LoadAll
-    frmResults.UpdateResults
-    frmActorProperties.NoteClassChange
-End Sub
-
-Public Sub ScriptNextError_Click()
-    frmResults.GoToNext
-End Sub
-
-Public Sub ScriptCompile_Click()
-    StartCompile
-    Ed.Server.Exec "SCRIPT COMPILE CLASS=" & Caption
-    EndCompile
-    frmResults.Results_DblClick
 End Sub
 
 Public Sub ResetUndo()
@@ -508,18 +538,3 @@ Public Sub PostLoad()
 
 End Sub
 
-Public Sub ScriptMakeAll_Click()
-    StartCompile
-    Ed.Server.Exec "SCRIPT MAKE ALL"
-    EndCompile
-End Sub
-
-Public Sub ScriptMakeChanged_Click()
-    StartCompile
-    Ed.Server.Exec "SCRIPT MAKE"
-    EndCompile
-End Sub
-
-Public Sub ScriptResults_Click()
-    frmResults.UpdateResults
-End Sub

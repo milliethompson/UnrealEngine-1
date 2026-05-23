@@ -64,6 +64,7 @@ void FCameraConsole::Init( UCamera *ThisCamera )
 	StatusSmallBar			= new("StatusBarS",		FIND_Existing)UTexture;
 	ConBackground			= new("Console",		FIND_Existing)UTexture;
 	Border					= new("Border",			FIND_Existing)UTexture;
+	Hud						= new("Hud",			FIND_Existing)UTexture;
     
 	// Start console log.
 	Logf(CONSOLE_SPAWN_1);
@@ -105,6 +106,16 @@ int FCameraConsole::Exec( const char *Cmd, FOutputDevice *Out )
 	guard(FCameraConsole::Exec);
 	const char *Str = Cmd;
 
+	if( GetCMD(&Str,"ENDFULLSCREEN") )
+	{
+		// Return from full-screen mode.
+		if( GCameraManager->FullscreenCamera && !IsTyping() )
+		{
+			debug(LOG_Info,"Esc pressed: Ending fullscreen mode");
+			GCameraManager->EndFullscreen();
+		}
+		return 1;
+	}
 	if( GetCMD(&Str,"CONSOLE") )
 	{
 		int IsToggle = GetCMD(&Str,"TOGGLE");
@@ -311,7 +322,8 @@ void FCameraConsole::PreRender( UCamera *Camera )
 		if( BorderSize>=1 )
 		{
 			// Status bar.
-			StatusBarLines = Min((FLOAT)(Camera->FX * STATUSBAR_V/STATUSBAR_U),(FLOAT)SYR);
+			//!!StatusBarLines = Min((FLOAT)(Camera->FX * STATUSBAR_V/STATUSBAR_U),(FLOAT)SYR);
+			StatusBarLines=0;
 			SYR -= StatusBarLines;
 		}
 		if( ConsolePos > 0.0 )
@@ -372,6 +384,7 @@ void FCameraConsole::PostRender(UCamera *Camera,int XLeft)
 		else StatusRefreshPages--;
 
 		// Draw status bar.
+		/*
 		if( StatusBarLines > 0 )
 		{
             const FLOAT XScale = FLOAT(Camera->FX) / STATUSBAR_U;
@@ -384,16 +397,22 @@ void FCameraConsole::PostRender(UCamera *Camera,int XLeft)
 			
 			GRend->DrawScaledSprite
 			(
-				Camera,Bar,
-				0,Camera->FY-StatusBarLines,
+				Camera,
+				Bar,
+				0,
+				Camera->FY-StatusBarLines,
 				Camera->FX            * (FLOAT)Bar->USize / STATUSBAR_U * AdditionalScale + 0.5,
 				(FLOAT)StatusBarLines * (FLOAT)Bar->VSize / STATUSBAR_V * AdditionalScale + 0.5,
-				BT_None,NULL,0,0
+				BT_None,
+				NULL,
+				0,
+				0,
+				1000.0
 			);
-		}
+		}*/
 
 		// Draw console.
-		if (ConsoleLines>0) GRend->DrawTiledTextureBlock
+		if( ConsoleLines > 0 ) GRend->DrawTiledTextureBlock
 		(
 			Camera,ConBackground,0,Camera->X,0,ConsoleLines,0,-ConsoleLines
 		);
@@ -415,6 +434,21 @@ void FCameraConsole::PostRender(UCamera *Camera,int XLeft)
 			GRend->DrawTiledTextureBlock(Camera,Border,Camera->X-BorderPixels,BorderPixels,YStart,YEnd-YStart,0,-V);
 		}
 	}
+
+	if( !GEditor && BorderSize >= 1 && Camera->X > 64+8 && Camera->Y > 64+8) GRend->DrawScaledSprite
+	(
+		Camera,
+		Hud,
+		Camera->FX - (64+4),
+		Camera->FY - (64+3),
+		64 + 0.5,
+		64 + 0.5,
+		GCameraManager->RenDev ? BT_Transparent : BT_None,
+		NULL,
+		0,
+		0,
+		1.0
+	);
 
 	// Draw console text.
 	if( ConsoleLines )
@@ -520,14 +554,7 @@ int	FCameraConsole::Process(EInputKey iKey, EInputState State, FLOAT Delta )
 		return 0;
 
 	// Keys that always take effect.
-	if( iKey==IK_Escape && GCameraManager->FullscreenCamera && !IsTyping() )
-	{
-		// Return from full-screen mode.
-		debug(LOG_Info,"Esc pressed: Ending fullscreen mode");
-		GCameraManager->EndFullscreen();
-		return 1;
-	}
-	else if( iKey==IK_Enter && Camera->Input->KeyDown(IK_Alt) )
+	if( iKey==IK_Enter && Camera->Input->KeyDown(IK_Alt) )
 	{	
 		// Toggle fullscreen.
 		if( !(Camera->Actor->ShowFlags & SHOW_ChildWindow) )
@@ -768,36 +795,40 @@ void FCameraConsole::PostReadInput( PPlayerTick &Move, FLOAT DeltaSeconds, FOutp
 	if( Move.Buttons[BUT_Strafe] )
 	{
 		// Strafe.
-		Move.Axis[AXIS_Strafe] += Move.Axis[AXIS_BaseX];
-		Move.Axis[AXIS_BaseX ]  = 0;
+		Move.Axis[AXIS_Strafe] += Move.Axis[AXIS_BaseX] + Move.Axis[AXIS_MouseX];
+		Move.Axis[AXIS_BaseX] = Move.Axis[AXIS_MouseX] = 0;
 	}
 	else
 	{
 		// Forward.
-		Move.Axis[AXIS_Turn ] += Move.Axis[AXIS_BaseX];
-		Move.Axis[AXIS_BaseX]   = 0;
+		Move.Axis[AXIS_Turn] += Move.Axis[AXIS_BaseX] + Move.Axis[AXIS_MouseX];
+		Move.Axis[AXIS_BaseX] = Move.Axis[AXIS_MouseX] = 0;
 	}
 
-	// Remap raw y-axis movement.
+	// Remap mouse y-axis movement.
 	if( Move.Buttons[BUT_Look] )
 	{
 		// Look up/down.
-		Move.Axis[AXIS_LookUp] += Move.Axis[AXIS_BaseY];
-		Move.Axis[AXIS_BaseY ]  = 0;
+		Move.Axis[AXIS_LookUp] += Move.Axis[AXIS_MouseY];
+		Move.Axis[AXIS_MouseY]  = 0;
 	}
 	else
 	{
 		// Move forward/backward.
-		Move.Axis[AXIS_Forward] += Move.Axis[AXIS_BaseY];
-		Move.Axis[AXIS_BaseY  ]  = 0;
+		Move.Axis[AXIS_Forward] += Move.Axis[AXIS_MouseY];
+		Move.Axis[AXIS_MouseY] = 0;
 	}
+
+	// Remap other y-axis movement.
+	Move.Axis[AXIS_Forward] += Move.Axis[AXIS_BaseY];
+	Move.Axis[AXIS_BaseY] = 0;
 
 	// Handle running.
 	if( Move.Buttons[BUT_Run] )
 	{
 		Move.Axis[AXIS_Forward] *= 2.0;
-		Move.Axis[AXIS_Strafe ] *= 2.0;
-		Move.Axis[AXIS_Up     ] *= 2.0;
+		Move.Axis[AXIS_Strafe] *= 2.0;
+		Move.Axis[AXIS_Up] *= 2.0;
 	}
 
 	unguard;

@@ -1,9 +1,9 @@
-'
-' Mover.
-'
-
-DeclareClass Name=Brush
 DeclareClass Name=Mover
+DeclareClass Name=Sound
+DeclareClass Name=Script
+DeclareClass Name=Pawn
+DeclareClass Name=Brush
+DeclareClass Name=Class
 
 Begin Class Name=Brush
    Begin Text
@@ -18,7 +18,6 @@ class Brush expands Actor
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Class=Brush
    End DefaultProperties
 End Class
 
@@ -33,41 +32,26 @@ class Mover expands Brush
 	intrinsic
 	package(UnGame);
 
-// How the mover should react when it bumps into an actor.
-var() enum EMoverBumpType
+// How the mover should react when it encroaches an actor.
+var() enum EMoverEncroachType
 {
-	MB_StopWhenBump,		// Stop when we hit an actor.
-	MB_ReturnWhenBump,		// Return to previous position when we hit an actor.
-   	MB_CrushWhenBump		// Crush the poor helpless actor.
-} MoverBumpType;
+	ME_StopWhenEncroach,	// Stop when we hit an actor.
+	ME_ReturnWhenEncroach,	// Return to previous position when we hit an actor.
+   	ME_CrushWhenEncroach,   // Crush the poor helpless actor.
+   	ME_IgnoreWhenEncroach,  // Ignore encroached actors.
+} MoverEncroachType;
 
-// How the mover should respond to Trigger/UnTrigger/Touch/UnTouch.
-var() enum EMoverTriggerType
-{
-	MT_None,				// No automatic control.
-	MT_TriggerOpenTimed,	// Open then close when triggered.
-	MT_TriggerToggle,		// Toggle when triggered.
-	MT_TriggerControl,		// Trigger=open, UnTrigger=close.
-	MT_TriggerCycleOn,		// ??
-	MT_TriggerCycleOff,		// ??
-	MT_TriggerInstant,		// ??
-	MT_ProximityOpenTimed,	// Open timed when player gets near.
-	MT_ProximityControl,	// Open when player gets near, close when far.
-	MT_StandOpenTimed,		// Open when player stands on it.
-} MoverTriggerType;
-
-// How the mover moves from one position to the other.
+// How the mover moves from one position to another.
 var() enum EMoverGlideType
 {
 	MV_MoveByTime,			// Move linearly.
 	MV_GlideByTime,			// Move with smooth acceleration.
-	MV_Sinusoid				// Move in sinusoid pattern.
 } MoverGlideType;
 
 //-----------------------------------------------------------------------------
-// Keyframes.
-var const byte   PrevKeyNum;       // If moving, the previous keyframe.
-var() const byte KeyNum;           // Current or destination keyframe.
+// Keyframe numbers.
+var() byte       KeyNum;           // Current or destination keyframe.
+var() byte       PrevKeyNum;       // Previous keyframe.
 var() const byte WorldRaytraceKey; // Raytrace the world with the brush here.
 var() const byte BrushRaytraceKey; // Raytrace the brush here.
 
@@ -75,126 +59,496 @@ var() const byte BrushRaytraceKey; // Raytrace the brush here.
 // Movement parameters.
 var() float      MoveTime;         // Time to spend moving between keyframes.
 var() float      StayOpenTime;     // How long to remain open before closing.
-var() float      BumpPlayerDamage; // How much to damage player if we bump him.
-var() rotation   FreeRotation;     // For freely rotating brushes.
+var() int        EncroachDamage;   // How much to damage encroached actors.
 
 //-----------------------------------------------------------------------------
-// Mover flags.
-var() bool       bInterruptable;   // Do multiple triggers interrupt movement?
-var() bool       bSlave;           // This brush is a slave to its event.
-var() bool       bTrigger;         // This brush acts as a trigger.
-var bool         bMoving;          // Currently moving.
-var bool         bReverseWhenDone; // Reverse when finished moving.
-var bool         bTriggerOnceOnly; // Go dormant after first trigger.
+// Mover state.
+var() bool       bTriggerOnceOnly; // Go dormant after first trigger.
+var() bool       bSlave;           // This brush is a slave.
+var   actor      Trigger;          // Who we were triggered by.
 
 //-----------------------------------------------------------------------------
 // Audio.
-var() sound      OpenSound;        // When hit full-open position.
-var() sound      ClosedSound;      // When hit full-closed position.
+var() sound      OpeningSound;     // When start opening.
+var() sound      ClosedSound;      // When finish closing.
 var() sound      MoveAmbientSound; // Ambient sound when moving.
 
 //-----------------------------------------------------------------------------
-// Array of 4 keyframe position offsets.
+// Internal.
 var vector       KeyPos[4];
 var rotation     KeyRot[4];
+var vector       BasePos, OldPos;
+var rotation     BaseRot, OldRot;
 
 //-----------------------------------------------------------------------------
-// Base absolute location and rotation.
-var const Actor    Slaves[16];        // List of actors standing on this brush.
-var const vector   BasePos, OldPos;   // For interpolating movement.
-var const rotation BaseRot, OldRot;   // For interpolating movement.
-var const float    CurTime, HoldTime; // Internal.
+// Movement functions.
+
+// Interpolate to keyframe KeyNum in Seconds time.
+final function InterpolateTo( byte NewKeyNum, float Seconds )
+{
+	NewKeyNum = Clamp( NewKeyNum, 0, ArrayCount(KeyPos) );
+	if( NewKeyNum==PrevKeyNum && KeyNum!=PrevKeyNum )
+	{
+		// Reverse the movement smoothly.
+		PhysAlpha = 1.0 - PhysAlpha;
+		OldPos    = BasePos + KeyPos[KeyNum];
+		OldRot    = /*BaseRot + */KeyRot[KeyNum];
+	}
+	else
+	{
+		// Start a new movement.
+		OldPos    = Location;
+		OldRot    = Rotation;
+		PhysAlpha = 0.0;
+	}
+
+	// Setup physics.
+	Physics          = PHYS_MovingBrush;
+	bInterpolating   = true;
+
+	// Setup mover info.
+	PrevKeyNum       = KeyNum;
+	KeyNum			 = NewKeyNum;
+	PhysRate         = 1.0 / Seconds;
+}
+
+// Set the specified keyframe.
+final function SetKeyframe( byte NewKeyNum, vector NewLocation, rotation NewRotation )
+{
+	KeyNum         = Clamp( NewKeyNum, 0, ArrayCount(KeyPos) );
+	KeyPos[KeyNum] = NewLocation;
+	KeyRot[KeyNum] = NewRotation;
+}
+
+// Interpolation ended.
+function InterpolateEnd( actor Other )
+{
+	AmbientSoundSet(None);
+}
+
+//-----------------------------------------------------------------------------
+// Functions.
+
+// If we have an event, broadcast it.
+function CauseEvent()
+{
+	// If this brush is set up to trigger others...
+	if( Event != '' )
+	{
+		if( KeyNum==1 ) Broadcast(Event).Trigger  ( Self, Instigator );
+		else            Broadcast(Event).UnTrigger( Self, Instigator );
+	}
+
+	// Opening sound.
+	if( KeyNum == 1 )
+		PlaySound( OpeningSound );
+	AmbientSoundSet( MoveAmbientSound );
+}
+
+function FinishedClosing()
+{
+	// Update sound effects.
+	PlaySound( ClosedSound );
+
+	// Notify our triggering actor that we have completed.
+	if( Trigger != None )
+		Trigger.ResetTrigger();
+	Trigger = None;
+	Instigator = None;
+}
+
+//-----------------------------------------------------------------------------
+// Engine notifications.
+
+function BeginPlay()
+{
+	local rotation R;
+
+	// Init key info.
+	CallParent.BeginPlay();
+	KeyNum         = Clamp( KeyNum, 0, ArrayCount(KeyPos) );
+	PhysAlpha      = 0.0;
+
+	// Set initial location.
+	Move( BasePos + KeyPos[KeyNum] - Location );
+
+	// This doesn't properly concatenate pitch and yaw.
+	R.Pitch = BaseRot.Pitch + KeyRot[KeyNum].Pitch;
+	R.Yaw   = BaseRot.Yaw   + KeyRot[KeyNum].Yaw;
+	R.Roll  = BaseRot.Roll  + KeyRot[KeyNum].Roll;
+	SetRotation( R );
+}
+
+function PostBeginPlay()
+{
+	local mover M;
+	
+	// Initialize all slaves.
+	if( !bSlave )
+	{
+		foreach AllActors( class 'Mover', M, Tag )
+		{
+			if( M.bSlave )
+			{
+				M.GotoState('');
+				M.SetBase( Self );
+			}
+		}
+	}
+}
+
+// When mover is spawned.
+function Spawned()
+{
+	CallParent.Spawned();
+	BasePos		= Location;
+	BaseRot		= Rotation;
+}
+
+// Return true to abort, false to continue.
+function bool EncroachingOn( actor Other )
+{
+	// Damage the encroached actor.
+	if( EncroachDamage != 0 )
+		Other.Damage( EncroachDamage, Instigator, Other.Location, vect(0,0,0) );
+
+	// Stop, return, or whatever.
+	if( MoverEncroachType == ME_StopWhenEncroach )
+	{
+		// Stop moving immediately.
+		bInterpolating = false;
+		GotoState( State, '' );
+		return true;
+	}
+	else if( MoverEncroachType == ME_ReturnWhenEncroach )
+	{
+		// Abort move and reverse course.
+		bInterpolating = false;
+		if( KeyNum == 0 )
+			GotoState( State, 'Open' );
+		else
+			GotoState( State, 'Close' );
+		return true;
+	}
+	else if( MoverEncroachType == ME_CrushWhenEncroach )
+	{
+		// Kill it.
+		Other.Die();
+		return false;
+	}
+	else if( MoverEncroachType == ME_IgnoreWhenEncroach )
+	{
+		// Ignore it.
+		return false;
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Trigger states.
+
+// When triggered, open, wait, then close.
+state() TriggerOpenTimed
+{
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		Trigger = Other;
+		Instigator = EventInstigator;
+		GotoState( 'TriggerOpenTimed', 'Open' );
+	}
+Open:
+	Disable( 'Trigger' );
+	InterpolateTo( 1, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	Sleep( StayOpenTime );
+	if( bTriggerOnceOnly )
+		GotoState('');
+Close:
+	InterpolateTo( 0, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	FinishedClosing();
+	Enable( 'Trigger' );
+}
+
+// Toggle when triggered.
+state() TriggerToggle
+{
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		Trigger = Other;
+		Instigator = EventInstigator;
+		if( KeyNum == 0 ) GotoState( 'TriggerToggle', 'Open' );
+		else              GotoState( 'TriggerToggle', 'Close' );
+	}
+Open:
+	InterpolateTo( 1, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	Trigger.ResetTrigger();
+	Stop;
+Close:		
+	InterpolateTo( 0, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	FinishedClosing();
+}
+
+// Open when triggered, close when get untriggered.
+state() TriggerControl
+{
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		Trigger = Other;
+		Instigator = EventInstigator;
+		GotoState( 'TriggerControl', 'Open' );
+	}
+	function UnTrigger( actor Other, pawn EventInstigator )
+	{
+		Trigger = Other;
+		Instigator = EventInstigator;
+		GotoState( 'TriggerControl', 'Close' );
+	}
+Open:
+	InterpolateTo( 1, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	Trigger.ResetTrigger();
+	if( bTriggerOnceOnly )
+		GotoState('');
+	Stop;
+Close:		
+	InterpolateTo( 0, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	FinishedClosing();
+}
+
+// Start pounding when triggered.
+state() TriggerPound
+{
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		Trigger = Other;
+		Instigator = EventInstigator;
+		GotoState( 'TriggerPound', 'Open' );
+	}
+	function UnTrigger( actor Other, pawn EventInstigator )
+	{
+		Trigger = None;
+		Instigator = None;
+		GotoState( 'TriggerPound', 'Close' );
+	}
+Open:
+	InterpolateTo( 1, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+Close:
+	InterpolateTo( 0, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	Sleep(StayOpenTime);
+	if( bTriggerOnceOnly )
+		GotoState('');
+	if( Trigger != None )
+		goto 'Open';
+}
+
+//-----------------------------------------------------------------------------
+// Bump states.
+
+// Open when bumped, wait, then close.
+state() BumpOpenTimed
+{
+	function Bump( actor Other )
+	{
+		Trigger = None;
+		Instigator = Pawn(Other);
+		GotoState( 'BumpOpenTimed', 'Open' );
+	}
+Open:
+	Disable( 'Bump' );
+	InterpolateTo( 1, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	Sleep( StayOpenTime );
+	if( bTriggerOnceOnly )
+		GotoState('');
+Close:
+	InterpolateTo( 0, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	FinishedClosing();
+	Enable( 'Bump' );
+}
+
+// Open when bumped, close when reset.
+state() BumpButton
+{
+	function Bump( actor Other )
+	{
+		Trigger = Other;
+		Instigator = Pawn(Other);
+		GotoState( 'BumpButton', 'Open' );
+	}
+	function ResetTrigger()
+	{
+		Instigator = None;
+		GotoState( 'BumpButton', 'Close' );
+	}
+Open:
+	Disable( 'Bump' );
+	InterpolateTo( 1, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	if( bTriggerOnceOnly )
+		GotoState('');
+	Stop;
+Close:
+	InterpolateTo( 0, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	FinishedClosing();
+	Enable( 'Bump' );
+}
+
+//-----------------------------------------------------------------------------
+// Stand states.
+
+// Open when stood on, wait, then close.
+state() StandOpenTimed
+{
+	function Attach( actor Other )
+	{
+		Trigger = None;
+		GotoState( 'StandOpenTimed', 'Open' );
+	}
+Open:
+	Disable( 'Attach' );
+	InterpolateTo( 1, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	Sleep( StayOpenTime );
+	if( bTriggerOnceOnly )
+		GotoState('');
+Close:
+	InterpolateTo( 0, MoveTime );
+	CauseEvent();
+	FinishInterpolation();
+	FinishedClosing();
+	Enable( 'Attach' );
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Class=Mover
-		Begin Brush Name=MoverDefaultBrush
-		 Settings  CSG=0 Flags=64 PolyFlags=0 Color=0
-		 Location  +00208.000000,-00384.000000,+00000.000000
-		 PrePivot  +00000.000000,+00000.000000,+00000.000000
-		 PostPivot +00000.000000,+00000.000000,+00000.000000
-		 Scale     X=+00001.000000 Y=+00001.000000 Z=+00001.000000 S=+00000.000000 AXIS=5
-		 PostScale X=+00001.000000 Y=+00001.000000 Z=+00001.000000 S=+00000.000000 AXIS=5
-		 Rotation  0,0,0
-		 Begin PolyList Num=6 Max=6
-			Begin Polygon Group=RECT Item=OUTSIDE Link=0
-			   Origin   -00016.000000,-00064.000000,+00128.000000
-			   Normal   +00000.000000,+00000.000000,+00001.000000
-			   TextureU +00000.000000,+00001.000000,+00000.000000
-			   TextureV -00001.000000,+00000.000000,+00000.000000
-			   Vertex   -00016.000000,-00064.000000,+00128.000000
-			   Vertex   +00016.000000,-00064.000000,+00128.000000
-			   Vertex   +00016.000000,+00064.000000,+00128.000000
-			   Vertex   -00016.000000,+00064.000000,+00128.000000
-			End Polygon
-			Begin Polygon Group=RECT Item=OUTSIDE Link=1
-			   Origin   -00016.000000,+00064.000000,-00128.000000
-			   Normal   +00000.000000,+00000.000000,-00001.000000
-			   TextureU +00000.000000,-00001.000000,+00000.000000
-			   TextureV -00001.000000,+00000.000000,+00000.000000
-			   Vertex   -00016.000000,+00064.000000,-00128.000000
-			   Vertex   +00016.000000,+00064.000000,-00128.000000
-			   Vertex   +00016.000000,-00064.000000,-00128.000000
-			   Vertex   -00016.000000,-00064.000000,-00128.000000
-			End Polygon
-			Begin Polygon Group=RECT Item=OUTSIDE Link=2
-			   Origin   -00016.000000,+00064.000000,-00128.000000
-			   Normal   +00000.000000,+00001.000000,+00000.000000
-			   TextureU +00001.000000,+00000.000000,+00000.000000
-			   TextureV +00000.000000,+00000.000000,-00001.000000
-			   Vertex   -00016.000000,+00064.000000,-00128.000000
-			   Vertex   -00016.000000,+00064.000000,+00128.000000
-			   Vertex   +00016.000000,+00064.000000,+00128.000000
-			   Vertex   +00016.000000,+00064.000000,-00128.000000
-			End Polygon
-			Begin Polygon Group=RECT Item=OUTSIDE Link=3
-			   Origin   +00016.000000,-00064.000000,-00128.000000
-			   Normal   +00000.000000,-00001.000000,+00000.000000
-			   TextureU -00001.000000,+00000.000000,+00000.000000
-			   TextureV +00000.000000,+00000.000000,-00001.000000
-			   Vertex   +00016.000000,-00064.000000,-00128.000000
-			   Vertex   +00016.000000,-00064.000000,+00128.000000
-			   Vertex   -00016.000000,-00064.000000,+00128.000000
-			   Vertex   -00016.000000,-00064.000000,-00128.000000
-			End Polygon
-			Begin Polygon Group=RECT Item=OUTSIDE Link=4
-			   Origin   +00016.000000,+00064.000000,-00128.000000
-			   Normal   +00001.000000,+00000.000000,+00000.000000
-			   TextureU +00000.000000,-00001.000000,+00000.000000
-			   TextureV +00000.000000,+00000.000000,-00001.000000
-			   Vertex   +00016.000000,+00064.000000,-00128.000000
-			   Vertex   +00016.000000,+00064.000000,+00128.000000
-			   Vertex   +00016.000000,-00064.000000,+00128.000000
-			   Vertex   +00016.000000,-00064.000000,-00128.000000
-			End Polygon
-			Begin Polygon Group=RECT Item=OUTSIDE Link=5
-			   Origin   -00016.000000,-00064.000000,-00128.000000
-			   Normal   -00001.000000,+00000.000000,+00000.000000
-			   TextureU +00000.000000,+00001.000000,+00000.000000
-			   TextureV +00000.000000,+00000.000000,-00001.000000
-			   Vertex   -00016.000000,-00064.000000,-00128.000000
-			   Vertex   -00016.000000,-00064.000000,+00128.000000
-			   Vertex   -00016.000000,+00064.000000,+00128.000000
-			   Vertex   -00016.000000,+00064.000000,-00128.000000
-			End Polygon
-		 End PolyList
-		End Brush
-	  Brush=MoverDefaultBrush
-      CollisionRadius=+000160.000000
-      CollisionHeight=+000160.000000
+      MoverEncroachType=ME_ReturnWhenEncroach
+      MoverGlideType=MV_GlideByTime
+      KeyNum=0
+      PrevKeyNum=0
+      WorldRaytraceKey=0
+      BrushRaytraceKey=0
+      MoveTime=+00001.000000
+      StayOpenTime=+00004.000000
+      EncroachDamage=0
+      bSlave=False
+      bTriggerOnceOnly=False
+      Trigger=None
+      OpenSound=None
+      CloseSound=None
+      MoveAmbientSound=None
+      KeyPos(0)=(+00000.000000,+00000.000000,+00000.000000)
+      KeyPos(1)=(+00000.000000,+00000.000000,+00000.000000)
+      KeyPos(2)=(+00000.000000,+00000.000000,+00000.000000)
+      KeyPos(3)=(+00000.000000,+00000.000000,+00000.000000)
+      KeyRot(0)=(0,0,0)
+      KeyRot(1)=(0,0,0)
+      KeyRot(2)=(0,0,0)
+      KeyRot(3)=(0,0,0)
+      BasePos=(+00000.000000,+00000.000000,+00000.000000)
+      OldPos=(+00000.000000,+00000.000000,+00000.000000)
+      BaseRot=(0,0,0)
+      OldRot=(0,0,0)
+      State=BumpOpenTimed
       bCollideActors=True
-	  bCanInterruptMove=True
-	  MoveTime=1.0
-	  DrawType=3
-	  StayOpenTime=4.0
-	  MoverBumpType=1
-	  MoverTriggerType=7
-	  MoverGlideType=1
-      KeyName(0)=None
-      KeyName(1)=None
-      KeyName(2)=None
-      KeyName(3)=None
-	  DefaultEdCategory=Mover
-	  Physics=PHYS_Interpolating
+      bBlockActors=True
+      bBlockPlayers=True
+      DrawType=DT_Brush
+      Begin Brush Name=MoverDefaultBrush
+         Settings  CSG=0 Flags=96 PolyFlags=0 Color=0
+         Location  +00208.000000,-00384.000000,+00000.000000
+         PrePivot  +00000.000000,+00000.000000,+00000.000000
+         PostPivot +00000.000000,+00000.000000,+00000.000000
+         Scale     X=+00001.000000 Y=+00001.000000 Z=+00001.000000 S=+00000.000000 AXIS=5
+         PostScale X=+00001.000000 Y=+00001.000000 Z=+00001.000000 S=+00000.000000 AXIS=5
+         Rotation  0,0,0
+         Begin PolyList Num=6 Max=6
+            Begin Polygon Group=RECT Item=OUTSIDE Link=0
+               Origin   -00016.000000,-00064.000000,+00128.000000
+               Normal   +00000.000000,+00000.000000,+00001.000000
+               TextureU +00000.000000,+00001.000000,+00000.000000
+               TextureV -00001.000000,+00000.000000,+00000.000000
+               Vertex   -00016.000000,-00064.000000,+00128.000000
+               Vertex   +00016.000000,-00064.000000,+00128.000000
+               Vertex   +00016.000000,+00064.000000,+00128.000000
+               Vertex   -00016.000000,+00064.000000,+00128.000000
+            End Polygon
+            Begin Polygon Group=RECT Item=OUTSIDE Link=1
+               Origin   -00016.000000,+00064.000000,-00128.000000
+               Normal   +00000.000000,+00000.000000,-00001.000000
+               TextureU +00000.000000,-00001.000000,+00000.000000
+               TextureV -00001.000000,+00000.000000,+00000.000000
+               Vertex   -00016.000000,+00064.000000,-00128.000000
+               Vertex   +00016.000000,+00064.000000,-00128.000000
+               Vertex   +00016.000000,-00064.000000,-00128.000000
+               Vertex   -00016.000000,-00064.000000,-00128.000000
+            End Polygon
+            Begin Polygon Group=RECT Item=OUTSIDE Link=2
+               Origin   -00016.000000,+00064.000000,-00128.000000
+               Normal   +00000.000000,+00001.000000,+00000.000000
+               TextureU +00001.000000,+00000.000000,+00000.000000
+               TextureV +00000.000000,+00000.000000,-00001.000000
+               Vertex   -00016.000000,+00064.000000,-00128.000000
+               Vertex   -00016.000000,+00064.000000,+00128.000000
+               Vertex   +00016.000000,+00064.000000,+00128.000000
+               Vertex   +00016.000000,+00064.000000,-00128.000000
+            End Polygon
+            Begin Polygon Group=RECT Item=OUTSIDE Link=3
+               Origin   +00016.000000,-00064.000000,-00128.000000
+               Normal   +00000.000000,-00001.000000,+00000.000000
+               TextureU -00001.000000,+00000.000000,+00000.000000
+               TextureV +00000.000000,+00000.000000,-00001.000000
+               Vertex   +00016.000000,-00064.000000,-00128.000000
+               Vertex   +00016.000000,-00064.000000,+00128.000000
+               Vertex   -00016.000000,-00064.000000,+00128.000000
+               Vertex   -00016.000000,-00064.000000,-00128.000000
+            End Polygon
+            Begin Polygon Group=RECT Item=OUTSIDE Link=4
+               Origin   +00016.000000,+00064.000000,-00128.000000
+               Normal   +00001.000000,+00000.000000,+00000.000000
+               TextureU +00000.000000,-00001.000000,+00000.000000
+               TextureV +00000.000000,+00000.000000,-00001.000000
+               Vertex   +00016.000000,+00064.000000,-00128.000000
+               Vertex   +00016.000000,+00064.000000,+00128.000000
+               Vertex   +00016.000000,-00064.000000,+00128.000000
+               Vertex   +00016.000000,-00064.000000,-00128.000000
+            End Polygon
+            Begin Polygon Group=RECT Item=OUTSIDE Link=5
+               Origin   -00016.000000,-00064.000000,-00128.000000
+               Normal   -00001.000000,+00000.000000,+00000.000000
+               TextureU +00000.000000,+00001.000000,+00000.000000
+               TextureV +00000.000000,+00000.000000,-00001.000000
+               Vertex   -00016.000000,-00064.000000,-00128.000000
+               Vertex   -00016.000000,-00064.000000,+00128.000000
+               Vertex   -00016.000000,+00064.000000,+00128.000000
+               Vertex   -00016.000000,+00064.000000,-00128.000000
+            End Polygon
+         End PolyList
+      End Brush
+      Brush=MoverDefaultBrush
+      CollisionRadius=+00160.000000
+      CollisionHeight=+00160.000000
+      Physics=PHYS_MovingBrush
+      DefaultEdCategory=Mover
    End DefaultProperties
 End Class
+

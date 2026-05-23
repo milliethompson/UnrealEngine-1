@@ -33,7 +33,6 @@ void UMesh::InitHeader()
 
 	// Init parent.
 	UPrimitive::InitHeader();
-	bCheckCollision = 0;
 
 	// Init objects.
 	Verts			= (UMeshVerts		*)NULL;
@@ -50,9 +49,9 @@ void UMesh::InitHeader()
 	AnimFrames		= 0;
 
 	// Scaling.
-	Scale			= GMath.UnitScaleVect;
-	Origin			= GMath.ZeroVector;
-	RotOrigin		= GMath.ZeroRotation;
+	Scale			= FVector(1,1,1);
+	Origin			= FVector(0,0,0);
+	RotOrigin		= FRotation(0,0,0);
 
 	// Other info.
 	AndFlags		= ~(DWORD)0;
@@ -95,16 +94,16 @@ IMPLEMENT_CLASS(UMesh);
 -----------------------------------------------------------------------------*/
 
 //
-// Get the world bounding volume for this primitive, as owned by Owner.
+// Get the rendering bounding volume for this primitive, as owned by Owner.
 //
-FBoundingRect UMesh::GetBoundingRect( AActor *Owner )
+FBoundingBox UMesh::GetRenderBoundingBox( const AActor *Owner ) const
 {
-	guard(UMesh::GetBoundingRect);
-	FBoundingRect Bound;
+	guard(UMesh::GetRenderBoundingBox);
+	FBoundingBox Bound;
 
 	// Get frame indices.
 	INDEX iFrame1 = 0, iFrame2 = 0;
-	FMeshAnimSeq *Seq = GetAnimSeq( Owner->AnimSequence );
+	const FMeshAnimSeq *Seq = GetAnimSeq( Owner->AnimSequence );
 	if( Seq && Owner->AnimFrame >= 0.0 )
 	{
 		// Animating, so use bound enclosing two frames' bounds.
@@ -115,15 +114,49 @@ FBoundingRect UMesh::GetBoundingRect( AActor *Owner )
 	}
 	else
 	{
-		// Interpolating, so use pessimistic mesh bound.
+		// Interpolating, so be pessimistic and use entire-mesh bound.
 		Bound = LocalBound;
 	}
 
 	// Transform Bound by owner's scale and origin.
-	Bound.Min = FVector(-1,-1,-1) + Owner->Location + Scale * (Bound.Min - Origin) * Owner->DrawScale;
-	Bound.Max = FVector(+1,+1,+1) + Owner->Location + Scale * (Bound.Max - Origin) * Owner->DrawScale;
+	Bound = FBoundingBox( Scale*Owner->DrawScale*(Bound.Min - Origin), Scale*Owner->DrawScale*(Bound.Max - Origin) ).ExpandBy(1.0);
+	if( Owner )
+	{
+		FCoords Coords = GMath.UnitCoords / RotOrigin / Owner->Rotation;
+		Coords.Origin  = Owner->Location;
+		return Bound.TransformBy( Coords.Transpose() );
+	}
+	else return Bound;
+	unguard;
+}
 
-	return Bound;
+//
+// Primitive box line check.
+//
+INT UMesh::LineCheck
+(
+	FCheckResult	&Result,
+	AActor			*Owner,
+	FVector			Start,
+	FVector			End,
+	FVector			Extent,
+	DWORD           ExtraNodeFlags
+)
+{
+	guard(UMesh::LineCheck);
+	if( Extent != FVector(0,0,0) )
+	{
+		// Use cyllinder.
+		return UPrimitive::LineCheck( Result, Owner, Start, End, Extent, ExtraNodeFlags );
+	}
+	else
+	{
+		// Use exact mesh collision.
+		//!!todo
+		// 1. Reject with local bound.
+		// 2. x-wise intersection test with all polygons.
+		return UPrimitive::LineCheck( Result, Owner, Start, End, FVector(0,0,0), ExtraNodeFlags );
+	}
 	unguard;
 }
 
@@ -176,7 +209,7 @@ BYTE UMesh::GetFrame
 	// Setup coordinate system.
 	FCoords Coords;
 	FVector TempVector;
-	if( Camera->IsWire() || Camera->IsOrtho() )
+	if( !Camera || Camera->IsWire() || Camera->IsOrtho() )
 	{
 		Coords		= GMath.UnitCoords * Owner->Rotation * RotOrigin;
 		TempVector  = Owner->Location;
@@ -192,7 +225,7 @@ BYTE UMesh::GetFrame
 	Coords.ZAxis     *= NewScale;
 
 	// Get animation sequence.
-	FMeshAnimSeq *Seq=GetAnimSeq( Owner->AnimSequence );
+	const FMeshAnimSeq *Seq = GetAnimSeq( Owner->AnimSequence );
 
 	// Transform all points into screenspace.
 	BYTE Outcode = FVF_OutReject;
@@ -225,8 +258,11 @@ BYTE UMesh::GetFrame
 			// Transform it.
 			(FVector&)ResultVerts[i] = (CachedVerts[i] - Origin).TransformVectorBy(Coords) + TempVector;
 			ResultVerts[i].Color.R   = -1;
-			ResultVerts[i].ComputeOutcode( Camera );
-			Outcode &= ResultVerts[i].Flags;
+			if( Camera )
+			{
+				ResultVerts[i].ComputeOutcode( Camera );
+				Outcode &= ResultVerts[i].Flags;
+			}
 		}
 	}
 	else
@@ -255,8 +291,11 @@ BYTE UMesh::GetFrame
 			// Transform it.
 			(FVector&)ResultVerts[i] = (CachedVerts[i] - Origin).TransformVectorBy(Coords) + TempVector;
 			ResultVerts[i].Color.R   = -1;
-			ResultVerts[i].ComputeOutcode( Camera );
-			Outcode &= ResultVerts[i].Flags;
+			if( Camera )
+			{
+				ResultVerts[i].ComputeOutcode( Camera );
+				Outcode &= ResultVerts[i].Flags;
+			}
 		}
 
 		// Update cached frame.

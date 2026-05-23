@@ -224,7 +224,8 @@ Public Sub LaunchScriptEd( _
     ClassName As String, _
     NewText As String, _
     Cursor As Long, _
-    ErrorLine As Long)
+    ErrorLine As Long, _
+    ErrorText As String)
 
     ' Locals.
     Dim F As frmScriptEd
@@ -270,17 +271,24 @@ HaveIt:
             While i < ErrorLine
                 j = 1 + InStr(j, S, Chr(10))
                 If j = 1 Then
+                    ' Not found.
+                    ErrorLine = 0
                     GoTo ShowIt
                 End If
                 i = i + 1
             Wend
             i = InStr(j + 1, S, Chr(13))
             If i <> 0 Then i = i - j
-            Call F.GotoText(j - 1, i)
+            F.ErrorBox.Text = ErrorText
+            Beep
+        Else
+            F.ErrorBox.Text = ""
         End If
 ShowIt:
         F.Show
         F.SetFocus
+        F.DoResize
+        If ErrorLine <> 0 Then Call F.GotoText(j - 1, i)
     End If
 End Sub
 
@@ -335,7 +343,7 @@ End Sub
 
 Public Sub EditScript_Click()
     If GetCurrent() <> "" Then
-        Call LaunchScriptEd(GetCurrent(), "", 0, 0)
+        Call LaunchScriptEd(GetCurrent(), "", 0, 0, "")
     End If
 End Sub
 
@@ -373,7 +381,7 @@ Public Sub LoadClass_Click()
     
     Call UpdateDialog(frmDialogs.ClassLoad)
     If (frmDialogs.ClassLoad.filename <> "") Then
-        Ed.Server.Exec "TASK BEGIN MESSAGE=" & Quotes("Loading and compiling classes")
+        Ed.BeginSlowTask "Loading and compiling classes"
         Screen.MousePointer = 11
         Fnames = Trim(frmDialogs.ClassLoad.filename)
         While (Fnames <> "")
@@ -384,17 +392,17 @@ Public Sub LoadClass_Click()
         Refresh_Click
         PostLoad
         Screen.MousePointer = 0
-        Ed.Server.Exec "TASK END"
+        Ed.EndSlowTask
     End If
 Skip:
     Ed.Server.Enable
 End Sub
 
 Private Sub Make_Click()
-    Ed.Server.Exec "TASK BEGIN MESSAGE=" & Quotes("Making all classes")
+    Ed.BeginSlowTask "Making all classes"
     Ed.Server.Exec "SCRIPT MAKE ALL"
     frmResults.UpdateResults
-    Ed.Server.Exec "TASK END"
+    Ed.EndSlowTask
 End Sub
 
 Public Sub MakeSubclass(ParentClass As String, Browser As Boolean)
@@ -445,7 +453,7 @@ Public Sub MakeSubclass(ParentClass As String, Browser As Boolean)
             Chr(13) & Chr(10) & Chr(13) & Chr(10)
         
         ' Launch the script editor.
-        Call LaunchScriptEd(GString, S, Len(S), 0)
+        Call LaunchScriptEd(GString, S, Len(S), 0, "")
     End If
 End Sub
 
@@ -569,3 +577,27 @@ Skip:
     Ed.Server.Enable
 End Sub
 
+' Process results after compiling a script.
+Public Sub ProcessResults()
+    Dim S As String, T As String, i As Long, Line As Long, Msg As String
+    S = Ed.Server.GetProp("Text", "Results")
+    If Left(S, 9) = "Error in " And InStr(S, ":") > 0 Then
+        ' Script compiler error.
+        Msg = Mid(S, InStr(S, ":") + 1)
+        If InStr(Msg, Chr(13)) Then Msg = Left(Msg, InStr(Msg, Chr(13)) - 1)
+        
+        S = Mid(S, 10)
+        i = InStr(S, ", Line ")
+        If i <> 0 Then
+            Line = Val(Mid(S, i + 7)) ' Line number
+            S = Left(S, i - 1) ' Class name
+            Call LaunchScriptEd(S, "", 0, Line, Msg)
+        End If
+    Else
+        Ed.StatusText S
+        If Not frmMain.ScriptForm Is Nothing Then
+            frmMain.ScriptForm.ErrorBox.Text = ""
+            frmMain.ScriptForm.LoadAll
+        End If
+    End If
+End Sub

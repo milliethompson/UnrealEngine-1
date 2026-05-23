@@ -55,6 +55,7 @@ int ULevel::PossessActor( APawn *Actor, UCamera *Camera )
 {
 	guard(ULevel::PossessActor);
 	checkState(IsLocked());
+	checkInput(Actor!=NULL);
 
 	if( !Actor->IsA("Pawn") )
 	{
@@ -75,7 +76,7 @@ int ULevel::PossessActor( APawn *Actor, UCamera *Camera )
 	Camera->Actor = Actor;
 	Actor->Process( NAME_Possess, NULL );
 
-	SetActorZone( Actor, 1 );
+	SetActorZone( Actor, 0, 1 );
 	debugf("Possess '%s %s' succeeded", Actor->GetClassName(), Actor->GetName() );
 
 	// Set the new actor's game rendering properties.
@@ -97,6 +98,7 @@ UCamera *ULevel::UnpossessActor( APawn *Actor )
 {
 	guard(ULevel::UnpossessActor);
 	checkState(IsLocked());
+	checkInput(Actor!=NULL);
 
 	// Make sure it's a player.
 	if( !Actor->Camera )
@@ -112,7 +114,7 @@ UCamera *ULevel::UnpossessActor( APawn *Actor )
 	Actor->Process( NAME_UnPossess, NULL );
 
 	// Reset its zone.
-	SetActorZone( Actor, 1 );
+	SetActorZone( Actor, 0, 1 );
 
 	return OldPossessor;
 	unguard;
@@ -129,44 +131,70 @@ UCamera *ULevel::UnpossessActor( APawn *Actor )
 //
 AActor *ULevel::SpawnActor
 (
-	UClass			*Class,
-	AActor			*Owner,
+	UClass*			Class,
+	AActor*			Owner,
 	FName			ActorName,
-	const FVector	*Location,
-	const FRotation *Rotation,
-	AActor			*Template
+	FVector			Location,
+	FRotation		Rotation,
+	AActor*			Template
 )
 {
 	guard(ULevel::SpawnActor);
 	checkState(IsLocked());
+
+	// Make sure this class is spawnable.
+	if( !Class )
+	{
+		debugf( LOG_Problem, "SpawnActor failed because no class was specified" );
+		return NULL;
+	}
+	if( Class->ClassFlags & CLASS_Abstract )
+	{
+		debugf( LOG_Problem, "SpawnActor failed because class %s is abstract", Class->GetName() );
+		return NULL;
+	}
+	else if( !Class->IsChildOf("Actor") )
+	{
+		debugf( LOG_Problem, "SpawnActor failed because %s is not an actor class", Class->GetName() );
+		return NULL;
+	}
+
+	// Setup.
 	INDEX iActor;
 	if( ActorName==NAME_None )
 		ActorName = Class->GetFName();
 
-	// Make sure there's a free actor.
+	// Find an available actor index.
 	guard(1);
 	for( iActor=0; iActor<Num; iActor++ )
 		if( Element(iActor)==NULL )
 			break;
 	if( iActor==Num && iActor<Max )
 		iActor = Num++;
-	else if( iActor >= Max )
-		appError( "Actor list exhausted" ); // Expand the actor list!!
+	else if( iActor == Max )
+		iActor = Add();
 	unguard;
 
-	// If no template was specified, use the class's default actor.
-	if( Template == NULL ) 
+	// Use class's default actor as a template.
+	if( !Template )
 		Template = &Class->GetDefaultActor();
+	checkState(Template!=NULL);
 
-	// Make sure this class isn't an abstract class, unless that's explicitly allowed.
-	if( Class->ClassFlags&CLASS_Abstract || !Class->IsChildOf("Actor") )
-		return NULL;
+	// Make sure actor will fit at desired location, and adjust location if necessary.
+	if( Template->bCollideWorld || Template->bCollideWhenPlacing )
+	{
+		if( !FindSpot( Template->GetCollisionExtent(), Location, 0 ) )
+		{
+			debugf( "SpawnActor %s failed because FindSpot didn't fit", Class->GetName() );
+			return NULL;
+		}
+	}
 
 	// Save previous empty entry, if transactional.
 	ModifyItem( iActor );
 
 	// Create an actor.
-     AActor *Actor = Element(iActor) = (AActor*)GObj.CreateObject(ActorName(),Class,CREATE_MakeUnique);
+    AActor *Actor = Element(iActor) = (AActor*)GObj.CreateObject(ActorName(),Class,CREATE_MakeUnique);
 	memcpy
 	( 
 		(BYTE*)Actor                        + sizeof(UObject),
@@ -186,14 +214,11 @@ AActor *ULevel::SpawnActor
 	if( GetState() == LEVEL_UpPlay )
 		Actor->bStatic = 0;
 
-	// Set the actor's location, if one was specified.
-	if( Location )
-	{
-		FVector spot = *Location;
-		PlaceActor(Actor, &spot); //Actor->Location = *Location;
-	}
-	if( Rotation )
-		Actor->Rotation = *Rotation;
+	// Set the actor's location and rotation.
+	Actor->Location = Location;
+	Actor->Rotation = Rotation;
+	if( Actor->bCollideActors && Hash.CollisionInitialized  )
+		Hash.AddActor( Actor );
 
 	// Remove the actor's brush, if it has one, because moving brushes
 	// are not duplicatable.
@@ -225,10 +250,6 @@ AActor *ULevel::SpawnActor
 	if( GetState() == LEVEL_UpPlay ) 
 		Actor->Process( NAME_PostBeginPlay, NULL );
 
-	// Set collision.
-	if( Actor->bCollideActors && Hash.CollisionInitialized  )
-		Hash.AddActor( Actor );
-
 	// Success: Return the actor.
 	return Actor;
 	unguard;
@@ -253,6 +274,7 @@ int ULevel::DestroyActor( AActor *ThisActor )
 {
 	guard(ULevel::DestroyActor);
 	checkState(IsLocked());
+	checkInput(ThisActor!=NULL);
 
 	// During gameplay, don't allow deletion of actors with
 	// bStatic, bNoDelete, or bDeleteMe.
@@ -277,19 +299,22 @@ int ULevel::DestroyActor( AActor *ThisActor )
 	GAudio.SfxStopActor( ThisActor->GetIndex() );
 	unguard;
 
-	// Remove from world collision list.
-	guard(4);
-	if( ThisActor->bCollideActors && Hash.CollisionInitialized  )
-		Hash.RemoveActor( ThisActor );
+	// Remove from base.
+	guard(2);
+	if( ThisActor->Base )
+		ThisActor->SetBase( NULL );
 	unguard;
 
-	// Remove the actor from the actor list, without killing it here.
-	// The actors are actually killed in ULevel::Unlock; until then the actor
-	// is still valid and in a state of limbo. It needs to be done this way in
-	// case an actor is destroyed but is still referenced somewhere on the
-	// execution stack.
-	guard(2);
-	Element(iActor)       = NULL;
+	// Remove from world collision hash.
+	guard(3);
+	if( ThisActor->bCollideActors && Hash.CollisionInitialized  )
+		Hash.RemoveActor( ThisActor );
+	Hash.CheckActorNotReferenced( ThisActor );
+	unguard;
+
+	// Remove the actor from the actor list.
+	guard(4);
+	Element(iActor) = NULL;
 	ThisActor->bDeleteMe = 1;
 	unguard;
 
@@ -328,9 +353,20 @@ int ULevel::DestroyActor( AActor *ThisActor )
 		Player->Camera->Kill();
 	unguard;
 
-	// If editing, cleanup the destroyed actors immediately.
-	if( GetState() == LEVEL_UpEdit )
+	// Cleanup.
+	guard(10);
+	if( GetState() == LEVEL_UpPlay )
+	{
+		// During play, just add to delete-list list and destroy when level is unlocked.
+		ThisActor->Deleted = FirstDeleted;
+		FirstDeleted       = ThisActor;
+	}
+	else
+	{
+		// Destroy them now.
 		CleanupDestroyed();
+	}
+	unguard;
 
 	// Return success.
 	return 1;
@@ -372,14 +408,14 @@ void ULevel::CleanupDestroyed()
 						AActor **LinkedActor = (AActor **)Actor->ObjectPropertyPtr(Property,0);
 						for( INT k=0; k<Property.ArrayDim; k++,LinkedActor++ )
 						{
-							if( *LinkedActor && (*LinkedActor)->bDeleteMe )
+							if( *LinkedActor==FirstDeleted && (*LinkedActor)->bDeleteMe )
 							{
 								// Remove this reference.
 								Actor->ModifyHeader();
 								*LinkedActor = NULL;
 
 								// Add to list of lost references.
-								Ref = new(GMem)PLostReference( Actor, Property.Name, k, Ref );
+								Ref = new( GMem )PLostReference( Actor, Property.Name, k, Ref );
 							}
 						}
 					}
@@ -388,15 +424,12 @@ void ULevel::CleanupDestroyed()
 		}
 		unguard;
 
-		// Physically destroy the actors-to-delete.
-		guard(KillEm);
-		while( FirstDeleted != NULL )
-		{
-			checkState(FirstDeleted->bDeleteMe);
-			AActor *ActorToKill = FirstDeleted;
-			FirstDeleted        = FirstDeleted->Deleted;
-			ActorToKill->Kill();
-		}
+		// Physically destroy the actor-to-delete.
+		guard(FinishHim);
+		checkState(FirstDeleted->bDeleteMe);
+		AActor *ActorToKill = FirstDeleted;
+		FirstDeleted        = FirstDeleted->Deleted;
+		ActorToKill->Kill();
 		unguard;
 
 		// Notify everybody of the references which were lost.
@@ -422,7 +455,7 @@ void ULevel::CleanupDestroyed()
 // one if none are available.  Returns actor number or NULL if none are
 // available.
 //
-AView *ULevel::SpawnViewActor( UCamera *Camera, FName MatchName, AActor *Template )
+AView *ULevel::SpawnViewActor( UCamera *Camera, FName MatchName )
 {
 	guard(ULevel::SpawnViewActor);
 	checkState(IsLocked());
@@ -453,15 +486,17 @@ AView *ULevel::SpawnViewActor( UCamera *Camera, FName MatchName, AActor *Templat
 		// None found, spawn a new one and set default position.
 		Actor = (AView*)SpawnActor
 		(
-			new( "View", FIND_Existing )UClass,
+			new("View",FIND_Existing)UClass,
 			NULL,
 			Camera->GetFName(),
-			Template ? &Template->Location : NULL,
-			Template ? &Template->Rotation : NULL,
-			Template
+			FVector(-500,-300,+300),
+			FRotation(0,0,0)
 		);
 		if( !Actor )
+		{
+			debugf( LOG_Problem, "SpawnViewActor failed because of SpawnActor" );
 			return NULL;
+		}
 
 		// Set the new actor's game rendering properties.
 		Actor->ShowFlags	= GGfx.DefaultCameraFlags;
@@ -477,6 +512,7 @@ AView *ULevel::SpawnViewActor( UCamera *Camera, FName MatchName, AActor *Templat
 	if( !PossessActor( Actor, Camera ) )
 	{
 		// Posess failed.
+		debugf( "SpawnViewActor failed to possess %s %s", Actor->GetClassName(), Actor->GetName() );
 		DestroyActor( Actor );
 		return NULL;
 	}
@@ -509,7 +545,7 @@ int ULevel::SpawnPlayActor( UCamera *Camera )
 				PlayerStart->PlayerSpawnClass,
 				NULL,
 				NAME_None,
-				&PlayerStart->Location
+				PlayerStart->Location
 			);
 			if( Actor )
 			{
@@ -555,15 +591,22 @@ int ULevel::SpawnPlayActor( UCamera *Camera )
 // Will move actor by up to CollisionRadius in the X and Y directions, or CollisionHeight
 // in the Z direction
 //
-// Returns 1 if the actor has been successfully moved, or 0 if it couldn't fit.
-//
+// Returns 1 if the actor can been successfully moved, or 0 if it couldn't fit.
+// The location passed is adjusted to the recommended value if the result is 1
+
 // PlaceActor is private. 
 // (PlaceActor is called by FarMoveActor and SpawnActor).
 //
 
 //MyBoxPointCheck is temporary hack, till Tim's works
-int ULevel::MyBoxPointCheck(FCheckResult &Result,AActor *Owner, const FVector &Point, FLOAT Radius,
-								FLOAT Height, DWORD ExtraNodeFlags)
+int ULevel::MyBoxPointCheck
+(
+	FCheckResult&	Result,
+	AActor*			Owner,
+	FVector			Point,
+	FVector			Extent,
+	DWORD			ExtraNodeFlags
+)
 {
 	guard(ULevel::MyBoxPointCheck);
 
@@ -577,73 +620,101 @@ int ULevel::MyBoxPointCheck(FCheckResult &Result,AActor *Owner, const FVector &P
 	for (int k=z; k<2; k++)
 			{
 				FVector Start = Point;
-				Start.X += 2 * (x - 0.5) * Radius;
-				Start.Y += 2 * (y - 0.5) * Radius;
-				Start.Z += 2 * (z - 0.5) * Height; 
+				Start.X += 2 * (x - 0.5) * Extent.X;
+				Start.Y += 2 * (y - 0.5) * Extent.Y;
+				Start.Z += 2 * (z - 0.5) * Extent.Z; 
 				FVector End = Point;
-				End.X += 2 * (i - 0.5) * Radius;
-				End.Y += 2 * (j - 0.5) * Radius;
-				End.Z += 2 * (k - 0.5) * Height;
-				result = result && Model->LineCheck(Result,Owner,Start,End,0);
+				End.X += 2 * (i - 0.5) * Extent.X;
+				End.Y += 2 * (j - 0.5) * Extent.Y;
+				End.Z += 2 * (k - 0.5) * Extent.Z;
+				result = result && Model->LineCheck(Result,NULL,Start,End,FVector(0,0,0),0);
 			}
 	
 	return result;
 	unguard;
 }
 
-int ULevel::PlaceActor( AActor *Actor, FVector *Location )
+//
+// Find a suitable nearby location to place a collision box.
+//
+int ULevel::FindSpot
+(
+	FVector Extent,
+	FVector &Location,
+	BOOL	bCheckActors
+)
 {
-	guard(ULevel::PlaceActor);
-	//Temporary hack for FarMoveActor
-	// FIXME- use Tim's (corrected) BoxPointCheck
-	// Temporary use MyBoxPointCheck
-	Actor->Location = *Location;
-	int result = 1;
-	FCheckResult Hit(1.0);
-	if (Actor->bCollideWorld 
-		&& !MyBoxPointCheck(Hit, Actor, *Location, Actor->CollisionRadius, Actor->CollisionHeight, 0)) 
+	guard(ULevel::FindSpot);
+
+	// Don't allow adjusting out by much more than the collision size.
+	FVector MaxAdjust = Extent * 1.15;
+
+	// Try some successive adjustments.
+	FVector Test = Location;
+	FVector OldHitNormal(0,0,0);
+	for( int Iter=0; Iter<6; Iter++ )
 	{
-		//subdivide bounding box into eight zones. for each zone that fails, add to adjustment vector
-		//FIXME - if Tim doesn't add suggested move to BoxPointCheck, then do this recursively?
-		// Instead of recursively, for now make adjustments in small steps
-		debugf("Adjusting PlaceActor");
-		FVector Adjust = GMath.ZeroVector;
-		FVector start;
-		for (int x=0; x<2; x++)
-			for (int y=0; y<2; y++)
-				for (int z=0; z<2; z++)
-				{
-					start = *Location;
-					start.X += (x - 0.5) * Actor->CollisionRadius;
-					start.Y += (y - 0.5) * Actor->CollisionRadius;
-					start.Z += (z - 0.5) * Actor->CollisionHeight;
-					if (!MyBoxPointCheck(Hit, Actor, start, 0.5 * Actor->CollisionRadius, 0.5 * Actor->CollisionHeight, 0))
-					{
-						Adjust.X += 0.5 * ((0.5 - x) * Actor->CollisionRadius);
-						Adjust.Y += 0.5 * ((0.5 - y) * Actor->CollisionRadius);
-						Adjust.Z += 0.5 * ((0.5 - z) * Actor->CollisionHeight);
-					}
-				}
-		Adjust.Z *= 1.1;
-		int nudges = 1;
-		result = 0;
-		while (nudges <9)
+		FMemMark Mark(GMem);
+		FCheckResult Hit(1.0);
+		if( Hash.SinglePointCheck( Hit, Test, Extent, 0, GetLevelInfo(), bCheckActors )==1 )
 		{
-			start = *Location + nudges * 0.125 * Adjust;
-			if (MyBoxPointCheck(Hit, Actor, start, Actor->CollisionRadius, Actor->CollisionHeight, 0))
+			// Found a safe point, so return it if the adjustment is acceptable.
+			if
+			(	Abs( Test.X - Location.X ) < MaxAdjust.X
+			&&	Abs( Test.Y - Location.Y ) < MaxAdjust.Y
+			&&	Abs( Test.Z - Location.Z ) < MaxAdjust.Z )
 			{
-				nudges = 9;
-				result = 1;
-				Actor->Location = start;
+				Location = Test;
+				return 1;
 			}
-			nudges++;
+			else return 0;
+		}
+		else if( Hit.Normal == FVector(0,0,0) )
+		{
+			// Center is inside a wall, so we have no hope of getting out.
+			break;
+		}
+		else if( Iter>0 && (Hit.Normal | OldHitNormal)<0.0 )
+		{
+			// Adjust the test location with a backprojection if we've hit two facing normals.
+			FVector Adjusted = Hit.Normal + OldHitNormal;
+			if( Adjusted.IsNearlyZero() )
+				break;
+			Adjusted.Normalize();
+			Test = Hit.Location + Adjusted * Hit.Location.Size() / (Adjusted | Hit.Normal);
+		}
+		else Test = Hit.Location;
+		OldHitNormal = Hit.Normal;
+	}
+
+	// Subdivide into 8 sub-cubes and check collision of each one.
+	FCheckResult Hit(1.0);
+	FVector Adjust(0,0,0), Offset;
+	for( Offset.X=-0.5; Offset.X<=0.5; Offset.X+=1.0 )
+		for( Offset.Y=-0.5; Offset.Y<=0.5; Offset.Y+=1.0 )
+			for( Offset.Z=-0.5; Offset.Z<=0.5; Offset.Z+=1.0 )
+				if( Model->PointCheck( Hit, NULL, Location + Offset * Extent, 0.5 * Extent, 0 ) )
+					Adjust += Offset;
+
+	Adjust = 0.125 * FVector( Sgn(Adjust.X), Sgn(Adjust.Y), Sgn(Adjust.Z) ) * MaxAdjust;
+	FVector Start = Location;
+	//debugf("Adjust is %f %f %f", Adjust.X, Adjust.Y, Adjust.Z);
+
+	for( int Nudges=0; Nudges<8; Nudges++ )
+	{
+		if( Model->PointCheck( Hit, NULL, Start+=Adjust, Extent, 0 ) )
+		{
+			Location = Start;
+			return 1;
 		}
 	}
 
-	return result;
+	// Failed.
+	return 0;
 	unguard;
 }
 
+//
 // Try to place an actor that has moved a long way.  This is for
 // moving actors through teleporters, adding them to levels, and
 // starting them out in levels.  The results of this function is independent
@@ -652,30 +723,35 @@ int ULevel::PlaceActor( AActor *Actor, FVector *Location )
 // If the actor doesn't fit exactly in the location specified, tries
 // to slightly move it out of walls and such.
 //
-//
 // Returns 1 if the actor has been successfully moved, or 0 if it couldn't fit.
 //
 // Updates the actor's Zone and sends ZoneChange if it changes.
 //
-
-int ULevel::FarMoveActor( AActor *Actor, FVector *Location, int test)
+int ULevel::FarMoveActor( AActor *Actor, FVector DestLocation,  BOOL test, BOOL bNoCheck )
 {
 	guard(ULevel::FarMoveActor);
 	checkState(IsLocked());
-	int result = PlaceActor(Actor, Location);
-	if (!test)
-		SetActorZone( Actor );
-	else //if test, figure out right zone without sending message
+	checkInput(Actor!=NULL);
+
+	if( Actor->bCollideActors ) //&& !test
+		Hash.RemoveActor( Actor );
+
+	FVector newLocation = DestLocation;
+	int result = 1;
+	if (!bNoCheck && Actor->bCollideWorld || Actor->bCollideWhenPlacing) 
+		result = FindSpot( Actor->GetCollisionExtent(), newLocation, 0 );
+
+	if (result)
 	{
-		int NewZoneNumber = Model->PointZone(Actor->Location);
-		if( NewZoneNumber != Actor->ZoneNumber )
-		{
-			AZoneInfo *Zone = GetZoneActor(NewZoneNumber);
-			Actor->ZoneNumber = NewZoneNumber;
-			Actor->Zone       = Zone;
-		}
+		Actor->Location = newLocation;
+		Actor->OldLocation = newLocation; //to zero velocity
+
+		SetActorZone( Actor, test );	
 	}
-	
+
+	if( Actor->bCollideActors ) //&& !test
+		Hash.AddActor( Actor );
+
 	return result;
 	unguard;
 }
@@ -690,31 +766,31 @@ int ULevel::DropToFloor( AActor *Actor)
 {
 	guard(ULevel::DropToFloor);
 	checkState(IsLocked());
+	checkInput(Actor!=NULL);
 
-	FVector FloorDelta = GMath.ZeroVector;
-	FloorDelta.Z = -1000.0;
+	// Try moving down a long way and see if we hit the floor.
+
 	FCheckResult Hit(1.0);
-	MoveActor(Actor, &FloorDelta, Hit);
-	int result = (Hit.Time < 1.0);
-	SetActorZone( Actor );
-	
-	return result;
+	MoveActor( Actor, FVector( 0, 0, -1000 ), Actor->Rotation, Hit );
+	return (Hit.Time < 1.0);
+
 	unguard;
 }
 
 /* TestMoveActor()
 Returns 1 if Actor can move from Start to End (completely).  Does not actually move actor.
-Start must be a valid location for the actor (test using BoxPointCheck).
+Start must be a valid location for the actor (test using PointCheck).
 */
-int ULevel::TestMoveActor( AActor *Actor, FVector &Start, FVector &End)
+int ULevel::TestMoveActor( AActor *Actor, FVector Start, FVector End, BOOL IgnorePawns )
 {
 	guard(ULevel::TestMoveActor);
 	checkState(IsLocked());
+	checkInput(Actor!=NULL);
 
 	// Skip if no vector.
-	FCheckResult Hit(1.0);
+/*	FCheckResult Hit(1.0);
 	FVector Delta = End - Start;
-	if (Delta.IsNearlyZero()) 
+	if ( Delta.IsNearlyZero() ) 
 		return 1;
 
 	// Call collision trace function.
@@ -722,72 +798,59 @@ int ULevel::TestMoveActor( AActor *Actor, FVector &Start, FVector &End)
 	FVector TestDelta = Delta + 2.0 * DeltaDir;
 
 	// Get collision time with world.
-	if (Actor->bCollideWorld)
-		Model->BoxLineCheck
+	if( Actor->bCollideWorld )
+		if (Model->LineCheck
 		(
 			Hit,
 			NULL,
 			Start,
 			Start + TestDelta,
-			Actor->CollisionRadius,
-			Actor->CollisionHeight,
+			Actor->GetCollisionExtent(),
 			0
-		);
+		) == 0)
+			return 0;
 
-	INT Moved = (Hit.Time == 1.0);
-	if (Moved && Actor->bCollideActors && ( Actor->bBlockActors || Actor->bBlockPlayers ))
+	// Handle collision with actors.
+	if( Actor->bCollideActors && (Actor->bBlockActors || Actor->bBlockPlayers) )
 	{
-		// Remove this actor from collision list.
-		Hash.RemoveActor( Actor );
-
 		// Now check actor collision along this line.
-		INT MaybeTouched=0, NumHits=0;
-		FCheckResult Hits[64];
-
 		//FIXME - do my own optimized (stop at first hit) collision check
 		//ignore pawns in that check (here I throw them away)
-		FLOAT Dist = TestDelta.Size();
-		FLOAT MoveDone = 0.0;
+		FLOAT Subdivision = 250.f;
+		FLOAT Dist        = TestDelta.Size();
+		FLOAT MoveDone    = 0.0;
 		FVector NextStart = Start;
-		while (MoveDone < Dist)
+		while( MoveDone < Dist )
 		{
-			NumHits = Hash.LineCheck
+			FMemMark Mark(GMem);
+			FCheckResult* FirstHit = Hash.LineCheck
 			(
-				Hits,
-				ARRAY_COUNT(Hits),
+				GMem,
 				NextStart,
-				NextStart + Min(250.f,Dist - MoveDone) * DeltaDir,
-				Actor->CollisionRadius,
-				Actor->CollisionHeight
+				NextStart + Min(Subdivision,Dist - MoveDone) * DeltaDir,
+				Actor->GetCollisionExtent(),
+				Actor->bCollideActors && (Actor->bBlockActors || Actor->bBlockPlayers),
+				NULL // Actor->bCollideWorld ? GetLevelInfo() : NULL
 			);
 
-			// Handle first blocking actor (but no pawns).
-			int j = 0;
-			while (j<NumHits)
-			{
-				if (!Hits[j].Actor->IsA("Pawn"))
-					if( Actor->IsBlockedBy(Hits[j].Actor) && !Actor->IsOverlapping(Hits[j].Actor) )
-					{
-						Moved = 0;
-						j = NumHits;
-					}
-				j++;
-			}
-		
-			if (Moved) //still going
-			{
-				MoveDone += 250.0;
-				NextStart += 250.0 * DeltaDir;
-			}
-			else
-				MoveDone = Dist;
-		}
+			// Handle first blocking actor.
+			for( FCheckResult* Hit=FirstHit; Hit; Hit=Hit->GetNext() )
+				if( Hit->Actor!=Actor && (!IgnorePawns || !Hit->Actor->IsA("Pawn")) )
+					if( Actor->IsBlockedBy(Hit->Actor) && !Actor->IsOverlapping(Hit->Actor) )
+						break;
+			Mark.Pop();
+			if( Hit!=NULL )
+				return 0;
 
-		// Add actor back to collision list.
-		Hash.AddActor( Actor );
+			// Still going.
+			MoveDone  += Subdivision;
+			NextStart += Subdivision * DeltaDir;
+		}
 	}
-	// Success.
-	return Moved;
+	// Success, can move.
+	return 1; */
+	debugf("Called TestMoveActor");
+	return 0;
 	unguard;
 }
 
@@ -819,160 +882,200 @@ int ULevel::TestMoveActor( AActor *Actor, FVector &Start, FVector &End)
 //
 // If Test = 1 (default 0), do not send notifications.
 //
-int ULevel::MoveActor( AActor *Actor, FVector *Delta, FCheckResult &Hit, int test )
+int ULevel::MoveActor
+(
+	AActor*			Actor,
+	FVector			Delta,
+	FRotation		NewRotation,
+	FCheckResult	&Hit,
+	BOOL			bTest,
+	BOOL			bIgnorePawns,
+	BOOL			bIgnoreBases
+)
 {
 	guard(ULevel::MoveActor);
 	checkState(IsLocked());
+	checkInput(Actor!=NULL);
 
 	// Skip if no vector.
 	Hit = FCheckResult(1.0);
-	if( (*Delta).IsNearlyZero() ) //( *Delta == GMath.ZeroVector )
+	if( Delta.IsNearlyZero() && NewRotation==Actor->Rotation )
 		return 1;
 
-	// Call collision trace function.
-	FVector DeltaDir = (*Delta).Normal();
-	FVector TestDelta = *Delta + 2.0 * DeltaDir;
+	// Set up.
+	FMemMark Mark(GMem);
+	FVector DeltaDir       = Delta.Normal();
+	FVector TestDelta      = Delta + 2.0 * DeltaDir;
+	INT     MaybeTouched   = 0;
+	INT     NumHits        = 0;
+	FCheckResult* FirstHit = NULL;
 
-	// Get collision time with world.
-	if( Actor->bCollideWorld )
+	// Perform movement collision checking if needed for this actor.
+	if( (Actor->bCollideActors || Actor->bCollideWorld) && !Actor->Brush && !Delta.IsNearlyZero() )
 	{
-		if( Model->BoxLineCheck
+		FirstHit = Hash.LineCheck
 		(
-			Hit,
-			NULL,
+			GMem,
 			Actor->Location,
 			Actor->Location + TestDelta,
-			Actor->CollisionRadius,
-			Actor->CollisionHeight,
-			0
-		) == 0 )
+			Actor->GetCollisionExtent(),
+			(Actor->bCollideActors && !Actor->Brush) ? 1              : 0,
+			(Actor->bCollideWorld && !Actor->Brush)  ? GetLevelInfo() : NULL
+		);
+
+		// Handle first blocking actor.
+		if( Actor->bCollideWorld || Actor->bBlockActors || Actor->bBlockPlayers )
 		{
-			Hit.Actor = GetLevelInfo();
-		}
-	}
-
-	INT Moved = (Hit.Time > 0.0);
-	if( Moved )
-	{
-		// Remove this actor from collision list.
-		if( Actor->bCollideActors )
-			Hash.RemoveActor( Actor );
-
-		// Now check actor collision along this line.
-		INT MaybeTouched=0, NumHits=0;
-		FCheckResult Hits[64];
-
-		if( Actor->bCollideActors )
-		{
-			NumHits = Hash.LineCheck
-			(
-				Hits,
-				ARRAY_COUNT(Hits),
-				Actor->Location,
-				Actor->Location + TestDelta,
-				Actor->CollisionRadius,
-				Actor->CollisionHeight
-			);
-
-			// Handle first blocking actor.
-			if( Actor->bBlockActors || Actor->bBlockPlayers )
+			for( FCheckResult* Test=FirstHit; Test; Test=Test->GetNext() )
 			{
-				for( int j=0; j<NumHits && Hits[j].Time<Hit.Time; j++ )
+				if
+				(	(!bIgnorePawns || !Test->Actor->IsA("Pawn")     )
+				&&	(!bIgnoreBases || !Actor->IsBasedOn(Test->Actor))
+				&&	(!Test->Actor->IsBasedOn(Actor)                 ) )
 				{
-					if (!test || !Actor->IsA("Pawn"))
+					MaybeTouched = 1;
+					if( Actor->IsBlockedBy(Test->Actor) )
 					{
-						if( Actor->IsBlockedBy(Hits[j].Actor) && !Actor->IsOverlapping(Hits[j].Actor) )
-							Hit = Hits[j];
-						else MaybeTouched = 1;
+						Hit = *Test;
+						break;
 					}
 				}
 			}
 		}
-		// Update actor's location.
-		//keep away from obstacle
-		FVector FinalDelta = *Delta;
-		if( Hit.Time < 1.0 )
-		{
-			//fix up delta - given that testdelta = delta + 2
-			FinalDelta = (TestDelta * Hit.Time);
-			FinalDelta = FinalDelta - Min(2.f, FinalDelta.Size()) * DeltaDir;
-			Hit.Time = FinalDelta.Size() / (*Delta).Size();
-		}
-		
-		Actor->Location += FinalDelta;
+	}
 
-		// Add actor back to collision list.
-		if( Actor->bCollideActors )
-			Hash.AddActor( Actor );
+	// Attenuate movement.
+	FVector FinalDelta = Delta;
+	if( Hit.Time < 1.0 )
+	{
+		// Fix up delta, given that TestDelta = Delta + 2.
+		FinalDelta = TestDelta * Hit.Time;
+		FinalDelta = FinalDelta - Min(2.f, FinalDelta.Size()) * DeltaDir;
+		Hit.Time   = FinalDelta.Size() / Delta.Size();
+	}
 
-		// Handle bump and touch notifications.
-		if (!test)
+	// Move the based actors (BEFORE encroachment checking).
+	if( Actor->StandingCount && !bTest )
+	{
+		for( int i=0; i<Num; i++ )
 		{
-			// Notify first bumped actor.
-			if( Hit.Actor && Hit.Actor!=GetLevelInfo() )
+			AActor *Other = Element(i);
+			if( Other && Other->Base==Actor )
 			{
-				// Tell physics code.
-				Actor->Bump( Hit.Actor );
-
-				// Notify actors.
-				Hit.Actor->Process( NAME_Bump, &PActor(Actor ) );
-				Actor->Process ( NAME_Bump, &PActor(Hit.Actor) );
-			}
-
-			// Handle touch notifications.
-			if( MaybeTouched || !Actor->bBlockActors || !Actor->bBlockPlayers )
-				for( int j=0; j<NumHits && Hits[j].Time<Hit.Time; j++ )
-					if( !Actor->IsBlockedBy(Hits[j].Actor) && Actor->IsOverlapping(Hits[j].Actor))
-						Actor->BeginTouch( Hits[j].Actor );
-
-			// UnTouch notification.
-			for( int i=0; i<ARRAY_COUNT(Actor->Touching); i++ )
-				if( Actor->Touching[i] && !Actor->IsOverlapping(Actor->Touching[i]) )
-					Actor->EndTouch( Actor->Touching[i], 0 );
-
-			// Set actor zone.
-			SetActorZone( Actor );
-		}
-		else
-		{
-			// If test, figure out right zone without sending message.
-			int NewZoneNumber = Model->PointZone(Actor->Location);
-			if( NewZoneNumber != Actor->ZoneNumber )
-			{
-				AZoneInfo *Zone = GetZoneActor(NewZoneNumber);
-				Actor->ZoneNumber = NewZoneNumber;
-				Actor->Zone       = Zone;
+				// Move base.
+				FVector   RotMotion( 0, 0, 0 );
+				FRotation DeltaRot ( 0, NewRotation.Yaw - Actor->Rotation.Yaw, 0 );
+				if( NewRotation != Actor->Rotation )
+				{
+					// Handle rotation-induced motion.
+					FRotation ReducedRotation = FRotation( 0, ReduceAngle(NewRotation.Yaw) - ReduceAngle(Actor->Rotation.Yaw), 0 );
+					FVector   Pointer         = Actor->Location - Other->Location;
+					RotMotion                 = Pointer - Pointer.TransformVectorBy( GMath.UnitCoords * ReducedRotation );
+				}
+				FCheckResult Hit(1.0);
+				MoveActor( Other, FinalDelta + RotMotion, Other->Rotation + DeltaRot, Hit, 0, 0, 1 );
+				if( Other->IsA("Pawn") )
+					((APawn*)Other)->ViewRotation += DeltaRot;
 			}
 		}
 	}
 
-	return Moved;
+	// Abort if encroachment declined.
+	if( CheckEncroachment( Actor, Actor->Location + FinalDelta, NewRotation ) )
+		return 0;
+
+	// Update the location.
+	if( Actor->bCollideActors ) Hash.RemoveActor( Actor );
+	Actor->Location += FinalDelta;
+	Actor->Rotation  = NewRotation;
+	if( Actor->bCollideActors ) Hash.AddActor( Actor );
+
+	// Handle bump and touch notifications.
+	if( !bTest )
+	{
+		// Notify first bumped actor unless it's the level or the actor's base.
+		if( Hit.Actor && Hit.Actor!=GetLevelInfo() && !Actor->IsBasedOn(Hit.Actor) )
+		{
+			// Notify both actors of the bump.
+			Hit.Actor->Process( NAME_Bump, &PActor(Actor    ) );
+			Actor->Process    ( NAME_Bump, &PActor(Hit.Actor) );
+		}
+
+		// Handle Touch notifications.
+		if( MaybeTouched || !Actor->bBlockActors || !Actor->bBlockPlayers )
+			for( FCheckResult* Test=FirstHit; Test && Test->Time<Hit.Time; Test=Test->GetNext() )
+				if
+				(	(!Test->Actor->IsBasedOn(Actor))
+				&&	(!bIgnoreBases || Actor->IsBasedOn(Test->Actor))
+				&&	(!Actor->IsBlockedBy(Test->Actor))
+				&&	(Actor->IsOverlapping(Test->Actor)) )
+					Actor->BeginTouch( Test->Actor );
+
+		// UnTouch notifications.
+		for( int i=0; i<ARRAY_COUNT(Actor->Touching); i++ )
+			if( Actor->Touching[i] && !Actor->IsOverlapping(Actor->Touching[i]) )
+				Actor->EndTouch( Actor->Touching[i], 0 );
+
+	}
+
+	// Set actor zone.
+	SetActorZone( Actor, bTest );
+	Mark.Pop();
+
+	// Update moving brush.
+	if( !bTest && Hit.Time>0.0 && Actor->Brush && (Actor->Brush->Location!=Actor->Location || Actor->Brush->Rotation!=Actor->Rotation) )
+		GBrushTracker.Update( Actor );
+
+	// Return whether we moved at all.
+	return Hit.Time>0.0;
 	unguard;
 }
 
 /*-----------------------------------------------------------------------------
-	RotateActor.
+	Encroachment.
 -----------------------------------------------------------------------------*/
 
 //
-// Try to set the actor's rotation to the specified rotation, performing
-// collision checking with the world (if the actor's collision shape is
-// rotation variant), and attempting to move and rotate any actors standing
-// on this actor.
+// Check whether Actor is encroaching other actors after a move, and return
+// 0 to ok the move, or 1 to abort it.
 //
-int ULevel::RotateActor
+int ULevel::CheckEncroachment
 (
 	AActor*		Actor,
-	FRotation&	DestRotation,
-	int			Test
+	FVector		TestLocation,
+	FRotation	TestRotation
 )
 {
-	guard(ULevel::RotateActor);
+	guard(ULevel::CheckEncroachment);
+	checkState(IsLocked());
+	checkInput(Actor!=NULL);
 
-	//todo!! floor handling
-	Actor->Rotation = DestRotation;
-	return 1;
+	// If this actor doesn't need encroachment checking, allow the move.
+	if( !Actor->bCollideActors || (!Actor->bBlockActors && !Actor->bBlockPlayers) || !Actor->Brush )
+		return 0;
 
+	// Query the mover about what he wants to do with the actors he is encroaching.
+	FMemMark Mark(GMem);
+	FCheckResult* FirstHit = Hash.EncroachmentCheck( GMem, Actor, TestLocation, TestRotation, 0 );	
+	for( FCheckResult* Test = FirstHit; Test!=NULL; Test=Test->GetNext() )
+	{
+		if( Test->Actor!=Actor && Test->Actor!=GetLevelInfo() && Actor->IsBlockedBy( Test->Actor ) )
+		{
+			PActorBool ActorBool( Test->Actor );
+			Actor->Process( NAME_EncroachingOn, &ActorBool );
+			if( ActorBool.Result != 0 )
+				return 1;
+		}
+	}
+
+	// Notify the encroached actors but not the level.
+	for( Test = FirstHit; Test; Test=Test->GetNext() )
+		if( Test->Actor!=Actor && Test->Actor!=GetLevelInfo() && Actor->IsBlockedBy( Test->Actor ) )
+			Test->Actor->Process( NAME_EncroachedBy, &PActor(Actor) );
+	Mark.Pop();
+
+	// Ok the move.
+	return 0;
 	unguard;
 }
 
@@ -983,48 +1086,73 @@ int ULevel::RotateActor
 //
 // Trace a line and return the first hit actor (LevelInfo means hit the world geomtry).
 //
-void ULevel::Trace
+int ULevel::Trace
 (
 	FCheckResult	&Hit,			// Item hit.
 	AActor			*SourceActor,	// Source actor, this or its parents is never hit.
 	const FVector	&End,			// End location.
 	const FVector	&Start,			// Start location.
-	BOOL			TraceActors		// Whether to trace for actors.
+	DWORD           TraceFlags,		// Trace flags.
+	FVector			Extent			// Collision extent.
 )
 {
 	guard(ULevel::Trace);
 	checkState(IsLocked());
 
-	// Init hit info.
-	Hit.Actor = NULL;
+	// Get list of hit actors.
+	FMemMark Mark(GMem);
+	FCheckResult* FirstHit = Hash.LineCheck
+	(
+		GMem,
+		Start,
+		End,
+		Extent,
+		(TraceFlags & TRACE_AllColliding) ? 1 : 0,
+		(TraceFlags & TRACE_Level       ) ? GetLevelInfo() : NULL
+	);
 
-	// Perform raytrace with world's primitive.
-	if( Model->LineCheck( Hit, NULL, Start, End, 0 ) == 0 )
+	// Skip owned actors and return the one nearest actor.
+	for( FCheckResult* Check = FirstHit; Check!=NULL; Check=Check->GetNext() )
 	{
-		// Hit a surface.
-		Hit.Actor     = GetLevelInfo();
-		Hit.Primitive = Model;
-	}
-
-	// Check collision with actors.
-	if( TraceActors )
-	{
-		// Get list of hit actors.
-		FCheckResult Hits[16];
-		INT NumHits = Hash.LineCheck( Hits, ARRAY_COUNT(Hits), Start, End, 0, 0 );
-
-		// Skip owned actors and get the nearest actor.
-		INDEX iCheck = 0;
-		if( SourceActor )
-			while( iCheck<NumHits && SourceActor->IsOwnedBy(Hits[iCheck].Actor) )
-				iCheck++;
-		if( iCheck < NumHits && (Hit.Actor==NULL || Hits[0].Time < Hit.Time) )
+		if( !SourceActor || !SourceActor->IsOwnedBy( Check->Actor ) )
 		{
-			Hit = Hits[iCheck];
-			Hit.Location = Start + (End-Start)*Hit.Time;
+			if( Check->Actor->IsA("LevelInfo") )
+			{
+				if( TraceFlags & TRACE_Level )
+					break;
+			}
+			else if( Check->Actor->IsA("Pawn") )
+			{
+				if( TraceFlags & TRACE_Pawns )
+					break;
+			}
+			else if( Check->Actor->IsA("Mover") )
+			{
+				if( TraceFlags & TRACE_Movers )
+					break;
+			}
+			else if( Check->Actor->IsA("ZoneInfo") )
+			{
+				if( TraceFlags & TRACE_ZoneChanges )
+					break;
+			}
+			else
+			{
+				if( TraceFlags & TRACE_Others )
+					break;
+			}
 		}
 	}
+	if( Check )
+		Hit = *Check;
+	else
+	{
+		Hit.Time = 1.0;
+		Hit.Actor = NULL;
+	}
 
+	Mark.Pop();
+	return Check==NULL;
 	unguard;
 }
 
@@ -1037,10 +1165,12 @@ void ULevel::Trace
 // and notify the actor of the zone change.  Skips the zone notification
 // if the zone hasn't changed.
 //
-void ULevel::SetActorZone( AActor *Actor, BOOL bForceRefresh )
+void ULevel::SetActorZone( AActor *Actor, BOOL bTest, BOOL bForceRefresh )
 {
 	guard(ULevel::SetActorZone);
 	checkState(IsLocked());
+	checkInput(Actor!=NULL);
+
 	if( Actor->bDeleteMe )
 		return;
 
@@ -1056,18 +1186,18 @@ void ULevel::SetActorZone( AActor *Actor, BOOL bForceRefresh )
 	if( NewZoneNumber != Actor->ZoneNumber )
 	{
 		// Notify old zone info of player leaving.
-		if( Actor->IsPlayer() )
+		if( Actor->IsPlayer() && !bTest )
 			Actor->Zone->Process( NAME_PlayerLeaving, &PActor(Actor) );
 
 		AZoneInfo *Zone = GetZoneActor(NewZoneNumber);
 
-		Actor->Process( NAME_ZoneChange, &PActor(Zone) );
+		if( !bTest )
+			Actor->Process( NAME_ZoneChange, &PActor(Zone) );
 
 		Actor->ZoneNumber = NewZoneNumber;
 		Actor->Zone       = Zone;
 
-		if( Actor->IsPlayer() )
-			// Notify new zone info of player entering.
+		if( Actor->IsPlayer() && !bTest )
 			Actor->Zone->Process( NAME_PlayerEntered, &PActor(Actor) );
 	} 
 	unguard;
@@ -1083,6 +1213,7 @@ void ULevel::SetActorZone( AActor *Actor, BOOL bForceRefresh )
 void ULevel::PlayerExec( AActor *Actor, const char *Cmd, FOutputDevice *Out )
 {
 	guard(ULevel::PlayerExec);
+	checkInput(Actor!=NULL);
 	const char *Str = Cmd;
 
 	// If a valid message was specified, send it to this actor.

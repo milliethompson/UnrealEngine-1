@@ -14,32 +14,31 @@ class Object
 
 //-----------------------------------------------------------------------------
 // UObjectBase properties.
-var transient const int   objVftable;
-var transient const name  Name;
-var transient const class Class;
-var transient const int   objFlags;
-var transient const int   objFileCRC;
-var transient const int   objFileHeaderOffset, objFileDataOffset;
-var transient const int   objFileHeaderSize,   objFileDataSize;
+var intrinsic const int   objVftable;
+var intrinsic const name  Name;
+var intrinsic const class Class;
+var intrinsic const int   objFlags;
+var intrinsic const int   objFileCRC;
+var intrinsic const int   objFileHeaderOffset, objFileDataOffset;
+var intrinsic const int   objFileHeaderSize,   objFileDataSize;
 
 //-----------------------------------------------------------------------------
 // UObject properties.
-var transient const int   objReadLocks, objWriteLocks, objTransLocks;
-var transient const int   objDataPtr;
-var transient const int   objIndex;
-var transient const int   objLinker;
-var transient const int   objFileIndex;
+var intrinsic const int   objReadLocks, objWriteLocks, objTransLocks;
+var intrinsic const int   objDataPtr;
+var intrinsic const int   objIndex;
+var intrinsic const int   objLinker;
+var intrinsic const int   objFileIndex;
 
 //-----------------------------------------------------------------------------
 // FExecStackMain properties.
-var transient const Class   stackLinkClass;
-var transient const int     stackLinkNode;
-var transient const Script  stackScript;
-var transient const int     stackCode;
-var transient const int     stackLocals;
-var transient const Object  stackObject;
-var transient const int     stackProbeMask[2];
-var transient const int     stackVfCache[12];
+var intrinsic const Class   stackLinkClass;
+var intrinsic const int     stackLinkNode;
+var intrinsic const Script  stackScript;
+var intrinsic const int     stackCode;
+var intrinsic const int     stackLocals;
+var intrinsic const Object  stackObject;
+var intrinsic const int     stackProbeMask[2];
 
 //=============================================================================
 // Basic intrinsic operators and functions.
@@ -133,7 +132,7 @@ intrinsic(247) final function     float Lerp  ( float Alpha, float A, float B );
 intrinsic(248) final function     float Smerp ( float Alpha, float A, float B );
 
 // String operators.
-intrinsic(228) final operator(20) string[255] $  ( coerce string[255] A, coerce String[255] B );
+intrinsic(228) final operator(10) string[255] $  ( coerce string[255] A, coerce String[255] B );
 intrinsic(197) final operator(24) bool        <  ( string[255] A, String[255] B );
 intrinsic(198) final operator(24) bool        >  ( string[255] A, String[255] B );
 intrinsic(199) final operator(24) bool        <= ( string[255] A, String[255] B );
@@ -175,7 +174,8 @@ intrinsic(225) final function float  Size   ( vector A );
 intrinsic(226) final function vector Normal ( vector A );
 intrinsic(227) final function        Invert ( out vector X, out vector Y, out vector Z );
 intrinsic(252) final function vector VRand  ( );
-intrinsic(253) final function float  Dist   ( vector A, vector B );//todo: Kill
+intrinsic(253) final function float  Dist   ( vector A, vector B );
+intrinsic(300) final function vector MirrorVectorByNormal( vector Vect, vector Normal );
 
 // Rotation operators and functions.
 intrinsic(142) final operator(24) bool ==     ( rotation A, rotation B );
@@ -211,19 +211,19 @@ intrinsic(258) final function bool ClassIsChildOf( class TestClass, class Parent
 
 // Internet.
 intrinsic(274) final function InternetSend( string[80] ToURL, string[255] Msg );
-engine function InternetReceive( string[80] FromURL, string[255] Msg );
+function InternetReceive( string[80] FromURL, string[255] Msg );
 
 //=============================================================================
 // Engine notification functions.
 
 // Updates.
-engine function Tick( float Time );
+function Tick( float Time );
 
 // Server function.
-engine function Server( float F, name N, string[255] S );
+function Server( float F, name N, string[255] S );
 
 // Querying.
-engine function Callback( object Other );
+function Callback( object Other );
 
 //=============================================================================
 // Functions.

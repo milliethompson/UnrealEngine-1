@@ -38,8 +38,8 @@ enum EAxis {
     AXIS_Strafe             =6,
     AXIS_Up                 =7,
     AXIS_LookUp             =8,
-    AXIS_Extra6             =9,
-    AXIS_Extra5             =10,
+    AXIS_MouseX             =9,
+    AXIS_MouseY             =10,
     AXIS_Extra4             =11,
     AXIS_Extra3             =12,
     AXIS_Extra2             =13,
@@ -114,9 +114,10 @@ enum EPhysics {
     PHYS_Flying             =4,
     PHYS_Rotating           =5,
     PHYS_Projectile         =6,
-    PHYS_Pathing            =7,
-    PHYS_Splining           =8,
-    PHYS_MAX                =9,
+    PHYS_Rolling            =7,
+    PHYS_Interpolating      =8,
+    PHYS_MovingBrush        =9,
+    PHYS_MAX                =10,
 };
 
 class UNENGINE_API AActor : public UObject {
@@ -131,7 +132,7 @@ public:
     class AActor *Target;
     class APawn *Instigator;
     class AInventory *Inventory;
-    class AActor *Floor;
+    class AActor *Base;
     class AZoneInfo *Zone;
     INT LatentAction;
     BYTE StandingCount;
@@ -167,14 +168,15 @@ public:
     DWORD bBlockPlayers:1;
     DWORD bProjTarget:1;
     FVector Location;
+    FRotation Rotation;
     FVector OldLocation;
     FVector ColLocation;
     FVector Velocity;
-    FRotation Rotation;
     FVector Acceleration;
     BYTE DrawType /* enum EDrawType */;
     BYTE BlitType /* enum EBlitType */;
     class UTexture *Texture;
+    class UTexture *Skin;
     class UMesh *Mesh;
     class UModel *Brush;
     FLOAT DrawScale;
@@ -205,6 +207,7 @@ public:
     DWORD bNoSmooth:1;
     DWORD bOnlyOwnerSee:1;
     DWORD bMeshEnviroMap:1;
+    DWORD bEnviroZone:1;
     DWORD bMeshCurvy:1;
     DWORD bShadowCast:1;
     DWORD bUser3:1;
@@ -212,20 +215,22 @@ public:
     DWORD bUser1:1;
     DWORD bUser0:1;
     BYTE Physics /* enum EPhysics */;
-    FLOAT Mass;
-    FLOAT Buoyancy;
     DWORD bMomentum:1;
     DWORD bBounce:1;
     DWORD bPitch:1;
     DWORD bYaw:1;
     DWORD bRoll:1;
-    DWORD bEnginePhysics:1;
     DWORD bFixedRotationDir:1;
     DWORD bYawClockwise:1;
     DWORD bPitchClockwise:1;
     DWORD bRollClockwise:1;
+    DWORD bInterpolating:1;
+    FLOAT Mass;
+    FLOAT Buoyancy;
     INT RotationSpeed;
     FRotation DesiredRotation;
+    FLOAT PhysAlpha;
+    FLOAT PhysRate;
     FLOAT LifeSpan;
     FName AnimSequence;
     FLOAT AnimFrame;
@@ -242,6 +247,7 @@ public:
     DWORD bIsSecretGoal:1;
     DWORD bIsKillGoal:1;
     DWORD bIsItemGoal:1;
+    DWORD bCollideWhenPlacing:1;
     FLOAT TickRate;
     FLOAT TimerRate;
     FLOAT TickCounter;
@@ -255,6 +261,14 @@ public:
 ///////////////////////////////////////////////////////
 // Class APawn:AActor:UObject
 ///////////////////////////////////////////////////////
+
+enum eArmorClass {
+    ARMOR_None              =0,
+    ARMOR_Normal            =1,
+    ARMOR_Super             =2,
+    ARMOR_God               =3,
+    ARMOR_MAX               =4,
+};
 
 enum EAttitude {
     ATTITUDE_Fear           =0,
@@ -300,6 +314,7 @@ public:
     CHAR Team[32];
     class AStatusInfo *StatusBar;
     class AWeapon *Weapon;
+    class AArmor *Armor;
     FRotation ViewRotation;
     INT MaxPitch;
     FLOAT BaseEyeHeight;
@@ -315,53 +330,60 @@ public:
     BYTE ItemCount;
     BYTE KillCount;
     BYTE SecretCount;
-    INT AmmoCount[10];
-    INT AmmoCapacity[10];
-    FLOAT NaturalArmor[4];
-    FLOAT Armor[4];
-    FLOAT HealRate;
+    FLOAT score;
+    BYTE Health;
+    BYTE ArmorClass /* enum eArmorClass */;
     DWORD bCanPossess:1;
     DWORD bLocalMovement:1;
     DWORD bLocalRotation:1;
     DWORD bBehindView:1;
     DWORD bIsPlayer:1;
+    DWORD bLookUpStairs:1;
+    DWORD bJustLanded:1;
+    DWORD bFromWall:1;
     DWORD bReadyToAttack:1;
     DWORD bHasRangedAttack:1;
     DWORD bMovingRangedAttack:1;
     DWORD bCanStrafe:1;
+    DWORD bFixedStart:1;
+    DWORD bReducedSpeed:1;
+    DWORD bCanJump:1;
+    DWORD bCanWalk:1;
+    DWORD bCanSwim:1;
+    DWORD bCanFly:1;
+    DWORD bCanOpenDoors:1;
+    DWORD bCanDoSpecial:1;
     FLOAT SightRadius;
     FLOAT PeripheralVision;
     FLOAT Noise;
     FLOAT HearingThreshold;
-    BYTE Visibility;
     FName Orders;
     FName OrderTag;
     class AActor *OrderObject;
     FVector LastSeenPos;
     FLOAT TimeBetweenAttacks;
+    FLOAT MeleeRange;
     FLOAT Alertness;
     FName NextAnim;
     FLOAT SightCounter;
     FLOAT Stimulus;
     class APawn *Enemy;
     FLOAT Aggressiveness;
+    FLOAT MoveTimer;
+    class APawn *Hated;
+    BYTE Visibility;
     BYTE AttitudeToPlayer /* enum EAttitude */;
     class APawn *OldEnemy;
     class AActor *MoveTarget;
-    FName NextState;
     FVector Destination;
     FVector Focus;
     FLOAT DesiredSpeed;
     FLOAT GroundSpeed;
     FLOAT WaterSpeed;
     FLOAT AirSpeed;
-    FLOAT Health;
     FLOAT AccelRate;
     FLOAT JumpZ;
     FLOAT MaxStepHeight;
-    INT InvisibilityTime;
-    INT SuperShieldTime;
-    INT SuperStrengthTime;
     DWORD bZoom:1;
     DWORD bRun:1;
     DWORD bLook:1;
@@ -387,6 +409,11 @@ public:
     BYTE SurfaceForceType /* enum ESurfaceForceType */;
     BYTE SurfaceForcePeriod;
     BYTE SurfaceForceMagnitude;
+    FLOAT count;
+    FLOAT CombatStyle;
+    class AHomeBase *home;
+    FName NextState;
+    FName NextLabel;
     enum {BaseFlags = CLASS_Intrinsic  | CLASS_ScriptWritable};
     DECLARE_CLASS(APawn,AActor,NAME_Pawn,NAME_UnEngine)
     #include "APawn.h"
@@ -409,27 +436,19 @@ public:
 };
 
 ///////////////////////////////////////////////////////
-// Class ADragon:AScriptedPawn:APawn:AActor:UObject
+// Class AFemale:AHuman:AScriptedPawn:APawn:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class ADragon : public AScriptedPawn {
+class AFemale : public AHuman {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class ASkaarj:AScriptedPawn:APawn:AActor:UObject
+// Class AMale:AHuman:AScriptedPawn:APawn:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class ASkaarj : public AScriptedPawn {
+class AMale : public AHuman {
 public:
-    class USound *LungeSound;
-    class USound *SpinSound;
-    class USound *ClawSound;
-    class USound *ShootSound;
-    BYTE LungeDamage;
-    BYTE SpinDamage;
-    BYTE ClawDamage;
-    BYTE ShootDamage;
 };
 
 ///////////////////////////////////////////////////////
@@ -438,8 +457,6 @@ public:
 
 class ABrute : public AScriptedPawn {
 public:
-    class USound *ShootSound;
-    class USound *WhipSound;
     BYTE ShootDamage;
     BYTE WhipDamage;
 };
@@ -520,6 +537,7 @@ public:
 
 class AKrall : public AScriptedPawn {
 public:
+    DWORD AttackSuccess:1;
 };
 
 ///////////////////////////////////////////////////////
@@ -528,22 +546,8 @@ public:
 
 class ATitan : public AScriptedPawn {
 public:
-};
-
-///////////////////////////////////////////////////////
-// Class AMale:AScriptedPawn:APawn:AActor:UObject
-///////////////////////////////////////////////////////
-
-class AMale : public AScriptedPawn {
-public:
-};
-
-///////////////////////////////////////////////////////
-// Class AFemale:AScriptedPawn:APawn:AActor:UObject
-///////////////////////////////////////////////////////
-
-class AFemale : public AScriptedPawn {
-public:
+    DWORD bStomp:1;
+    FLOAT realSpeed;
 };
 
 ///////////////////////////////////////////////////////
@@ -660,6 +664,27 @@ public:
 };
 
 ///////////////////////////////////////////////////////
+// Class ASkaarjWarrior:AScriptedPawn:APawn:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ASkaarjWarrior : public AScriptedPawn {
+public:
+    BYTE LungeDamage;
+    BYTE SpinDamage;
+    BYTE ClawDamage;
+    BYTE ShootDamage;
+    DWORD AttackSuccess:1;
+};
+
+///////////////////////////////////////////////////////
+// Class ASkaarjDummy:ASkaarjWarrior:AScriptedPawn:APawn:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ASkaarjDummy : public ASkaarjWarrior {
+public:
+};
+
+///////////////////////////////////////////////////////
 // Class ABrush:AActor:UObject
 ///////////////////////////////////////////////////////
 
@@ -674,65 +699,43 @@ public:
 // Class AMover:ABrush:AActor:UObject
 ///////////////////////////////////////////////////////
 
-enum EMoverBumpType {
-    MB_StopWhenBump         =0,
-    MB_ReturnWhenBump       =1,
-    MB_CrushWhenBump        =2,
-    MB_MAX                  =3,
-};
-
-enum EMoverTriggerType {
-    MT_None                 =0,
-    MT_TriggerOpenTimed     =1,
-    MT_TriggerToggle        =2,
-    MT_TriggerControl       =3,
-    MT_TriggerCycleOn       =4,
-    MT_TriggerCycleOff      =5,
-    MT_TriggerInstant       =6,
-    MT_ProximityOpenTimed   =7,
-    MT_ProximityControl     =8,
-    MT_StandOpenTimed       =9,
-    MT_MAX                  =10,
+enum EMoverEncroachType {
+    ME_StopWhenEncroach     =0,
+    ME_ReturnWhenEncroach   =1,
+    ME_CrushWhenEncroach    =2,
+    ME_IgnoreWhenEncroach   =3,
+    ME_MAX                  =4,
 };
 
 enum EMoverGlideType {
     MV_MoveByTime           =0,
     MV_GlideByTime          =1,
-    MV_Sinusoid             =2,
-    MV_MAX                  =3,
+    MV_MAX                  =2,
 };
 
 class UNGAME_API AMover : public ABrush {
 public:
-    BYTE MoverBumpType /* enum EMoverBumpType */;
-    BYTE MoverTriggerType /* enum EMoverTriggerType */;
+    BYTE MoverEncroachType /* enum EMoverEncroachType */;
     BYTE MoverGlideType /* enum EMoverGlideType */;
-    BYTE PrevKeyNum;
     BYTE KeyNum;
+    BYTE PrevKeyNum;
     BYTE WorldRaytraceKey;
     BYTE BrushRaytraceKey;
     FLOAT MoveTime;
     FLOAT StayOpenTime;
-    FLOAT BumpPlayerDamage;
-    FRotation FreeRotation;
-    DWORD bInterruptable:1;
-    DWORD bSlave:1;
-    DWORD bTrigger:1;
-    DWORD bMoving:1;
-    DWORD bReverseWhenDone:1;
+    INT EncroachDamage;
     DWORD bTriggerOnceOnly:1;
-    class USound *OpenSound;
+    DWORD bSlave:1;
+    class AActor *Trigger;
+    class USound *OpeningSound;
     class USound *ClosedSound;
     class USound *MoveAmbientSound;
     FVector KeyPos[4];
     FRotation KeyRot[4];
-    class AActor *Slaves[16];
     FVector BasePos;
     FVector OldPos;
     FRotation BaseRot;
     FRotation OldRot;
-    FLOAT CurTime;
-    FLOAT HoldTime;
     enum {BaseFlags = CLASS_Intrinsic  | CLASS_ScriptWritable};
     DECLARE_CLASS(AMover,ABrush,NAME_Mover,NAME_UnGame)
     #include "AMover.h"
@@ -799,6 +802,35 @@ public:
     class UClass *ProjectileClass[2];
     FLOAT ProjStartDist;
     FLOAT Dispersion[2];
+    class AWeapon *NextWeapon;
+    class AInventory *TempInv;
+    FVector DropLocation;
+};
+
+///////////////////////////////////////////////////////
+// Class AEightBall:AWeapon:AInventory:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AEightBall : public AWeapon {
+public:
+    class Arocket *R[6];
+    class Arocket *S;
+    class AGrenade *g[6];
+    INT RocketsLoaded;
+    INT i;
+    DWORD bFireLoad:1;
+    FRotation TempRot;
+    FVector NewLocation;
+    FVector X;
+    FVector Y;
+    FVector Z;
+    FVector HitNormal;
+    FVector HitLocation;
+    FVector EndTrace;
+    FVector StartTrace;
+    class AActor *LockedTarget;
+    class AActor *NewTarget;
+    class AActor *oldTarget;
 };
 
 ///////////////////////////////////////////////////////
@@ -807,6 +839,18 @@ public:
 
 class AAutoMag : public AWeapon {
 public:
+    class AActor *Other;
+    FVector HitNormal;
+    FVector HitLocation;
+    FVector EndTrace;
+    FVector StartTrace;
+    FRotation GunRot;
+    INT hitdamage;
+    FVector X;
+    FVector Y;
+    FVector Z;
+    FLOAT AltAccuracy;
+    FVector BulletDirection;
 };
 
 ///////////////////////////////////////////////////////
@@ -818,51 +862,114 @@ public:
 };
 
 ///////////////////////////////////////////////////////
-// Class AFlameGun:AWeapon:AInventory:AActor:UObject
-///////////////////////////////////////////////////////
-
-class AFlameGun : public AWeapon {
-public:
-};
-
-///////////////////////////////////////////////////////
 // Class AStinger:AWeapon:AInventory:AActor:UObject
 ///////////////////////////////////////////////////////
 
 class AStinger : public AWeapon {
 public:
+    class AStingerProjectile *R;
+    class AStingerProjectile *S[5];
+    FVector X;
+    FVector Y;
+    FVector Z;
+    INT i;
+    FRotation AltRotation;
 };
 
 ///////////////////////////////////////////////////////
-// Class Arazor:AWeapon:AInventory:AActor:UObject
+// Class ARifle:AWeapon:AInventory:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Arazor : public AWeapon {
+class ARifle : public AWeapon {
+public:
+    class AActor *Other;
+    class AWeaponLight *RifleLight;
+    FVector HitNormal;
+    FVector HitLocation;
+    FVector EndTrace;
+    FVector StartTrace;
+    FVector X;
+    FVector Y;
+    FVector Z;
+    FVector NewHitLocation;
+    FRotation BeamRot;
+    class AWeaponLight *R;
+    DWORD bScopeUp:1;
+    class ASightLight *S;
+    INT i;
+    FVector BulletDirection;
+};
+
+///////////////////////////////////////////////////////
+// Class ARazorJack:AWeapon:AInventory:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ARazorJack : public AWeapon {
+public:
+    class ARazorBlade *S;
+    FVector X;
+    FVector Y;
+    FVector Z;
+    FRotation AltRotation;
+};
+
+///////////////////////////////////////////////////////
+// Class AFlamethrower:AWeapon:AInventory:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AFlamethrower : public AWeapon {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Aeightbal:AWeapon:AInventory:AActor:UObject
+// Class AImpaler:AWeapon:AInventory:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Aeightbal : public AWeapon {
+class AImpaler : public AWeapon {
 public:
+    class AEnergyBolt *R;
+    class AImpalerBolt *i;
+    FVector X;
+    FVector Y;
+    FVector Z;
 };
 
 ///////////////////////////////////////////////////////
-// Class Aflamet:AWeapon:AInventory:AActor:UObject
+// Class AFlakCannon:AWeapon:AInventory:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Aflamet : public AWeapon {
+class AFlakCannon : public AWeapon {
 public:
+    class AChunk1 *s1;
+    class AChunk1 *s5;
+    class AChunk2 *s2;
+    class AChunk2 *s6;
+    class AChunk3 *s3;
+    class AChunk3 *s7;
+    class AChunk4 *s4;
+    class AChunk4 *s8;
+    class AFlakShell *s9;
+    FVector X;
+    FVector Y;
+    FVector Z;
 };
 
 ///////////////////////////////////////////////////////
-// Class Arifle:AWeapon:AInventory:AActor:UObject
+// Class ATeleportGun:AWeapon:AInventory:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Arifle : public AWeapon {
+class ATeleportGun : public AWeapon {
 public:
+    class AActor *goalProj;
+};
+
+///////////////////////////////////////////////////////
+// Class AStunner:AWeapon:AInventory:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AStunner : public AWeapon {
+public:
+    INT Charge;
 };
 
 ///////////////////////////////////////////////////////
@@ -905,13 +1012,14 @@ public:
 
 class AArmor : public APowerUp {
 public:
+    FLOAT ArmorStrength;
 };
 
 ///////////////////////////////////////////////////////
-// Class Aheart:APowerUp:APickup:AInventory:AActor:UObject
+// Class AHeart:APowerUp:APickup:AInventory:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Aheart : public APowerUp {
+class AHeart : public APowerUp {
 public:
 };
 
@@ -964,6 +1072,14 @@ public:
 };
 
 ///////////////////////////////////////////////////////
+// Class ALava_Boots:AInventory:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ALava_Boots : public AInventory {
+public:
+};
+
+///////////////////////////////////////////////////////
 // Class AProjectile:AActor:UObject
 ///////////////////////////////////////////////////////
 
@@ -996,42 +1112,10 @@ public:
 };
 
 ///////////////////////////////////////////////////////
-// Class AEightBall:AProjectile:AActor:UObject
-///////////////////////////////////////////////////////
-
-class AEightBall : public AProjectile {
-public:
-};
-
-///////////////////////////////////////////////////////
-// Class AFireball:AProjectile:AActor:UObject
-///////////////////////////////////////////////////////
-
-class AFireball : public AProjectile {
-public:
-};
-
-///////////////////////////////////////////////////////
-// Class AFireball2:AProjectile:AActor:UObject
-///////////////////////////////////////////////////////
-
-class AFireball2 : public AProjectile {
-public:
-};
-
-///////////////////////////////////////////////////////
 // Class ABulletProjectile:AProjectile:AActor:UObject
 ///////////////////////////////////////////////////////
 
 class ABulletProjectile : public AProjectile {
-public:
-};
-
-///////////////////////////////////////////////////////
-// Class AShellProjectile:AProjectile:AActor:UObject
-///////////////////////////////////////////////////////
-
-class AShellProjectile : public AProjectile {
 public:
 };
 
@@ -1041,6 +1125,10 @@ public:
 
 class AStingerProjectile : public AProjectile {
 public:
+    FRotation RandRot;
+    FVector X;
+    FVector Y;
+    FVector Z;
 };
 
 ///////////////////////////////////////////////////////
@@ -1060,19 +1148,21 @@ public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Abeam:AProjectile:AActor:UObject
-///////////////////////////////////////////////////////
-
-class Abeam : public AProjectile {
-public:
-};
-
-///////////////////////////////////////////////////////
 // Class Arocket:AProjectile:AActor:UObject
 ///////////////////////////////////////////////////////
 
 class Arocket : public AProjectile {
 public:
+    FRotation RandRot;
+    FRotation NormUp;
+    FRotation DestRotation;
+    FRotation NewRotation;
+    INT NumBounces;
+    class AActor *Seeking;
+    INT IncTime;
+    FVector X;
+    FVector Y;
+    FVector Z;
 };
 
 ///////////////////////////////////////////////////////
@@ -1080,6 +1170,195 @@ public:
 ///////////////////////////////////////////////////////
 
 class ABigRock : public AProjectile {
+public:
+    FRotation RandRot;
+    FRotation NormUp;
+    FRotation GunRot;
+    FVector X;
+    FVector Y;
+    FVector Z;
+};
+
+///////////////////////////////////////////////////////
+// Class ARock2:ABigRock:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ARock2 : public ABigRock {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class ARock3:ABigRock:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ARock3 : public ABigRock {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class ARock1:ABigRock:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ARock1 : public ABigRock {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class ARazorBlade:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ARazorBlade : public AProjectile {
+public:
+    FVector X;
+    FVector Y;
+    FVector Z;
+    INT NumWallHits;
+    INT TickTime;
+    DWORD bAltMode:1;
+    INT CurPitch;
+    INT PitchStart;
+    INT YawStart;
+    INT CurYaw;
+    FRotation CurRotation;
+    DWORD bPitchMode:1;
+};
+
+///////////////////////////////////////////////////////
+// Class AImpalerBolt:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AImpalerBolt : public AProjectile {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class AEnergyBolt:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AEnergyBolt : public AProjectile {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class AChunk:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AChunk : public AProjectile {
+public:
+    FRotation RandRot;
+    FRotation NormUp;
+    FRotation GunRot;
+    FVector X;
+    FVector Y;
+    FVector Z;
+    DWORD bDelayTime:1;
+    FLOAT Rand;
+};
+
+///////////////////////////////////////////////////////
+// Class AChunk1:AChunk:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AChunk1 : public AChunk {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class AChunk2:AChunk:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AChunk2 : public AChunk {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class AChunk3:AChunk:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AChunk3 : public AChunk {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class AChunk4:AChunk:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AChunk4 : public AChunk {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class AFlakShell:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AFlakShell : public AProjectile {
+public:
+    FRotation RandRot;
+    FRotation NormUp;
+    class AChunk1 *s1;
+    class AChunk1 *s5;
+    class AChunk2 *s2;
+    class AChunk2 *s6;
+    class AChunk3 *s3;
+    class AChunk3 *s7;
+    class AChunk4 *s4;
+    class AChunk4 *s8;
+    FVector X;
+    FVector Y;
+    FVector Z;
+};
+
+///////////////////////////////////////////////////////
+// Class AShellCase:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AShellCase : public AProjectile {
+public:
+    FVector X;
+    FVector Y;
+    FVector Z;
+    FLOAT Rand;
+};
+
+///////////////////////////////////////////////////////
+// Class AShellCase2:AShellCase:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AShellCase2 : public AShellCase {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class ARifleShellCase:AShellCase:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ARifleShellCase : public AShellCase {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class AGrenade:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AGrenade : public AProjectile {
+public:
+    FRotation RandRot;
+    FRotation NormUp;
+};
+
+///////////////////////////////////////////////////////
+// Class AKraalBolt:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AKraalBolt : public AProjectile {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class ATeleportProj:AProjectile:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ATeleportProj : public AProjectile {
 public:
 };
 
@@ -1102,19 +1381,36 @@ public:
 };
 
 ///////////////////////////////////////////////////////
-// Class ACreaturepoint:AKeypoint:AActor:UObject
+// Class ACreaturePoint:AKeypoint:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class ACreaturepoint : public AKeypoint {
+class ACreaturePoint : public AKeypoint {
 public:
-    FName ownerClan;
+    FName ownerTeam;
+    DWORD taken:1;
+    INT upstreamPaths[16];
+    INT Paths[16];
+    FVector turnDirection;
+    FLOAT visitedWeight;
+    FLOAT cost;
+    DWORD bEndPoint:1;
+    DWORD bSpecialBlock:1;
+    DWORD bPathsDefined:1;
 };
 
 ///////////////////////////////////////////////////////
-// Class APatrolpoint:ACreaturepoint:AKeypoint:AActor:UObject
+// Class APathNode:ACreaturePoint:AKeypoint:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class APatrolpoint : public ACreaturepoint {
+class APathNode : public ACreaturePoint {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class APatrolpoint:ACreaturePoint:AKeypoint:AActor:UObject
+///////////////////////////////////////////////////////
+
+class APatrolpoint : public ACreaturePoint {
 public:
     FName Nextpatrol;
     FLOAT pausetime;
@@ -1122,29 +1418,29 @@ public:
 };
 
 ///////////////////////////////////////////////////////
-// Class AAmbushpoint:ACreaturepoint:AKeypoint:AActor:UObject
+// Class AAmbushpoint:ACreaturePoint:AKeypoint:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class AAmbushpoint : public ACreaturepoint {
+class AAmbushpoint : public ACreaturePoint {
 public:
     FVector lookdir;
-    DWORD taken:1;
     BYTE survivecount;
 };
 
 ///////////////////////////////////////////////////////
-// Class AHomeBase:ACreaturepoint:AKeypoint:AActor:UObject
+// Class AHomeBase:ACreaturePoint:AKeypoint:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class AHomeBase : public ACreaturepoint {
+class AHomeBase : public ACreaturePoint {
 public:
+    FLOAT Extent;
 };
 
 ///////////////////////////////////////////////////////
-// Class ASpawnpoint:ACreaturepoint:AKeypoint:AActor:UObject
+// Class ASpawnpoint:ACreaturePoint:AKeypoint:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class ASpawnpoint : public ACreaturepoint {
+class ASpawnpoint : public ACreaturePoint {
 public:
 };
 
@@ -1170,21 +1466,6 @@ public:
 
 class AAmbientSound : public AKeypoint {
 public:
-};
-
-///////////////////////////////////////////////////////
-// Class APathNode:AKeypoint:AActor:UObject
-///////////////////////////////////////////////////////
-
-class APathNode : public AKeypoint {
-public:
-    INT upstreamPaths[16];
-    INT Paths[16];
-    FVector turnDirection;
-    FLOAT visitedWeight;
-    FLOAT cost;
-    DWORD bEndPoint:1;
-    DWORD bSpecialBlock:1;
 };
 
 ///////////////////////////////////////////////////////
@@ -1217,7 +1498,7 @@ public:
 
 class ATeleporter : public AKeypoint {
 public:
-    CHAR TeleportURL[64];
+    CHAR URL[64];
     FName ProductRequired;
     DWORD bChangesVelocity:1;
     DWORD bChangesYaw:1;
@@ -1234,6 +1515,19 @@ public:
 
 class AWayBeacon : public AKeypoint {
 public:
+};
+
+///////////////////////////////////////////////////////
+// Class AInterpolationPoint:AKeypoint:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AInterpolationPoint : public AKeypoint {
+public:
+    INT Position;
+    FLOAT RateModifier;
+    DWORD bEndOfPath:1;
+    class AInterpolationPoint *Prev;
+    class AInterpolationPoint *Next;
 };
 
 ///////////////////////////////////////////////////////
@@ -1293,8 +1587,11 @@ public:
     FVector ZoneVelocity;
     FLOAT ZoneGroundFriction;
     FLOAT ZoneFluidFriction;
+    FName ZonePlayerEvent;
+    INT ZonePlayerCount;
     FLOAT AuralSpace;
     FLOAT AuralDepth;
+    class UMusic *Song;
     BYTE AmbientBrightness;
     BYTE AmbientHue;
     BYTE AmbientSaturation;
@@ -1303,7 +1600,7 @@ public:
     BYTE FogThickness;
     BYTE FogHue;
     BYTE FogSaturation;
-    class UMusic *Song;
+    class UTexture *EnvironmentMap;
 };
 
 ///////////////////////////////////////////////////////
@@ -1373,7 +1670,6 @@ public:
     DWORD bInternet:1;
     DWORD bRestartLevel:1;
     CHAR JumpToLevel[80];
-    FName Dependencies[16];
 };
 
 ///////////////////////////////////////////////////////
@@ -1513,6 +1809,37 @@ public:
 };
 
 ///////////////////////////////////////////////////////
+// Class AWeaponLight:ALight:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AWeaponLight : public ALight {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class ASightLight:ALight:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ASightLight : public ALight {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class ATriggerLight:ALight:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ATriggerLight : public ALight {
+public:
+    FLOAT ChangeTime;
+    DWORD bInitiallyOn:1;
+    BYTE InitialType /* enum ELightType */;
+    FLOAT InitialBrightness;
+    FLOAT Alpha;
+    FLOAT Direction;
+    class AActor *Trigger;
+};
+
+///////////////////////////////////////////////////////
 // Class ATriggers:AActor:UObject
 ///////////////////////////////////////////////////////
 
@@ -1560,7 +1887,15 @@ public:
     FName OutEvents[8];
     FLOAT OutDelays[8];
     INT i;
-    class AActor *Other;
+    class AActor *Trigger;
+};
+
+///////////////////////////////////////////////////////
+// Class APlayerPathTrigger:ATriggers:AActor:UObject
+///////////////////////////////////////////////////////
+
+class APlayerPathTrigger : public ATriggers {
+public:
 };
 
 ///////////////////////////////////////////////////////
@@ -1581,130 +1916,138 @@ public:
 };
 
 ///////////////////////////////////////////////////////
-// Class AChandelier:ADecoration:AActor:UObject
+// Class AUrn:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class AChandelier : public ADecoration {
+class AUrn : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class AHammok:ADecoration:AActor:UObject
+// Class ALamp1:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class AHammok : public ADecoration {
+class ALamp1 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Aurn:ADecoration:AActor:UObject
+// Class ALamp4:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Aurn : public ADecoration {
+class ALamp4 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Alamp1:ADecoration:AActor:UObject
+// Class APlant1:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Alamp1 : public ADecoration {
+class APlant1 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Alamp4:ADecoration:AActor:UObject
+// Class APlant2:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Alamp4 : public ADecoration {
+class APlant2 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Aplant1:ADecoration:AActor:UObject
+// Class APlant3:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Aplant1 : public ADecoration {
+class APlant3 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Aplant2:ADecoration:AActor:UObject
+// Class ASign1:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Aplant2 : public ADecoration {
+class ASign1 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Aplant3:ADecoration:AActor:UObject
+// Class AFlag1:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Aplant3 : public ADecoration {
+class AFlag1 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Asign1:ADecoration:AActor:UObject
+// Class AFlag2:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Asign1 : public ADecoration {
+class AFlag2 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Aflag1:ADecoration:AActor:UObject
+// Class AFlag3:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Aflag1 : public ADecoration {
+class AFlag3 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Aflag2:ADecoration:AActor:UObject
+// Class ACandle:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Aflag2 : public ADecoration {
+class ACandle : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Aflag3:ADecoration:AActor:UObject
+// Class ACandle2:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Aflag3 : public ADecoration {
+class ACandle2 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Acandle:ADecoration:AActor:UObject
+// Class AFan1:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Acandle : public ADecoration {
+class AFan1 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Acandle2:ADecoration:AActor:UObject
+// Class AFan2:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Acandle2 : public ADecoration {
+class AFan2 : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Afan1:ADecoration:AActor:UObject
+// Class ABarrel:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Afan1 : public ADecoration {
+class ABarrel : public ADecoration {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class Afan2:ADecoration:AActor:UObject
+// Class ATapestry1:ADecoration:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class Afan2 : public ADecoration {
+class ATapestry1 : public ADecoration {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class ASconce:ADecoration:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ASconce : public ADecoration {
 public:
 };
 
@@ -1717,26 +2060,77 @@ public:
 };
 
 ///////////////////////////////////////////////////////
-// Class AClipExplosion:AExplosion:AActor:UObject
+// Class ABurst:AExplosion:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class AClipExplosion : public AExplosion {
+class ABurst : public AExplosion {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class AShellExplosion:AExplosion:AActor:UObject
+// Class AElectricity:AExplosion:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class AShellExplosion : public AExplosion {
+class AElectricity : public AExplosion {
 public:
 };
 
 ///////////////////////////////////////////////////////
-// Class ATarydiumExplosion:AExplosion:AActor:UObject
+// Class ABallExplosion:AExplosion:AActor:UObject
 ///////////////////////////////////////////////////////
 
-class ATarydiumExplosion : public AExplosion {
+class ABallExplosion : public AExplosion {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class AFatRing:AExplosion:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AFatRing : public AExplosion {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class AFlameBall:AExplosion:AActor:UObject
+///////////////////////////////////////////////////////
+
+class AFlameBall : public AExplosion {
+public:
+    FRotation NormUp;
+};
+
+///////////////////////////////////////////////////////
+// Class ABloodSpurt:AExplosion:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ABloodSpurt : public AExplosion {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class ATinyBurst:AExplosion:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ATinyBurst : public AExplosion {
+public:
+};
+
+///////////////////////////////////////////////////////
+// Class ASpriteExplosion:AExplosion:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ASpriteExplosion : public AExplosion {
+public:
+    class UTexture *s_Exp[20];
+    INT i;
+};
+
+///////////////////////////////////////////////////////
+// Class ARingExplosion:AExplosion:AActor:UObject
+///////////////////////////////////////////////////////
+
+class ARingExplosion : public AExplosion {
 public:
 };
 

@@ -60,7 +60,6 @@ REG_NAME_HIGH( 104, Self             )
 REG_NAME_HIGH( 105, True             )
 REG_NAME_HIGH( 106, False            )
 REG_NAME_HIGH( 107, Transient        )
-REG_NAME_HIGH( 109, NoName           )
 REGISTER_NAME( 110, X                )
 REGISTER_NAME( 111, Y                )
 REGISTER_NAME( 112, Z                )
@@ -114,6 +113,7 @@ REGISTER_NAME( 171, BitMatrix        )
 REGISTER_NAME( 172, Type			 )
 REGISTER_NAME( 173, Primitive		 )
 REGISTER_NAME( 174, MeshAnimNotifys	 )
+REGISTER_NAME( 175, Cylinder         )
 
 // Intrinsic actor class names.
 REGISTER_NAME( 250, Actor			 )
@@ -144,8 +144,8 @@ REGISTER_NAME( 303, LostChild		 ) // [PActor] Sent to a parent actor when anothe
 REGISTER_NAME( 304, LostReference    ) // [PLostReference] Sent to an actor when an actor it references is destroyed.
 
 // Triggers.
-REGISTER_NAME( 306, Trigger			 ) // [PActor] Message sent by Trigger actors.
-REGISTER_NAME( 307, UnTrigger		 ) // [PActor] Message sent by Trigger actors.
+REGISTER_NAME( 306, Trigger			 ) // [PTrigger] Message sent by Trigger actors.
+REGISTER_NAME( 307, UnTrigger		 ) // [PTrigger] Message sent by Trigger actors.
 
 // Physics & world interaction.
 REGISTER_NAME( 308, Timer			 ) // [null] The per-actor timer has fired.
@@ -156,29 +156,35 @@ REGISTER_NAME( 312, ZoneChange		 ) // [PActor] Actor has changed into a new zone
 REGISTER_NAME( 313, Touch			 ) // [PActor] Actor was just touched by another actor.
 REGISTER_NAME( 314, UnTouch			 ) // [PActor] Actor touch just ended, always sent sometime after Touch.
 REGISTER_NAME( 315, Bump			 ) // [PActor] Actor was just touched and blocked. No interpenetration. No UnBump.
-REGISTER_NAME( 317, StepOn           ) // [PActor] Sent to actor when it steps on another actor.
-REGISTER_NAME( 318, StepOff          ) // [PActor] Sent to actor when it steps off another actor.
-REGISTER_NAME( 319, SteppedOnBy		 ) // [PActor] Sent to actor when it's stepped on by another actor.
-REGISTER_NAME( 320, SteppedOffBy	 ) // [PActor] Sent to actor when another actor steps off it.
+REGISTER_NAME( 316, BeginState		 ) // [null] Just entered a new state.
+REGISTER_NAME( 317, EndState		 ) // [null] About to leave the current state.
+REGISTER_NAME( 318, BaseChange		 ) // [null] Sent to actor when its floor changes.
+REGISTER_NAME( 319, Attach			 ) // [PActor] Sent to actor when it's stepped on by another actor.
+REGISTER_NAME( 320, Detach			 ) // [PActor] Sent to actor when another actor steps off it.
 REGISTER_NAME( 321, PlayerEntered	 ) // [PActor] Sent to a ZoneInfo actor when a player enters.
 REGISTER_NAME( 322, PlayerLeaving	 ) // [PActor] Sent to a ZoneInfo actor when a player is leaving.
 REGISTER_NAME( 323, KillCredit		 ) // [null] Actor has just received credit for a kill.
 REGISTER_NAME( 324, AnimEnd			 ) // [null] Animation sequence has ended.
 REGISTER_NAME( 325, EndedRotation	 ) // [null] Physics based rotation just ended.
+REGISTER_NAME( 326, InterpolateEnd   ) // [null] Movement interpolation sequence finished.
+REGISTER_NAME( 327, EncroachingOn    ) // [PActor] Encroaching on another actor.
+REGISTER_NAME( 328, EncroachedBy     ) // [PActor] Being encroached by another actor.
 
 // Kills.
-REGISTER_NAME( 326, Die				 ) // [null] Actor died (sent if specific die message not processed).
+REGISTER_NAME( 335, Die				 ) // [null] Actor died (sent if specific die message not processed).
 
 // Updates.
-REGISTER_NAME( 328, Tick			 ) // [PTick] Clock tick update for nonplayer.
-REGISTER_NAME( 329, PlayerTick		 ) // [PTick] Clock tick update for player.
-REGISTER_NAME( 330, Expired		     ) // [null] Actor's LifeSpan expired.
+REGISTER_NAME( 336, Tick			 ) // [PTick] Clock tick update for nonplayer.
+REGISTER_NAME( 337, PlayerTick		 ) // [PTick] Clock tick update for player.
+REGISTER_NAME( 338, Expired		     ) // [null] Actor's LifeSpan expired.
 
 // AI.
-REGISTER_NAME(  331,SeePlayer        )	// [PActor] Can see player.
-REGISTER_NAME(  332,EnemyNotVisible  )  // [null] Current Enemy is not visible.
-REGISTER_NAME(  333,HearNoise        )	// [PNoise] Noise nearby.
-REGISTER_NAME(  334,UpdateEyeHeight  )	// [PFloat] update eye level (after physics).
+REGISTER_NAME( 340,SeePlayer         ) // [PActor] Can see player.
+REGISTER_NAME( 341,EnemyNotVisible   ) // [null] Current Enemy is not visible.
+REGISTER_NAME( 342,HearNoise         ) // [PNoise] Noise nearby.
+REGISTER_NAME( 343,UpdateEyeHeight   ) // [PFloat] update eye level (after physics).
+REGISTER_NAME( 344,SeeMonster        ) // [PActor] Can see non-player.
+REGISTER_NAME( 345,SeeFriend         ) // [PActor] Can see non-player friend.
 
 // Special tag meaning 'All probes'.
 REGISTER_NAME( 363, All				 ) // [null] Special meaning, not a message.
@@ -217,12 +223,6 @@ REGISTER_NAME( 452, PostBeginPlay	 ) // [null] Sent right after BeginPlay, for r
 REGISTER_NAME( 453, EndPlay			 ) // [null] Play has just ended.
 REGISTER_NAME( 454, BeginEdit		 ) // [null] Editing has just begin.
 REGISTER_NAME( 455, EndEdit			 ) // [null] Editing has just ended.
-
-// Movers.
-REGISTER_NAME( 510, KeyMoveTo		 ) // [PMoveTo] Move to a keyframe.
-REGISTER_NAME( 511, KeyStop			 ) // [null] Stop moving immediately.
-REGISTER_NAME( 512, KeyReverse		 ) // [null] Reverse course of KeyMoveTo.
-REGISTER_NAME( 513, SetKeyPoint		 ) // [????] Set a keyframe position to that of a named keypoint actor.
 
 /*-----------------------------------------------------------------------------
 	Hardcoded names used by the compiler.
@@ -276,7 +276,6 @@ REG_NAME_HIGH( 657, ScriptConst)
 
 // State overrides.
 REG_NAME_HIGH( 670, Auto)
-REG_NAME_HIGH( 671, Settable)
 REG_NAME_HIGH( 672, Ignores)
 
 // Calling overrides.
@@ -289,9 +288,10 @@ REG_NAME_HIGH( 690, Operator)
 REG_NAME_HIGH( 691, PreOperator)
 REG_NAME_HIGH( 692, PostOperator)
 REG_NAME_HIGH( 693, Final)
-REG_NAME_HIGH( 694, Engine)
+REG_NAME_HIGH( 694, Iterator)
 REG_NAME_HIGH( 695, Latent)
 REG_NAME_HIGH( 696, Return)
+REG_NAME_HIGH( 697, Singular)
 
 // Variable declaration.
 REG_NAME_HIGH( 710, Var)

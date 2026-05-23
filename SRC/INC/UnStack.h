@@ -15,7 +15,7 @@
 	Forward declarations.
 -----------------------------------------------------------------------------*/
 
-struct FStackNodeLink;
+struct FStackNodePtr;
 struct FExecStack;
 struct FExecStackMain;
 class UClass;
@@ -44,28 +44,47 @@ enum EPropertyBin
 // lists of stack nodes, where the linked list can contain multiple nodes
 // from multiple scripts.
 //
-struct UNENGINE_API FStackNodeLink
+struct UNENGINE_API FStackNodePtr
 {
 	UClass	*Class;	// Class the stack node resides in, NULL=empty entry.
 	INT		iNode;	// Node index into class's script's stack tree.
 
 	// Constructors.
-	FStackNodeLink( UClass* InClass, INT iInNode )
+	FStackNodePtr( UClass* InClass, INT iInNode )
 	:	Class	(InClass)
 	,	iNode	(iInNode)
 	{}
-	FStackNodeLink( int )
-	:	Class	(NULL)
-	,	iNode	(0)
-	{}
-	FStackNodeLink()
+	FStackNodePtr()
 	{}
 
 	// Serializer.
-	inline friend FArchive& operator<<( FArchive &Ar, FStackNodeLink &Link );
+	inline friend FArchive& operator<<( FArchive &Ar, FStackNodePtr &Link );
 
 	// Accessors.
-	inline class FStackNode &Node() const;
+	inline class FStackNode* operator->() const;
+	inline class FStackNode& operator*() const;
+};
+
+/*-----------------------------------------------------------------------------
+	IteratorList base.
+-----------------------------------------------------------------------------*/
+
+//
+// Base class for UnrealScript iterator lists.
+//
+struct FIteratorList
+{
+	// Variables.
+	FIteratorList* Next;
+
+	// Functions.
+	FIteratorList()
+	{}
+	FIteratorList( FIteratorList* InNext )
+	:	Next( InNext )
+	{}
+	FIteratorList* GetNext()
+	{ return (FIteratorList*)Next; }
 };
 
 /*-----------------------------------------------------------------------------
@@ -76,32 +95,18 @@ struct UNENGINE_API FStackNodeLink
 // Information about script execution at one stack level.
 //
 struct UNENGINE_API FExecStack
-{
-	// The stack node we're in. This is always valid.
-	// In state:    The state's stack node.
-	// In no state: Stack class's stack node.
-	// In function: The stack node where the function's parms are defined.
-	FStackNodeLink Link;
-
-	// The script we're executing code in. If we're in a state or no state,
-	// this may be NULL to indicate we're not currently executing code.
-	UScript *Script;
-
-	// The object pointer, for optimization.
-	UObject *Object;
-
-	// Pointer to code within the script's data. NULL means we're not executing
-	// code now, otherwise this is a pointer into Script's data.
-	BYTE *Code;
-
-	// Local variables.
-	BYTE *Locals;
+{	
+	FStackNodePtr  Link;   // Points to stack node of the class, state, or function we're in.
+	UObject*       Object; // Pointer to the owning object.
+	UScript*       Script; // The script we're executing code in. NULL if not executing code.
+	BYTE*          Code;   // Instruction pointer within script's data.
+	BYTE*          Locals; // Base address of local variables.
 
 	// Constructors.
 	inline FExecStack() {};
 	inline FExecStack( int );
-	inline FExecStack( UObject *InObject );
-	inline FExecStack( UObject *InObject, const FStackNodeLink &InLink, BYTE *InLocals );
+	inline FExecStack( UObject* InObject );
+	inline FExecStack( UObject* InObject, const FStackNodePtr InLink, BYTE* InLocals );
 };
 
 /*-----------------------------------------------------------------------------
@@ -114,31 +119,8 @@ struct UNENGINE_API FExecStack
 //
 struct UNENGINE_API FExecStackMain : public FExecStack
 {
-	// Probe messages which are currently enabled.
-	QWORD ProbeMask;
-
-	// Virtual function cache.
-	enum {NUM_CACHE_ENTRIES=4};
-	struct UNENGINE_API FVfCacheEntry
-	{
-		// Variables.
-		FName			Name;		// Name of the virtual function, NAME_None=empty.
-		WORD			Staleness;	// Lower means don't replace it.
-		FStackNodeLink	Link;		// Stack node where the virtual function is defined.
-
-		// Constructor.
-		FVfCacheEntry() {};
-	} VfCache[NUM_CACHE_ENTRIES];
-
-	// Empty the cache; must be called during state change.
-	void InitVfCache()
-	{
-		for( int i=0; i<NUM_CACHE_ENTRIES; i++ )
-		{
-			VfCache[i].Name      = NAME_None;
-			VfCache[i].Staleness = MAXWORD;
-		}
-	}
+	// Variables;
+	QWORD ProbeMask; // Enabled probe messages.
 
 	// Serializer. Must properly serialize all permanent runtime contents to disk.
 	friend FArchive& operator<<( FArchive& Ar, FExecStackMain &Exec );
@@ -146,6 +128,9 @@ struct UNENGINE_API FExecStackMain : public FExecStack
 	// Constructor.
 	FExecStackMain() {};
 	FExecStackMain( UObject *InObject );
+
+	// Init for a new state.
+	void InitForState();
 };
 
 /*-----------------------------------------------------------------------------

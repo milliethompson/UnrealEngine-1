@@ -106,6 +106,7 @@ int FGlobalUnrealEngine::Init
 	if (GNetManager) GNetManager->Init();	// Initialize networking.
 	GGfx.Init					(); 		// Init graphics subsystem.
 	GRend->Init					(); 		// Init rendering subsystem.
+	GAudio.DirectSoundOwnerWindowSet((void*)GApp->hWndLog); // DirectSound.
 	GAudio.Init					(GDefaults.AudioActive); // Init music and sound.
 	GGameBase->Init				();			// Initialize game-specific info and actor messages.
 	GGameBase->CheckState		();			// Verify that game state is valid.
@@ -222,28 +223,28 @@ UCamera *FGlobalUnrealEngine::OpenCamera()
 //
 // Draw a camera view.
 //
-void FGlobalUnrealEngine::Draw(UCamera *Camera, int Scan)
+void FGlobalUnrealEngine::Draw( UCamera *Camera, int Scan )
 {
 	guard(FGlobalUnrealEngine::Draw);
 
-	FVector				OriginalLocation;
-	FRotation			OriginalRotation;
+	FVector	  OriginalLocation;
+	FRotation OriginalRotation;
 
 	if( Camera->Level->Model->ModelFlags & MF_InvalidBsp )
 	{
-		debug (LOG_Problem,"Can't draw game view - invalid Bsp");
+		debug( LOG_Problem, "Can't draw game view - invalid Bsp" );
 		return;
 	}
 	if( !Camera->Lock(LOCK_ReadWrite|LOCK_CanFail) )
 	{
-		debug (LOG_Problem,"Couldn't lock camera for drawing");
+		debug( LOG_Problem, "Couldn't lock camera for drawing" );
 		return;
 	}
-	GRend->PreRender(Camera);
+	GRend->PreRender( Camera );
 
 	// Do game-specific prerendering; handles adjusting the view location
 	// according to the actor's status, rendering the status bar, etc.
-	Camera->Console->PreRender(Camera);
+	Camera->Console->PreRender( Camera );
 	if( Camera->X>0 && Camera->Y>0 )
 	{
 		// Handle graphics-mode prerendering; handles special preprocessing
@@ -271,9 +272,7 @@ void FGlobalUnrealEngine::Draw(UCamera *Camera, int Scan)
 			GRend->DrawWorld(Camera);
 
 			// Draw the player's weapon.
-			if( ( Actor->Weapon != NULL)
-			&&  (!Actor->bBehindView)
-			&&	( Actor->ShowFlags & SHOW_Actors) )
+			if( Actor->Weapon!=NULL && (Actor->ShowFlags & SHOW_Actors) )
 			{
 				Actor->Weapon->Process
 				(
@@ -313,9 +312,22 @@ void FGlobalUnrealEngine::Draw(UCamera *Camera, int Scan)
 //
 // Enter a level by URL.
 //
+char CurrentWorldURL[256]="";
+BOOL CurrentLoadSaveGame=0;
 void FGlobalUnrealEngine::EnterWorld( const char *WorldURL, BOOL LoadSaveGame )
 {
 	guard(FGlobalUnrealEngine::EnterWorld);
+
+	if( stricmp(WorldURL,"restart")==0 )
+	{
+		WorldURL     = CurrentWorldURL;
+		LoadSaveGame = CurrentLoadSaveGame;
+	}
+	else
+	{
+		CurrentLoadSaveGame = LoadSaveGame;
+		strcpy(CurrentWorldURL,WorldURL);
+	}
 
 	// Exit any existing game.
 	if( GServer.GetLevel() )
@@ -356,7 +368,7 @@ void FGlobalUnrealEngine::EnterWorld( const char *WorldURL, BOOL LoadSaveGame )
 	Level->SetState(LEVEL_UpPlay);
 
 	// Associate cameras and players.
-	Level->ReconcileActors(0);
+	Level->ReconcileActors();
 
 	// Init moving brushes.
 	GBrushTracker.Init(Level);

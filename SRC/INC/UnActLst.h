@@ -20,7 +20,7 @@
 //
 // A collision hash table.
 //
-class FCollisionHash
+class UNENGINE_API FCollisionHash
 {
 public:
 	// Constants.
@@ -59,15 +59,17 @@ public:
 	BOOL CollisionInitialized;
 
 	// Low-level actor-actor collision checking functions.
-	void  Init();
-	void  Exit();
-	void  Tick();
-	void  AddActor( AActor *Actor );
-	void  RemoveActor( AActor *Actor );
-	int   LineCheck( FCheckResult *Hits, INT ListMax, const FVector &Start, const FVector &End, FLOAT Radius, FLOAT Height );
-	int   PointCheck( const FVector &Location, FLOAT Radius, FLOAT Height, AActor **List, INT ListMax );
-	void  GetActorExtent( AActor *Actor, INT &iX0, INT &iX1, INT &iY0, INT &iY1, INT &iZ0, INT &iZ1 );
-	void  GetHashIndices( FVector Location, INT &iX, INT &iY, INT &iZ )
+	void Init();
+	void Exit();
+	void Tick();
+	void AddActor( AActor *Actor );
+	void RemoveActor( AActor *Actor );
+	FCheckResult* LineCheck( FMemStack& Mem, FVector Start, FVector End, FVector Extent, BOOL bCheckActors, ALevelInfo* LevelInfo );
+	FCheckResult* PointCheck( FMemStack& Mem, FVector Location, FVector Extent, DWORD ExtraNodeFlags, ALevelInfo* Level, BOOL bActors );
+	FCheckResult* EncroachmentCheck( FMemStack& Mem, AActor* Actor, FVector Location, FRotation Rotation, DWORD ExtraNodeFlags );
+	int SinglePointCheck( FCheckResult& Hit, FVector Location, FVector Extent, DWORD ExtraNodeFlags, ALevelInfo* Level, BOOL bActors );
+	void GetActorExtent( AActor *Actor, INT &iX0, INT &iX1, INT &iY0, INT &iY1, INT &iZ0, INT &iZ1 );
+	void GetHashIndices( FVector Location, INT &iX, INT &iY, INT &iZ )
 	{
 		iX = Clamp(ftoi( (Location.X + XY_OFS) * (1.0/GRAN_XY) ), 0, (int)NUM_BUCKETS);
 		iY = Clamp(ftoi( (Location.Y + XY_OFS) * (1.0/GRAN_XY) ), 0, (int)NUM_BUCKETS);
@@ -78,10 +80,22 @@ public:
 		iLocation = iX + (iY << BASIS_BITS) + (iZ << (BASIS_BITS*2));
 		return Hash[ HashX[iX] ^ HashY[iY] ^ HashZ[iZ] ];
 	}
+	void CheckActorNotReferenced( AActor* Actor )
+	{
+#if CHECK_ALL
+		guard(FCollisionHash::CheckActorNotReferenced);
+		if( !GEditor )
+			for( int i=0; i<NUM_BUCKETS; i++ )
+				for( FActorLink* Link=Hash[i]; Link; Link=Link->Next )
+					if( Link->Actor == Actor )
+						appErrorf( "Actor %s %s has collision hash fragments", Actor->GetClassName(), Actor->GetName() );
+		unguard;
+#endif
+	}
 };
 
 /*-----------------------------------------------------------------------------
-	Global actor and class functions
+	Global actor and class functions.
 -----------------------------------------------------------------------------*/
 
 //

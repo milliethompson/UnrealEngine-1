@@ -23,7 +23,7 @@
 void FProperty::SerializeProperty( FArchive& Ar, BYTE *Value, BYTE *Default )
 {
 	guard(FProperty::SerializeProperty);
-	if( !(Flags & CPF_Transient) )
+	if( !(Flags & (CPF_Transient|CPF_Intrinsic)) )
 	{
 		// Serialize this.
 		for( int j=0; j<ArrayDim; j++ ) switch( Type )
@@ -317,14 +317,14 @@ void FProperty::ExportU( FOutputDevice &Out, BYTE *Data )
 			case CPT_Vector:
 			{
 				FVector *Temp = (FVector *)Data;
-				if( *Temp != GMath.ZeroVector ) 
+				if( *Temp != FVector(0,0,0) ) 
 					Out.Logf( "(%+013.6f,%+013.6f,%+013.6f)",Temp->X,Temp->Y,Temp->Z);
 				break;
 			}
 			case CPT_Rotation:
 			{
 				FRotation *Temp = (FRotation *)Data;
-				if ( *Temp != GMath.ZeroRotation )
+				if ( *Temp != FRotation(0,0,0) )
 					Out.Logf( "(%i,%i,%i)",Temp->Pitch,Temp->Yaw,Temp->Roll);
 				break;
 			}

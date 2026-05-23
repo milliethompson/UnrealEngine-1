@@ -18,11 +18,25 @@
 // Packed mesh vertex point for skinned meshes.
 struct FMeshVert
 {
+	// Variables.
 	union
 	{
 		struct {INT X:11; INT Y:11; INT Z:10;};
 		struct {DWORD D;};
 	};
+
+	// Constructor.
+	FMeshVert()
+	{}
+	FMeshVert( const FVector& In )
+	: X(In.X), Y(In.Y), Z(In.Z)
+	{}
+
+	// Functions.
+	FVector Vector() const
+	{
+		return FVector( X, Y, Z );
+	}
 
 	// Serializer.
 	friend FArchive &operator<< (FArchive &Ar, FMeshVert &V)
@@ -286,31 +300,51 @@ class UNENGINE_API UMesh : public UPrimitive
 	}
 
 	// UPrimitive interface.
-	FBoundingRect GetBoundingRect( AActor *Owner );
+	FBoundingBox GetRenderBoundingBox( const AActor *Owner ) const;
+	INT LineCheck
+	(
+		FCheckResult	&Result,
+		AActor			*Owner,
+		FVector			Start,
+		FVector			End,
+		FVector			Size,
+		DWORD           ExtraNodeFlags
+	);
 
 	// UMesh interface.
 	UMesh( int NumPolys, int NumVerts, int NumFrames, int NumTex );
+	const FMeshAnimSeq* GetAnimSeq( FName SeqName ) const
+	{
+		guardSlow(UMesh::GetAnimSeq);
+		if( AnimSeqs )
+			for( int i=0; i<AnimSeqs->Num; i++ )
+				if( SeqName == AnimSeqs(i).Name )
+					return &AnimSeqs(i);
+		return NULL;
+		unguardSlow;
+	}
 	FMeshAnimSeq* GetAnimSeq( FName SeqName )
 	{
 		guardSlow(UMesh::GetAnimSeq);
-		FMeshAnimSeq* Result = NULL;
-		Lock(LOCK_Read);
 		if( AnimSeqs )
-		{
 			for( int i=0; i<AnimSeqs->Num; i++ )
-			{
 				if( SeqName == AnimSeqs(i).Name )
-				{
-					Result = &AnimSeqs(i);
-					break;
-				}
-			}
-		}
-		Unlock(LOCK_Read);
-		return Result;
+					return &AnimSeqs(i);
+		return NULL;
 		unguardSlow;
 	}
 	BYTE GetFrame( class FTransSample *Verts, UCamera *Camera, AActor *Owner );
+	UTexture* GetTexture( int Count, AActor* Owner )
+	{
+		guardSlow(UMesh::GetTexture);
+		if( Owner && Owner->Skin && (Count==0 || Owner->bMeshEnviroMap) )
+			return Owner->Skin;
+		else if( Textures(Count) )
+			return Textures(Count);
+		else
+			return GGfx.DefaultTexture;
+		unguardSlow;
+	}
 };
 
 /*----------------------------------------------------------------------------

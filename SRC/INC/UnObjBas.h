@@ -105,20 +105,20 @@ public:
 };
 
 /*----------------------------------------------------------------------------
-	Object type flags.
+	Class flags.
 ----------------------------------------------------------------------------*/
 
 //
 // Flags describing an object type.
 //
-enum EObjectTypeFlags
+enum EClassFlags
 {
 	// Base flags.
 	CLASS_Abstract          = 0x00001,  // Class is abstract and can't be instantiated directly.
 	CLASS_ScriptWritable	= 0x00002,	// Scripts can write this object type.
 	CLASS_PreKill           = 0x00004,	// This object should be deleted before non-PreKill ones.
 	CLASS_Transient			= 0x00008,	// This object type can't be saved; null it out at save time.
-	CLASS_Swappable			= 0x00010,	// Object is swappable.
+	CLASS_Swappable			= 0x00010,	// Object's data is swappable.
 	CLASS_Intrinsic			= 0x00020,	// Class is intrinsic: dependencies exist in the C++ code.
 	CLASS_NoEditParent      = 0x00080,  // All parent properties are forced to be uneditable.
 	CLASS_Decompile			= 0x10000,	// Decompile the class.
@@ -132,6 +132,22 @@ enum EObjectTypeFlags
 /*----------------------------------------------------------------------------
 	FGlobalObjectManager.
 ----------------------------------------------------------------------------*/
+
+//
+// Object hash link.
+//
+struct FObjectHashLink
+{
+	// Variables.
+	UObject*         Object;
+	FObjectHashLink* HashNext;
+
+	// Constructor.
+	FObjectHashLink( UObject* InObject, FObjectHashLink* InHashNext )
+	:	Object	(InObject)
+	,	HashNext(InHashNext)
+	{}
+};
 
 //
 // The global object manager.  This tracks all information about all
@@ -148,6 +164,9 @@ class UNENGINE_API FGlobalObjectManager
 	friend class UClass;
 
 public:
+	// Hash.
+	enum {HASH_COUNT=1024};
+
 	// Accessors.
 	DWORD GetMaxRes() {return MaxRes;}
 	UObject *GetResArray(DWORD i) {return ResArray[i];}
@@ -194,6 +213,7 @@ private:
 	INDEX			MaxRes;	 		// Maximum objects in table.
 	UArray			*Root;	 		// Root array, for tracking active objects.
 	UObject 		**ResArray;	 	// Global table of all objects.
+	FObjectHashLink	**ResHash;		// Object hash.
 
 	// Internal functions.
 	void AddObject(UObject *Res);
@@ -389,7 +409,7 @@ public:\
 		return 0; \
 	} \
 	/* Add an item if it's not a duplicate of an existing item */ \
-	int AddUniqueItem(BaseDataType Item ) \
+	int AddUniqueItem(BaseDataType Item) \
 	{ \
 		for( int i=0; i<Num; i++ ) \
 			if( memcmp(&Element(i),&Item,sizeof(BaseDataType))==0 ) \
@@ -441,15 +461,19 @@ enum EObjectFlags
 	RF_TransHeader		= 0x000100,	// Used by transaction tracking system to track changed headers.
 	RF_HardcodedRes     = 0x000200, // Hardcoded object; don't free or export it.
 	RF_HighlightedName  = 0x000400, // A hardcoded name which should be syntax-highlighted.
+	RF_InSingularFunc   = 0x000800, // In a singular function.
+	RF_Unused1          = 0x001000, // Unused.
 	RF_Temp1			= 0x002000,	// Temporary flag for user routines.
 	RF_UnlinkedHeader	= 0x004000,	// During load/save, indicates that objects/names are unlinked.
 	RF_UnlinkedData		= 0x008000,	// During load/save, indicates that objects/names are unlinked.
 	RF_LoadForClient	= 0x010000,	// In-file load for client.
 	RF_LoadForServer	= 0x020000,	// In-file load for client.
 	RF_LoadForEdit		= 0x040000,	// In-file load for client.
+	RF_Unused2          = 0x080000, // Unused;
 	RF_NotForClient		= 0x100000,	// Don't load this object for the game client.
 	RF_NotForServer		= 0x200000,	// Don't load this object for the game server.
 	RF_NotForEdit		= 0x400000,	// Don't load this object for the editor.
+	RF_Unused3          = 0x800000, // Unused.
 	RF_ContextFlags		= RF_NotForClient | RF_NotForServer | RF_NotForEdit, // All context flags.
 	RF_LoadContextFlags	= RF_LoadForClient | RF_LoadForServer | RF_LoadForEdit, // Flags affecting loading.
 	RF_Load  			= RF_LoadContextFlags, // Flags to load from Unrealfiles.
@@ -482,7 +506,7 @@ class UNENGINE_API UObjectBase : public FUnknown
 public:
 	// General info.
 	FName		Name;				// Name of the object.
-	UClass		*Class;	  			// Class the object belongs to.
+	UClass*		Class;	  			// Class the object belongs to.
 	DWORD		Flags;				// Private EObjectFlags used by object manager.
 
 	// Info for objects stored in files only.
@@ -514,12 +538,12 @@ class UNENGINE_API UObject : private UObjectBase
 
 private:
 	// Information relevent in memory only.
-	INT				ReadLocks;			// Number of read locks applied.
+	ULinker*		XLinker;			// Linker it came from or NULL if none.
+	void*			Data;				// Pointer to data in memory, not meaningful when stored on disk.
+	mutable INT		ReadLocks;			// Number of read locks applied.
 	INT				WriteLocks;			// Number of write locks applied.
 	INT				TransLocks;			// Number of transactional locks applied.
-	void			*Data;				// Pointer to data in memory, not meaningful when stored on disk.
 	INDEX			Index;				// Index of object into FGlobalObjectManager's ResArray table.
-	ULinker			*XLinker;			// Linker it came from or NULL if none.
 	INDEX			FileIndex;			// File index it came from in the Linker, or INDEX_NONE.
 
 public:
@@ -562,32 +586,40 @@ public:
 	virtual void	SerializeHeader (FArchive &Ar);
 	virtual INT     Lock			(DWORD LockType);
 	virtual void    Unlock			(DWORD LockType);
+	virtual INT     ReadLock		() const;
+	virtual void    ReadUnlock		() const;
 	virtual void    UnloadData		();
 
 	// Accessors.
-	inline UClass*      GetClass() const			{return Class;}
-	inline void         SetClass(UClass *In)        {Class=In;}
-	inline const char*  GetClassName() const		{return ((UObject*)Class)->GetName();}
-	inline DWORD		GetFlags() const			{return Flags;}
-	inline void			SetFlags(DWORD NewFlags) 	{Flags|=NewFlags;}
-	inline void			ClearFlags(DWORD NewFlags)	{Flags&=~NewFlags;}
-	inline DWORD		GetContextFlags() const		{return Flags & RF_ContextFlags;}
-	inline void			SetData(void *New)			{Data=New;}
-	inline const char*  GetName() const			{return Name();}
-	inline const FName  GetFName() const            {return Name;}
-	inline void			Rename(const char *NewName)	{Name = FName(NewName,FNAME_Add);}
-	inline DWORD		GetIndex() const			{return Index;}
-	inline INT			IsLocked() const			{return ReadLocks>0;}
-	inline INT			IsWriteLocked() const		{return WriteLocks>0;}
-	inline INT			IsTransLocked() const		{return TransLocks>0;}
-	inline void			InitLocks()					{ReadLocks=WriteLocks=TransLocks=0;}
-	inline DWORD        GetClassFlags() const;
-	inline void*        ObjectPropertyPtr(class FProperty &Property, int iElement=0);
-	inline void         GetObjectBins(BYTE**);
-	inline BOOL         IsProbing(FName ProbeName);
-	inline BOOL         IsA(const class UClass *SomeParent) const;
-	inline BOOL         IsA(const char *Name) const;
-	inline void*        GetData() const
+	UClass*     GetClass() const			{return Class;}
+	void        SetClass(UClass *In)        {Class=In;}
+	const char* GetClassName() const		{return ((UObject*)Class)->GetName();}
+	DWORD		GetFlags() const			{return Flags;}
+	void		SetFlags(DWORD NewFlags) 	{Flags|=NewFlags;}
+	void		ClearFlags(DWORD NewFlags)	{Flags&=~NewFlags;}
+	DWORD		GetContextFlags() const		{return Flags & RF_ContextFlags;}
+	void		SetData(void *New)			{Data=New;}
+	const char* GetName() const				{return Name();}
+	const FName GetFName() const            {return Name;}
+	void		Rename(const char *NewName)	{Name = FName(NewName,FNAME_Add);}
+	DWORD		GetIndex() const			{return Index;}
+	INT			IsLocked() const			{return ReadLocks>0;}
+	INT			IsWriteLocked() const		{return WriteLocks>0;}
+	INT			IsTransLocked() const		{return TransLocks>0;}
+	void		InitLocks()					{ReadLocks=WriteLocks=TransLocks=0;}
+	DWORD       GetClassFlags() const;
+	void*       ObjectPropertyPtr(class FProperty &Property, int iElement=0);
+	void        GetObjectBins(BYTE**);
+	BOOL        IsProbing(FName ProbeName);
+	BOOL        IsA(const class UClass *SomeParent) const;
+	BOOL        IsA(const char *Name) const;
+	void*       GetData()
+	{
+		// GetData is only valid when an object is locked or is not swappable.
+		//debugState( IsLocked() || !(GetClassFlags() & CLASS_Swappable) );
+		return Data;
+	}
+	const void*  GetData() const
 	{
 		// GetData is only valid when an object is locked or is not swappable.
 		//debugState( IsLocked() || !(GetClassFlags() & CLASS_Swappable) );

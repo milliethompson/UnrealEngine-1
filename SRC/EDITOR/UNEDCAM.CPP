@@ -376,14 +376,13 @@ void CameraMoveRotWithPhysics
 	{
 		// Move with collision; player is outside and collision is enabled.
 		FCheckResult Hit(1.0);
-		Camera->Level->Model->BoxLineCheck 
+		Camera->Level->Model->LineCheck 
 		(
 			Hit,
 			NULL,
 			Camera->Actor->Location,
 			Camera->Actor->Location + Delta,
-			20.0,
-			24.0,
+			FVector(20.0,20.0,24.0),
 			0
 		);
 		Camera->Actor->Location += Hit.Time * Delta;
@@ -395,7 +394,7 @@ void CameraMoveRotWithPhysics
 		else if( Hit.Time<1.0 && !(Camera->Actor->ShowFlags&SHOW_PlayerCtrl))
 		{
 			// Stop him.
-			Camera->Actor->Velocity = GMath.ZeroVector;
+			Camera->Actor->Velocity = FVector(0,0,0);
 		}
 	}
 	else
@@ -756,7 +755,7 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, FLOAT MouseX, FLOA
 			//
 			if (Buttons & (BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE))
 				{
-				Camera->Actor->Velocity = GMath.ZeroVector;
+				Camera->Actor->Velocity = FVector(0,0,0);
 				}
 			else
 				{
@@ -795,7 +794,7 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, FLOAT MouseX, FLOA
 			//
 			if (Buttons&(BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE))
 				{
-				Camera->Actor->Velocity = GMath.ZeroVector;
+				Camera->Actor->Velocity = FVector(0,0,0);
 				}
 			else
 				{
@@ -829,7 +828,7 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, FLOAT MouseX, FLOA
 			//
 			if (Buttons & (BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE))
 				{
-				Camera->Actor->Velocity = GMath.ZeroVector;
+				Camera->Actor->Velocity = FVector(0,0,0);
 				}
 			else
 				{
@@ -853,7 +852,7 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, FLOAT MouseX, FLOA
 			//
 			if (Buttons & (BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE))
 				{
-				Camera->Actor->Velocity = GMath.ZeroVector;
+				Camera->Actor->Velocity = FVector(0,0,0);
 				}
 			else if( Camera->Input->KeyDown(IK_Alt) )
 				{
@@ -1016,7 +1015,7 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, FLOAT MouseX, FLOA
 		case EM_AddActor:		/* Add actor/light */
 			if( Buttons & (BUT_FIRSTHIT | BUT_LASTRELEASE | BUT_SETMODE | BUT_EXITMODE) )
 			{
-				Camera->Actor->Velocity = GMath.ZeroVector;
+				Camera->Actor->Velocity = FVector(0,0,0);
 			}
 			else
 			{
@@ -1150,31 +1149,33 @@ void FGlobalEditor::edcamMove (UCamera *Camera, BYTE Buttons, FLOAT MouseX, FLOA
 // Handle a regular ASCII key that was pressed in UnrealEd.
 // Returns 1 if proceesed, 0 if not.
 //
-int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
-	{
+int FGlobalEditor::edcamKey( UCamera *Camera, int Key )
+{
 	guard(FGlobalEditor::edcamKey);
 	ULevel		*Level;
 	int			ModeClass;
 	int 		Processed=0;
-	//
-	if (Camera->IsBrowser()) return 0;
-	//
+
+	if( Camera->IsBrowser() )
+		return 0;
+
 	ModeClass = GUnrealEditor.edcamModeClass(GUnrealEditor.edcamMode(Camera));
 	Level     = Camera->Level;
-	//
-	if(Camera->Input->KeyDown(IK_Shift) || (Key==IK_Delete)) // Selection functions.
+
+	if( Camera->Input->KeyDown(IK_Shift) || (Key==IK_Delete) )
+	{
+		// Selection functions.
+		if( ModeClass == EMC_Actor ) switch( toupper(Key) )
 		{
-		if (ModeClass==EMC_Actor) switch (toupper(Key))
-			{
 			case 'A': GUnrealEditor.Exec  ("ACTOR SELECT ALL");		return 1;
 			case 'N': GUnrealEditor.Exec  ("ACTOR SELECT NONE");	return 1;
 			case 'Z': GUnrealEditor.Exec  ("ACTOR SELECT NONE");	return 1;
 			case 'Y': GUnrealEditor.Exec  ("ACTOR DELETE");			return 1;
 			case 'D': GUnrealEditor.Exec  ("ACTOR DUPLICATE");		return 1;
 			case IK_Delete: GUnrealEditor.Exec("ACTOR DELETE");		return 1;			
-			}
-		else if (GUnrealEditor.MapEdit) switch (toupper(Key))
-			{
+		}
+		else if( GUnrealEditor.MapEdit ) switch( toupper(Key) )
+		{
 			case 'A': GUnrealEditor.Exec  ("MAP SELECT ALL");		return 1;
 			case 'N': GUnrealEditor.Exec  ("MAP SELECT NONE");		return 1;
 			case 'Z': GUnrealEditor.Exec  ("MAP SELECT NONE");		return 1;
@@ -1187,9 +1188,9 @@ int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
 			case 'S': GUnrealEditor.Exec  ("MAP SELECT NEXT");		return 1;
 			case 'X': GUnrealEditor.Exec  ("MAP SELECT PREVIOUS"); 	return 1;
 			case IK_Delete: GUnrealEditor.Exec  ("MAP DELETE");		return 1;
-			}
-		else switch (toupper(Key))
-			{
+		}
+		else switch( toupper(Key) )
+		{
 			case 'A': GUnrealEditor.Exec  ("POLY SELECT ALL"); 				return 1;
 			case 'N': GUnrealEditor.Exec  ("POLY SELECT NONE"); 			return 1;
 			case 'Z': GUnrealEditor.Exec  ("POLY SELECT NONE"); 			return 1;
@@ -1208,57 +1209,70 @@ int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
 			case 'X': GUnrealEditor.Exec  ("POLY SELECT MEMORY XOR"); 		return 1;
 			case 'U': GUnrealEditor.Exec  ("POLY SELECT MEMORY UNION"); 	return 1;
 			case 'O': GUnrealEditor.Exec  ("POLY SELECT MEMORY INTERSECT"); return 1;
-			};
 		}
-	else if (!Camera->Input->KeyDown(IK_Alt))
-		{
+	}
+	else if( !Camera->Input->KeyDown(IK_Alt) )
+	{
 		if( Camera->Lock(LOCK_ReadWrite|LOCK_CanFail) )
+		{
+			switch( toupper(Key) )
 			{
-			switch (toupper(Key))
-				{
-				case 'B': 		// Toggle brush visibility
+				case 'B': 
+					// Toggle brush visibility.
 					Camera->Actor->ShowFlags ^= SHOW_Brush;
 					Processed=1;
 					break;
-				case 'K': 		// Toggle backdrop
+				case 'K':
+					// Toggle backdrop.
 					Camera->Actor->ShowFlags ^= SHOW_Backdrop;
 					Processed=1;
 					break;
-				case 'P':		// Toggle player controls
+				case 'P':
+					// Toggle player controls.
 					Camera->Actor->ShowFlags ^= SHOW_PlayerCtrl;
 					Processed=1;
-					GCameraManager->ResetModes();
 					break;
-				case 'U':		// Undo
+				case 'H':
+					// Hide actors.
+					Camera->Actor->ShowFlags ^= SHOW_Actors;
+					break;
+				case 'U':
+					// Undo.
 					Camera->Unlock(LOCK_ReadWrite,0);
 					if (GTrans->Undo(Camera->Level)) GCameraManager->RedrawLevel (Level);
 					Camera->Lock(LOCK_ReadWrite);
 					Processed=1;
 					break;
-				case 'R':		// Redo
+				case 'R':
+					// Redo.
 					Camera->Unlock(LOCK_ReadWrite,0);
 					if (GTrans->Redo(Camera->Level)) GCameraManager->RedrawLevel (Level);
 					Camera->Lock(LOCK_ReadWrite);
 					Processed=1;
 					break;
-				case 'L':		// Look ahead
+				case 'L':
+					// Look ahead.
 		        	Camera->Actor->ViewRotation.Pitch = 0;
 		        	Camera->Actor->ViewRotation.Roll  = 0;
 					Processed=1;
 					break;
-				case '1':	  // Movement speed
+				case '1':
+					// Movement speed.
 					GUnrealEditor.MovementSpeed = 1;
 					Processed=1;
 					break;
-				case '2':	  // Movement speed
+				case '2':
+					// Movement speed.
 					GUnrealEditor.MovementSpeed = 4;
 					Processed=1;
 					break;
-				case '3':  	  // Movement speed
+				case '3':
+					// Movement speed.
 					GUnrealEditor.MovementSpeed = 16;
 					Processed=1;
 					break;
-				case IK_Escape:   // Escape, update screen
+				case IK_Escape:
+					// Escape, update screen.
 					Processed=1;
 					break;
 				case IK_Delete:
@@ -1267,13 +1281,13 @@ int FGlobalEditor::edcamKey (UCamera *Camera, int Key)
 					Camera->Lock(LOCK_ReadWrite);
 					Processed=1;
 					break;
-				};
+			}
 			Camera->Unlock(LOCK_ReadWrite,0);
-			};
-		};
+		}
+	}
 	return Processed;
 	unguard;
-	};
+}
 
 /*-----------------------------------------------------------------------------
    Coordinates.
@@ -1553,7 +1567,7 @@ void DrawTextureBrowser( UCamera *Camera )
 				DrawTextureRect( Camera, List[i], X+Space, Y+Space, Size, (Size>=64), 0 );
 
 				if( GUnrealEditor.Scan.Active )
-					GUnrealEditor.Scan.PostScan(EDSCAN_BrowserTex,(int)List[i],0,0,&GMath.ZeroVector);
+					GUnrealEditor.Scan.PostScan(EDSCAN_BrowserTex,(int)List[i],0,0,&FVector(0,0,0));
 			}
 		}
 	}
@@ -1569,8 +1583,8 @@ void DrawTextureBrowser( UCamera *Camera )
 //
 // Draw an onscreen mouseable button.
 //
-int DrawButton (UCamera *Camera,UTexture *Texture,int X, int Y, int ScanCode)
-	{
+int DrawButton( UCamera *Camera, UTexture *Texture, int X, int Y, int ScanCode )
+{
 	if (GUnrealEditor.Scan.Active)
 		GUnrealEditor.Scan.PreScan();
 	GRend->DrawScaledSprite
@@ -1584,10 +1598,11 @@ int DrawButton (UCamera *Camera,UTexture *Texture,int X, int Y, int ScanCode)
 		BT_Normal,
 		NULL,
 		0,
-		0
+		0,
+		0.0
 	);
 	if (GUnrealEditor.Scan.Active)
-		GUnrealEditor.Scan.PostScan(EDSCAN_UIElement,ScanCode,0,0,&GMath.ZeroVector);
+		GUnrealEditor.Scan.PostScan(EDSCAN_UIElement,ScanCode,0,0,&FVector(0,0,0));
 	return Texture->USize+2;
 	};
 
@@ -1656,23 +1671,17 @@ void FGlobalEditor::edcamDraw( UCamera *Camera, int DoScan )
 			else
 				Actor->AnimSequence = NAME_None;
 
-			FMeshAnimSeq *Seq  = Mesh->GetAnimSeq( Actor->AnimSequence );
+			const FMeshAnimSeq *Seq = Mesh->GetAnimSeq( Actor->AnimSequence );
 			Camera->BuildCoords();
 
 			// Auto rotate if wanted.
-			if( Actor->ShowFlags & SHOW_RealTime )
-			{
-				static FLOAT Time=0.0;
-				FLOAT NewTime = ((SQWORD)GApp->MicrosecondTime())/1000000.0;
-				if( NewTime - Time < 1.0 )
-					Actor->ViewRotation.Yaw += (NewTime - Time) * 8192.0;
-				Time = NewTime;
-			}
+			if( (Actor->ShowFlags & SHOW_Brush) && (GServer.TimeSeconds - LastTimeSeconds < 0.25) )
+				Actor->ViewRotation.Yaw += (GServer.TimeSeconds - LastTimeSeconds) * 8192.0;
 
 			// Remember.
 			OriginalLocation		= Actor->Location;
 			OriginalRotation		= Actor->ViewRotation;
-			Actor->Location			= GMath.ZeroVector;		
+			Actor->Location			= FVector(0,0,0);
 			Actor->bHiddenEd		= 1;
 			Actor->bHidden			= 1;
 			Actor->DrawType			= DT_Mesh;
@@ -1685,10 +1694,6 @@ void FGlobalEditor::edcamDraw( UCamera *Camera, int DoScan )
 			// Update mesh.
 			Mesh->Lock(LOCK_Read);
 			FLOAT NumFrames = Seq ? Seq->NumFrames : 1.0;
-			if( ShowFlags & SHOW_Brush )
-			{
-				Actor->Rotation.Yaw += Min( 4, (int)(GServer.TimeSeconds-LastTimeSeconds) )*8.0;
-			}
 			if( ShowFlags & SHOW_Backdrop )
 			{
 				Actor->AnimFrame += Min( 1.0, (GServer.TimeSeconds-LastTimeSeconds)*30.0 / NumFrames);
@@ -1788,7 +1793,7 @@ void FGlobalEditor::edcamDraw( UCamera *Camera, int DoScan )
 				constrainSimplePoint(&Camera->Level->Brush()->TransformedBound.Min,&Constraints);
 				constrainSimplePoint(&Camera->Level->Brush()->TransformedBound.Max,&Constraints);
 
-				GEdRend->DrawBoundingRect(Camera,&Camera->Level->Brush()->TransformedBound);
+				GEdRend->DrawBoundingBox( Camera, &Camera->Level->Brush()->TransformedBound );
 			}
 		}
 	}
@@ -1916,12 +1921,12 @@ void FGlobalEditor::edcamClick
 
 			if( !CurrentClass )
 				CurrentClass = new("Light",FIND_Existing)UClass;
-			Actor = Camera->Level->SpawnActor(CurrentClass,NULL,NAME_None,&V,NULL,NULL);
+			Actor = Camera->Level->SpawnActor(CurrentClass,NULL,NAME_None,V);
 
 			if( Actor )
 			{
 				Actor->bDynamicLight = 1;
-				if( Camera->Level->FarMoveActor( Actor, &V ) )
+				if( Camera->Level->FarMoveActor( Actor, V ) )
 				{
 					debug(LOG_Info,"Added actor successfully");
 				}
@@ -2137,7 +2142,6 @@ void FGlobalEditor::edcamClick
 					Camera->Actor->ShowFlags ^= SHOW_PlayerCtrl;
 					Camera->Logf(LOG_Info,"Player controls are %s",
 						Camera->Actor->ShowFlags&SHOW_PlayerCtrl ? "On" : "Off");
-					GCameraManager->ResetModes();
 					break;
 			}
 			break;

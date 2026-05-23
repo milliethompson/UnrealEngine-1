@@ -54,7 +54,7 @@ public:
 	void	UnlockCameraWindow	(UCamera *Camera,int Blit);
 	void	ShutdownAfterError	();
 	UCamera *CurrentCamera		();
-	void	ResetModes			();
+	void    UpdateCameraInput   (UCamera *Camera);
 	void	MakeCurrent			(UCamera *Camera);
 	void	MakeFullscreen		(UCamera *Camera);
 	int		Exec				(const char *Cmd,FOutputDevice *Out=GApp);
@@ -80,7 +80,6 @@ public:
 	int			CursorIsCaptured();
 	void		SaveFullscreenWindowRect(UCamera *Camera);
 	int			Toggle(HMENU hMenu,int Item);
-	void		StoreMove(FLOAT MouseX,FLOAT MouseY,int LButton,int MButton,int RButton);
 	void		FindAvailableModes(UCamera *Camera);
 	void		SetColorDepth(UCamera *Camera,int NewColorBytes);
 	int			IsHardware3D(UCamera *Camera);
@@ -94,8 +93,6 @@ public:
 	int			UseDirectMouse;		// Whether DirectMouse usage is allowed.
 	int			UseDirectDraw;		// Whether DirectDraw usage is allowed.
 	int 		InMenuLoop;			// Whether we're in a modal menu loop state.
-	FVector		StoredMove;			// Stored movement.
-	FRotation	StoredRot;			// Accumulated yaw.
 	INT			NormalMouseInfo[3];	// Mouse info from SystemParametersInfo.
 	INT			CaptureMouseInfo[3];// Mouse info when captured.
 	GUID		ddGUIDs[MAX_DD];	// Avaiable DirectDraw GUIDs.
@@ -120,7 +117,7 @@ public:
 	int			ddInit();
 	void		ddExit();
 	char		*ddError(HRESULT Result);
-	int			ddSetMode(HWND hWndParent,int Width, int Height, int ColorBytes,int &Caps);
+	int			ddSetMode(HWND hWndOwner, int Width, int Height, int ColorBytes,int &Caps);
 	void		ddEndMode();
 	int			ddSetCamera(UCamera *Camera,int Width, int Height, int ColorBytes, int RequestedCaps);
 
@@ -128,7 +125,6 @@ public:
 	QWORD		StoredMouseTime;
 	void		dmStart();
 	void		dmEnd();
-	void		dmTick();
 };
 
 /////////////////////////////////////////////////////////////////////////////

@@ -1,6 +1,7 @@
 VERSION 5.00
 Object = "{0BA686C6-F7D3-101A-993E-0000C0EF6F5E}#1.0#0"; "THREED32.OCX"
-Object = "{27395F88-0C0C-101B-A3C9-08002B2F49FB}#1.1#0"; "picclp32.ocx"
+Object = "{27395F88-0C0C-101B-A3C9-08002B2F49FB}#1.1#0"; "PICCLP32.OCX"
+Object = "{6B7E6392-850A-101B-AFC0-4210102A8DA7}#1.1#0"; "COMCTL32.OCX"
 Begin VB.MDIForm frmMain 
    AutoShowChildren=   0   'False
    BackColor       =   &H00000000&
@@ -8,10 +9,9 @@ Begin VB.MDIForm frmMain
    ClientHeight    =   8130
    ClientLeft      =   2085
    ClientTop       =   1845
-   ClientWidth     =   11865
+   ClientWidth     =   15960
    Icon            =   "Main.frx":0000
    LinkTopic       =   "Form1"
-   Moveable        =   0   'False
    ScrollBars      =   0   'False
    Visible         =   0   'False
    WindowState     =   2  'Maximized
@@ -22,9 +22,9 @@ Begin VB.MDIForm frmMain
       TabIndex        =   1
       Top             =   0
       Visible         =   0   'False
-      Width           =   11865
+      Width           =   15960
       _Version        =   65536
-      _ExtentX        =   20929
+      _ExtentX        =   28152
       _ExtentY        =   767
       _StockProps     =   15
       ForeColor       =   16777215
@@ -41,11 +41,43 @@ Begin VB.MDIForm frmMain
       BorderWidth     =   0
       FloodColor      =   0
       ShadowColor     =   1
+      Begin VB.PictureBox ProgressHolder 
+         Height          =   495
+         Left            =   0
+         ScaleHeight     =   435
+         ScaleWidth      =   15195
+         TabIndex        =   24
+         Top             =   0
+         Visible         =   0   'False
+         Width           =   15255
+         Begin VB.TextBox ProgressText 
+            Appearance      =   0  'Flat
+            BackColor       =   &H8000000F&
+            BorderStyle     =   0  'None
+            Height          =   285
+            Left            =   3720
+            TabIndex        =   26
+            Text            =   "Text1"
+            Top             =   100
+            Width           =   11415
+         End
+         Begin ComctlLib.ProgressBar ProgressBar 
+            Height          =   195
+            Left            =   120
+            TabIndex        =   25
+            Top             =   105
+            Width           =   3495
+            _ExtentX        =   6165
+            _ExtentY        =   344
+            _Version        =   327680
+            Appearance      =   0
+         End
+      End
       Begin VB.TextBox Callback 
          Height          =   345
-         Left            =   870
+         Left            =   5520
          MultiLine       =   -1  'True
-         TabIndex        =   22
+         TabIndex        =   20
          Text            =   "Main.frx":030A
          Top             =   45
          Visible         =   0   'False
@@ -55,12 +87,12 @@ Begin VB.MDIForm frmMain
          BackColor       =   &H00C0C0C0&
          Height          =   315
          HelpContextID   =   328
-         Left            =   6840
-         TabIndex        =   16
+         Left            =   3360
+         TabIndex        =   14
          TabStop         =   0   'False
          Tag             =   "Enter calculation here, ex. 1+2*3"
          Text            =   "0"
-         Top             =   3300
+         Top             =   60
          Width           =   2265
       End
       Begin VB.ComboBox ModeCombo 
@@ -69,7 +101,7 @@ Begin VB.MDIForm frmMain
          HelpContextID   =   111
          Left            =   6480
          Style           =   2  'Dropdown List
-         TabIndex        =   12
+         TabIndex        =   10
          TabStop         =   0   'False
          Tag             =   "Editing Mode"
          Top             =   60
@@ -77,7 +109,7 @@ Begin VB.MDIForm frmMain
       End
       Begin VB.Timer Timer 
          Interval        =   60000
-         Left            =   390
+         Left            =   5640
          Top             =   0
       End
       Begin VB.ComboBox TextureCombo 
@@ -118,8 +150,8 @@ Begin VB.MDIForm frmMain
       Begin Threed.SSCommand CalcZero 
          Height          =   285
          HelpContextID   =   328
-         Left            =   2715
-         TabIndex        =   15
+         Left            =   2475
+         TabIndex        =   13
          Tag             =   "Zero the calculator value"
          Top             =   75
          Width           =   210
@@ -144,8 +176,8 @@ Begin VB.MDIForm frmMain
          Default         =   -1  'True
          Height          =   285
          HelpContextID   =   328
-         Left            =   3000
-         TabIndex        =   14
+         Left            =   2760
+         TabIndex        =   12
          Tag             =   "Perform calculation"
          Top             =   75
          Width           =   495
@@ -168,8 +200,8 @@ Begin VB.MDIForm frmMain
       End
       Begin Threed.SSCommand HelpButton 
          Height          =   285
-         Left            =   1080
-         TabIndex        =   11
+         Left            =   840
+         TabIndex        =   9
          Tag             =   "Help"
          Top             =   75
          Width           =   615
@@ -193,8 +225,8 @@ Begin VB.MDIForm frmMain
       End
       Begin Threed.SSCommand EpicButton 
          Height          =   285
-         Left            =   1800
-         TabIndex        =   10
+         Left            =   1560
+         TabIndex        =   8
          Tag             =   "Visit Epic's Web page"
          Top             =   75
          Width           =   615
@@ -215,42 +247,18 @@ Begin VB.MDIForm frmMain
          BevelWidth      =   1
          RoundedCorners  =   0   'False
       End
-      Begin Threed.SSCommand RedoButton 
-         Height          =   285
-         Left            =   600
-         TabIndex        =   9
-         Tag             =   "Redo"
-         Top             =   75
-         Width           =   375
-         _Version        =   65536
-         _ExtentX        =   661
-         _ExtentY        =   503
-         _StockProps     =   78
-         Caption         =   ">>"
-         BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
-            Name            =   "MS Sans Serif"
-            Size            =   8.25
-            Charset         =   0
-            Weight          =   400
-            Underline       =   0   'False
-            Italic          =   0   'False
-            Strikethrough   =   0   'False
-         EndProperty
-         BevelWidth      =   1
-         RoundedCorners  =   0   'False
-      End
-      Begin Threed.SSCommand UndoButton 
+      Begin Threed.SSCommand PlayButton 
          Height          =   285
          Left            =   120
-         TabIndex        =   8
-         Tag             =   "Undo"
+         TabIndex        =   23
+         Tag             =   "Help"
          Top             =   75
-         Width           =   375
+         Width           =   615
          _Version        =   65536
-         _ExtentX        =   661
+         _ExtentX        =   1085
          _ExtentY        =   503
          _StockProps     =   78
-         Caption         =   "<<"
+         Caption         =   "Play"
          BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
             Name            =   "MS Sans Serif"
             Size            =   8.25
@@ -262,6 +270,7 @@ Begin VB.MDIForm frmMain
          EndProperty
          BevelWidth      =   1
          RoundedCorners  =   0   'False
+         AutoSize        =   1
       End
       Begin VB.Label ModeLabel 
          Alignment       =   1  'Right Justify
@@ -269,7 +278,7 @@ Begin VB.MDIForm frmMain
          Caption         =   "Mode: "
          Height          =   210
          Left            =   5880
-         TabIndex        =   13
+         TabIndex        =   11
          Top             =   105
          Width           =   615
       End
@@ -305,7 +314,7 @@ Begin VB.MDIForm frmMain
       Align           =   3  'Align Left
       Height          =   7695
       Left            =   0
-      TabIndex        =   17
+      TabIndex        =   15
       Top             =   435
       Visible         =   0   'False
       Width           =   2070
@@ -329,14 +338,14 @@ Begin VB.MDIForm frmMain
          Left            =   0
          ScaleHeight     =   4635
          ScaleWidth      =   1755
-         TabIndex        =   19
+         TabIndex        =   17
          Top             =   1080
          Width           =   1815
          Begin Threed.SSRibbon ToolIcons 
             Height          =   615
             Index           =   0
             Left            =   0
-            TabIndex        =   20
+            TabIndex        =   18
             Top             =   0
             Visible         =   0   'False
             Width           =   615
@@ -356,7 +365,7 @@ Begin VB.MDIForm frmMain
             Caption         =   "Status"
             Height          =   495
             Left            =   0
-            TabIndex        =   21
+            TabIndex        =   19
             Top             =   600
             Width           =   1695
          End
@@ -364,7 +373,7 @@ Begin VB.MDIForm frmMain
       Begin VB.VScrollBar Scroller 
          Height          =   5775
          Left            =   1800
-         TabIndex        =   18
+         TabIndex        =   16
          Top             =   0
          Visible         =   0   'False
          Width           =   245
@@ -373,7 +382,7 @@ Begin VB.MDIForm frmMain
    Begin Threed.SSPanel BrowserPanel 
       Align           =   4  'Align Right
       Height          =   7695
-      Left            =   9435
+      Left            =   13530
       TabIndex        =   0
       Top             =   435
       Visible         =   0   'False
@@ -398,7 +407,7 @@ Begin VB.MDIForm frmMain
          Height          =   315
          Left            =   810
          Style           =   2  'Dropdown List
-         TabIndex        =   23
+         TabIndex        =   21
          Tag             =   "Various resources you can browse"
          Top             =   45
          Width           =   1605
@@ -416,7 +425,7 @@ Begin VB.MDIForm frmMain
          EndProperty
          Height          =   300
          Left            =   75
-         TabIndex        =   24
+         TabIndex        =   22
          Top             =   75
          Width           =   735
       End
@@ -530,6 +539,7 @@ Begin VB.MDIForm frmMain
       End
       Begin VB.Menu Delete 
          Caption         =   "Delete"
+         Shortcut        =   {DEL}
       End
       Begin VB.Menu XXX 
          Caption         =   "-"
@@ -606,33 +616,12 @@ Begin VB.MDIForm frmMain
    End
    Begin VB.Menu ScriptMenu 
       Caption         =   "&Script"
-      Visible         =   0   'False
-      Begin VB.Menu ScriptCompile 
-         Caption         =   "&Compile Script"
-         Shortcut        =   {F5}
-      End
       Begin VB.Menu ScriptMakeChanged 
-         Caption         =   "&Make Changed Scripts"
-         Shortcut        =   {F6}
-      End
-      Begin VB.Menu ScriptMakeAll 
-         Caption         =   "Make &All Scripts"
+         Caption         =   "&Compile Changed Scripts"
          Shortcut        =   {F7}
       End
-      Begin VB.Menu ZDAFFODIL 
-         Caption         =   "-"
-      End
-      Begin VB.Menu ScriptNextError 
-         Caption         =   "&Next Error"
-         Shortcut        =   {F4}
-      End
-      Begin VB.Menu ScriptResults 
-         Caption         =   "&Results"
-         Shortcut        =   {F8}
-      End
-      Begin VB.Menu ScriptEditDefaults 
-         Caption         =   "&Edit Default Actor Properties"
-         Shortcut        =   {F9}
+      Begin VB.Menu ScriptMakeAll 
+         Caption         =   "Compile &All Scripts"
       End
    End
    Begin VB.Menu Brush 
@@ -811,6 +800,10 @@ Begin VB.MDIForm frmMain
       End
       Begin VB.Menu WindowLog 
          Caption         =   "&Log"
+      End
+      Begin VB.Menu ScriptResults 
+         Caption         =   "&Results"
+         Shortcut        =   {F5}
       End
       Begin VB.Menu ZFUS 
          Caption         =   "-"
@@ -1160,7 +1153,9 @@ Private Sub CurvedStair_Click()
 End Sub
 
 Private Sub Delete_Click()
-    Ed.Server.Exec "DELETE"
+    If MsgBox("Are you sure you want to delete?", vbOKCancel) = vbOK Then
+        Ed.Server.Exec "DELETE"
+    End If
 End Sub
 
 Private Sub Directories_Click()
@@ -1491,6 +1486,7 @@ Private Sub MDIForm_Load()
     GInitialResized = 1
     '
     Ed.Server.Exec "APP HIDE"
+    Ed.Server.Exec "APP SET PROGRESSBAR=" & Trim(Str(ProgressBar.hwnd)) & " PROGRESSTEXT=" & Trim(Str(ProgressText.hwnd))
     '
     ' Set server parameters to the defaults the
     ' editor expects:
@@ -1581,7 +1577,7 @@ End Sub
 
 Private Sub MDIForm_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
     If (Button And 2) <> 0 Then ' Right click
-        PopupMenu frmPopups.WIndow
+        PopupMenu frmPopups.Window
     End If
 End Sub
 
@@ -1662,35 +1658,31 @@ Private Sub ObjectProperties_Click()
 End Sub
 
 Private Sub Open_Click()
-    '
-    ' Dialog for "Open Map":
-    '
+    
+    ' Dialog for "Open Map".
     On Error GoTo Skip
     Ed.Server.Disable
     frmDialogs.MapOpen.filename = ""
     frmDialogs.MapOpen.ShowOpen
-    '
+    
     Call UpdateDialog(frmDialogs.MapOpen)
     If (frmDialogs.MapOpen.filename <> "") Then
-        '
+        
         ' Load the map, inhibiting redraw since we're
         ' about to resize everything anyway.
-        '
         Ed.MapFname = frmDialogs.MapOpen.filename
         Caption = Ed.EditorAppName + " - " + Ed.MapFname
-        '
+        
         Ed.BeginSlowTask "Loading map"
         Ed.Server.SlowExec "MAP LOAD FILE=" & _
             Quotes(Ed.MapFname) & " REDRAW=OFF"
         Ed.EndSlowTask
-        '
+        
         If Ed.MapEdit Then Call Ed.Tools.Click("MAPEDIT")
         Ed.LoadParamsFromLevel
         ResizeAll (True)
         PostLoad
-        '
     End If
-    '
 Skip: Ed.Server.Enable
 End Sub
 
@@ -1732,6 +1724,10 @@ Private Sub PolygonProperties_Click()
    frmSurfaceProps.Show
 End Sub
 
+Private Sub PlayButton_Click()
+    PlayLevel_Click
+End Sub
+
 Private Sub Preferences_Click()
    Ed.Server.Disable
    frmPreferences.Show 1
@@ -1752,10 +1748,6 @@ Private Sub EditRedo_Click()
     Else
         Ed.Server.Exec "TRANSACTION REDO"
     End If
-End Sub
-
-Private Sub RedoButton_Click()
-    Ed.Tools.Click "TRANSACTION REDO"
 End Sub
 
 Private Sub RelNotes_Click()
@@ -1848,28 +1840,30 @@ Private Sub SaveBrushAs_Click()
     SaveBrush_Click
 End Sub
 
-Private Sub ScriptCompile_Click()
-    ScriptForm.ScriptCompile_Click
-End Sub
-
 Private Sub ScriptEditDefaults_Click()
     ScriptForm.ScriptEditDefaults_Click
 End Sub
 
 Private Sub ScriptMakeAll_Click()
-    ScriptForm.ScriptMakeAll_Click
+    Ed.BeginSlowTask "Compiling all scripts"
+    PreSaveAll
+    Ed.Server.Exec "SCRIPT MAKE ALL"
+    frmActorProperties.NoteClassChange
+    Ed.EndSlowTask
+    frmClassBrowser.ProcessResults
 End Sub
 
 Private Sub ScriptMakeChanged_Click()
-    ScriptForm.ScriptMakeChanged_Click
-End Sub
-
-Private Sub ScriptNextError_Click()
-    ScriptForm.ScriptNextError_Click
+    Ed.BeginSlowTask "Compiling changed scripts"
+    PreSaveAll
+    Ed.Server.Exec "SCRIPT MAKE"
+    frmActorProperties.NoteClassChange
+    Ed.EndSlowTask
+    frmClassBrowser.ProcessResults
 End Sub
 
 Private Sub ScriptResults_Click()
-    ScriptForm.ScriptResults_Click
+    frmResults.UpdateResults
 End Sub
 
 Private Sub SelAdjFloors_Click()
@@ -2017,10 +2011,6 @@ Private Sub EditUndo_Click()
     Else
         Ed.Server.Exec "TRANSACTION UNDO"
     End If
-End Sub
-
-Private Sub UndoButton_Click()
-    Ed.Tools.Click "TRANSACTION UNDO"
 End Sub
 
 Private Sub UnrealScriptHelp_Click()
@@ -2428,7 +2418,7 @@ Private Sub Callback_KeyPress(KeyAscii As Integer)
     Case EDC_MAPCHANGE:
     Case EDC_ACTORCHANGE:
     Case EDC_RTCLICKWINDOW:
-        PopupMenu frmPopups.WIndow
+        PopupMenu frmPopups.Window
     End Select
     '
 End Sub

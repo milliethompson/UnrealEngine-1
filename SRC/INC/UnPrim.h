@@ -16,33 +16,51 @@
 -----------------------------------------------------------------------------*/
 
 //
+// Results of an actor check.
+//
+struct FIteratorActorList : public FIteratorList
+{
+	// Variables.
+	AActor*		Actor;		// Actor which was hit, or NULL=none.
+
+	// Functions.
+	FIteratorActorList()
+	{}
+	FIteratorActorList( FIteratorActorList* InNext, AActor* InActor )
+	:	FIteratorList	(InNext)
+	,	Actor			(InActor)
+	{}
+	FIteratorActorList* GetNext()
+	{ return (FIteratorActorList*) Next; }
+};
+
+//
 // Results from a collision check.
 //
-struct FCheckResult
+struct FCheckResult : public FIteratorActorList
 {
 	// Variables.
 	FVector		Location;   // Location of the hit in coordinate system of the returner.
 	FVector		Normal;     // Normal vector in coordinate system of the returner. Zero=none.
-	AActor*		Actor;		// Actor which was hit, or NULL=none.
 	UPrimitive*	Primitive;  // Actor primitive which was hit, or NULL=none.
-	INDEX		Item;       // Primitive data item which was hit, INDEX_NONE=none.
 	FLOAT       Time;       // Time until hit, if line check.
+	INDEX		Item;       // Primitive data item which was hit, INDEX_NONE=none.
 
-	// Constructors.
+	// Functions.
 	FCheckResult()
 	{}
-	FCheckResult( FLOAT InTime )
-	:	Location	(0,0,0)
+	FCheckResult( FLOAT InTime, FCheckResult* InNext=NULL )
+	:	FIteratorActorList( InNext, NULL )
+	,	Location	(0,0,0)
 	,	Normal		(0,0,0)
-	,	Actor		(NULL)
 	,	Primitive	(NULL)
-	,	Item		(INDEX_NONE)
 	,	Time		(InTime)
+	,	Item		(INDEX_NONE)
 	{}
-
-	// QSort helper function.
+	FCheckResult*& GetNext()
+	{ return *(FCheckResult**)&Next; }
 	friend INT Compare( const FCheckResult &A, const FCheckResult &B )
-		{ return A.Time - B.Time; }
+	{ return A.Time - B.Time; }
 };
 
 /*-----------------------------------------------------------------------------
@@ -63,7 +81,6 @@ class UNENGINE_API UPrimitive : public UObject
 
 	// Variables.
 	FBoundingVolume LocalBound;
-	BOOL bCheckCollision;
 
 	// UObject interface.
 	void InitHeader()
@@ -74,8 +91,7 @@ class UNENGINE_API UPrimitive : public UObject
 		UObject::InitHeader();
 
 		// Init variables.
-		bCheckCollision=0;
-		LocalBound.Init();
+		LocalBound = FBoundingVolume(0);
 
 		unguard;	
 	}
@@ -97,38 +113,21 @@ class UNENGINE_API UPrimitive : public UObject
 	(
 		FCheckResult	&Result,
 		AActor			*Owner,
-		const FVector	&Location,
-		DWORD			ExtraNodeFlags
-	) {return 1;}
+		FVector			Location,
+		FVector			Extent,
+		DWORD           ExtraNodeFlags
+	);
 	virtual INT LineCheck
 	(
 		FCheckResult	&Result,
 		AActor			*Owner,
-		const FVector	&Start,
-		const FVector	&End,
-		DWORD ExtraNodeFlags
-	) {return 1;}
-	virtual INT BoxPointCheck
-	(
-		FCheckResult	&Result,
-		AActor			*Owner,
-		const FVector   &Point,
-		FLOAT           Radius,
-		FLOAT           Height,
+		FVector			Start,
+		FVector			End,
+		FVector			Extent,
 		DWORD           ExtraNodeFlags
-	) {return 1.0;}
-	virtual INT BoxLineCheck
-	(
-		FCheckResult	&Result,
-		AActor			*Owner,
-		const FVector   &Start,
-		const FVector   &End,
-		FLOAT           Radius,
-		FLOAT           Height,
-		DWORD           ExtraNodeFlags
-	) {return 1.0;}
-	virtual FBoundingRect GetBoundingRect( AActor *Owner )
-	{ FBoundingRect R; R.Init(); return R; }
+	);
+	virtual FBoundingBox GetRenderBoundingBox( const AActor *Owner ) const;
+	virtual FBoundingBox GetCollisionBoundingBox( const AActor *Owner ) const;
 };
 
 /*----------------------------------------------------------------------------

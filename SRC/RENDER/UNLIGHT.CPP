@@ -348,7 +348,7 @@ const FLightManager::FLocalEffectEntry FLightManager::Effects[LE_MAX] =
 {/* Interference */	merge_None,				spatial_Interference,	NULL,				0,		0,		0,		0,		1		},
 {/* Cylinder     */	merge_None,				spatial_Cylinder,		NULL,				0,		0,		0,		0,		0		},
 {/* Rotor        */	merge_None,				spatial_Rotor,			NULL,				0,		0,		0,		0,		1		},
-{/* Unused		 */	merge_None,				spatial_None,			NULL,				0,		0,		0,		0,		0		},
+{/* Unused		 */	merge_Test,				spatial_None,			NULL,				0,		0,		0,		0,		0		},
 };
 
 const FLightManager::LIGHT_TYPE_FUNC FLightManager::GLightTypeFuncs[LT_MAX] =
@@ -562,7 +562,7 @@ void FLightManager::BuildTemporaryTables()
 	TemporaryTablesBuilt=1;
 	
 	// Build inverse vectors. Though this may seem slow, it's actually only a teeny drain on CPU time.
-	FCoords Temp = FCoords( FVector(0,0,0), TextureU, TextureV, WorldNormal ).Inverse();
+	FCoords Temp = FCoords( FVector(0,0,0), TextureU, TextureV, WorldNormal ).Inverse().Transpose();
 	InverseUAxis = Temp.XAxis * 65536.0;
 	InverseVAxis = Temp.YAxis * 65536.0;
 	InverseNAxis = Temp.ZAxis;
@@ -1048,7 +1048,29 @@ void FLightManager::merge_WaterShimmer( BYTE Caps, INT Key, FLightInfo &Info, RA
 void FLightManager::merge_Test( BYTE Caps, INT Key, FLightInfo &Info, RAINBOW_PTR Stream, RAINBOW_PTR Dest )
 {
 	guardSlow(FLightManager::merge_Test);
-	AUTOMERGE(*Src++,0);
+	if( Stream.PtrVOID == NULL )
+	{
+		Stream = Dest;
+		FLOAT *Temp = Stream.PtrFLOAT;
+		for( int i=0; i<MeshVSize; i++ )
+		{
+			for( int j=0; j<MeshUSize; j++ )
+				*Temp++ = (FLOAT)((3<<22) + 0x10);
+			Temp += MeshUSkip;
+		}
+	}
+	else
+	{
+		BYTE  *Src  = Info.IlluminationMap;
+		FLOAT Scale = Info.FloatScale;
+		for( int i=0; i<MeshVSize; i++ )
+		{
+			for( int j=0; j<MeshUSize; j++ )
+				*Dest.PtrFLOAT++ = Max( *Stream.PtrFLOAT++ - Scale * *Src++, (FLOAT)((3<<22) + 0x10) );
+			Dest.PtrFLOAT   += MeshUSkip;
+			Stream.PtrFLOAT += MeshUSkip;
+		}
+	}
 	unguardSlow;
 }
 
@@ -1358,22 +1380,86 @@ void FLightManager::spatial_Interference( FLightInfo *Info, BYTE *Src, BYTE *Des
 	unguardSlow;
 }
 
+// Fuzzy line classification.
+INT FuzzyLineCheckR
+(
+	UModel		&Model,
+	INDEX		iNode,
+	FVector		Start,
+	FVector		End,
+	INT			Outside,
+	DWORD		ExtraNodeFlags
+)
+{
+	while( iNode != INDEX_NONE )
+	{
+		// Check side-of-plane for both points.
+		const FBspNode*	Node  = &Model.Nodes(iNode);
+		FLOAT           Dist1 = Node->Plane.PlaneDot(Start);
+		FLOAT           Dist2 = Node->Plane.PlaneDot(End);
+
+		// Classify line based on both distances.
+		if( Dist1 > -0.001 && Dist2 > -0.001 )
+		{
+			// Both points are in front.
+			Outside |= Node->IsCsg(ExtraNodeFlags);
+			iNode    = Node->iFront;
+		}
+		else if( Dist1 < 0.001 && Dist2 < 0.001 )
+		{
+			// Both points are in back.
+			Outside &= !Node->IsCsg(ExtraNodeFlags);
+			iNode    = Node->iBack;
+		}
+		else
+		{
+			// Line is split.
+			FVector Middle     = Start + (Start-End) * (Dist1/(Dist2-Dist1));
+			INT     FrontFirst = Dist1 > 0.0;
+
+			// Recurse with front part.
+			if( !FuzzyLineCheckR( Model, Node->iChild[FrontFirst], Start, Middle, Node->ChildOutside(FrontFirst,Outside,ExtraNodeFlags), ExtraNodeFlags ) )
+				return 0;
+
+			// Loop with back part.
+			Outside = Node->ChildOutside(1-FrontFirst,Outside);
+			iNode   = Node->iChild[1-FrontFirst];
+			Start   = Middle;
+		}
+	}
+	return Outside;
+}
+
+FLOAT FuzzyLineCheck
+(
+	UModel			&Model,
+	const FVector	&Start,
+	const FVector	&Delta,
+	const FVector	&DU,
+	const FVector	&DV,
+	INT				RecursionCount
+)
+{
+	FVector End = Start + Delta * 0.99;
+	return FuzzyLineCheckR( Model, 0, Start, End, Model.RootOutside, NF_NotVisBlocking );
+}
+
 // Spotlight lighting
 void FLightManager::spatial_Spotlight( FLightInfo *Info, BYTE *Src, BYTE *Dest )
 {
 	guardSlow(FLightManager::spatial_Spotlight);
-	// Directional spotlight beam lighting
-	FVector View  = Info->Actor->Rotation.Vector();
-	FLOAT   Sine  = 1.0 - Info->Actor->LightCone / 256.0;
-	FLOAT   RSine = 1.0 / (1.0 - Sine);
+	FVector View      = (Info->Actor->IsA("Pawn") ? ((APawn*)Info->Actor)->ViewRotation : Info->Actor->Rotation).Vector();
+	FLOAT   Sine      = 1.0 - Info->Actor->LightCone / 256.0;
+	FLOAT   RSine     = 1.0 / (1.0 - Sine);
+	FLOAT   SineRSine = Sine * RSine;
+	FLOAT   SineSq    = Sine * Sine;
 	SPATIAL_BEGIN1
-		FLOAT Size = SqrtApprox(Vertex.SizeSquared());
-		//
-		FLOAT Dot = Max(0.f,(Vertex | View) - Sine * Size) * RSine;
-		if( Dot > 0.0 )
+		FLOAT SizeSq = Vertex | Vertex;
+		FLOAT VDotV  = Vertex | View;
+		if( VDotV > 0.0 && Square(VDotV) > SineSq * SizeSq )
 		{
-			Dot /= Size;
-			Dot *= Dot;
+			FLOAT Dot    = Square( VDotV * RSine * DivSqrtApprox(SizeSq) - SineRSine );
+			//FLOAT Phrack = FuzzyLineCheck( *Level->Model, Info->Actor->Location, Vertex, VertexDU, VertexDV, 0 );
 			*Dest = Dot * *Src * Diffuse * LightSqrt[SqrtOfs];
 		}
 		else *Dest = 0.0;
@@ -1385,16 +1471,10 @@ void FLightManager::spatial_Spotlight( FLightInfo *Info, BYTE *Src, BYTE *Dest )
 void FLightManager::spatial_Test( FLightInfo *Info, BYTE *Src, BYTE *Dest )
 {
 	guardSlow(FLightManager::spatial_Test);
-	// Dynamic shadow test
-	FVector ActorLocation = Camera->Actor->Location;
-	//Temp.X += 200.0; Temp.Y += 200.0;
-	SPATIAL_BEGIN
-		//FVector Temp = Vertex.TransformPointBy(Camera->Uncoords);
-		//FLOAT Dist = 0.01 * (Temp - Camera->Actor->Location).Size2D();
-		FLOAT Dist = 0.016 * (Vertex - ActorLocation).Size2D();
-		if (Dist > 1.0) Dist = 1.0;
-		FLOAT V = (Dist > 1.0) ? 1.0 : Dist*Dist;
-		*Dest = *Src * Diffuse * LightSqrt[SqrtOfs] * V;
+	SPATIAL_BEGIN1
+		FLOAT Scale	= Min(Vertex.Size() * Info->RRadius,1.f);
+		if( Scale > 0.0 )
+			*Dest = *Src * Scale;
 	SPATIAL_END
 	unguardSlow;
 }
@@ -1708,6 +1788,7 @@ void FLightManager::FLightInfo::ComputeFromActor( UCamera *Camera )
 
 	// Other precomputed info:
 	Diffuse = Abs(((Location-Base) | Normal) * RRadius);
+	//Diffuse = (Location-Base).Size() * RRadius;
 
 	// Coloring.
 	if( Camera->Caps & CC_ColoredLight )
@@ -1880,10 +1961,10 @@ void FLightManager::SetupForSurf
 		FTextureVStart	= 0;
 		MeshSpacing		= 0;
 		MeshUSize		= 0;
-		TextureU		= GMath.ZeroVector;
-		TextureV		= GMath.ZeroVector;
-		WorldNormal		= GMath.ZeroVector;
-		WorldBase		= GMath.ZeroVector;
+		TextureU		= FVector(0,0,0);
+		TextureV		= FVector(0,0,0);
+		WorldNormal		= FVector(0,0,0);
+		WorldBase		= FVector(0,0,0);
 
 		// Get light actors.
 		NumLights   = 0;
@@ -2044,7 +2125,8 @@ void FLightManager::SetupForSurf
 		if( Surf )
 		{
 			Surf->PolyFlags &= ~PF_DynamicLight;
-			if( IsDynamic ) Surf->PolyFlags |= PF_DynamicLight;
+			if( IsDynamic )
+				Surf->PolyFlags |= PF_DynamicLight;
 		}
 
 		// Generate cache entry if needed.
@@ -2094,12 +2176,12 @@ void FLightManager::SetupForSurf
 				{
 					// This light has spatial effects, so we must cache its shadow map since
 					// we will be generating its illumination map per frame.
-					int CacheID = MakeCacheID(CID_ShadowMap,iLightMesh,Info-FirstLight);
-					ShadowMap = (BYTE *)GCache.Get(CacheID,*TopItemToUnlock++);
+					int CacheID = MakeCacheID( CID_ShadowMap, iLightMesh, Info - FirstLight );
+					ShadowMap = (BYTE *)GCache.Get( CacheID, *TopItemToUnlock++ );
 					if( !ShadowMap  )
 					{
 						// Create and generate its shadow map.
-						ShadowMap = (BYTE *)GCache.Create(CacheID,TopItemToUnlock[-1],MeshSpace * sizeof(BYTE));
+						ShadowMap = (BYTE *)GCache.Create( CacheID, TopItemToUnlock[-1], MeshSpace * sizeof(BYTE) );
 						ShadowMapGen_B( ShadowLoc, ShadowMap );
 					}
 
@@ -2257,9 +2339,10 @@ void ApplyLightCallback( UModel *Model, INDEX iNode, int ActorPtr )
 		FBspSurf			*Poly	= &Model->Surfs (Node->iSurf);
 		FLightMeshIndex		*Index	=  Model->GetLightMeshIndex(Node->iSurf);
 
-		if( !(Node->NodeFlags & NF_PolyOccluded )
-			&& Index && FLightManager::NumDynLightPolys < FLightManager::MAX_DYN_LIGHT_POLYS
-			&& (Actor->bSpecialLit ? (Poly->PolyFlags&PF_SpecialLit) : !(Poly->PolyFlags&PF_SpecialLit)) )
+		if
+		(	!(Node->NodeFlags & NF_PolyOccluded )
+		&&	Index && FLightManager::NumDynLightPolys < FLightManager::MAX_DYN_LIGHT_POLYS
+		&&	(Actor->bSpecialLit ? (Poly->PolyFlags&PF_SpecialLit) : !(Poly->PolyFlags&PF_SpecialLit)) )
 		{
 			int n = Index->NumStaticLights + Index->NumDynamicLights;
 			if( n < Index->MAX_POLY_LIGHTS )

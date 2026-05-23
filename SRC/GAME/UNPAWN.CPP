@@ -28,7 +28,7 @@ IMPLEMENT_CLASS(APawn);
 //
 void APawn::inputCopyFrom( const PPlayerTick &Tick )
 {
-	guard(CopyInputTo);
+	guard(inputCopyFrom);
 
 	// Copy buttons.
 	bZoom		= Tick.Buttons[BUT_Zoom];
@@ -46,24 +46,22 @@ void APawn::inputCopyFrom( const PPlayerTick &Tick )
 
 	// Copy axes.
 	aForward	= Tick.Axis[AXIS_Forward];
-	aTurn		= Tick.Axis[AXIS_Turn];
-	aStrafe		= Tick.Axis[AXIS_Strafe];
-	aUp			= Tick.Axis[AXIS_Up];
-	aLookUp		= Tick.Axis[AXIS_LookUp];
-	aExtra4		= Tick.Axis[AXIS_Extra4];
-	aExtra3		= Tick.Axis[AXIS_Extra3];
-	aExtra2		= Tick.Axis[AXIS_Extra2];
-	aExtra1		= Tick.Axis[AXIS_Extra1];
-	aExtra0		= Tick.Axis[AXIS_Extra0];
+	aTurn		= Tick.Axis[AXIS_Turn   ];
+	aStrafe		= Tick.Axis[AXIS_Strafe ];
+	aUp			= Tick.Axis[AXIS_Up     ];
+	aLookUp		= Tick.Axis[AXIS_LookUp ];
+	aExtra4		= Tick.Axis[AXIS_Extra4 ];
+	aExtra3		= Tick.Axis[AXIS_Extra3 ];
+	aExtra2		= Tick.Axis[AXIS_Extra2 ];
+	aExtra1		= Tick.Axis[AXIS_Extra1 ];
+	aExtra0		= Tick.Axis[AXIS_Extra0 ];
 
 	unguard;
 }
 
-
 /*-----------------------------------------------------------------------------
 	Pawn related functions.
 -----------------------------------------------------------------------------*/
-
 
 enum EAIFunctions
 {
@@ -88,8 +86,60 @@ enum EAIFunctions
 	AI_ActorReachable = 520,
 	AI_PointReachable = 521,
 	AI_ClearPaths = 522,
-	AI_JumpLanding = 523
+	AI_JumpLanding = 523,
+	AI_FindStairRotation = 524, //FIXME - implement
+	AI_FindRandomDest = 525
 };
+
+static void execFindStairRotation( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFindStairRotation);
+	debugState(Context!=NULL);
+	APawn *PawnContext = (APawn *)Context;
+
+	P_GET_VECTOR(rotdir); //usually, rotdir = vector(ViewRotation)
+	P_FINISH;
+
+	/*
+	//FIXME - Do this right
+	// find start of next step, and use that as start
+	
+	FRotation stairRot;
+	rotdir.Z = 0;
+	rotdir.Normalize();
+	FVector start = PawnContext->Location;
+	FVector end = rotdir * 2 * PawnContext->CollisionRadius + start;
+	if (PawnContext->GetLevel()->testMoveActor(PawnContext,start,end))
+	{
+		//using subdivision, figure out angle of steps
+		
+	}
+	else
+		stairRot = PawnContext->ViewRotation;
+
+		rotdir = PawnContext->Location - realLocation;
+
+		PawnContext->Velocity = rotdir * 16.0 - PawnContext->Zone->ZoneVelocity;
+		PawnContext->GetLevel()->testWalking();
+		if (Physics == PHYS_Falling)
+		{
+			rotdir.Normalize();
+			stairRot = rotdir.Rotation();
+		}
+		else
+		{
+			rotdir = rotdir + PawnContext->Location - realLocation;
+			rotdir.Normalize();
+			stairRot = rotdir.Rotation();
+		}
+	}
+
+	PawnContext->GetLevel()->FarMoveActor(PawnContext, &realLocation, 1);
+	PawnContext->Velocity = realVelocity;
+	*(FRotation*)Result = stairRot; */
+	unguardSlow;
+}
+AUTOREGISTER_INTRINSIC( AI_FindStairRotation, execFindStairRotation);
 
 static void execJumpLanding( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
@@ -99,6 +149,8 @@ static void execJumpLanding( FExecStack &Stack, UObject *Context, BYTE *&Result 
 	FVector Landing;
 	FVector vel = PawnContext->Velocity;
 	PawnContext->jumpLanding(vel, Landing, 0);
+
+	P_FINISH;
 
 	*(FVector*)Result = Landing;
 	unguardSlow;
@@ -176,18 +228,19 @@ static void execFindPathTo( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	APawn *PawnContext = (APawn *)Context;
 
 	P_GET_VECTOR(point);
-	P_GET_FLOAT_OPT(maxweight, 1000000.0);
+	P_GET_INT_OPT(maxpaths, 50); 
+	P_GET_FLOAT_OPT(maxweight, 10000.0);
 	P_GET_BOOL_OPT(bClearPaths, 1);
 	P_FINISH;
 
 	if (bClearPaths)
 		PawnContext->clearPaths();
-	APathNode * bestPath = NULL;
+	ACreaturePoint * bestPath = NULL;
 	AActor * newPath;
-	if (PawnContext->findPathTo(point, maxweight, newPath))
-		bestPath = (APathNode *)newPath;
+	if (PawnContext->findPathTo(point, maxpaths, maxweight, newPath))
+		bestPath = (ACreaturePoint *)newPath;
 
-	*(APathNode**)Result = bestPath; 
+	*(ACreaturePoint**)Result = bestPath; 
 	unguardSlow;
 }
 AUTOREGISTER_INTRINSIC( AI_FindPathTo, execFindPathTo);
@@ -199,27 +252,59 @@ static void execFindPathToward( FExecStack &Stack, UObject *Context, BYTE *&Resu
 	APawn *PawnContext = (APawn *)Context;
 
 	P_GET_ACTOR(goal);
-	P_GET_FLOAT_OPT(maxweight, 1000000.0);
+	P_GET_INT_OPT(maxpaths, 50);
+	P_GET_FLOAT_OPT(maxweight, 10000.0);
 	P_GET_BOOL_OPT(bClearPaths, 1);
 	P_FINISH;
 
 	if (bClearPaths)
 		PawnContext->clearPaths();
-	APathNode * bestPath = NULL;
+	ACreaturePoint * bestPath = NULL;
 	AActor * newPath;
-	if (PawnContext->findPathToward(goal, maxweight, newPath))
-		bestPath = (APathNode *)newPath;
+	if (PawnContext->findPathToward(goal, maxpaths, maxweight, newPath))
+		bestPath = (ACreaturePoint *)newPath;
 
-	*(APathNode**)Result = bestPath; 
+	*(ACreaturePoint**)Result = bestPath; 
 	unguardSlow;
 }
 AUTOREGISTER_INTRINSIC( AI_FindPathToward, execFindPathToward);
+
+/* FindRandomDest()
+returns a random pathnode which is reachable from the creature's location
+*/
+static void execFindRandomDest( FExecStack &Stack, UObject *Context, BYTE *&Result )
+{
+	guardSlow(execFindPathTo);
+	debugState(Context!=NULL);
+	APawn *PawnContext = (APawn *)Context;
+
+	P_GET_INT_OPT(maxpaths, 100);
+	P_GET_FLOAT_OPT(maxweight, 10000.0);
+	P_GET_BOOL_OPT(bClearPaths, 1);
+	P_FINISH;
+
+	if (bClearPaths)
+		PawnContext->clearPaths();
+	ACreaturePoint * bestPath = NULL;
+	AActor * newPath;
+	if (PawnContext->findRandomDest(maxpaths, maxweight, newPath))
+	{
+		//debugf("Successfully found random destination");
+		bestPath = (ACreaturePoint *)newPath;
+	}
+
+	*(ACreaturePoint**)Result = bestPath; 
+	unguardSlow;
+}
+AUTOREGISTER_INTRINSIC( AI_FindRandomDest, execFindRandomDest);
 
 static void execClearPaths( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execFindPathTo);
 	debugState(Context!=NULL);
 	APawn *PawnContext = (APawn *)Context;
+
+	P_FINISH;
 
 	PawnContext->clearPaths(); 
 	unguardSlow;
@@ -238,11 +323,13 @@ static void execMakeNoise( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_GET_FLOAT(Loudness);
 	P_FINISH;
 	
+	//debugf("Make Noise");
 	ActorContext->CheckNoiseHearing(Loudness);
 	unguardSlow;
 }
 AUTOREGISTER_INTRINSIC( AI_MakeNoise, execMakeNoise);
 
+//FIXME - fix floorz or remove
 static void execFloorZ( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
 	guardSlow(execFloorZ);
@@ -250,7 +337,7 @@ static void execFloorZ( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_GET_VECTOR(point);
 	P_FINISH;
 	
-	*(FLOAT*)Result = ((AActor *)Context)->FloorZ(point);
+	*(FLOAT*)Result = point.Z;//((AActor *)Context)->FloorZ(point);
 	unguardSlow;
 }
 AUTOREGISTER_INTRINSIC( AI_FloorZ, execFloorZ);
@@ -272,6 +359,7 @@ AUTOREGISTER_INTRINSIC( AI_LineOfSightTo, execLineOfSightTo);
 /* execMoveTo()
 start moving to a point -does not use routing
 Destination is set to a point
+//FIXME - don't use ground speed for flyers (or set theirs = flyspeed)
 */
 static void execMoveTo( FExecStack &Stack, UObject *Context, BYTE *&Result )
 {
@@ -283,10 +371,15 @@ static void execMoveTo( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_GET_VECTOR(dest);
 	P_GET_FLOAT_OPT(speed, 1.0);
 	P_FINISH;
-	
+
+	FVector Move = dest - PawnContext->Location;
+	PawnContext->MoveTarget = NULL;
+	PawnContext->bReducedSpeed = 0;
 	PawnContext->DesiredSpeed = Max(0.f, Min(1.f, speed));
+	PawnContext->setMoveTimer(Move.Size()); 
 	PawnContext->LatentAction = AI_PollMoveTo;
 	PawnContext->Destination = dest;
+	PawnContext->Focus = dest;
 	unguardSlow;
 }
 AUTOREGISTER_INTRINSIC( AI_MoveTo, execMoveTo);
@@ -297,7 +390,7 @@ static void execPollMoveTo( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	debugState(Stack.Object->IsA("Pawn"));
 	APawn *Pawn = (APawn*)Stack.Object;
 
-	Pawn->rotateToward(Pawn->Destination);
+	Pawn->rotateToward(Pawn->Focus);
 	if (Pawn->moveToward(Pawn->Destination))
 		Pawn->LatentAction = 0;
 
@@ -320,7 +413,19 @@ static void execMoveToward( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_GET_FLOAT_OPT(speed, 1.0);
 	P_FINISH;
 
+	if (!goal)
+	{
+		debugf("MoveToward with no goal");
+		return;
+	}
+
+	FVector Move = goal->Location - PawnContext->Location;	
+	PawnContext->bReducedSpeed = 0;
 	PawnContext->DesiredSpeed = Max(0.f, Min(1.f, speed));
+	if (goal->IsA("Pawn"))
+		PawnContext->MoveTimer = 2.0; //max before re-assess movetoward
+	else
+		PawnContext->setMoveTimer(Move.Size()); 
 	PawnContext->MoveTarget = goal;
 	PawnContext->LatentAction = AI_PollMoveToward;
 	unguardSlow;
@@ -333,11 +438,20 @@ static void execPollMoveToward( FExecStack &Stack, UObject *Context, BYTE *&Resu
 	debugState(Stack.Object->IsA("Pawn"));
 	APawn *Pawn = (APawn*)Stack.Object;
 
-	Pawn->Destination = Pawn->MoveTarget->Location;
-	Pawn->rotateToward(Pawn->MoveTarget->Location);
-	if (Pawn->moveToward(Pawn->MoveTarget->Location))
+	if (!Pawn->MoveTarget)
+	{
+		debugf("MoveTarget cleared during movetoward");
 		Pawn->LatentAction = 0;
+		return;
+	}
 
+	Pawn->Destination = Pawn->MoveTarget->Location;
+	Pawn->Focus = Pawn->Destination;
+	Pawn->rotateToward(Pawn->Focus);
+	FLOAT oldDesiredSpeed = Pawn->DesiredSpeed;
+	if (Pawn->moveToward(Pawn->Destination))
+		Pawn->LatentAction = 0;
+	Pawn->DesiredSpeed = oldDesiredSpeed; //don't slow down when moving toward an actor
 	unguardSlow;
 }
 AUTOREGISTER_INTRINSIC( AI_PollMoveToward, execPollMoveToward);
@@ -356,7 +470,11 @@ static void execStrafeTo( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_GET_VECTOR(FocalPoint);
 	P_FINISH;
 
+	FVector Move = Dest - PawnContext->Location;
+	PawnContext->MoveTarget = NULL;
+	PawnContext->bReducedSpeed = 0;
 	PawnContext->DesiredSpeed = 1.0;
+	PawnContext->setMoveTimer(Move.Size()); 
 	PawnContext->LatentAction = AI_PollStrafeTo;
 	PawnContext->Destination = Dest;
 	PawnContext->Focus = FocalPoint;
@@ -393,7 +511,15 @@ static void execStrafeFacing( FExecStack &Stack, UObject *Context, BYTE *&Result
 	P_GET_ACTOR(goal);
 	P_FINISH;
 
+	if (!goal)
+	{
+		debugf("StrafeFacing without goal");
+		return;
+	}
+	FVector Move = Dest - PawnContext->Location;	
+	PawnContext->bReducedSpeed = 0;
 	PawnContext->DesiredSpeed = 1.0;
+	PawnContext->setMoveTimer(Move.Size()); 
 	PawnContext->Destination = Dest;
 	PawnContext->MoveTarget = goal;
 	PawnContext->LatentAction = AI_PollStrafeFacing;
@@ -407,7 +533,15 @@ static void execPollStrafeFacing( FExecStack &Stack, UObject *Context, BYTE *&Re
 	debugState(Stack.Object->IsA("Pawn"));
 	APawn *Pawn = (APawn*)Stack.Object;
 
-	Pawn->rotateToward(Pawn->MoveTarget->Location);
+	if (!Pawn->MoveTarget)
+	{
+		debugf("MoveTarget cleared during strafefacing");
+		Pawn->LatentAction = 0;
+		return;
+	}
+
+	Pawn->Focus = Pawn->MoveTarget->Location;
+	Pawn->rotateToward(Pawn->Focus);
 	if (Pawn->moveToward(Pawn->Destination))
 		Pawn->LatentAction = 0;
 
@@ -428,6 +562,9 @@ static void execTurnToward( FExecStack &Stack, UObject *Context, BYTE *&Result )
 	P_GET_ACTOR(goal);
 	P_FINISH;
 	
+	if (!goal)
+		return;
+
 	PawnContext->MoveTarget = goal;
 	PawnContext->LatentAction = AI_PollTurnToward;
 	unguardSlow;
@@ -440,7 +577,15 @@ static void execPollTurnToward( FExecStack &Stack, UObject *Context, BYTE *&Resu
 	debugState(Stack.Object->IsA("Pawn"));
 	APawn *Pawn = (APawn*)Stack.Object;
 
-	if (Pawn->rotateToward(Pawn->MoveTarget->Location))
+	if (!Pawn->MoveTarget)
+	{
+		debugf("MoveTarget cleared during turntoward");
+		Pawn->LatentAction = 0;
+		return;
+	}
+
+	Pawn->Focus = Pawn->MoveTarget->Location;
+	if (Pawn->rotateToward(Pawn->Focus))
 		Pawn->LatentAction = 0;  
 
 	unguardSlow;
@@ -457,7 +602,8 @@ static void execTurnTo( FExecStack &Stack, UObject *Context, BYTE *&Result )
 
 	P_GET_VECTOR(FocalPoint);
 	P_FINISH;
-	
+
+	PawnContext->MoveTarget = NULL;
 	PawnContext->LatentAction = AI_PollTurnTo;
 	PawnContext->Focus = FocalPoint;
 	unguardSlow;
@@ -478,6 +624,26 @@ static void execPollTurnTo( FExecStack &Stack, UObject *Context, BYTE *&Result )
 AUTOREGISTER_INTRINSIC( AI_PollTurnTo, execPollTurnTo);
 
 //=================================================================================
+void APawn::setMoveTimer(FLOAT MoveSize)
+{
+	guard(APawn::setMoveTimer);
+
+	FLOAT MaxSpeed = 100.0; //safety in case called with Physics = PHYS_None (shouldn't)
+
+	if (Physics == PHYS_Walking)
+		MaxSpeed = GroundSpeed;
+	else if (Physics == PHYS_Falling)
+		MaxSpeed = GroundSpeed;
+	else if (Physics == PHYS_Flying)
+		MaxSpeed = AirSpeed;
+	else if (Physics == PHYS_Swimming)
+		MaxSpeed = WaterSpeed;
+
+	MoveTimer = 1.0 + 1.3 * MoveSize/(DesiredSpeed * MaxSpeed); 
+
+	unguard;
+}
+
 /* moveToward()
 move Actor toward a point.  Returns 1 if Actor reached point
 (Set Acceleration, let physics do actual move)
@@ -487,17 +653,33 @@ int APawn::moveToward(const FVector &Dest)
 	guard(APawn::moveToward);
 	FVector Direction = Dest - Location;
 	if (Physics == PHYS_Walking) Direction.Z = 0.0; 
-	FLOAT DistanceSquared = Direction.SizeSquared();
-	int success = 1;
-	Acceleration = GMath.ZeroVector;
+	FLOAT Distance = Direction.Size();
+	Direction = Direction.Normal();
+	int success = 0;
+	FLOAT speed = Velocity.Size(); 
+	FVector Veldir = Velocity.Normal();
+	Acceleration = Direction * AccelRate;
+	Acceleration -= 0.3 * (1 - (Direction | Veldir)) * Velocity.Size() * (Veldir - Direction); 
 
-	//FIXME - return success based on when I know I'll reach the point
-	//FIXME - don't get stuck on walls (use normal)
-	if (DistanceSquared > 0.1 * Velocity.SizeSquared()) //move not too small to do
+	if (MoveTarget && MoveTarget->IsA("Pawn"))
 	{
-		Acceleration = Direction.Normal() * AccelRate;
-		success = 0;
+		if (Distance < CollisionRadius + MoveTarget->CollisionRadius + 0.5 * MeleeRange)
+			success = 1;
 	}
+	else if (Distance < Max((0.15 * speed), 30.0))
+	{
+		if (!bReducedSpeed) //haven't reduced speed yet
+		{
+			DesiredSpeed = 0.5 * DesiredSpeed;
+			bReducedSpeed = 1;
+		}
+		DesiredSpeed = Min(DesiredSpeed, 200.f/speed);
+		if (Distance < 15.0)
+			success = 1;
+	}
+
+	if (MoveTimer < 0.0)
+		success = 1; //give up
 
 	return success;
 	unguard;
@@ -517,9 +699,11 @@ int APawn::rotateToward(const FVector &FocalPoint)
 	DesiredRotation.Yaw = DesiredRotation.Yaw & 65535;
 
 	//only base success on Yaw (assume can aim up and down, even if I pitch the pawn), unless
-	//gliding - in which case pitch is very important, as is roll (FIXME)
-	//FIXME - better judging of having reached correct rotation
-	int success = (Abs(DesiredRotation.Yaw - Rotation.Yaw) < 2000);
+	//flying - in which case pitch is very important, as is roll (FIXME)
+	int success = (Abs(DesiredRotation.Yaw - (Rotation.Yaw & 65535)) < 2000);
+	if (!success) //check if on opposite sides of zero
+		success = (Abs(DesiredRotation.Yaw - (Rotation.Yaw & 65535)) > 63535);	
+
 	return success;
 	unguard;
 }
@@ -528,35 +712,41 @@ DWORD APawn::LineOfSightTo(AActor *Other)
 {
 	guard(APawn::LineOfSightTo);
 	FVector ViewPoint, OtherBody;
-	FCheckResult Hit(0.0);
+
+	if (!Other)
+		return 0;
+
+	FCheckResult Hit(1.0);
 	int result = 0;
 	
 	ViewPoint = Location;
-	ViewPoint.Z += BaseEyeHeight; //look from eyes
+	ViewPoint.Z += EyeHeight; //look from eyes
 
-	//FIXME - when PVS, only test if in same PVS
+	//FIXME - when PVS, only do this test if in same PVS
 	
-	//try viewpoint to center
-	GetLevel()->Trace(Hit, this, OtherBody, ViewPoint, 1);
-	if ( Hit.Actor == Other)
+	GetLevel()->Trace(Hit, this, Other->Location, ViewPoint, TRACE_Level); //VisBlocking);
+	if (Hit.Time == 1.0)
 		result = 1;
 
 	//try viewpoint to head
 	if (!result)
 	{
+		Hit = FCheckResult(1.0);
 		OtherBody = Other->Location;
-		OtherBody.Z += Other->CollisionHeight - 6;
-		GetLevel()->Trace(Hit, this, OtherBody, ViewPoint, 1);
-		if ( Hit.Actor == Other)
+		OtherBody.Z += Other->CollisionHeight * 0.8;
+		GetLevel()->Trace(Hit, this, OtherBody, ViewPoint, TRACE_Level); //VisBlocking); 
+		if ( Hit.Time == 1.0)
 			result = 1;
 	}
 
 	//try viewpoint to feet
 	if (!result)
 	{
-		OtherBody.Z = OtherBody.Z - Other->CollisionHeight - Other->CollisionHeight + 12;
-		GetLevel()->Trace(Hit, this, OtherBody, ViewPoint, 1);
-		if ( Hit.Actor == Other)
+		Hit = FCheckResult(1.0);
+		OtherBody = Other->Location;
+		OtherBody.Z = OtherBody.Z - Other->CollisionHeight * 0.8;
+		GetLevel()->Trace(Hit, this, OtherBody, ViewPoint, TRACE_Level); //VisBlocking); 
+		if ( Hit.Time == 1.0)
 			result = 1;
 	}
 
@@ -571,8 +761,8 @@ int AActor::CanBeHeardBy(AActor *Other)
 	int result = 0;
 	FCheckResult Hit(1.0);
 
-	GetLevel()->Trace(Hit, this, Other->Location, Location, 0);
-	if (Hit.Actor == Other)
+	GetLevel()->Trace(Hit, this, Other->Location, Location, TRACE_Level); //VisBlocking);
+	if (Hit.Time == 1.0) 
 		result = 1;
 	return result;
 	unguard;
@@ -587,8 +777,7 @@ void AActor::CheckNoiseHearing(FLOAT Loudness)
 	for (INDEX i=0; i<GetLevel()->Num; i++) 
 	{
 		AActor *Actor = GetLevel()->Element(i);
-		if (Actor)
-		if (Actor->IsA("Pawn")) 
+		if (Actor && Actor->IsA("Pawn") && (Actor != this) && Actor->IsProbing(NAME_HearNoise)) 
 		{
 			if (CanBeHeardBy(Actor)) 
 				Actor->Process(NAME_HearNoise, &PNoise(Loudness, this) );
@@ -611,6 +800,7 @@ void APawn::CheckEnemyVisible()
 	unguard;
 }
 
+
 /* Player shows self to pawns that are ready
 */
 void APawn::ShowSelf()
@@ -623,10 +813,34 @@ void APawn::ShowSelf()
 		if (Actor)
 		{
 			APawn *Pawn = Actor->IsA("Pawn") ? (APawn*)Actor : NULL;
-			if (Pawn)
+			if (Pawn && (Pawn != this))
 				if ((Pawn->SightCounter < 0.0) && Pawn->IsProbing(NAME_SeePlayer)) 
-					if (Pawn->LineOfSightTo(this))
-						Pawn->Process(NAME_SeePlayer, &PActor(this) );
+				{
+					if (bIsPlayer)
+					{
+						if (Pawn->LineOfSightTo(this))
+							Pawn->Process(NAME_SeePlayer, &PActor(this));
+					}
+					else if (Pawn->GetClass() != GetClass()) //FIXME || (Pawn->Team != Team))
+					{
+						if (Pawn->IsProbing(NAME_SeeMonster))
+						{
+							FVector LoS = Pawn->Location - Location;
+							LoS.Normalize();
+							if ((LoS | Rotation.Vector()) > 0.5)
+								if (Pawn->LineOfSightTo(this))
+									Pawn->Process(NAME_SeeMonster, &PActor(this));
+						}
+					}
+		/*			else if (Pawn->IsProbing(NAME_SeeFriend)) FIXME - use teamleader to coordinate instead?
+					{
+						FVector LoS = Pawn->Location - Location;
+						LoS.Normalize();
+						if ((LoS | Rotation.Vector()) > 0.5)
+							if (Pawn->LineOfSightTo(this))
+								Pawn->Process(NAME_SeeFriend, &PActor(this));
+					} */
+				}
 		}
 	}
 	unguard;
@@ -636,21 +850,23 @@ void APawn::ShowSelf()
 //returns Z height of the actor if placed on the floor below a Point
 //(returns CollisionHeight + 1 below actor location, if floor below that)
 //(for a given actor, with a given CollisionRadius and CollisionHeight)
+//NOT USED NOW - FIX UP OR REMOVE
 inline FLOAT AActor::FloorZ(FVector Point)
 {
-	//FIXME - this is very broken!!!!
 	guard(AActor::FloorZ);
-	FLOAT Floor;
-	FVector Down = GMath.ZeroVector;
-	Down.Z = -1 * (CollisionHeight + 1);
+	FLOAT FloorZ = Location.Z - 1000.0;
+	FVector Down = FVector(0,0, -1 * (CollisionHeight + 1));
 	FVector currentLocation = Location;
+	FVector dest = Point;
 	FCheckResult Hit(1.0);
-	GetLevel()->MoveActor(this, &Down, Hit);
-	Floor = Location.Z + 2.0; //2.0 = slight float
-	Down.Z = currentLocation.Z - Location.Z;
-	GetLevel()->MoveActor(this, &Down, Hit);
+	if (GetLevel()->FarMoveActor(this, dest, 1)) 
+	{
+		GetLevel()->MoveActor(this, Down, Rotation, Hit, 1);
+		FloorZ = Location.Z;
+		GetLevel()->FarMoveActor(this, currentLocation, 1, 1);
+	}
 
-	return Floor; 
+	return FloorZ; 
 
 	unguard;
 }
@@ -659,29 +875,47 @@ int APawn::actorReachable(AActor *Other)
 {
 	guard(AActor::actorReachable);
 
+	if (!Other)
+		return 0;
+
+	if (!Other->IsA("Pawn")) //only look past 800 for pawns
+		if (GetLevel()->GetState() == LEVEL_UpPlay)
+		{
+			FVector Dir2D = Other->Location - Location;
+			Dir2D.Z = 0.0;
+			if (Dir2D.Size() > 800.0) //non-pawns must be within 800.0
+				return 0;
+		}
+
 	//check other visible
 	int clearpath = LineOfSightTo(Other); 
 
-	//FIXME? go back to fly reachable for all?	
-	//Fixme - adjust destination using a FarMoveActor
-
-	if (clearpath) 
+	if (clearpath)
 		clearpath = Reachable(Other->Location);
 
 	return clearpath;
 	unguard;
 }
 
-int APawn::pointReachable(FVector &aPoint)
+int APawn::pointReachable(FVector aPoint)
 {
 	guard(AActor::pointReachable);
 
-	FCheckResult Hit(0.0);
+	if (GetLevel()->GetState() == LEVEL_UpPlay)
+	{
+		FVector Dir2D = aPoint - Location;
+		Dir2D.Z = 0.0;
+		if (Dir2D.Size() > 800.0) //points must be within 800.0
+			return 0;
+	}
+
+	FCheckResult Hit(1.0);
 	//check aPoint visible
 	FVector	ViewPoint = Location;
 	ViewPoint.Z += BaseEyeHeight; //look from eyes
 
-	int clearpath = GetLevel()->Model->LineCheck(Hit,NULL,ViewPoint, aPoint,0); //FIXME - should be trace
+	GetLevel()->Trace(Hit, this, aPoint, ViewPoint, TRACE_Level); //VisBlocking); 
+	int clearpath = (Hit.Time == 1.0);
 
 	if (clearpath) 
 		clearpath = Reachable(aPoint);
@@ -690,13 +924,17 @@ int APawn::pointReachable(FVector &aPoint)
 	unguard;
 }
 
-int APawn::Reachable(FVector &aPoint)
+int APawn::Reachable(FVector aPoint)
 {
 	guard(AActor::Reachable);
-	//FIXME? go back to fly reachable for all?	
-	//Fixme - adjust destination using a FarMoveActor
 
-	int clearpath = 0;
+	FVector realLoc = Location;
+	int	clearpath = GetLevel()->FarMoveActor(this, aPoint, 1);
+	if (!clearpath)
+		return 0;
+
+	aPoint = Location; //adjust destination
+	GetLevel()->FarMoveActor(this, realLoc,1,1);
 
 	if (Physics == PHYS_Walking)
 		clearpath = walkReachable(aPoint);
@@ -709,7 +947,7 @@ int APawn::Reachable(FVector &aPoint)
 	unguard;
 }
 
-int APawn::flyReachable(FVector &Dest)
+int APawn::flyReachable(FVector Dest)
 {
 	guard(APawn::flyReachable);
 	
@@ -722,16 +960,8 @@ int APawn::flyReachable(FVector &Dest)
 
 	FVector start = Location;
 	FVector end = start + path;
-	start.Z += MaxStepHeight;
-	end.Z += MaxStepHeight;
 
-	int clearpath = GetLevel()->TestMoveActor(this, start, end);
-	if (!clearpath)
-	{
-		start.Z -= MaxStepHeight;
-		end.Z -= MaxStepHeight;
-		clearpath = GetLevel()->TestMoveActor(this, start, end);
-	}
+	int clearpath = GetLevel()->TestMoveActor(this, start, end, 1);
 
 	return clearpath;
 	unguard;
@@ -746,7 +976,7 @@ initialize Scout to be able to do all these things
 // FIXME - allow jumping up and down if bCanJump (false for Scout!)
 
 */
-int APawn::walkReachable(FVector &Dest)
+int APawn::walkReachable(FVector Dest)
 {
 	guard(APawn::walkReachable);
 
@@ -760,52 +990,89 @@ int APawn::walkReachable(FVector &Dest)
 
 		int stillmoving = 1;
 		success = 0;
-		FLOAT closeSquared = CollisionRadius * CollisionRadius * 0.25 * 0.25; //should it be less?
-		FLOAT Movesize = GroundSpeed * 0.05;
+		FLOAT closeSquared = 225.0; //should it be less for path building? its 15 * 15
+		FLOAT MaxZDiff = CollisionHeight; //FIXME + MaxStepHeight? - YES, do it (after E3)
+		FLOAT Movesize = 16.0; 
+		FVector Direction = Dest - Location;
+		Direction.Z = 0.0; //get 2D size
+		FLOAT Dist2D = Direction.Size();
+		if (GetLevel()->GetState() == LEVEL_UpPlay)
+		{
+			MaxZDiff = CollisionHeight + MaxStepHeight;
+			FLOAT bigThresh = Dist2D - 800.0;
+			if (bigThresh > 0.0)
+			{
+				FLOAT bigThreshSq = bigThresh * bigThresh;
+				if (bigThreshSq > closeSquared)
+				{
+					MaxZDiff += bigThresh; //FIXME? * MaxStepHeight * 1/16; 
+					closeSquared = bigThreshSq;
+				}
+			}
+			if (JumpZ > 0)
+				Movesize = Max(128.f, CollisionRadius);
+			else
+				Movesize = CollisionRadius;
+		}
+
+		float ticks = Dist2D * 0.125; //increase to 0.125 or 0.2
 
 		while (stillmoving == 1) 
 		{
-			FVector Direction = Dest - Location;
+			Direction = Dest - Location;
+
 			FLOAT Zdiff = Direction.Z;
 			Direction.Z = 0; //this is a 2D move
-			FLOAT DistanceSquared = Direction.SizeSquared();
-			if (DistanceSquared > closeSquared) //move not too small to do
-			{
-				if (DistanceSquared < Movesize * Movesize)
-					stillmoving = walkMove(Direction);
-				else
-					stillmoving = walkMove(Direction.Normal() * Movesize);
-				 
-				if (JumpZ > 0.0) //FIXME - add a bCanJump
-				{
-					if (stillmoving == -1) 
-					{
-						FVector Landing;
-						stillmoving = FindBestJump(Dest, Velocity, Landing, 1);
-					}
-					else if (stillmoving == 0)
-					{
-						FVector Landing;
-						stillmoving = FindJumpUp(Dest, Velocity, Landing, 1);
-					}
-				}
-			}
+			FLOAT testZ = Zdiff - CollisionHeight;
+			FLOAT DistanceSquared = Direction.SizeSquared(); //2D size
+			FLOAT MoveSizeSquared = Movesize * Movesize;
+			if ((testZ > 0) && (DistanceSquared < 0.8 * testZ * testZ))
+				stillmoving = 0; //too steep to get there
 			else
 			{
-				stillmoving = 0;
-				if (abs(Zdiff) < CollisionHeight) 
-					success = 1;
+				if (DistanceSquared > closeSquared) //move not too small to do
+				{
+					if (DistanceSquared < MoveSizeSquared) 
+						stillmoving = walkMove(Direction, 8.0, 0);
+					else
+						stillmoving = walkMove(Direction.Normal() * Movesize, 4.1, 0);
+					 
+					if ((stillmoving != 1) && (JumpZ > 0.0)) //FIXME - add a bCanJump
+					{
+						if (stillmoving == -1) 
+						{
+							FVector Landing;
+							stillmoving = FindBestJump(Dest, GroundSpeed * Direction.Normal(), Landing, 1);
+						}
+						else if (stillmoving == 0)
+						{
+							FVector Landing;
+							stillmoving = FindJumpUp(Dest, GroundSpeed * Direction.Normal(), Landing, 1);
+						}
+					}
+				}
+				else
+				{
+					stillmoving = 0;
+					if (abs(Zdiff) < MaxZDiff) 
+						success = 1;
+				}
+				ticks = ticks - 1.0;
+				if (ticks < 0)
+					stillmoving = 0;
 			}
 		}
-		GetLevel()->FarMoveActor(this, &OriginalPos, 1); //move actor back to starting point
+		GetLevel()->FarMoveActor(this, OriginalPos, 1, 1); //move actor back to starting point
 		Velocity = realVel;
 	}
 	
+	
+
 	return success;
 	unguard;
 }
 
-int APawn::jumpReachable(FVector &Dest)
+int APawn::jumpReachable(FVector Dest)
 {
 	guard(APawn::jumpReachable);
 
@@ -819,7 +1086,7 @@ int APawn::jumpReachable(FVector &Dest)
 		FVector Landing;
 		jumpLanding(Velocity, Landing, 1); 
 		success = walkReachable(Dest);
-		GetLevel()->FarMoveActor(this, &OriginalPos, 1); //move actor back to starting point
+		GetLevel()->FarMoveActor(this, OriginalPos, 1, 1); //move actor back to starting point
 	}
 	
 	return success;
@@ -830,20 +1097,25 @@ int APawn::jumpReachable(FVector &Dest)
 determine landing position of current fall, given testVel as initial velocity.
 Assumes near-zero acceleration by pawn during jump (make sure creatures do this FIXME)
 */
-void APawn::jumpLanding(FVector testVel, FVector &Landing, int moveActor)
+void APawn::jumpLanding(FVector testVel, FVector &Landing, int movePawn)
 {
 	guard(APawn::jumpLanding);
 
 
 	FVector OriginalPos = Location;
 	int landed = 0;
+	int ticks = 0;
+	FLOAT tickTime = 0.05;
+	if (GetLevel()->GetState() == LEVEL_UpPlay)
+		tickTime = 0.1;
+
 	while (!landed)
 	{
-		testVel = testVel * (1 - Zone->ZoneFluidFriction * 0.05) 
-					+ Zone->ZoneGravity * 0.05; 
-		FVector Adjusted = (testVel + Zone->ZoneVelocity) * 0.05;
+		testVel = testVel * (1 - Zone->ZoneFluidFriction * tickTime) 
+					+ Zone->ZoneGravity * tickTime; 
+		FVector Adjusted = (testVel + Zone->ZoneVelocity) * tickTime;
 		FCheckResult Hit(1.0);
-		GetLevel()->MoveActor(this, &Adjusted, Hit, 1);
+		GetLevel()->MoveActor(this, Adjusted, Rotation, Hit, 1);
 		if (Hit.Time < 1.0)
 		{
 			if (Hit.Normal.Z > 0.7)
@@ -854,34 +1126,40 @@ void APawn::jumpLanding(FVector testVel, FVector &Landing, int moveActor)
 				FVector Delta = (Adjusted - Hit.Normal * (Adjusted | Hit.Normal)) * (1.0 - Hit.Time);
 				if( (Delta | Adjusted) >= 0 )
 				{
-					GetLevel()->MoveActor(this, &Delta, Hit, 1);
+					GetLevel()->MoveActor(this, Delta, Rotation, Hit, 1);
 					if (Hit.Time < 1.0) //hit second wall
 					{
 						if (Hit.Normal.Z > 0.7)
 							landed = 1;	
 						FVector DesiredDir = Adjusted.Normal();
 						TwoWallAdjust(DesiredDir, Delta, Hit.Normal, OldHitNormal, Hit.Time);
-						GetLevel()->MoveActor(this, &Delta, Hit, 1);
+						GetLevel()->MoveActor(this, Delta, Rotation, Hit, 1);
 						if (Hit.Normal.Z > 0.7)
 							landed = 1;
 					}
 				}
 			}
 		}
+		ticks++;
+		if (ticks > 150)
+		{
+			GetLevel()->FarMoveActor(this, OriginalPos, 1, 1); //move actor back to starting point
+			landed = 1;
+		}
 	}
 
 	Landing = Location;
-	if (!moveActor)
-		GetLevel()->FarMoveActor(this, &OriginalPos, 1); //move actor back to starting point
+	if (!movePawn)
+		GetLevel()->FarMoveActor(this, OriginalPos, 1, 1); //move actor back to starting point
 
 	unguard;
 }
 
-int APawn::FindJumpUp(FVector &Dest, FVector &vel, FVector &Landing, int moveActor)
+int APawn::FindJumpUp(FVector Dest, FVector vel, FVector &Landing, int moveActor)
 {
 	guard(APawn::FindJumpUp);
 
-	//FIXME - try to jump up
+	//FIXME - try to jump up 
 	return 0;
 
 	unguard;
@@ -890,8 +1168,7 @@ int APawn::FindJumpUp(FVector &Dest, FVector &vel, FVector &Landing, int moveAct
 /* Find best jump from current position toward destination.  Assumes that there is no immediate 
 barrier.  Sets vel to the suggested initial velocity, Landing to the expected Landing, 
 and moves actor if moveActor is set */
-
-int APawn::FindBestJump(FVector &Dest, FVector &vel, FVector &Landing, int moveActor)
+int APawn::FindBestJump(FVector Dest, FVector vel, FVector &Landing, int movePawn)
 {
 	guard(APawn::FindBestJump);
 
@@ -932,45 +1209,44 @@ int APawn::FindBestJump(FVector &Dest, FVector &vel, FVector &Landing, int moveA
 		//debugf("Landed at (%f, %f, %f)", Location.X, Location.Y, Location.Z);
 		FVector olddist = Dest - realLocation;
 		FVector dist = Dest - Location;
-		success = (dist.Size() < olddist.Size());
+		success = (dist.Size() < olddist.Size() - 8.0);
 		// FIXME - if failed, imagine with no jumpZ (step out first)
-		if (!moveActor)
-			GetLevel()->FarMoveActor(this, &realLocation, 1); //move actor back to starting point
+		if (!movePawn)
+			GetLevel()->FarMoveActor(this, realLocation, 1, 1); //move actor back to starting point
 	}
 	return success;
 
 	unguard;
 }
 
+
 /* walkMove() 
 - returns 1 if move happened, zero if it didn't because of barrier, and -1
 if it didn't because of ledge
 Move direction must not be adjusted.
 */
-int APawn::walkMove(FVector Delta)
+int APawn::walkMove(const FVector &Delta, FLOAT threshold, int bAdjust)
 {
 	guard(APawn::walkMove);
 	int result = 1;
 	FVector StartLocation = Location;
-	Velocity = 20 * Delta;// + (-1 * Actor->Zone->ZoneVelocity)); 	// counteract zonevelocity when setting velocity
-	Velocity = Velocity.Normal() * Min(GroundSpeed, Velocity.Size());
 	//acceleration shouldn't matter
 
-	testWalking();
+	testWalking(Delta);
 	if (Physics == PHYS_Falling) //fell off ledge
 	{
-		GetLevel()->FarMoveActor(this, &StartLocation, 1);
+		if (bAdjust) 
+			GetLevel()->FarMoveActor(this, StartLocation, 1, 1);
 		result = -1;
 		Physics = PHYS_Walking;
 	}
 	else //check if move successful
 	{
 		FVector RealMove = Location - StartLocation;
-		if (RealMove.Size() < 4.0) //FIXME - bigger/smaller threshold?
+		if (RealMove.Size() < threshold) //FIXME - bigger/smaller threshold?
 		{
-			//if (RealMove.Size() > 1.0)
-			//	DebugPrint("Sorta real move not taken");
-			GetLevel()->FarMoveActor(this, &StartLocation, 1);
+			if (bAdjust)
+				GetLevel()->FarMoveActor(this, StartLocation, 1, 1);
 			result = 0;
 		}
 	}
@@ -986,14 +1262,13 @@ void APawn::clearPaths()
 {
 	guard(APawn::clearPaths);
 
-	ULevel *Level = GetLevel();
-	debugf("clear paths");
-	for (INDEX i=0; i<Level->Num; i++)
+	ULevel *MyLevel = GetLevel();
+	for (INDEX i=0; i<MyLevel->Num; i++)
 	{
-		AActor *Actor = Level->Element(i); 
-		if (Actor && Actor->IsA("PathNode"))
+		AActor *Actor = MyLevel->Element(i); 
+		if (Actor && Actor->IsA("CreaturePoint"))
 		{
-			APathNode *node = (APathNode *)Actor;
+			ACreaturePoint *node = (ACreaturePoint *)Actor;
 			node->visitedWeight = 10000000.0;
 			node->bEndPoint = 0;
 			node->bSpecialBlock = 0;
@@ -1004,50 +1279,369 @@ void APawn::clearPaths()
 	unguard;
 }
 
-int APawn::findPathToward(AActor *goal, FLOAT maxweight, AActor *&bestPath)
+int APawn::findPathToward(AActor *goal, INT maxpaths, FLOAT maxweight, AActor *&bestPath)
 {
 	guard(APawn::findPathToward);
 
+	bestPath = NULL;
+	if (!goal)
+		return 0;
+
 	FVector Dest = goal->Location;
+
 	if (Physics != PHYS_Flying)
 		if (goal->IsA("Pawn"))
 		{
 			APawn *goalpawn = (APawn *)goal;
 			if (goalpawn->Physics == PHYS_Falling)
-				jumpLanding(goalpawn->Velocity, Dest);
+				goalpawn->jumpLanding(goalpawn->Velocity, Dest);
 		//	else if (goalpawn->Physics == PHYS_Flying)
 		//		Dest.Z = GetLevel()->FloorZ(Dest);
 		}
-		
-	return findPathTo(Dest, maxweight, bestPath);
+	//debugf(" %s FindPathToward %s", GetClass()->GetName(), goal->GetClass()->GetName());
+	
+	AActor *EndAnchor;
+	if (goal->IsA("CreaturePoint"))
+	{
+		EndAnchor = goal;
+		//debugf("Goal is a creature point");
+	}
+	else
+		EndAnchor = NULL;
+
+	int	clearpath = findPathTo(Dest, maxpaths, maxweight, bestPath, EndAnchor);
+
+	return clearpath;
+
 	unguard;
 }
 
-int APawn::findPathTo(FVector Dest, FLOAT maxweight, AActor *&bestPath)
+#define MAXP 8
+
+int APawn::findPathTo(FVector Dest, INT maxpaths, FLOAT maxweight, AActor *&bestPath, AActor *EndAnchorPath)
 {
 	guard(APawn::findPathTo);
+	clock(GServer.AudioTickTime)
 	bestPath = NULL;
+	ULevel *MyLevel = GetLevel();
+	FVector targdist;
+
+	//if (maxpaths == 1)
+	//	return(findOnePathTo(Dest, bestPath));
+	//if (maxpaths == 2) //FIXME - support anchors in this, or merge it in
+	//	return findTwoPathTo(Dest, bestPath, maxweight);
 	int success = 0;
 	int result = 0;
-	ULevel *Level = GetLevel();
+	AActor *EndPoint[MAXP];
+	AActor *DestPoint[MAXP];
+	FLOAT Dist[MAXP];
+	FLOAT DestDist[MAXP];
+	//INT Check[MAXP];
 
-	//first mark all paths reachable by this pawn
-	for (INDEX i=0; i<Level->Num; i++)
-	{
-		AActor *Actor = Level->Element(i); 
-		if (Actor && Actor->IsA("PathNode"))
-			if (pointReachable(Actor->Location))
-			{
-				((APathNode *)Actor)->bEndPoint = 1;
-				success = 1;
-			}
-	}
+	int numEndPoints = 0;
+	int numDestPoints = 0;
+	FCheckResult Hit(1.0);
 
 	//adjust destination using farmoveactor
 	FVector RealLocation = Location;
-	success = Level->FarMoveActor(this, &Dest, 1);
+	success = MyLevel->FarMoveActor(this, Dest, 1);
 	Dest = Location;
-	
+	if (success)
+		MyLevel->FarMoveActor(this, RealLocation, 1, 1);
+	else
+	{
+		//debugf("destination in unreachable place");
+		unclock(GServer.AudioTickTime);
+		//debugf("Find path time was %f", GApp->CpuToMilliseconds(GServer.AudioTickTime));
+		return 0;	
+	}
+
+	//FIXME - add ACreaturePoint linked list
+	//FIXME - extend anchor distance beyond collision radius
+	// find paths visible from this pawn
+	FVector	ViewPoint = Location;
+	ViewPoint.Z += BaseEyeHeight; //look from eyes
+	int startanchor = 0;
+	int endanchor = 0;
+
+	if (MoveTarget && MoveTarget->IsA("CreaturePoint") 
+		&& ((MoveTarget->Location - Location).Size() < CollisionRadius))
+	{
+		//debugf("On a start anchor");
+		startanchor = 1;
+		EndPoint[0] = MoveTarget;
+		Dist[0] = 0;
+		numEndPoints = 1;
+	}
+
+	if (EndAnchorPath != NULL)
+	{
+		//debugf("found an end anchor");
+		endanchor = 1;
+		DestPoint[0] = EndAnchorPath;
+		DestDist[0] = 0;
+		numDestPoints = 1;
+	}
+
+	INDEX i=0;
+	if ( startanchor && endanchor )
+		i = MyLevel->Num; //don't need to go through actors
+
+	while ( i<MyLevel->Num )
+	{
+		AActor *Actor = MyLevel->Element(i); 
+		if ( Actor && Actor->IsA("CreaturePoint") )
+		{
+			if (!startanchor && ((Location - Actor->Location).SizeSquared() < 640000) )
+			{
+				MyLevel->Trace(Hit, this, Actor->Location, ViewPoint, TRACE_Level); //VisBlocking))
+				if (Hit.Time == 1.0) 
+				{ 	
+					if (maxpaths == 1) //then path must also be visible to target
+						MyLevel->Trace(Hit, this, Dest, Actor->Location, TRACE_Level);
+					if (Hit.Time == 1.0)
+					{
+						FLOAT dist2D = (Actor->Location - Location).Size2D() 
+										+ 2 * Max(0.f, Actor->Location.Z - Location.Z); //penalize paths above
+						if (numEndPoints < MAXP)
+						{
+							EndPoint[numEndPoints] = Actor;
+							Dist[numEndPoints] = dist2D;
+							numEndPoints++;
+						}
+						else
+						{
+							INDEX j = 0;
+							while (j<MAXP)
+							{
+								if (Dist[j] > dist2D)
+								{
+									Dist[j] = dist2D;
+									EndPoint[j] = Actor;
+									j = 16;
+								}
+								j++;
+							}
+						}
+						if (!endanchor && (maxpaths == 1)) //don't look for endanchor ??
+						{
+							if (numDestPoints < MAXP)
+							{
+								DestPoint[numDestPoints] = Actor;
+								DestDist[numDestPoints] = dist2D;
+								numDestPoints++;
+							}
+							else
+							{
+								INDEX j = 0;
+								while (j<MAXP)
+								{
+									if (DestDist[j] > dist2D)
+									{
+										DestDist[j] = dist2D;
+										DestPoint[j] = Actor;
+										j = MAXP;
+									}
+									j++;
+								}
+							}
+						}
+					}
+				}
+			}
+				
+			if (!endanchor && (maxpaths > 1) && ((Dest - Actor->Location).SizeSquared() < 640000)) //fixme - smaller size when path building supports it
+			{
+				MyLevel->Trace(Hit, this, Dest, Actor->Location, TRACE_Level);
+				if (Hit.Time == 1.0) //VisBlocking))
+				{
+					FLOAT dist2D = targdist.Size2D()
+								 + 2 * Max(0.f, Actor->Location.Z - Location.Z);
+					if ((dist2D > 4 * CollisionRadius) //FIXME > COLLISIONRADIUS not optimal
+						|| (Abs(Actor->Location.Z - Dest.Z) > CollisionHeight))
+					{
+						if (numDestPoints < MAXP)
+						{
+							DestPoint[numDestPoints] = Actor;
+							DestDist[numDestPoints] = dist2D;
+							numDestPoints++;
+						}
+						else
+						{
+							INDEX j = 0;
+							while (j<MAXP)
+							{
+								if (DestDist[j] > dist2D)
+								{
+									DestDist[j] = dist2D;
+									DestPoint[j] = Actor;
+									j = MAXP;
+								}
+								j++;
+							}
+						}
+					}
+					else if (MyLevel->FarMoveActor(this, Actor->Location, 1))
+					{
+						if (Reachable(Dest))
+						{
+							DestPoint[0] = Actor;
+							numDestPoints = 1;
+							endanchor = 1;
+						}
+						MyLevel->FarMoveActor(this, RealLocation, 1, 1);
+					}
+				}
+			}
+		}
+		i++;
+	}
+
+	if ((numEndPoints == 0) || (numDestPoints == 0))
+	{
+		unclock(GServer.AudioTickTime);
+		//debugf("Find path time was %f", GApp->CpuToMilliseconds(GServer.AudioTickTime));
+		return 0;
+	}
+
+	//debugf("Visible endpoints = %d", numEndPoints);
+	//debugf("visible destpoints = %d", numDestPoints);
+	// order based on distance
+	if (numEndPoints > 1)
+	{
+		for (INDEX j=0; j<numEndPoints; j++)
+		{
+			for (i=1; i<numEndPoints; i++)
+			{
+				if (Dist[i] < Dist[i-1])
+				{
+					FLOAT tempDist = Dist[i];
+					AActor *tempActor = EndPoint[i];
+					Dist[i] = Dist[i-1];
+					EndPoint[i] = EndPoint[i-1];
+					Dist[i-1] = tempDist;
+					EndPoint[i-1] = tempActor;
+				}
+			}
+		}
+	}
+
+	//mark all paths reachable by this pawn
+	//and remove further visibles that are close enough
+	//FIXME - finish merging findonepathto in - special case(check combined dist instead of dist for reaches)
+
+	if (!startanchor) //look for a start anchor
+	{
+		INDEX j = 0;
+		while (j<numEndPoints)
+		{
+			if (Dist[j] < 4 * CollisionRadius) //FIXME - greater than collision radius not optimal
+			{
+				if (Abs(EndPoint[j]->Location.Z - Location.Z) < CollisionHeight)
+				{
+					if (pointReachable(EndPoint[j]->Location))
+					{
+						startanchor = 1;
+						EndPoint[0] = EndPoint[j];
+						Dist[0] = Dist[j];
+						j = numEndPoints;
+					}
+				}
+			}
+			else
+				j = numEndPoints;
+
+			j++;
+		}
+	}
+
+	//if (startanchor && !(ACreaturePoint *)EndPoint[0])
+	//	debugf("Illegal start anchor!");
+
+	if (startanchor)
+	{
+		//debugf("Found start anchor");
+		if (MyLevel->FarMoveActor(this, EndPoint[0]->Location, 1))
+		{
+			if (pointReachable(Dest))
+			{
+				bestPath = EndPoint[0];
+				MyLevel->FarMoveActor(this, RealLocation, 1);
+				unclock(GServer.AudioTickTime);
+				//debugf("Find path time was %f", GApp->CpuToMilliseconds(GServer.AudioTickTime));
+				return 1;
+			}
+			MyLevel->FarMoveActor(this, RealLocation, 1, 1);
+		}
+
+		numEndPoints = 1;
+		ACreaturePoint *anchor = (ACreaturePoint *)EndPoint[0];
+		if (anchor->bPathsDefined == 0)
+		{
+			unclock(GServer.AudioTickTime);
+			//debugf("Find path time was %f", GApp->CpuToMilliseconds(GServer.AudioTickTime));
+			return 0;
+		}
+
+		INDEX j = 0;
+		FReachSpec *spec;
+		while (j<16)
+		{
+			if (anchor->Paths[j] == -1)
+				j = 16;
+			else
+			{
+				//if (anchor->Paths[j] > GetLevel()->ReachSpecs->Num - 1)
+				//	debugf("illegal reachspec offset");
+				//else
+				//{
+					spec = &MyLevel->ReachSpecs->Element(anchor->Paths[j]);
+					//if (spec->Start != anchor)
+					//	debugf("Wrong reachspec called!");
+					//else if (!spec)
+					//	debugf("Spec was NULL");
+					//else 
+					if (spec->supports(this))
+					{
+						success = 1;
+						((ACreaturePoint *)spec->End)->bEndPoint = 1;
+						numEndPoints ++;
+					}
+				//}
+				j++;
+			}
+		}
+	}
+	else
+	{
+		//debugf("NO start anchor");
+		int num = 0;
+		i = 0;
+		while (i<numEndPoints)
+		{
+			if (pointReachable(EndPoint[i]->Location))
+			{
+				num++;
+				((ACreaturePoint *)EndPoint[i])->bEndPoint = 1;
+				success = 1;
+				if (num == 3)
+					i = numEndPoints;
+				/*
+				INDEX j = 0;
+				while (j<16)
+				{
+					if (((ACreaturePoint *)EndPoint[i])->Paths[j] == -1)
+						j = 16;
+					else
+					check if reachspec to any on this list which supports
+					pawn, and the added distance isn't significant
+				*/
+			}
+			i++;
+		}
+	}
+
+	//debugf("Num reachable ends %d", numEndPoints);
 	//now explore paths from destination
 	if (success)
 	{
@@ -1058,38 +1652,538 @@ int APawn::findPathTo(FVector Dest, FLOAT maxweight, AActor *&bestPath)
 		FLOAT newbest;
 		FVector dir;
 
-		for (INDEX i=0; i<Level->Num; i++)
+		// order based on distance
+		if (numDestPoints > 1)
 		{
-			AActor *Actor = Level->Element(i); 
-			if (Actor && Actor->IsA("PathNode"))
+			for (INDEX j=0; j<numDestPoints; j++)
 			{
-				dir = Dest - Actor->Location;
-				currentweight = dir.Size();
-				dir = Actor->Location - RealLocation;
-				if ((currentweight + dir.Size()) < bestweight)
-					if (Level->Model->LineCheck(Result,Owner,Actor->Location,Dest,0))
-						if (Level->FarMoveActor(this, &Actor->Location, 1))
-							if (pointReachable(Dest))
+				for (i=1; i<numDestPoints; i++)
+				{
+					if (DestDist[i] < DestDist[i-1])
+					{
+						FLOAT tempDist = DestDist[i];
+						AActor *tempActor = DestPoint[i];
+						DestDist[i] = DestDist[i-1];
+						DestPoint[i] = DestPoint[i-1];
+						DestDist[i-1] = tempDist;
+						DestPoint[i-1] = tempActor;
+					}
+				}
+			}
+		}
+
+		int num = 0;
+		i = 0;
+		FLOAT minDist = (Location - Dest).Size();
+
+		while ( i<numDestPoints )
+		{
+			AActor *Path = DestPoint[i];
+			dir = Dest - Path->Location;
+			currentweight = dir.Size();
+			dir = Path->Location - RealLocation;
+			if (((currentweight + dir.Size()) < bestweight)
+				&& MyLevel->FarMoveActor(this, Path->Location, 1)
+				&& pointReachable(Dest))
+				{	
+					newbest = bestweight;
+					if (bestPathFrom(Path, newbest, currentweight, newPath, maxpaths))
+					{
+						dir = RealLocation - newPath->Location;
+						newbest += dir.Size();
+						if (newbest < bestweight)
+						{
+							bestweight = newbest;
+							bestPath = newPath;
+							result = 1;
+						}
+					}
+					num++;
+					if (num == 3)
+						i = numDestPoints;
+				}
+			i++;
+			if (bestweight < minDist * 1.5)
+				i = numDestPoints;
+		}
+	}
+	MyLevel->FarMoveActor(this, RealLocation, 1, 1);
+	//if (result) debugf("Found a Path");
+	//else debugf("NO Path found");
+	unclock(GServer.AudioTickTime);
+	//debugf("Find path time was %f", GApp->CpuToMilliseconds(GServer.AudioTickTime));
+	return result;
+	unguard;
+}
+
+/* FindOnePathTo() FIXME - NOT USED, REMOVE
+fast support for common special case of findPathTo()
+where only one intermediate ACreaturePoint is allowed
+*/
+/*
+int APawn::findOnePathTo(FVector Dest, AActor *&bestPath)
+{
+	guard(APawn::findOnePathTo);
+	int result = 0;
+	ULevel *MyLevel = GetLevel();
+	AActor *EndPoint[16];
+	FLOAT Dist[16];
+	int numEndPoints = 0;
+	FCheckResult Hit(0.0);
+
+	//assume I am adjusting from corner - so just try nearest path and see if it works
+
+
+	
+	//debugf("Find One Path");
+	//adjust destination using farmoveactor
+	FVector RealLocation = Location;
+	CollisionRadius += 6.0; //FIXME - remove this adjust!!!
+	if (MyLevel->FarMoveActor(this, Dest, 1))
+	{
+		Dest = Location;
+		CollisionRadius -= 6.0;
+		MyLevel->FarMoveActor(this, RealLocation, 1);
+	}
+	else
+	{
+		//debugf("destination in unreachable place");
+		CollisionRadius -= 6.0;
+		unclock(GServer.AudioTickTime);
+		debugf("Find path time was %f", GApp->CpuToMilliseconds(GServer.AudioTickTime));
+
+		return 0;	
+	}
+
+	//FIXME - add ACreaturePoint linked list
+	//FIXME - extend anchor distance beyond collision radius
+	// find paths visible from this pawn
+	FVector	ViewPoint = Location;
+	ViewPoint.Z += BaseEyeHeight; //look from eyes
+	for (INDEX i=0; i<MyLevel->Num; i++)
+	{
+		AActor *Actor = MyLevel->Element(i); 
+		if (Actor && Actor->IsA("CreaturePoint"))
+		{
+			MyLevel->Trace(Hit, this, Actor->Location, ViewPoint, TRACE_Level);
+			if (Hit.Time == 1.0) //VisBlocking))
+			{
+				MyLevel->Trace(Hit, this, Actor->Location, Dest, TRACE_Level);
+				if (Hit.Time == 1.0) //VisBlocking)) 
+				{ 	
+					FVector distance = Actor->Location - Location;
+					FLOAT dist = distance.Size();
+					distance = Actor->Location - Dest;
+					dist += distance.Size();
+					if (numEndPoints < 16)
+					{
+						EndPoint[numEndPoints] = Actor;
+						Dist[numEndPoints] = dist;
+						numEndPoints++;
+					}
+					else
+					{
+						INDEX j = 0;
+						while (j<numEndPoints)
+						{
+							if (Dist[j] > dist)
 							{
-								newbest = bestweight;
-								if (bestPathFrom(Actor, newbest, currentweight, newPath))
-								{
-									dir = RealLocation - newPath->Location;
-									newbest += dir.Size();
-									if (newbest < bestweight)
-									{
-										bestweight = newbest;
-										bestPath = newPath;
-										result = 1;
-									}
-								}
+								Dist[j] = dist;
+								EndPoint[j] = Actor;
+								j = numEndPoints;
 							}
+							j++;
+						}
+					}
+				}
 			}
 		}
 	}
-	Level->FarMoveActor(this, &RealLocation, 1);
 
+	//debugf("Visible endpoints = %d", numEndPoints);
+
+	// order based on distance
+	if (numEndPoints > 1)
+	{
+		for (INDEX j=0; j<numEndPoints; j++)
+		{
+			for (i=1; i<numEndPoints; i++)
+			{
+				if (Dist[i] < Dist[i-1])
+				{
+					FLOAT tempDist = Dist[i];
+					AActor *tempActor = EndPoint[i];
+					Dist[i] = Dist[i-1];
+					EndPoint[i] = EndPoint[i-1];
+					Dist[i-1] = tempDist;
+					EndPoint[i-1] = tempActor;
+				}
+			}
+		}
+	}
+
+	//find shortest path w/ one ACreaturePoint
+	while(i<numEndPoints)
+	{
+		if (Reachable(EndPoint[i]->Location))
+			if (MyLevel->FarMoveActor(this, EndPoint[i]->Location, 1))
+			{
+				if (pointReachable(Dest))
+				{
+					i = numEndPoints;
+					result = 1;
+					bestPath = EndPoint[i];
+				}
+				MyLevel->FarMoveActor(this, RealLocation, 1);
+			}
+		i++;
+	}
+	unclock(GServer.AudioTickTime);
+	debugf("Find path time was %f", GApp->CpuToMilliseconds(GServer.AudioTickTime));
 	return result;
+	unguard;
+}
+*/
+
+/* FindTwoPathTo()
+fast support for common special case of findPathTo()
+where only two intermediate ACreaturePoint are allowed
+*/
+//FIXME NOT CURRENTLY USED - fix or remove
+int APawn::findTwoPathTo(FVector Dest, AActor *&bestPath, FLOAT maxweight)
+{
+	guard(APawn::findTwoPathTo);
+	int result = 0;
+	ULevel *MyLevel = GetLevel();
+	AActor *EndPoint[16];
+	AActor *DestPoint[16];
+	FLOAT Dist[16];
+	FLOAT DestDist[16];
+	int numEndPoints = 0;
+	int numDestPoints = 0;
+	FCheckResult Hit(0.0);
+
+	//debugf("Find Two Path");
+	//adjust destination using farmoveactor
+	FVector RealLocation = Location;
+	CollisionRadius += 6.0; //FIXME - remove this adjust!!!
+	if (MyLevel->FarMoveActor(this, Dest, 1))
+	{
+		Dest = Location;
+		CollisionRadius -= 6.0;
+		MyLevel->FarMoveActor(this, RealLocation, 1, 1);
+	}
+	else
+	{
+		//debugf("destination in unreachable place");
+		CollisionRadius -= 6.0;
+		unclock(GServer.AudioTickTime);
+		//debugf("Find path time was %f", GApp->CpuToMilliseconds(GServer.AudioTickTime));
+
+		return 0;	
+	}
+
+	// find paths visible from this pawn and from dest
+	FVector	ViewPoint = Location;
+	ViewPoint.Z += BaseEyeHeight; //look from eyes
+	for (INDEX i=0; i<MyLevel->Num; i++)
+	{
+		AActor *Actor = MyLevel->Element(i); 
+		if (Actor && Actor->IsA("CreaturePoint"))
+		{
+			MyLevel->Trace(Hit, this, Actor->Location, ViewPoint, TRACE_Level);
+			if (Hit.Time == 1.0) //VisBlocking))
+			{ 	
+				FVector distance = Actor->Location - Location;
+				FLOAT dist = distance.Size();
+				if (numEndPoints < 16)
+				{
+					EndPoint[numEndPoints] = Actor;
+					Dist[numEndPoints] = dist;
+					numEndPoints++;
+				}
+				else
+				{
+					INDEX j = 0;
+					while (j<numEndPoints)
+					{
+						if (Dist[j] > dist)
+						{
+							Dist[j] = dist;
+							EndPoint[j] = Actor;
+							j = numEndPoints;
+						}
+						j++;
+					}
+				}
+			}
+			MyLevel->Trace(Hit, this, Actor->Location, Dest, TRACE_Level);
+			if (Hit.Time == 1.0) //VisBlocking)) 
+			{ 	
+				FVector distance = Actor->Location - Dest;
+				FLOAT dist = distance.Size();
+				if (numDestPoints < 16)
+				{
+					DestPoint[numDestPoints] = Actor;
+					DestDist[numDestPoints] = dist;
+					numDestPoints++;
+				}
+				else
+				{
+					INDEX j = 0;
+					while (j<numDestPoints)
+					{
+						if (DestDist[j] > dist)
+						{
+							DestDist[j] = dist;
+							DestPoint[j] = Actor;
+							j = numDestPoints;
+						}
+						j++;
+					}
+				}
+			}
+		}
+	}
+
+	//debugf("Visible endpoints = %d", numEndPoints);
+
+	// order endpoints based on distance
+	if (numEndPoints > 1)
+	{
+		for (INDEX j=0; j<numEndPoints; j++)
+		{
+			for (i=1; i<numEndPoints; i++)
+			{
+				if (Dist[i] < Dist[i-1])
+				{
+					FLOAT tempDist = Dist[i];
+					AActor *tempActor = EndPoint[i];
+					Dist[i] = Dist[i-1];
+					EndPoint[i] = EndPoint[i-1];
+					Dist[i-1] = tempDist;
+					EndPoint[i-1] = tempActor;
+				}
+			}
+		}
+	}
+
+	// order destpoints based on distance
+	if (numDestPoints > 1)
+	{
+		for (INDEX j=0; j<numDestPoints; j++)
+		{
+			for (i=1; i<numDestPoints; i++)
+			{
+				if (DestDist[i] < DestDist[i-1])
+				{
+					FLOAT tempDist = DestDist[i];
+					AActor *tempActor = DestPoint[i];
+					DestDist[i] = DestDist[i-1];
+					DestPoint[i] = DestPoint[i-1];
+					DestDist[i-1] = tempDist;
+					DestPoint[i-1] = tempActor;
+				}
+			}
+		}
+	}
+
+	//FIXME - create sorted list of all potential paths (with valid midpath) (up to 256)
+	//find shortest path w/ two ACreaturePoints
+	//starting from nearest endpoint - find what DestPoints can be reached, and in order
+	//of potential dist try them (if any are better than BestDist
+	FLOAT BestDist = maxweight;
+	FLOAT PotentialDist;
+	INT EndPointReachable;
+	FReachSpec *spec;
+	INDEX iSpec;
+
+	while(i<numEndPoints)
+	{
+		EndPointReachable = 0;
+		INDEX j = 0;
+		if (((ACreaturePoint *)EndPoint[i])->bPathsDefined == 0)
+			return 0;
+
+		while (j<16)
+		{
+			iSpec = ((ACreaturePoint *)EndPoint[i])->Paths[j];
+			if (iSpec == -1)
+				j = 16;
+			else
+			{
+				spec = &MyLevel->ReachSpecs->Element(iSpec);
+				if (spec->supports(this))
+					((ACreaturePoint *)spec->End)->bEndPoint = 1;
+				j++;
+			}
+		}
+		j = 0;
+		while (j < numDestPoints)
+		{
+			if (((ACreaturePoint *)DestPoint[j])->bEndPoint)
+			{
+				((ACreaturePoint *)DestPoint[j])->bEndPoint = 0; //clear for next pass
+				FVector MidPath = DestPoint[j]->Location - EndPoint[i]->Location;
+				PotentialDist = Dist[i] + DestDist[j] + MidPath.Size();
+				if (PotentialDist < BestDist)
+				{
+					if (EndPointReachable || Reachable(EndPoint[i]->Location))
+					{
+						EndPointReachable = 1;
+						if (MyLevel->FarMoveActor(this, DestPoint[j]->Location, 1))
+						{
+							if (pointReachable(Dest))
+							{
+								result = 1;
+								bestPath = EndPoint[i];
+								BestDist = PotentialDist;
+							}
+							MyLevel->FarMoveActor(this, RealLocation, 1, 1);
+						}
+					}
+					else
+						j = numDestPoints;
+				}
+				j++;
+			}
+		}
+		i++;
+	}
+	unclock(GServer.AudioTickTime);
+	//debugf("Find path time was %f", GApp->CpuToMilliseconds(GServer.AudioTickTime));
+	return result;
+	unguard;
+}
+
+/* FindRandomDest()
+returns a random pathnode reachable from creature's current location
+*/
+int APawn::findRandomDest(INT maxpaths, FLOAT maxweight, AActor *&bestPath)
+{
+	guard(APawn::findRandomDest);
+	int result = 0;
+	ULevel *MyLevel = GetLevel();
+	AActor *EndPoint[16];
+	FLOAT Dist[16];
+	int numEndPoints = 0;
+	FCheckResult Hit(0.0);
+
+	// find paths visible from this pawn
+	FVector	ViewPoint = Location;
+	ViewPoint.Z += BaseEyeHeight; //look from eyes
+	INDEX i=0;
+	while (i<MyLevel->Num)
+	{
+		AActor *Actor = MyLevel->Element(i); 
+		if (Actor && Actor->IsA("CreaturePoint"))
+		{
+			MyLevel->Trace(Hit, this, Actor->Location, ViewPoint, TRACE_Level); //VisBlocking))
+			if (Hit.Time == 1.0)
+			{ 	
+				if (numEndPoints < 8)
+				{
+					FVector dir = Actor->Location - Location;
+					EndPoint[numEndPoints] = Actor;
+					Dist[numEndPoints] = dir.Size();
+					numEndPoints++;
+				}
+				else
+					i = MyLevel->Num;
+			}
+		}
+		i++;
+	}
+
+	// order endpoints based on distance
+	if (numEndPoints > 1)
+	{
+		for (INDEX j=0; j<numEndPoints; j++)
+		{
+			for (i=1; i<numEndPoints; i++)
+			{
+				if (Dist[i] < Dist[i-1])
+				{
+					FLOAT tempDist = Dist[i];
+					AActor *tempActor = EndPoint[i];
+					Dist[i] = Dist[i-1];
+					EndPoint[i] = EndPoint[i-1];
+					Dist[i-1] = tempDist;
+					EndPoint[i-1] = tempActor;
+				}
+			}
+		}
+	}
+
+	//mark reachable path nodes
+	int numReached = 0;
+	for(i=0; i<numEndPoints; i++)
+	{
+		if (!((ACreaturePoint *)EndPoint[i])->bEndPoint)
+			if (Reachable(EndPoint[i]->Location))
+				numReached = numReached + TraverseFrom(EndPoint[i]);
+	}
+
+	//pick a random path node from among those reachable
+	i=0;
+	bestPath = NULL;
+	while (i<MyLevel->Num)
+	{
+		if (numReached == 0)
+			i = MyLevel->Num;
+		else
+		{
+			AActor *Actor = MyLevel->Element(i); 
+			if (Actor && Actor->IsA("CreaturePoint"))
+			{
+				if (((ACreaturePoint *)Actor)->bEndPoint)
+				{
+					result = 1;
+					bestPath = Actor;
+					if (frand() * (float)numReached <= 1.0)
+						i = MyLevel->Num; //quit with current path
+					numReached -= 1;
+				}
+			}
+			i++;
+		}
+	}
+	return result;
+	unguard;
+}
+
+/* TraverseFrom()
+traverse the graph, marking all reached paths.  Return number of new paths marked
+*/
+
+int APawn::TraverseFrom(AActor *start)
+{
+	guard(APawn::TraverseFrom);
+	int numMarked = 1; //mark the one we're at
+	ACreaturePoint *node = (ACreaturePoint *)start;
+	if (node->bPathsDefined == 0)
+		return 0;
+
+	node->bEndPoint = 1;
+	FReachSpec *spec;
+	ULevel *MyLevel = GetLevel();
+	int i = 0;
+	while (i<16)
+	{
+		if (node->Paths[i] == -1)
+			i = 16;
+		else
+		{
+			spec = &MyLevel->ReachSpecs->Element(node->Paths[i]);
+			ACreaturePoint *nextNode = spec->End->IsA("CreaturePoint") ? (ACreaturePoint *)spec->End : NULL;
+
+			if (nextNode && !nextNode->bEndPoint)
+				if (spec->supports(this))
+					numMarked = numMarked + TraverseFrom(nextNode);
+			i++;
+		}
+	}
+	return numMarked;
 	unguard;
 }
 
@@ -1099,13 +2193,15 @@ parameters - bestweight is the current best weight, and currentweight is the cur
 (best weight may be updated)
 startnode is the starting path
 if a better path is found, it is returned
+FIXME - use maxdepth
 */
-int APawn::bestPathFrom(AActor *start, float &bestweight, float currentweight, AActor *&bestPath)
+int APawn::bestPathFrom(AActor *start, float &bestweight, float currentweight, AActor *&bestPath, int maxdepth)
 {
 	guard(APawn::bestPathFrom);
 	int result = 0;
-	APathNode *startnode = (APathNode *)start;
-	if (startnode->visitedWeight <= currentweight) //already came through here, faster
+	ACreaturePoint *startnode = (ACreaturePoint *)start;
+	if ((startnode->bPathsDefined == 0) || (startnode->visitedWeight <= currentweight))
+		//paths not defined, or already came through here, faster
 	{
 		bestPath = NULL;
 		result = 0;
@@ -1113,21 +2209,27 @@ int APawn::bestPathFrom(AActor *start, float &bestweight, float currentweight, A
 	else
 	{
 		startnode->visitedWeight = currentweight;
-		debugf("Weight for node at (%f, %f, %f) is %f",
-			startnode->Location.X,startnode->Location.Y,startnode->Location.Z,currentweight);
+		//debugf("Weight for node at (%f, %f, %f) is %f",
+		//	startnode->Location.X,startnode->Location.Y,startnode->Location.Z,currentweight);
 		if (startnode->bEndPoint) //success
 		{
-			debugf("Success!");
+			//debugf("Success!");
 			bestweight = currentweight;
 			bestPath = startnode;
 			result = 1;
 		}
+		else if (maxdepth == 1)
+		{
+			bestPath = NULL;
+			result = 0;
+		}
 		else
 		{
-			ULevel *Level = GetLevel();
+			ULevel *MyLevel = GetLevel();
 			AActor *nextPath;
 			AActor *newPath = NULL;
 			FReachSpec *spec;
+			maxdepth = maxdepth - 1;;
 			int i = 0;
 			while (i<16)
 			{
@@ -1135,13 +2237,13 @@ int APawn::bestPathFrom(AActor *start, float &bestweight, float currentweight, A
 					i = 16;
 				else
 				{
-					spec = &Level->ReachSpecs->Element(startnode->upstreamPaths[i]);
+					spec = &MyLevel->ReachSpecs->Element(startnode->upstreamPaths[i]);
 					if (spec->supports(this))
 					{ 
 						nextPath = spec->Start;
-						FLOAT newweight = currentweight + spec->distance + ((APathNode *)nextPath)->cost;
+						FLOAT newweight = currentweight + spec->distance + ((ACreaturePoint *)nextPath)->cost;
 						if (newweight < bestweight)
-							if (bestPathFrom(nextPath, bestweight, newweight, newPath))
+							if (bestPathFrom(nextPath, bestweight, newweight, newPath, maxdepth))
 							{ 
 								result = 1;
 								bestPath = newPath;

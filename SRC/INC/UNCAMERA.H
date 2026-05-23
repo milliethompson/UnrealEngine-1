@@ -119,14 +119,10 @@ class UNENGINE_API UCamera : public UObject, public FOutputDevice
 	enum {BaseFlags = CLASS_Intrinsic | CLASS_Transient | CLASS_PreKill};
 	enum {GUID1=0,GUID2=0,GUID3=0,GUID4=0};
 
-	// Contants.
-	enum {MAX_CAMERA_STORED_KEYS=32};
-
 	// Screen & data info.
 	ULevel::Ptr		Level;   		// Level the camera is viewing.
-	UTexture		*Texture;		// Texture ID of screen.
-	DWORD			DataSize; 		// Size of camera data buffer (platform-dependent).
-	UObject			*MiscRes;		// Used in in modes like EM_TEXVIEW.
+	UTexture*		Texture;		// Texture ID of screen.
+	UObject*		MiscRes;		// Used in in modes like EM_TEXVIEW.
 	QWORD			LastUpdateTime;	// Time of last update.
 
 	// Window info.
@@ -134,16 +130,12 @@ class UNENGINE_API UCamera : public UObject, public FOutputDevice
 	INT				ColorBytes;		// 1=256-color, 4=24-bit color.
 	INT				Caps;			// Capabilities (CC_).
 	INT				OnHold;			// 1=on hold, can't be resized.
-	INT				RedMask;		// Red bitmask (if truecolor).
-	INT				GreenMask;		// Green bitmask (if truecolor).
-	INT				BlueMask;		// Blue bitmask (if truecolor).
-	INT				AlphaMask;		// Alpha bitmask (if truecolor).
 
 	// Temporal info.
 	DWORD			Current;		// If this is the current input camera.
 	DWORD			ClickFlags;		// Click flags used by move and click functions.
 
-	// Things that have an effect when the camera is first opened (pOpenCameraWindow).
+	// Things that have an effect when the camera is first opened.
 	INT				OpenX;			// Screen X location to open window at.
 	INT				OpenY;			// Screen X location to open window at.
 	DWORD			ParentWindow;	// hWnd of parent window.
@@ -154,17 +146,12 @@ class UNENGINE_API UCamera : public UObject, public FOutputDevice
 	// Input system.
 	class FInputBase *Input;
 
-	// Remembered actor (for ReconcileActors).
-	APawn			RememberedActor;
-
 	// Lock info: Valid only while locked.
-	APawn			*Actor;			// Actor containing location, rotation info for camera.
+	APawn*			Actor;			// Actor containing location, rotation info for camera.
 	INT				Stride;			// Stride in pixels.
 	INT				ByteStride;		// Stride in bytes = SXStride * ColorBytes.
-	BYTE			*RealScreen;	// Pointer to real screen of size SXStride,SYR.
-	BYTE			*Screen;		// Pointer to screen, may be offset into Realscreen.
-
-	// Precomputed stuff for optimization.
+	BYTE*			RealScreen;		// Pointer to real screen of size SXStride,SYR.
+	BYTE*			Screen;			// Pointer to screen, may be offset into Realscreen.
 	INT             FXB,FYB;        // Offset of top left active viewport.
 	INT				X2,Y2;			// SXR/2, SYR/2.
 	INT				FixX;			// Fix(X).
@@ -235,7 +222,7 @@ class UNENGINE_API UCamera : public UObject, public FOutputDevice
 	// UCamera functions valid only when rendering.
 	void	BuildCoords();
 	void	PrecomputeRenderInfo(int SXR, int SYR);
-	const FVector *GetOrthoNormal();
+	FVector GetOrthoNormal();
 
 	// Input related functions.
 	void ReadInput( PPlayerTick &Move, FLOAT DeltaSeconds, FOutputDevice *Out );
@@ -276,7 +263,7 @@ public:
 	virtual int 	LockCameraWindow	(UCamera *Camera)=0;
 	virtual void	UnlockCameraWindow	(UCamera *Camera,int Blit)=0;
 	virtual void	ShutdownAfterError	()=0;
-	virtual void	ResetModes			()=0;
+	virtual void    UpdateCameraInput   (UCamera *Camera)=0;
 	virtual UCamera *CurrentCamera		()=0;
 	virtual void	MakeCurrent			(UCamera *Camera)=0;
 	virtual void	MakeFullscreen		(UCamera *Camera)=0;

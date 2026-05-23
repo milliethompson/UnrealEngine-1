@@ -82,7 +82,7 @@ CUnrealWnApp::CUnrealWnApp()
 	Dialog						= NULL;
 
 	// Default (undetectable) error.
-	strcpy (Error,"General Protection Fault in Unreal\r\n\r\n");
+	strcpy( Error, "General Protection Fault in Unreal\r\n\r\n" );
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -115,11 +115,11 @@ BOOL CUnrealWnApp::InitInstance()
 	Ptr=(char *)mystrstr(BaseDir,MFC_HELP_PARTIAL);
 	if (Ptr==NULL)
 	{
-		AfxMessageBox("Unreal is not installed properly.  Please reinstall.");
+		AfxMessageBox( "Unreal is not installed properly.  Please reinstall." );
 		return FALSE;
 	}
 	*Ptr=0; // Now BaseDir is set.
-	SetCurrentDirectory(BaseDir);
+	SetCurrentDirectory( BaseDir );
 
 	// Parse the command line to see if launched as OLE server.
 	strcpy(CmdLine,m_lpCmdLine);

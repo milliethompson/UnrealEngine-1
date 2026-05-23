@@ -37,14 +37,12 @@ enum ENestAllowFlags
 	ALLOW_Function			= 0x0004,	// Allow Event declarations at this level.
 	ALLOW_State				= 0x0008,	// Allow State declarations at this level.
 	ALLOW_ElseIf			= 0x0010,	// Allow ElseIf commands at this level.
-	ALLOW_Until				= 0x0020,	// Allow Loop/Until commands at this level.
 	ALLOW_VarDecl			= 0x0040,	// Allow variable declarations at this level.
 	ALLOW_Class				= 0x0080,	// Allow class definition heading.
 	ALLOW_Case				= 0x0100,	// Allow 'case' statement.
 	ALLOW_Default			= 0x0200,	// Allow 'default' case statement.
 	ALLOW_Return			= 0x0400,	// Allow 'return' within a function.
 	ALLOW_Break				= 0x0800,	// Allow 'break' from loop.
-	ALLOW_Next				= 0x1000,	// Allow 'next' after for.
 	ALLOW_Label				= 0x2000,	// Allow any label.
 	ALLOW_Ignores			= 0x4000,	// Allow function masks like 'Ignores'.
 };
@@ -260,7 +258,7 @@ public:
 	}
 	int GetConstFloat( FLOAT &R )
 	{
-		if     ( TokenType==TOKEN_Const && Type==CPT_Float )
+		if( TokenType==TOKEN_Const && Type==CPT_Float )
 		{
 			R = Float;
 			return 1;
@@ -354,14 +352,15 @@ struct FRetryPoint
 //
 enum EFixupType
 {
-	FIXUP_SwitchEnd		= 0,			// Address past end of Switch construct.
-	FIXUP_IfEnd			= 1,			// Address past end of If construct.
-	FIXUP_LoopStart		= 2,			// Address of loop start.
-	FIXUP_LoopEnd		= 3,			// Address past end of Loop construct.
-	FIXUP_ForStart		= 4,			// Address of for start.
-	FIXUP_ForEnd		= 5,			// Address past end of For construct.
-	FIXUP_Label			= 6,			// Address of a label.
-	FIXUP_MAX			= 7,			// Maximum value.
+	FIXUP_SwitchEnd		= 0, // Address past end of Switch construct.
+	FIXUP_IfEnd			= 1, // Address past end of If construct.
+	FIXUP_LoopStart		= 2, // Address of loop start.
+	FIXUP_LoopEnd		= 3, // Address past end of Loop construct.
+	FIXUP_ForStart		= 4, // Address of for start.
+	FIXUP_ForEnd		= 5, // Address past end of For construct.
+	FIXUP_Label			= 6, // Address of a label.
+	FIXUP_IteratorEnd   = 7, // Address of end of iterator.
+	FIXUP_MAX			= 8, // Maximum value.
 };
 
 //
@@ -390,12 +389,12 @@ struct FNestFixupRequest
 struct FLabelRecord : public FLabelEntry
 {
 	// Variables.
-	FLabelRecord *Next;					// Next label in the nest info's linked list of labels.
+	FLabelRecord *Next; // Next label in the nest info's linked list of labels.
 
 	// Constructor.
 	FLabelRecord( FName InName, INT iInCode, FLabelRecord *InNext )
-	:	FLabelEntry( InName, iInCode)
-	,	Next	(InNext)
+	:	FLabelEntry		( InName, iInCode )
+	,	Next			( InNext )
 	{}
 };
 
@@ -431,10 +430,9 @@ struct FFuncInfo
 struct FNestInfo
 {
 	// Information for all nesting levels.
-	UClass			*Class;				// Generating class.
+	FStackNodePtr   Link;               // Link to the stack node.
 	ENestType		NestType;			// Statement that caused the nesting.
 	INT				Allow;				// Types of statements to allow at this nesting level.
-	INT				iNode;				// Stack node index.
 
 	// Information for cost nesting levels.
 	INT				Fixups[FIXUP_MAX];	// Fixup addresses for PopNest to use.
@@ -449,7 +447,7 @@ struct FNestInfo
 	// Return the stack node.
 	FStackNode *Node()
 	{
-		return iNode==INDEX_NONE ? NULL : &Class->StackTree->Element(iNode);
+		return Link.iNode==INDEX_NONE ? NULL : &Link.Class->StackTree->Element(Link.iNode);
 	}
 
 	// Set a fixup address.
@@ -485,7 +483,9 @@ public:
 	int				PrevLine;				// Line previous to last GetChar() call.
 	int				StatementsCompiled;		// Number of statements compiled.
 	int				LinesCompiled;			// Total number of lines compiled.
-	int				GotAffector;			// Go an expression that has a side effect?
+	int				GotAffector;			// Got an expression that has a side effect?
+	int				GotIterator;			// Got an iterator.
+	int				AllowIterator;			// Allow iterators.
 	int				Booting;				// Bootstrap compiling classes.
 	int				Pass;					// Compilation pass.
 
@@ -500,7 +500,7 @@ public:
 	void			ExitMake(int Success);
 
 	// Precomputation.
-	void			PrecomputeProbeMasks(const FStackNodeLink &Link);
+	void			PrecomputeProbeMasks(FStackNodePtr Link);
 
 	// High-level compiling functions.
 	int				CompileScript(UClass *Class,FMemStack *Mem,BOOL ObjectPropertiesAreValid,BOOL Booting,INT Pass);
@@ -567,7 +567,7 @@ public:
 
 	// Emitters.
 	void			EmitConstant(FToken &ConstToken);
-	void			EmitStackNodeLinkFunction(FStackNodeLink &Link, BOOL ForceFinal);
+	void			EmitStackNodeLinkFunction(FStackNodePtr Link, BOOL ForceFinal);
 	void			EmitAddressToFixupLater(FNestInfo *Nest, EFixupType Type, FName Name);
 	void			EmitAddressToChainLater(FNestInfo *Nest);
 	void			EmitChainUpdate(FNestInfo *Nest);

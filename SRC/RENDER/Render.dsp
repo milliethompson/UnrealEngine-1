@@ -42,7 +42,7 @@ RSC=rc.exe
 # PROP Ignore_Export_Lib 0
 # PROP Target_Dir "."
 # ADD BASE CPP /nologo /MT /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /YX /c
-# ADD CPP /nologo /GB /Zp4 /MD /W4 /WX /vd0 /GX /O2 /Ob2 /I "..\Inc" /I "..\Inc\3dfx" /D "COMPILING_RENDER" /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /Yu"Unreal.h" /FD /QIfdiv- /QIfdiv- /c
+# ADD CPP /nologo /Zp4 /MD /W4 /WX /vd0 /GX /O2 /Ob2 /I "..\Inc" /I "..\Inc\3dfx" /D "COMPILING_RENDER" /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /Yu"Unreal.h" /FD /QIfdiv- /QIfdiv- /c
 # ADD BASE MTL /nologo /D "NDEBUG" /win32
 # ADD MTL /nologo /D "NDEBUG" /mktyplib203 /win32
 # ADD BASE RSC /l 0x409 /d "NDEBUG"

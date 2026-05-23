@@ -112,7 +112,6 @@ public:
 		const FVector &Base, const FVector &Normal, const FVector &U, const FVector &V, FLOAT PanU, FLOAT PanV,
 		DWORD PolyFlags);
 	void DrawPolyC(UCamera *Camera,UTexture *Texture,const FTransTexture *Pts,int NumPts,DWORD PolyFlags);
-	void DrawPolyF(UCamera *Camera,const FTransform *Pts,int NumPts,FColor Color);
 	int Exec(const char *Cmd,FOutputDevice *Out);
 
 	// FRageRenderDevice interface.
@@ -642,69 +641,6 @@ void FRageRenderDevice::DrawPolyC
 	guard(FRageRenderDevice::DrawPolyC);
 	if( !Locked ) appError("Not locked");
 	// Not yet implemented.
-	unguard;
-}
-
-/*-----------------------------------------------------------------------------
-	FRageRenderDevice flat shaded polygon drawer.
------------------------------------------------------------------------------*/
-
-//
-// Set an ATI vertex structure based on a point.
-//
-inline void SetVertF(C3D_VTCF &V,const FTransform &P)
-{
-	V.x = P.ScreenX * (1.0/65536.0);
-	V.y = P.ScreenY;
-	V.z = 0.0;
-
-	V.s = 0.0;
-	V.t = 0.0;
-	V.w = 1.0;
-
-	V.r = 255.0*(FLOAT)rand()/(FLOAT)RAND_MAX;
-	V.g = 255.0*(FLOAT)rand()/(FLOAT)RAND_MAX;
-	V.b = 255.0*(FLOAT)rand()/(FLOAT)RAND_MAX;
-}
-
-//
-// Draw a flat-shaded poly.
-//
-void FRageRenderDevice::DrawPolyF
-(
-	UCamera				*Camera,
-	const FTransform	*Pts,
-	int					NumPts,
-	FColor				Color
-)
-{
-	guard(FRageRenderDevice::DrawPolyF);
-	C3D_EC Result;
-	if( !Locked ) appError("Not locked");
-
-	// Set color.
-	C3D_ETLIGHT Light = C3D_ETL_NONE; // C3D_ETL_NONE C3D_ETL_MODULATE C3D_ETL_ALPHA_DECAL
-	Result = ATI3DCIF.ContextSetState(hRC,C3D_ERS_TMAP_LIGHT,&Light);
-
-	Result = ATI3DCIF.ContextSetState(hRC,C3D_ERS_SOLID_CLR,&Color);
-
-	C3D_ESHADE Shade = C3D_ESH_SOLID; //C3D_ESH_NONE,C3D_ESH_SOLID,C3D_ESH_FLAT,C3D_ESH_SMOOTH
-	Result = ATI3DCIF.ContextSetState(hRC,C3D_ERS_SHADE_MODE,&Shade);
-
-	// Build RageVerts by decomposing the arbitrary convex polygon stored in Pts[]
-	// into a triangle strip.
-	int n=0,m=NumPts>>1;
-	C3D_VTCF RageVerts[128];
-	for( int i=0; i<m; i++ )
-	{
-		SetVertF(RageVerts[n++],Pts[i         ]);
-		SetVertF(RageVerts[n++],Pts[NumPts-i-1]);
-	};
-	if (NumPts&1) SetVertF(RageVerts[n++],Pts[m]);
-
-	Result = ATI3DCIF.RenderPrimStrip((C3D_VSTRIP)RageVerts,n);
-	if (Result) appErrorf("RenderPrimStrip failed: %s",RageError(Result));
-
 	unguard;
 }
 

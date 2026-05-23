@@ -34,7 +34,7 @@ class Info expands Actor
       Target=None
       Instigator=None
       Inventory=None
-      Floor=None
+      Base=None
       Zone=None
       LatentAction=0
       ZoneNumber=0
@@ -318,39 +318,51 @@ var() vector ZoneGravity;  // Gravity acceleration in zone, if bGravityZone
 var() vector ZoneVelocity; // Velocity added to actors in this zone.
 var() float ZoneGroundFriction;
 var() float ZoneFluidFriction;
- 
+var() name   ZonePlayerEvent;
+var   int    ZonePlayerCount;
+  
 //-----------------------------------------------------------------------------
 // Audio properties.
 var() float  AuralSpace; // Size of zone, for echo volume.
 var() float  AuralDepth; // Depth of zone, for echo delay.
+var() music  Song;       // Song to play when in this zone or level.
 
 //-----------------------------------------------------------------------------
-// Ambient lighting parameters.
-var() byte   AmbientBrightness; // Ambient lighting level in this zone.
-var() byte   AmbientHue;        // Hue of all ambient zone lighting.
-var() byte   AmbientSaturation; // Saturation of ambient zone lighting.
+// Zone rendering.
+// Ambient lighting.
+var() byte AmbientBrightness, AmbientHue, AmbientSaturation;
 
-//-----------------------------------------------------------------------------
-// Ramp lighting parameters.
-// These take effect on regular Pentiums but not MMX technology Pentiums.
+// Ramp lighting, software non-MMX only.
 var() byte RampHue, RampSaturation;
 
-//-----------------------------------------------------------------------------
-// Zone fog parameters.
-// On regular Pentiums these take effect only if bFogZone is set, and fog can't
-// coexist with regular lighting. On MMX machines, these always
-// take effect and they coexist with regular lighting.
+// Fog.
 var() byte FogThickness, FogHue, FogSaturation;
 
-//-----------------------------------------------------------------------------
-// Zone audio.
-var() music Song; // Song to play when in this zone or level.
+// Environment map texture for the zone.
+var() texture EnvironmentMap;
 
 //=============================================================================
-// Engine functions.
+// Iterator functions.
 
-Engine Function PlayerEntered( Pawn Other );
-Engine Function PlayerLeaving( Pawn Other );
+// Iterate through all actors in this zone.
+intrinsic(308) iterator function ZoneActors( class BaseClass, out actor Actor );
+
+//=============================================================================
+// Engine notification functions.
+
+// When a player enters this zone.
+Function PlayerEntered( Pawn Other )
+{
+	if( ++ZonePlayerCount==1 && ZonePlayerEvent!='' )
+		Broadcast( ZonePlayerEvent ).Trigger( Self, Other );
+}
+
+// When a player leaves this zone.
+Function PlayerLeaving( Pawn Other )
+{
+	if( --ZonePlayerCount==0 && ZonePlayerEvent!='' )
+		Broadcast( ZonePlayerEvent ).UnTrigger( Self, Other );
+}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
@@ -478,12 +490,6 @@ var bool   bInternet;    // Whether Internet support is active.
 // Level jumping.
 var bool       bRestartLevel; // Restart level after tick is done.
 var string[80] JumpToLevel;   // Jump to this level after tick is done.
-
-//-----------------------------------------------------------------------------
-// File dependencies.
-
-// List of all files which this UnrealFile should be stored relative to.
-var(Dependencies) name Dependencies[16];
 
 //=============================================================================
 // Functions.

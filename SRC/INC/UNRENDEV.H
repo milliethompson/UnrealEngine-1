@@ -43,9 +43,6 @@ class FRenderDevice
 
 	// Draw a polygon using texture coordinates.
 	virtual void DrawPolyC(UCamera *Camera,UTexture *Texture,const class FTransTexture *Pts,int NumPts,DWORD PolyFlags)=0;
-
-	// Draw a polygon flat-shaded.
-	virtual void DrawPolyF(UCamera *Camera,const class FTransform *Pts,int NumPts,FColor Color)=0;
 };
 
 /*------------------------------------------------------------------------------------

@@ -1,10 +1,13 @@
-'
-' Triggers
-'
+DeclareClass Name=Script
+DeclareClass Name=Pawn
+DeclareClass Name=Class
+DeclareClass Name=Projectile
 DeclareClass Name=Triggers
 DeclareClass Name=Trigger
 DeclareClass Name=Counter
 DeclareClass Name=Dispatcher
+DeclareClass Name=InterpolationPoint
+DeclareClass Name=PlayerPathTrigger
 
 Begin Class Name=Triggers
    Begin Text
@@ -18,14 +21,11 @@ class Triggers expands Actor
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Class=Triggers
-      CollisionRadius=+0040.000000
-      CollisionHeight=+0040.000000
-	  bEventSource=True
       bHidden=True
       bCollideActors=True
-	  DefaultEdCategory=Trigger
-	  Physics=PHYS_None
+      CollisionRadius=+00040.000000
+      CollisionHeight=+00040.000000
+      DefaultEdCategory=Trigger
    End DefaultProperties
 End Class
 
@@ -82,9 +82,9 @@ function Touch( actor Other )
 {
 	if( IsRelevant( Other ) )
 	{
-		if( Event != NoName )
+		if( Event != '' )
 			// Broadcast the Trigger message to all matching actors.
-			Broadcast( Event ).Trigger( Other );
+			Broadcast( Event ).Trigger( Other, Other.Instigator );
 
 		if( Message != "" )
 			// Send a string message to the toucher.
@@ -103,21 +103,17 @@ function UnTouch( actor Other )
 {
 	if( IsRelevant( Other ) )
 	{
-		if( Event != NoName )
+		if( Event != '' )
 			// Untrigger all matching actors.
-			Broadcast( Event ).UnTrigger( Other );
+			Broadcast( Event ).UnTrigger( Other, Other.Instigator );
 	}
 }
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Class=Trigger
-      CollisionRadius=+0040.000000
-      CollisionHeight=+0040.000000
-	  bEventSource=True
-      bHidden=True
-      bCollideActors=True
-	  bTriggerOnceOnly=False
+      TriggerType=TT_PlayerProximity
+      Message=""
+      bTriggerOnceOnly=False
    End DefaultProperties
 End Class
 
@@ -162,7 +158,7 @@ function Reset()
 //
 // Counter was triggered.
 //
-function Trigger( actor Other )
+function Trigger( actor Other, pawn EventInstigator )
 {
 	local string[255] S;
 	local string[8] Num;
@@ -176,9 +172,9 @@ function Trigger( actor Other )
 		{
 			// Trigger all matching actors.
 			if( bShowMessage && CompleteMessage != "" )
-				Other.Instigator.Message(CompleteMessage);
-			if( Event != NoName )
-				Broadcast( Event ).UnTrigger( Other );
+				Instigator.Message( CompleteMessage );
+			if( Event != '' )
+				Broadcast( Event ).UnTrigger( Other, EventInstigator );
 		}
 		else if( bShowMessage && CountMessage != "" )
 		{
@@ -203,21 +199,15 @@ function Trigger( actor Other )
 		}
 	}
 }
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Class=Counter
-      CollisionRadius=+0040.000000
-      CollisionHeight=+0040.000000
-	  bEventSource=True
-      bHidden=True
-      bCollideActors=True
-	  NumToCount=2
-	  DefaultEdCategory=Counter
-	  CountMessage="Only %i more to go..."
-	  CompleteMessage="Completed!"
-	  bShowMessage=True
+      NumToCount=2
+      bShowMessage=True
+      CountMessage="Only %i more to go..."
+      CompleteMessage="Completed!"
+      OriginalNum=0
+      DefaultEdCategory=Counter
    End DefaultProperties
 End Class
 
@@ -237,7 +227,7 @@ var() name  OutEvents[8]; // Events to generate.
 var() float OutDelays[8]; // Relative delays before generating events.
 
 var int i;       // Internal counter.
-var actor Other; // Actor who activated this dispatcher.
+var actor Trigger; // Actor who activated this dispatcher.
 
 //=============================================================================
 // Dispatcher logic.
@@ -245,10 +235,11 @@ var actor Other; // Actor who activated this dispatcher.
 //
 // When dispatcher is triggered...
 //
-function Trigger( actor InOther )
+function Trigger( actor Other, pawn EventInstigator )
 {
-	Other = InOther;
-	gotostate(Dispatch);
+	Trigger = Other;
+	Instigator = EventInstigator;
+	gotostate('Dispatch');
 }
 
 //
@@ -257,27 +248,75 @@ function Trigger( actor InOther )
 state Dispatch
 {
 Begin:
-	disable(Trigger);
+	disable('Trigger');
 	for( i=0; i<ArrayCount(OutEvents); i++ )
 	{
-		if( OutEvents[i] != NoName )
+		if( OutEvents[i] != '' )
 		{
-			Broadcast(OutEvents[i]).Trigger(Other);
 			Sleep(OutDelays[i]);
+			Broadcast(OutEvents[i]).Trigger( Trigger, Instigator );
 		}
 	}
-	enable(Trigger);
+	enable('Trigger');
 }
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    End Text
    Begin DefaultProperties
-      Class=Dispatcher
-      CollisionRadius=+0040.000000
-      CollisionHeight=+0040.000000
-	  bEventSource=True
-      bHidden=True
-      bCollideActors=True
-	  DefaultEdCategory=Dispatcher
+      OutEvents(0)=None
+      OutEvents(1)=None
+      OutEvents(2)=None
+      OutEvents(3)=None
+      OutEvents(4)=None
+      OutEvents(5)=None
+      OutEvents(6)=None
+      OutEvents(7)=None
+      OutDelays(0)=+00000.000000
+      OutDelays(1)=+00000.000000
+      OutDelays(2)=+00000.000000
+      OutDelays(3)=+00000.000000
+      OutDelays(4)=+00000.000000
+      OutDelays(5)=+00000.000000
+      OutDelays(6)=+00000.000000
+      OutDelays(7)=+00000.000000
+      i=0
+      Trigger=None
+      DefaultEdCategory=Dispatcher
    End DefaultProperties
 End Class
+
+Begin Class Name=PlayerPathTrigger
+   Begin Text
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//=============================================================================
+// PlayerPathTrigger.
+//=============================================================================
+class PlayerPathTrigger expands Triggers
+	package(UnEngine);
+
+// When touched, send the player flying along a path.
+function Touch( actor Other )
+{
+	local InterpolationPoint i;
+	if( Pawn(Other)!=None && Pawn(Other).bIsPlayer )
+	{
+		foreach AllActors( class 'InterpolationPoint', i, Tag )
+		{
+			if( i.Position == 0 )
+			{
+				Other.GotoState('');
+				Other.SetCollision(Other.bCollideActors,false,false);
+				Other.Target = i;
+				Other.Physics = PHYS_Interpolating;
+				Other.PhysRate = 1.0;
+				Other.PhysAlpha = 0.0;
+				Other.bInterpolating = true;
+			}
+		}
+	}
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   End Text
+   Begin DefaultProperties
+   End DefaultProperties
+End Class
+

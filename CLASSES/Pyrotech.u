@@ -1,7 +1,3 @@
-'
-' UnrealEd class and child classes for class: Pyrotechnics
-'
-
 DeclareClass Name=Pyrotechnics
 DeclareClass Name=PlayerRespawn
 DeclareClass Name=TeleportIn

@@ -337,9 +337,6 @@ public:
 	virtual void	bspValidateBrush	(UModel *Brush,int ForceValidate,int DoStatusUpdate);
 	virtual INDEX	bspAddNode			(UModel *Model, INDEX iParent, ENodePlace ENodePlace, DWORD NodeFlags, FPoly *EdPoly);
 
-	// Zone virtuals (UnZone.cpp).
-	virtual void	zoneBuild(ULevel *Level);
-
 	// Shadow virtuals (UnShadow.cpp).
 	virtual void	shadowIlluminateBsp (ULevel *Level, int Selected);
 
@@ -360,7 +357,7 @@ public:
 	virtual void meshBuildBounds(UMesh *Mesh);
 
 	// Visibility.
-	virtual void TestVisibility(UModel *Model,int A, int B);
+	virtual void TestVisibility(ULevel *Level,UModel *Model,int A, int B);
 
 	// Scripts.
 	virtual int MakeScripts(int MakeAll);

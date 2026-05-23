@@ -43,6 +43,8 @@ int CDECL UnrealAllocationErrorHandler(size_t);
 int SlowLog=0,SlowClosed=0;
 QWORD FGlobalPlatform_PerformanceFrequency;
 FLOAT FGlobalPlatform_CpuSpeed;
+HWND FGlobalPlatform_hWndProgressBar=NULL;
+HWND FGlobalPlatform_hWndProgressText=NULL;
 
 void FGlobalPlatform_MemoryStatus(FOutputDevice &Out);
 
@@ -95,8 +97,10 @@ int FGlobalPlatform::Exec(const char *Cmd,FOutputDevice *Out)
 		if( GetCMD(&Str,"SET") )
 		{
 			DWORD hWndParent;
-			if (GetDWORD(Str,"HWND=",&hWndParent)) 
+			if( GetDWORD( Str, "HWND=", &hWndParent ) )
 				SetParent((DWORD)hWndParent);
+			GetDWORD( Str, "PROGRESSBAR=", (DWORD*)&FGlobalPlatform_hWndProgressBar );
+			GetDWORD( Str, "PROGRESSTEXT=", (DWORD*)&FGlobalPlatform_hWndProgressText );
 			return 1;
 		}
 		else if( GetCMD(&Str,"OPEN") )
@@ -223,7 +227,7 @@ void FGlobalPlatform_CPUID( int i, DWORD *A, DWORD *B, DWORD *C, DWORD *D )
 void FGlobalPlatform::Poll()
 {
 	guard(FGlobalPlatform::Poll);
-	if (GCameraManager) 
+	if( GCameraManager )
 		GCameraManager->Poll();
 	unguard;
 }
@@ -237,7 +241,7 @@ void FGlobalPlatform::Poll()
 // entered, 0 if not.  If entered, sets Name to the name typed in and Password
 // to the password.
 //
-int FGlobalPlatform::PasswordDialog(const char *Title,const char *Prompt,char *Name,char *Password)
+int FGlobalPlatform::PasswordDialog( const char *Title, const char *Prompt, char *Name, char *Password )
 {
 	guard(FGlobalPlatform::PasswordDialog);
 
@@ -265,7 +269,7 @@ int FGlobalPlatform::PasswordDialog(const char *Title,const char *Prompt,char *N
 //
 // Add a new allocation to the list of tracked allocations.
 //
-void FGlobalPlatform_AddTrackedAllocation(void *Ptr,int Size,char *Name)
+void FGlobalPlatform_AddTrackedAllocation( void *Ptr, int Size, char *Name )
 {
 	guard(FGlobalPlatform_AddTrackedAllocation);
 
@@ -286,7 +290,7 @@ void FGlobalPlatform_AddTrackedAllocation(void *Ptr,int Size,char *Name)
 // Delete an existing allocation from the list.
 // Returns the original (pre-alignment) pointer.
 //
-void *FGlobalPlatform_DeleteTrackedAllocation(void *Ptr)
+void *FGlobalPlatform_DeleteTrackedAllocation( void *Ptr )
 {
 	guard(FGlobalPlatform_DeleteTrackedAllocation);
 
@@ -335,7 +339,7 @@ void FGlobalPlatform_DumpTrackedAllocations()
 // This code is not guarded because it will be called before
 // the error trapping mechanism is set up.
 //
-void FGlobalPlatform::Init(char *ThisCmdLine, char *BaseDir)
+void FGlobalPlatform::Init( char *ThisCmdLine, char *BaseDir )
 {
 	try
 	{
@@ -352,7 +356,6 @@ void FGlobalPlatform::Init(char *ThisCmdLine, char *BaseDir)
 		PlatformVersion	= PLATFORM_VERSION;
 		hWndLog			= 0;
 		hWndParent		= 0;
-		hWndSlowTask	= 0;
 		Debugging		= 0;
 		InAppError		= 0;
 		InSlowTask		= 0;
@@ -444,6 +447,7 @@ void FGlobalPlatform::Startup()
 	LARGE_INTEGER lFreq;
 	QueryPerformanceFrequency(&lFreq);
 	FGlobalPlatform_PerformanceFrequency = ((QWORD)lFreq.LowPart) + ((QWORD)lFreq.HighPart<<32); 
+	checkState(FGlobalPlatform_PerformanceFrequency!=0);
 
 	INT Cycles=0;
 	DWORD Q1 = MicrosecondTime();
@@ -503,11 +507,16 @@ void FGlobalPlatform::Startup()
 	Logf( LOG_Init, "CPU Detected: %s (%s)", Model, Brand );
 	Logf( LOG_Init, "CPU Features: %s", FeatStr );
 
+	// Keyboard layout.
+	char KL[KL_NAMELENGTH];
+	checkState(GetKeyboardLayoutName(KL)!=0);
+	debugf( "Keyboard layout: %s", KL );
+
 	// Handle operator new allocation errors.
 	_set_new_handler(UnrealAllocationErrorHandler);
 
 	// Handle malloc allocation errors.
-	_set_new_mode (1);
+	_set_new_mode (1);	
 
 	unguard;
 }
@@ -629,7 +638,7 @@ QWORD FGlobalPlatform::MicrosecondTime()
 	LARGE_INTEGER Numerator;
 
 	if( !QueryPerformanceCounter(&Numerator) )
-		App.Platform.Error ("FGlobalPlatform::Time: No performance counter exists");
+		App.Platform.Error( "FGlobalPlatform::Time: No performance counter exists" );
 
 	QWORD N = (QWORD)Numerator.LowPart + (((QWORD)Numerator.HighPart)<<32);
 
@@ -641,8 +650,8 @@ QWORD FGlobalPlatform::MicrosecondTime()
 //
 // Return the system time.
 //
-void FGlobalPlatform::SystemTime(INT *Year,INT *Month,INT *DayOfWeek,
-	INT *Day,INT *Hour,INT *Min,INT *Sec,INT *MSec)
+void FGlobalPlatform::SystemTime( INT *Year,INT *Month,INT *DayOfWeek,
+	INT *Day,INT *Hour,INT *Min,INT *Sec,INT *MSec )
 {
 	guard(FGlobalPlatform::SystemTime);
 
@@ -664,7 +673,7 @@ void FGlobalPlatform::SystemTime(INT *Year,INT *Month,INT *DayOfWeek,
 //
 // Convert milliseconds to CPU cycles.
 //
-FLOAT FGlobalPlatform::CpuToMilliseconds(INT CpuCycles)
+FLOAT FGlobalPlatform::CpuToMilliseconds( INT CpuCycles )
 {
 	return 1000.0 * CpuCycles / FGlobalPlatform_CpuSpeed;
 };
@@ -708,7 +717,7 @@ void FGlobalPlatform::Disable()
 // This is expected to return immediately as the URL is launched by another
 // task.
 //
-void FGlobalPlatform::LaunchURL(char *URL, char *Extra)
+void FGlobalPlatform::LaunchURL( char *URL, char *Extra )
 {
 	guard(FGlobalPlatform::LaunchURL);
 
@@ -921,7 +930,7 @@ void FGlobalPlatform::CloseLog()
 // Open the log file.
 // Not guarded.
 //
-void FGlobalPlatform::OpenLog(const char *Fname)
+void FGlobalPlatform::OpenLog( const char *Fname )
 {
 	CTime		T = CTime::GetCurrentTime();
 	CString	S = (CString) "Log file open, " + T.Format("%#c");
@@ -956,7 +965,7 @@ void FGlobalPlatform::OpenLog(const char *Fname)
 //
 // Show memory status.
 //
-void FGlobalPlatform_MemoryStatus(FOutputDevice &Out)
+void FGlobalPlatform_MemoryStatus( FOutputDevice &Out )
 {
 	MEMORYSTATUS B; B.dwLength = sizeof(B);
 	GlobalMemoryStatus(&B);
@@ -981,7 +990,7 @@ void FGlobalPlatform_MemoryStatus(FOutputDevice &Out)
 //
 // Set the parent of the main server/log window.
 //
-void FGlobalPlatform::SetParent(DWORD hWndNewParent)
+void FGlobalPlatform::SetParent( DWORD hWndNewParent )
 {
 	guard(FGlobalPlatform::SetParent);
 	hWndParent = hWndNewParent;
@@ -1005,7 +1014,7 @@ void FGlobalPlatform::RequestExit()
 // Message box.  YesNo: 1=yes/no, 0=ok.
 // Not guarded.
 //
-int FGlobalPlatform::MessageBox(const char *Text,const char *Title,int YesNo)
+int FGlobalPlatform::MessageBox( const char *Text, const char *Title, int YesNo )
 {
 	guard(FGlobalPlatform::MessageBox);
 
@@ -1082,7 +1091,7 @@ void FGlobalPlatform::Hide()
 -----------------------------------------------------------------------------*/
 
 // Allocate memory. Tracks all memory allocations.
-void *VARARGS FGlobalPlatform::Malloc( int Size,const char *Fmt,... )
+void *VARARGS FGlobalPlatform::Malloc( int Size, const char *Fmt, ... )
 {
 #if CHECK_ALLOCS
 	char TempStr[4096];
@@ -1196,7 +1205,7 @@ void FGlobalPlatform::Free( void *Ptr )
 //
 // Allocation error handler.
 //
-int CDECL UnrealAllocationErrorHandler(size_t)
+int CDECL UnrealAllocationErrorHandler( size_t )
 {
 	appError
 	(
@@ -1218,9 +1227,6 @@ void FGlobalPlatform::ShutdownAfterError()
 	{
 		GuardTrap = 1;
 
-		if( InSlowTask )
-			DestroyWindow( (HWND)hWndSlowTask );
-		
 		if( ServerAlive )
 		{
 			ServerAlive = 0;
@@ -1287,7 +1293,7 @@ void FGlobalPlatform::Error( const char *Msg )
 // Global error handler with a formatted message.
 // Not guarded.
 //
-void VARARGS FGlobalPlatform::Errorf(const char *Fmt, ...)
+void VARARGS FGlobalPlatform::Errorf( const char *Fmt, ... )
 {
 	char 	TempStr[4096];
 	va_list ArgPtr;
@@ -1299,7 +1305,7 @@ void VARARGS FGlobalPlatform::Errorf(const char *Fmt, ...)
 	Error(TempStr);
 }
 
-void VARARGS FGlobalPlatform::GuardMessagef(const char *Fmt, ...)
+void VARARGS FGlobalPlatform::GuardMessagef( const char *Fmt, ... )
 {
 	char 	TempStr[4096];
 	va_list ArgPtr;
@@ -1319,84 +1325,16 @@ void VARARGS FGlobalPlatform::GuardMessagef(const char *Fmt, ...)
 -----------------------------------------------------------------------------*/
 
 //
-// Information about a slow task in progress.
-//
-struct FSlowTaskInfo
-{
-	char Title  [80];
-	char Status	[80];
-	int  Numerator;
-	int  Denominator;
-	int  Cancelable;
-} GSlowTaskInfo;
-
-//
-// Slow task status modeless dialog.
-//
-BOOL FAR PASCAL SlowProc( HWND hWnd, WORD Msg, WPARAM wParam, LPARAM lParam )
-{
-	guard(SlowProc);
-
-	int Percent = GSlowTaskInfo.Denominator ? (100*GSlowTaskInfo.Numerator) / GSlowTaskInfo.Denominator : 0;
-	switch( Msg )
-	{
-		case WM_INITDIALOG:
-			guard(WM_INITDIALOG);
-			App.Platform.hWndSlowTask = (DWORD)hWnd;
-			if( GSlowTaskInfo.Cancelable )
-			{
-				// Haven't found a way to handle cancellable operations
-				// without reentrancy problems.
-			}
-			SetDlgItemText( hWnd, IDC_STATTEXT, GSlowTaskInfo.Status );
-			SendMessage( GetDlgItem(hWnd,IDC_PROGRESS1), PBM_SETPOS, (WPARAM)Percent, (LPARAM)0 );
-			SetWindowText( hWnd, GSlowTaskInfo.Title );
-			return TRUE;
-			unguard;
-		case WM_PAINT:
-			guard(WM_PAINT);
-			SetDlgItemText	(hWnd,IDC_STATTEXT,GSlowTaskInfo.Status);
-			SendMessage		(GetDlgItem(hWnd,IDC_PROGRESS1),PBM_SETPOS,(WPARAM)Percent,(LPARAM)0);
-			SetWindowText	(hWnd,GSlowTaskInfo.Title);
-			// Continue with default processing.
-			return FALSE;
-			unguard;
-		case WM_DESTROY:
-			guard(WM_DESTROY);
-			return TRUE;
-			unguard;
-		default:
-			// Default dialog processing.
-			return FALSE;
-	}
-	unguard;
-}
-
-//
 // Begin a slow task, optionally bringing up a progress bar.  Nested calls may be made
 // to this function, and the dialog will only go away after the last slow task ends.
 //
-void FGlobalPlatform::BeginSlowTask( const char *Task,int StatusWindow, int Cancelable )
+void FGlobalPlatform::BeginSlowTask( const char *Task, int StatusWindow, int Cancelable )
 {
 	guard(FGlobalPlatform::BeginSlowTask);
-
-	if( InSlowTask==0 && !CameraManager->FullscreenCamera )
+	if( FGlobalPlatform_hWndProgressBar && FGlobalPlatform_hWndProgressText )
 	{
-		hWndSlowTask = NULL;
-
-		// Set cursor to hourglass.
-		CameraManager->SetModeCursor( NULL );		
-		if( StatusWindow )
-		{
-			strcpy( GSlowTaskInfo.Title, Task );
-			strcpy( GSlowTaskInfo.Status, "" );
-			GSlowTaskInfo.Numerator   = 0;
-			GSlowTaskInfo.Denominator = 0;
-			GSlowTaskInfo.Cancelable  = Cancelable;
-
-			if( !CreateDialog( AfxGetInstanceHandle(), MAKEINTRESOURCE(IDD_SLOWTASK), (HWND)hWndParent, (DLGPROC)SlowProc ) )
-				appErrorf( "CreateDialog failed %i", GetLastError() );
-		}
+		SendMessage( FGlobalPlatform_hWndProgressBar, PBM_SETRANGE, (WPARAM)0, MAKELPARAM(0, 100) );
+		SendMessage( FGlobalPlatform_hWndProgressText, WM_SETTEXT, (WPARAM)0, (LPARAM)Task );
 	}
 	InSlowTask++;
 	unguard;
@@ -1409,45 +1347,25 @@ void FGlobalPlatform::EndSlowTask()
 {
 	guard(FGlobalPlatform::EndSlowTask);
 	
-	if( InSlowTask==0 )
+	if( InSlowTask>0 )
 	{
-		debug( LOG_Info, "EndSlowTask: Not begun" );
-		return;
+		InSlowTask--;
 	}
-	InSlowTask--;
-	if( InSlowTask == 0 )
-	{
-		// Restore cursor to original state.
-		GCameraManager->SetModeCursor(NULL);
-		if( hWndSlowTask )
-			DestroyWindow( (HWND)hWndSlowTask );
-		hWndSlowTask = NULL;
-	}
+	else debug( LOG_Info, "EndSlowTask: Not begun" );
 	unguard;
 }
 
 //
 // Update the progress bar with a message and percent complete.
 //
-int FGlobalPlatform::StatusUpdate(const char *Str, int Numerator, int Denominator) // Returns 0 if cancel
+int FGlobalPlatform::StatusUpdate( const char *Str, int Numerator, int Denominator )
 {
 	guard(FGlobalPlatform::StatusUpdate);
-	int Percent;
 
-	GSlowTaskInfo.Numerator   = Numerator;
-	GSlowTaskInfo.Denominator = Denominator;
-
-	if( !GSlowTaskInfo.Denominator ) Percent = 0;
-	else Percent = (100*GSlowTaskInfo.Numerator)/GSlowTaskInfo.Denominator;
-
-	if( InSlowTask && hWndSlowTask )
+	if( InSlowTask && FGlobalPlatform_hWndProgressBar && FGlobalPlatform_hWndProgressText )
 	{
-		if( strcmp(Str,GSlowTaskInfo.Status)!=0 )
-		{
-			strcpy (GSlowTaskInfo.Status,Str);
-			SetDlgItemText((HWND)hWndSlowTask,IDC_STATTEXT,GSlowTaskInfo.Status);
-		}
-		SendMessage( GetDlgItem((HWND)hWndSlowTask, IDC_PROGRESS1), PBM_SETPOS, (WPARAM)Percent, (LPARAM)0 );
+		SendMessage( FGlobalPlatform_hWndProgressText, WM_SETTEXT, (WPARAM)0, (LPARAM)Str );
+		SendMessage( FGlobalPlatform_hWndProgressBar, PBM_SETPOS, (WPARAM)(Denominator ? 100*Numerator/Denominator : 0), (LPARAM)0 );
 	}
 
 	// Should return 0 if cancel is desired, but cancel isn't implemented.
@@ -1458,7 +1376,7 @@ int FGlobalPlatform::StatusUpdate(const char *Str, int Numerator, int Denominato
 //
 // Update the progress bar.
 //
-int VARARGS FGlobalPlatform::StatusUpdatef(const char *Fmt, int Numerator, int Denominator, ...)
+int VARARGS FGlobalPlatform::StatusUpdatef( const char *Fmt, int Numerator, int Denominator, ... )
 {
 	guard(FGlobalPlatform::StatusUpdatef);
 
@@ -1469,7 +1387,7 @@ int VARARGS FGlobalPlatform::StatusUpdatef(const char *Fmt, int Numerator, int D
 	vsprintf (TempStr,Fmt,ArgPtr);
 	va_end   (ArgPtr);
 
-	return StatusUpdate (TempStr,Numerator,Denominator);
+	return StatusUpdate( TempStr,Numerator, Denominator );
 	
 	unguard;
 }
@@ -1477,6 +1395,7 @@ int VARARGS FGlobalPlatform::StatusUpdatef(const char *Fmt, int Numerator, int D
 //----------------------------------------------------------------------------
 //                The default configuration file name.
 //----------------------------------------------------------------------------
+
 const char * FGlobalPlatform::DefaultProfileFileName() const
 {
     static char FileName[_MAX_PATH+1] = { 0 }; //+1 for trailing null.
@@ -1496,6 +1415,7 @@ const char * FGlobalPlatform::DefaultProfileFileName() const
 //----------------------------------------------------------------------------
 //                The "factory-settings" configuration file name.
 //----------------------------------------------------------------------------
+
 const char * FGlobalPlatform::FactoryProfileFileName() const
 {
     static char FileName[_MAX_PATH+1] = { 0 }; //+1 for trailing null.
@@ -1512,6 +1432,7 @@ const char * FGlobalPlatform::FactoryProfileFileName() const
 //----------------------------------------------------------------------------
 //       Profile operation: Get the integer value for Key in Section.
 //----------------------------------------------------------------------------
+
 int FGlobalPlatform::GetProfileInteger 
 (
     const char * Section      // The name of the section
@@ -1532,6 +1453,7 @@ int FGlobalPlatform::GetProfileInteger
 //----------------------------------------------------------------------------
 //       Profile operation: Get a boolean value.
 //----------------------------------------------------------------------------
+
 BOOL FGlobalPlatform::GetProfileBoolean
 (
     const char * Section      // The name of the section
@@ -1564,6 +1486,7 @@ BOOL FGlobalPlatform::GetProfileBoolean
 //----------------------------------------------------------------------------
 //       Profile operation: Put a boolean value.
 //----------------------------------------------------------------------------
+
 void FGlobalPlatform::PutProfileBoolean
 (
     const char * Section      // The name of the section
@@ -1581,6 +1504,7 @@ void FGlobalPlatform::PutProfileBoolean
 //----------------------------------------------------------------------------
 //       Profile operation: Put an integer value.
 //----------------------------------------------------------------------------
+
 void FGlobalPlatform::PutProfileInteger
 (
     const char * Section      // The name of the section
@@ -1598,6 +1522,7 @@ void FGlobalPlatform::PutProfileInteger
 //----------------------------------------------------------------------------
 //       Profile operation: Get all the values in a section.
 //----------------------------------------------------------------------------
+
 void FGlobalPlatform::GetProfileSection 
 (
     const char * Section      // The name of the section
@@ -1621,6 +1546,7 @@ void FGlobalPlatform::GetProfileSection
 //----------------------------------------------------------------------------
 //       Profile operation: Get the value associated with a key.
 //----------------------------------------------------------------------------
+
 BOOL FGlobalPlatform::GetProfileValue 
 (
     const char * Section      // The name of the section
@@ -1652,6 +1578,7 @@ BOOL FGlobalPlatform::GetProfileValue
 //----------------------------------------------------------------------------
 // Profile operation: Remove all values in the section and write out new values.
 //----------------------------------------------------------------------------
+
 void FGlobalPlatform::PutProfileSection 
 (
     const char * Section      // The name of the section
@@ -1676,6 +1603,7 @@ void FGlobalPlatform::PutProfileSection
 //----------------------------------------------------------------------------
 //       Profile operation:
 //----------------------------------------------------------------------------
+
 void FGlobalPlatform::PutProfileValue // Change the value associated with a key in a section.
 (
     const char * Section,     // The name of the section

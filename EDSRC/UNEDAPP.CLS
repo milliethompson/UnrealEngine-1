@@ -252,15 +252,16 @@ End Sub
 ' make it a child window of the editor's main window.
 '
 Public Sub OpenFreeCamera()
+    Dim ShowFlags As Long
     '
     If Screen.Width = 640 * Screen.TwipsPerPixelX Then
-        Call Ed.OpenCamera(0, DefCamX + 112 + 13, DefCamY + 76, 320, 200, SHOW_NORMAL + SHOW_MENU + SHOW_BACKDROP, REN_PLAINTEX, "")
+        Call Ed.OpenCamera(0, DefCamX + 112 + 13, DefCamY + 76, 320, 200, SHOW_FREE, REN_DYNLIGHT, "")
     ElseIf Screen.Width = 800 * Screen.TwipsPerPixelX Then
-        Call Ed.OpenCamera(0, DefCamX + 112 + 13, DefCamY + 76, 400, 300, SHOW_NORMAL + SHOW_MENU + SHOW_BACKDROP, REN_PLAINTEX, "")
+        Call Ed.OpenCamera(0, DefCamX + 112 + 13, DefCamY + 76, 400, 300, SHOW_FREE, REN_DYNLIGHT, "")
     ElseIf Screen.Width = 1280 * Screen.TwipsPerPixelX Then
-        Call Ed.OpenCamera(0, DefCamX + 112, DefCamY + 76, 640, 480, SHOW_NORMAL + SHOW_MENU + SHOW_BACKDROP, REN_PLAINTEX, "")
+        Call Ed.OpenCamera(0, DefCamX + 112, DefCamY + 76, 640, 480, SHOW_FREE, REN_DYNLIGHT, "")
     Else ' Assume 1024x768
-        Call Ed.OpenCamera(0, DefCamX + 112, DefCamY + 76, 560, 400, SHOW_NORMAL + SHOW_MENU + SHOW_BACKDROP, REN_PLAINTEX, "")
+        Call Ed.OpenCamera(0, DefCamX + 112, DefCamY + 76, 560, 400, SHOW_FREE, REN_DYNLIGHT, "")
     End If ' 76
     '
     DefCamX = DefCamX + 32
@@ -362,7 +363,11 @@ End Sub
 ' timeout period.
 '
 Public Sub BeginSlowTask(Descr As String)
-    StatusText (Descr)
+    frmMain.ProgressText.Text = Descr
+    frmMain.ProgressHolder.Top = 0
+    frmMain.ProgressHolder.Width = frmMain.MainBar.Width
+    frmMain.ProgressHolder.Visible = 1
+    frmMain.ProgressHolder.Refresh
     Screen.MousePointer = 11
     App.OleRequestPendingTimeout = 5# * 60# * 1000#
     App.OleServerBusyTimeout = 5# * 60# * 1000#
@@ -373,6 +378,7 @@ End Sub
 ' and OLE timeout period.
 '
 Public Sub EndSlowTask()
+    frmMain.ProgressHolder.Visible = 0
     Screen.MousePointer = 0
     App.OleRequestPendingTimeout = 5# * 1000#
     App.OleServerBusyTimeout = 5# * 1000#

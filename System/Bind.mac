@@ -12,8 +12,9 @@ Bind RButton "Button BUT_Look"
 Bind MButton "Button BUT_Look"
 
 ; Mouse axis movement bindings.
-Bind MouseX   "Axis AXIS_BaseX Speed=10.0"
-Bind MouseY   "Axis AXIS_BaseY Speed=10.0"
+Bind MouseX   "Axis AXIS_MouseX Speed=10.0"
+Bind MouseY   "Axis AXIS_MouseY Speed=10.0"
+Bind MouseW   "Axis AXIS_LookUp Speed=10.0"
 ;!!ms mouse rolly thing
 
 ; Joystick bindings.
@@ -42,8 +43,9 @@ Bind T        "Server Test"
 
 ; Buttons.
 Bind Ctrl     "Button BUT_Fire | Server Fire"
-Bind Alt      "Button BUT_Strafe"
-Bind Z        "Button BUT_Duck"
+Bind Alt      "Button BUT_AltFire | Server AltFire"
+Bind "/"      "Button BUT_Strafe"
+;Bind Z       "Button BUT_Duck"
 Bind Home     "Button BUT_Zoom"
 Bind \        "Button BUT_LookAround"
 Bind Shift    "Button BUT_Run"

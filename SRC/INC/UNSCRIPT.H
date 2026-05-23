@@ -25,8 +25,8 @@ enum {MAX_FUNC_PARMS        = 16};
 //
 // guardexec mechanism for script debugging.
 //
-#define unguardexecSlow  unguardfSlow(("Script=%s Node=%i Code=%04x Context=%s",Stack.Link.Class->GetName(),Stack.Link.iNode,Stack.Code - &Stack.Object->GetClass()->Script->Element(0),Context?Context->GetClassName():"None"))
-#define unguardexec      unguardf    (("Script=%s Node=%i Code=%04x Context=%s",Stack.Link.Class->GetName(),Stack.Link.iNode,Stack.Code - &Stack.Object->GetClass()->Script->Element(0),Context?Context->GetClassName():"None"))
+#define unguardexecSlow  unguardfSlow(("Script=%s Node=%i Code=%04x Context=%s",Stack.Link.Class->GetName(),Stack.Link.iNode,Stack.Code - &Stack.Script->Element(0),Context?Context->GetClassName():"None"))
+#define unguardexec      unguardf    (("Script=%s Node=%i Code=%04x Context=%s",Stack.Link.Class->GetName(),Stack.Link.iNode,Stack.Code - &Stack.Script->Element(0),Context?Context->GetClassName():"None"))
 
 //
 // Information about a stack node.
@@ -39,16 +39,17 @@ enum EStackNodeFlags
 	SNODE_FinalFunc			= 0x02,		// Function is final (prebindable, non-overridable function).
 	SNODE_PrivateFunc		= 0x04,		// Function is private (may not be called by scripts, only by C++ engine code).
 	SNODE_DefinedFunc		= 0x08,		// Function has been defined (not just declared).
-	SNODE_EngineFunc		= 0x10,		// Function is engine-generated and can be called without necessarily being defined.
+	SNODE_IteratorFunc		= 0x10,		// Function is an iterator.
 	SNODE_LatentFunc		= 0x20,		// Function is a latent state function.
 	SNODE_PreOperatorFunc	= 0x40,		// Unary operator is a prefix operator.
+	SNODE_SingularFunc      = 0x80,     // Function cannot be reentered.
 
 	// State flags.
 	SNODE_EditableState		= 0x01,		// State should be user-selectable in UnrealEd.
 	SNODE_AutoState			= 0x02,		// State is automatic (the default state).
 
 	// Combinations of flags.
-	SNODE_FuncOverrideMatch	= SNODE_IntrinsicFunc | SNODE_FinalFunc | SNODE_PreOperatorFunc, // Flags which must match in overridden functions.
+	SNODE_FuncOverrideMatch	= SNODE_FinalFunc | SNODE_PrivateFunc | SNODE_LatentFunc | SNODE_PreOperatorFunc, // Flags which must match in overridden functions.
 };
 
 //
@@ -65,7 +66,8 @@ enum ENestType
 	NEST_Loop				=0x0006,	//  While/Do/Loop/Until.
 	NEST_Switch				=0x0007,	//  Switch.
 	NEST_For				=0x0008,	//  For.
-	NEST_Max				=0x0009
+	NEST_ForEach            =0x000A,    //  ForEach.
+	NEST_Max				=0x000A
 };
 
 //
@@ -127,43 +129,46 @@ enum EExprToken
 	EX_IntConstByte			= 0x2C,		// Int constant that requires 1 byte.
 	EX_BoolVariable			= 0x2D,		// A bool variable which requires a bitmask.
 	EX_ActorCast			= 0x2E,		// Safe actor class casting.
+	EX_Iterator             = 0x2F,     // Begin an iterator operation.
+	EX_IteratorPop          = 0x30,     // Pop an iterator level.
+	EX_IteratorNext         = 0x31,     // Go to next iteration.
 
 	// Intrinsic conversions.
-	EX_MinConversion		= 0x30,		// Minimum conversion token.
-	EX_RotationToVector		= 0x31,
-	EX_ByteToInt			= 0x32,
-	EX_ByteToBool			= 0x33,
-	EX_ByteToFloat			= 0x34,
-	EX_IntToByte			= 0x35,
-	EX_IntToBool			= 0x36,
-	EX_IntToFloat			= 0x37,
-	EX_BoolToByte			= 0x38,
-	EX_BoolToInt			= 0x39,
-	EX_BoolToFloat			= 0x3A,
-	EX_FloatToByte			= 0x3B,
-	EX_FloatToInt			= 0x3C,
-	EX_FloatToBool			= 0x3D,
-	EX_ObjectToInt          = 0x3E,
-	EX_ObjectToBool			= 0x3F,
-	EX_NameToBool			= 0x40,
-	EX_StringToByte			= 0x41,
-	EX_StringToInt			= 0x42,
-	EX_StringToBool			= 0x43,
-	EX_StringToFloat		= 0x44,
-	EX_StringToVector		= 0x45,
-	EX_StringToRotation		= 0x46,
-	EX_VectorToBool			= 0x47,
-	EX_VectorToRotation		= 0x48,
-	EX_RotationToBool		= 0x49,
-	EX_ByteToString			= 0x4A,
-	EX_IntToString			= 0x4B,
-	EX_BoolToString			= 0x4C,
-	EX_FloatToString		= 0x4D,
-	EX_ObjectToString		= 0x4E,
-	EX_NameToString			= 0x4F,
-	EX_VectorToString		= 0x50,
-	EX_RotationToString		= 0x51,
-	EX_MaxConversion		= 0x53,		// Maximum conversion token.
+	EX_MinConversion		= 0x38,		// Minimum conversion token.
+	EX_RotationToVector		= 0x39,
+	EX_ByteToInt			= 0x3A,
+	EX_ByteToBool			= 0x3B,
+	EX_ByteToFloat			= 0x3C,
+	EX_IntToByte			= 0x3D,
+	EX_IntToBool			= 0x3E,
+	EX_IntToFloat			= 0x3F,
+	EX_BoolToByte			= 0x40,
+	EX_BoolToInt			= 0x41,
+	EX_BoolToFloat			= 0x42,
+	EX_FloatToByte			= 0x43,
+	EX_FloatToInt			= 0x44,
+	EX_FloatToBool			= 0x45,
+	EX_ObjectToInt          = 0x46,
+	EX_ObjectToBool			= 0x47,
+	EX_NameToBool			= 0x48,
+	EX_StringToByte			= 0x49,
+	EX_StringToInt			= 0x4A,
+	EX_StringToBool			= 0x4B,
+	EX_StringToFloat		= 0x4C,
+	EX_StringToVector		= 0x4D,
+	EX_StringToRotation		= 0x4E,
+	EX_VectorToBool			= 0x4F,
+	EX_VectorToRotation		= 0x50,
+	EX_RotationToBool		= 0x51,
+	EX_ByteToString			= 0x52,
+	EX_IntToString			= 0x53,
+	EX_BoolToString			= 0x54,
+	EX_FloatToString		= 0x55,
+	EX_ObjectToString		= 0x56,
+	EX_NameToString			= 0x57,
+	EX_VectorToString		= 0x58,
+	EX_RotationToString		= 0x59,
+	EX_MaxConversion		= 0x5A,		// Maximum conversion token.
 
 	// Intrinsics.
 	EX_ExtendedIntrinsic	= 0x60,
@@ -269,22 +274,22 @@ private:
 class UNENGINE_API FStackNode
 {
 public:
+	// Constant.
+	enum {HASH_COUNT = 256};            // Number of items in hash, must be a power of two.
+
 	// Links.
-	FStackNodeLink  Parent;				// Link to parent class's version of this state.
-	FStackNodeLink	ChildFunctions;		// Child functions at this scope.
-	FStackNodeLink	ChildStates;		// Child states immediately below this scope.
-	FStackNodeLink	Next;				// Next stack node at this scope.
+	FStackNodePtr   ParentItem;			// Link to parent class's version of this item.
+	FStackNodePtr   ParentNest;			// Link to item above this in the nesting hierarchy.
+	FStackNodePtr	ChildFunctions;		// Child functions at this scope.
+	FStackNodePtr	ChildStates;		// Child states immediately below this scope.
+	FStackNodePtr	Next;				// Next stack node at this scope.
 
 	// General information.
 	FName			Name;				// Name if function, NAME_None otherwise.
 	WORD			iCode;				// Offset of start of code in script's code bin, or MAXWORD=no code.
 	WORD			CodeLabelOffset;	// State: offset of label table in code or WORD_NONE; function: return value offset.
-	WORD			Line;				// First-pass compile text line.
-	WORD			Pos;				// First-pass compile text position.
-	BYTE			NestType;			// Type of this scope block.
 	BYTE			StackNodeFlags;		// EStackNodeFlags.
-	BYTE			NumParms;			// Number of function, including return value.
-	BYTE			OperPrecedence;		// Operator precedence.
+	BYTE			NestType;			// Type of this scope block.
 
 	// Information specific to stack node types.
 	union
@@ -292,20 +297,28 @@ public:
 		// Information for states and classes.
 		struct
 		{
-			QWORD	ProbeMask;			// Mask showing which probe messages are handled in this NEST_Class/NEST_State.
-			QWORD	IgnoreMask;			// Probes to explicitly ignore.
+			QWORD ProbeMask;			// Mask showing which probe messages are handled in this NEST_Class/NEST_State.
+			QWORD IgnoreMask;			// Probes to explicitly ignore.
+			FStackNodePtr *VfHash;      // Hash table of virtual functions (in memory only, during gameplay).
 		};
 
 		// Information for functions.
 		struct
 		{
-			WORD	LocalsSize;			// Size of locals used by the function.
-			WORD	ParmsSize;			// Size of function parameters.
-			WORD	iIntrinsic;			// Index of intrinsic function into C++'s intrinsic function list, 0=none.
-			WORD	iFirstProperty;		// Index into class of first property.
-			WORD	NumProperties;		// Total number of properties (parms + regular variables declared on this scope level).
+			WORD LocalsSize;			// Size of locals used by the function.
+			WORD ParmsSize;			    // Size of function parameters.
+			WORD iIntrinsic;			// Index of intrinsic function into C++'s intrinsic function list, 0=none.
+			WORD iFirstProperty;		// Index into class of first property.
+			WORD NumProperties;		    // Total number of properties (parms + regular variables declared on this scope level).
+			FStackNodePtr HashNext;     // Next item in hash (in memory only, during gameplay).
 		};
 	};
+
+	// Information for the compiler.
+	BYTE			NumParms;			// Number of function, including return value.
+	BYTE			OperPrecedence;		// Operator precedence.
+	WORD			Line;				// First-pass compile text line.
+	WORD			Pos;				// First-pass compile text position.
 
 	// Functions.
 	friend FArchive& operator<<( FArchive& Ar, FStackNode &Node );
@@ -365,6 +378,8 @@ class UNENGINE_API UStackTree : public UDatabase
 		Ar << Class;
 		unguard;
 	}
+	void PostLoadData(DWORD PostFlags);
+	void UnloadData();
 };
 
 /*-----------------------------------------------------------------------------
@@ -429,21 +444,26 @@ void UNENGINE_API execUndefined( FExecStack &Stack, UObject *Context, BYTE *&Res
 -----------------------------------------------------------------------------*/
 
 //
-// FStackNodeLink serializer.
+// FStackNodePtr serializer.
 //
-inline FArchive& operator<<( FArchive &Ar, FStackNodeLink &Link )
+inline FArchive& operator<<( FArchive &Ar, FStackNodePtr &Link )
 {
-	guard(FStackNodeLink::<<);		
+	guard(FStackNodePtr::<<);		
 	Ar << Link.Class;
-	if( Link.Class ) Ar << Link.iNode;
+	if( Link.Class )
+		Ar << Link.iNode;
 	return Ar;
 	unguard;
 }
 
 //
-// FStackNodeLink node getter.
+// FStackNodePtr node getter.
 //
-inline FStackNode &FStackNodeLink::Node() const
+inline FStackNode* FStackNodePtr::operator->() const
+{
+	return &Class->StackTree->Element(iNode);
+}
+inline FStackNode& FStackNodePtr::operator*() const
 {
 	return Class->StackTree->Element(iNode);
 }
@@ -452,23 +472,23 @@ inline FStackNode &FStackNodeLink::Node() const
 // FExecStack constructors.
 //
 inline FExecStack::FExecStack( int )
-:	Link	( 0 )
+:	Link	(NULL,0)
 ,	Script	(NULL)
 ,	Code	(NULL)
 ,	Object	(NULL)
 ,	Locals	(NULL)
 {}
 inline FExecStack::FExecStack( UObject *InObject )
-:	Link	( 0 )
+:	Link	(NULL,0)
 ,	Script	(NULL)
 ,	Code	(NULL)
 ,	Object	(InObject)
 ,	Locals	(NULL)
 {}
-inline FExecStack::FExecStack( UObject *InObject, const FStackNodeLink &InLink, BYTE *InLocals )
+inline FExecStack::FExecStack( UObject *InObject, FStackNodePtr InLink, BYTE *InLocals )
 :	Link	(InLink)
 ,	Script	(Link.Class->Script)
-,	Code	(&Script->Element(Link.Node().iCode))
+,	Code	(&Script->Element(Link->iCode))
 ,	Object	(InObject)
 ,	Locals	(InLocals)
 {}
@@ -477,11 +497,9 @@ inline FExecStack::FExecStack( UObject *InObject, const FStackNodeLink &InLink, 
 // FExecStackMain constructors.
 //
 inline FExecStackMain::FExecStackMain( UObject *InObject )
-:	FExecStack	( InObject )
+:	FExecStack	( InObject  )
 ,	ProbeMask	( ~(QWORD)0 )
-{
-	InitVfCache();
-}
+{}
 
 //
 // FExecStackMain serializer.

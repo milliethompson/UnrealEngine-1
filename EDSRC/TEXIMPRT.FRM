@@ -376,12 +376,14 @@ Private Sub Ok_Click()
         TexFlags = 0
         If BumpMap.Value Then TexFlags = TexFlags + TF_BumpMap
         If Blur.Value Then TexFlags = TexFlags + TF_Blur
+        Ed.BeginSlowTask "Importing Texture"
         Ed.Server.Exec "TEXTURE IMPORT FILE=" & Quotes(TexFname) & _
             " NAME=" & Quotes(TexName) & _
             " Set=" & Quotes(TexSet) & _
             " MIPS=" & OnOff(Int(DoMips.Value)) & _
             " FLAGS=" & Trim(Str(IIf(DoMasked.Value, PF_MASKED, 0))) & _
             " TEXFLAGS=" & Trim(Str(TexFlags))
+        Ed.EndSlowTask
         DoNext
     End If
 

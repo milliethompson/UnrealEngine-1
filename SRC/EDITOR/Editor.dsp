@@ -198,9 +198,5 @@ SOURCE=..\Engine\UnSyntax.cpp
 
 SOURCE=..\Engine\UnVisi.cpp
 # End Source File
-# Begin Source File
-
-SOURCE=.\UnZone.cpp
-# End Source File
 # End Target
 # End Project
